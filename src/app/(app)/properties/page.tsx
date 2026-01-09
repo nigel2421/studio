@@ -1,4 +1,6 @@
 
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -13,9 +15,16 @@ import { getProperties } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { PlusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
+import { Property } from '@/lib/types';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-export default async function PropertiesPage() {
-  const properties = await getProperties();
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  useEffect(() => {
+    getProperties().then(setProperties);
+  }, []);
 
   const getImage = (imageId: string) => {
     return PlaceHolderImages.find((img) => img.id === imageId);
@@ -82,7 +91,7 @@ export default async function PropertiesPage() {
                       </div>
                       <div>
                         <p className="font-medium">Occupied Units</p>
-                        <p>{property.units.filter(unit => unit.status === 'occupied').length}</p>
+                        <p>{property.units.filter(unit => unit.status === 'rented').length}</p>
                       </div>
                       <div>
                         <p className="font-medium">Vacant Units</p>
@@ -91,7 +100,7 @@ export default async function PropertiesPage() {
                     </div>
                     <div className="mt-4">
                       <h4 className="font-medium">Units</h4>
-                      <div className="max-h-48 overflow-y-auto">
+                      <ScrollArea className="h-48">
                           <ul className="list-disc list-inside text-sm text-muted-foreground">
                           {property.units.map((unit, index) => (
                               <li key={`${unit.name}-${index}`} className="flex items-center justify-between">
@@ -100,12 +109,12 @@ export default async function PropertiesPage() {
                                       <Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'}> 
                                           {unit.status}
                                       </Badge>
-                                      <Badge variant='outline' className="ml-2">{unit.managementType}</Badge>
+                                      <Badge variant='outline' className="ml-2 capitalize">{unit.managementType}</Badge>
                                   </div>
                               </li>
                           ))}
                           </ul>
-                      </div>
+                      </ScrollArea>
                     </div>
                   </>
                 )}

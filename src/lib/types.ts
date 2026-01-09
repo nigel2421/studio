@@ -11,7 +11,7 @@ export type Property = {
 export type Unit = {
   name: string;
   status: 'vacant' | 'rented';
-  managementType: 'owner' | 'contract';
+  managementType: 'owner' | 'contract' | 'self-owned';
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
@@ -44,3 +44,4 @@ export type MaintenanceRequest = {
   status: 'pending' | 'in-progress' | 'completed';
   createdAt: string;
 };
+

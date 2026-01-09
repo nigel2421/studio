@@ -1,18 +1,28 @@
 
+'use client';
+
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { getMaintenanceRequests, getTenants, getProperties } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MaintenanceRequest, Tenant, Property } from "@/lib/types";
 
-export default async function DashboardPage() {
-  const maintenanceRequests = await getMaintenanceRequests();
-  const tenants = await getTenants();
-  const properties = await getProperties();
+export default function DashboardPage() {
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  useEffect(() => {
+    getMaintenanceRequests().then(setMaintenanceRequests);
+    getTenants().then(setTenants);
+    getProperties().then(setProperties);
+  }, []);
 
   const recentRequests = maintenanceRequests
-    .filter(r => r.status !== 'Completed')
+    .filter(r => r.status !== 'completed')
     .slice(0, 3);
   
   const getTenantName = (tenantId: string) => tenants.find(t => t.id === tenantId)?.name || 'Unknown';

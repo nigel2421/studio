@@ -70,8 +70,8 @@ export async function addProperty(property: Omit<Property, 'id' | 'units' | 'ima
         .map(name => name.trim())
         .filter(name => name)
         .map(name => ({ name, status: 'vacant' as const, managementType: 'owner' as const }));
-    const imageId = Math.floor(Math.random() * 15 + 1).toString();
-    await addDoc(collection(db, 'properties'), { ...propertyData, units: unitArray, imageId });
+    const imageId = Math.floor(Math.random() * 3 + 1).toString();
+    await addDoc(collection(db, 'properties'), { ...propertyData, units: unitArray, imageId: `property-${imageId}` });
 }
 
 export async function archiveTenant(tenantId: string): Promise<void> {
@@ -106,13 +106,15 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
             await updateDoc(oldPropertyRef, { units: updatedOldUnits });
         }
 
-        const newProperty = await getProperty(tenantData.propertyId!);
-        if (newProperty && newProperty.units) {
-            const updatedNewUnits = newProperty.units.map(unit =>
-                unit.name === tenantData.unitName ? { ...unit, status: 'rented' } : unit
-            );
-            const newPropertyRef = doc(db, 'properties', tenantData.propertyId!);
-            await updateDoc(newPropertyRef, { units: updatedNewUnits });
+        if (tenantData.propertyId && tenantData.unitName) {
+            const newProperty = await getProperty(tenantData.propertyId);
+            if (newProperty && newProperty.units) {
+                const updatedNewUnits = newProperty.units.map(unit =>
+                    unit.name === tenantData.unitName ? { ...unit, status: 'rented' } : unit
+                );
+                const newPropertyRef = doc(db, 'properties', tenantData.propertyId);
+                await updateDoc(newPropertyRef, { units: updatedNewUnits });
+            }
         }
     }
 }
