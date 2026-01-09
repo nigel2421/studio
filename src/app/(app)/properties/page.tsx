@@ -9,11 +9,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getProperties } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useState } from 'react';
 import { Property } from '@/lib/types';
@@ -64,7 +65,7 @@ export default function PropertiesPage() {
         {properties.map((property) => {
             const image = getImage(property.imageId);
             return (
-            <Card key={property.id} className="overflow-hidden">
+            <Card key={property.id} className="overflow-hidden flex flex-col">
                 <CardHeader className="p-0">
                 {image && (
                     <div className="aspect-video relative w-full">
@@ -78,7 +79,7 @@ export default function PropertiesPage() {
                     </div>
                 )}
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-6 flex-grow">
                 <CardTitle className="mb-1">{property.name}</CardTitle>
                 <CardDescription>{property.type}</CardDescription>
                 <p className="mt-4 text-sm text-muted-foreground">{property.address}</p>
@@ -119,6 +120,13 @@ export default function PropertiesPage() {
                   </>
                 )}
                 </CardContent>
+                <CardFooter className="flex justify-end gap-2 p-6 pt-0">
+                    <Button asChild variant="outline">
+                        <Link href={`/properties/edit/${property.id}`}>
+                            <Edit className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                </CardFooter>
             </Card>
             );
         })}

@@ -1,7 +1,7 @@
 
 import type { Property, Tenant, MaintenanceRequest, Unit } from '@/lib/types';
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc } from 'firebase/firestore';
 
 async function getCollection<T>(collectionName: string): Promise<T[]> {
   const querySnapshot = await getDocs(collection(db, collectionName));
@@ -72,6 +72,11 @@ export async function addProperty(property: Omit<Property, 'id' | 'units' | 'ima
         .map(name => ({ name, status: 'vacant' as const, managementType: 'owner' as const }));
     const imageId = Math.floor(Math.random() * 3 + 1).toString();
     await addDoc(collection(db, 'properties'), { ...propertyData, units: unitArray, imageId: `property-${imageId}` });
+}
+
+export async function updateProperty(propertyId: string, propertyData: Partial<Property>): Promise<void> {
+    const propertyRef = doc(db, 'properties', propertyId);
+    await updateDoc(propertyRef, propertyData);
 }
 
 export async function archiveTenant(tenantId: string): Promise<void> {

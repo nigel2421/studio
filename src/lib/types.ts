@@ -8,10 +8,13 @@ export type Property = {
   imageId: string;
 };
 
+export type ManagementType = 'owner' | 'contract' | 'self-owned';
+export const managementTypes: ManagementType[] = ['owner', 'contract', 'self-owned'];
+
 export type Unit = {
   name: string;
   status: 'vacant' | 'rented';
-  managementType: 'owner' | 'contract' | 'self-owned';
+  managementType: ManagementType;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
@@ -44,4 +47,3 @@ export type MaintenanceRequest = {
   status: 'pending' | 'in-progress' | 'completed';
   createdAt: string;
 };
-
