@@ -26,6 +26,8 @@ export default function LoginPage() {
         setError('No user found with this email. You can sign up instead.');
       } else if (error.code === 'auth/wrong-password') {
         setError('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
       } else {
         setError('Failed to log in. Please try again later.');
       }
@@ -37,7 +39,8 @@ export default function LoginPage() {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'viewer', { name: email.split('@')[0] });
+      const name = userCredential.user.email?.split('@')[0] || 'Admin';
+      await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'admin', { name });
       toast({
         title: 'Sign Up Successful',
         description: 'You can now log in with the credentials you just created.',
@@ -45,7 +48,9 @@ export default function LoginPage() {
     } catch (error: any) {
        if (error.code === 'auth/email-already-in-use') {
         setError('This email is already in use. Try logging in instead.');
-      } else {
+       } else if (error.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address to sign up.');
+       } else {
         setError('Failed to sign up. Please try again later.');
       }
       console.error(error);
