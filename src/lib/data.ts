@@ -67,11 +67,12 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'status'> & {rent: number}): Promise<void> {
-    const { rent, ...restOfTenantData } = tenantData;
+export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'status'> & {rent: number, securityDeposit: number}): Promise<void> {
+    const { rent, securityDeposit, ...restOfTenantData } = tenantData;
     const newTenantData = {
         ...restOfTenantData,
         status: 'active' as const,
+        securityDeposit: securityDeposit || 0,
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
