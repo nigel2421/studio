@@ -57,11 +57,13 @@ export async function getTenant(id: string): Promise<Tenant | null> {
         const readingsQuery = query(
             collection(db, 'waterReadings'), 
             where('tenantId', '==', id),
-            orderBy('createdAt', 'desc'),
             limit(12)
         );
         const readingsSnapshot = await getDocs(readingsQuery);
-        tenant.waterReadings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
+        const readings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
+        // Sort in-memory to avoid needing a composite index
+        readings.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+        tenant.waterReadings = readings;
     }
     return tenant;
 }
@@ -90,7 +92,7 @@ export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'statu
     }
 
     // Create Firebase Auth user for the tenant
-    const appName = 'tenant-creation-app';
+    const appName = 'tenant-creation-app-' + newTenantData.email;
     let secondaryApp;
     try {
         secondaryApp = getApp(appName);
