@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // AuthWrapper will handle redirection
+      router.push('/dashboard');
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         setError('No user found with this email. You can sign up instead.');
@@ -37,8 +37,6 @@ export default function LoginPage() {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // For this simple sign-up, we'll assign a 'viewer' role by default.
-      // More complex role assignment would happen in an admin panel.
       await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'viewer', { name: email.split('@')[0] });
       toast({
         title: 'Sign Up Successful',
