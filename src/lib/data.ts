@@ -222,11 +222,15 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
     const q = query(
         collection(db, "maintenanceRequests"), 
-        where("tenantId", "==", tenantId),
-        orderBy("createdAt", "desc")
+        where("tenantId", "==", tenantId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    
+    // Sort in-memory to avoid needing a composite index
+    requests.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+
+    return requests;
 }
 
 export async function addWaterMeterReading(data: {
