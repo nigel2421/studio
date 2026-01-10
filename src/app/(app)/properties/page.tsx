@@ -153,8 +153,6 @@ export default function PropertiesPage() {
                                       <Badge variant={unit.status === 'vacant' ? 'secondary' : unit.status === 'client occupied' ? 'outline' : 'default'} className="capitalize"> 
                                           {unit.status}
                                       </Badge>
-                                      <Badge variant='outline' className="capitalize">{unit.ownership}</Badge>
-                                      <Badge variant='outline'>{unit.unitType}</Badge>
                                     </div>
                                 </div>
                             </AccordionTrigger>
@@ -166,7 +164,11 @@ export default function PropertiesPage() {
                                   <p><span className="font-medium text-foreground">Phone:</span> {tenant.phone}</p>
                                 </div>
                               ) : (
-                                <p className="text-sm text-muted-foreground">This unit is {unit.status}.</p>
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                    <p>This unit is {unit.status}.</p>
+                                    <p><span className="font-medium text-foreground">Ownership:</span> {unit.ownership}</p>
+                                    <p><span className="font-medium text-foreground">Type:</span> {unit.unitType}</p>
+                                </div>
                               )}
                             </AccordionContent>
                           </AccordionItem>
