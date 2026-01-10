@@ -37,7 +37,7 @@
       "type": "Apartment Building",
       "imageId": "property-1",
       "units": [
-        { "name": "GMA 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-1", "name": "John Doe", "email": "john.doe@example.com", "phone": "555-1234", "lease": { "id": "lease-1", "startDate": "2023-08-01", "endDate": "2024-07-31", "rent": 2200, "paymentStatus": "Paid" } } },
+        { "name": "GMA 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-1", "name": "John Doe", "email": "john.doe@example.com", "phone": "555-1234", "lease": { "id": "lease-1", "startDate": "2023-08-01", "endDate": "2024-07-31", "rent": 2200, "paymentStatus": "Paid", "lastPaymentDate": "2024-07-05" } } },
         { "name": "GMA 10-B", "status": "vacant", "managementType": "owner" },
         { "name": "GMA 10-C", "status": "vacant", "managementType": "owner" }
       ]
@@ -49,7 +49,7 @@
       "type": "Apartment Complex",
       "imageId": "property-2",
       "units": [
-        { "name": "GMAnnex 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-2", "name": "Jane Smith", "email": "jane.smith@example.com", "phone": "555-5678", "lease": { "id": "lease-2", "startDate": "2023-09-01", "endDate": "2024-08-31", "rent": 1850, "paymentStatus": "Due" } } },
+        { "name": "GMAnnex 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-2", "name": "Jane Smith", "email": "jane.smith@example.com", "phone": "555-5678", "lease": { "id": "lease-2", "startDate": "2023-09-01", "endDate": "2024-08-31", "rent": 1850, "paymentStatus": "Pending" } } },
         { "name": "GMAnnex 10-B", "status": "vacant", "managementType": "owner" },
         { "name": "GMAnnex 10-C", "status": "vacant", "managementType": "owner" }
       ]

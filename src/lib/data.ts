@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment } from '@/lib/types';
@@ -42,9 +43,11 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
 }
 
 export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
-    const q = query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "maintenanceRequests"));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    requests.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+    return requests;
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
@@ -119,7 +122,9 @@ export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'statu
         // For now, we'll log the error.
         throw new Error("Failed to create tenant login credentials.");
     } finally {
-        await deleteApp(secondaryApp);
+        if (secondaryApp) {
+            await deleteApp(secondaryApp);
+        }
     }
 }
 
@@ -287,10 +292,34 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     // Add to payments collection
     await addDoc(collection(db, 'payments'), payment);
 
-    // Update tenant's payment status
+    // Update tenant's lease information
+    let newLeaseData = {};
     if (payment.amount >= tenant.lease.rent) {
-        await updateDoc(tenantRef, {
-            'lease.paymentStatus': 'Paid'
-        });
+        const today = new Date();
+        const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        newLeaseData = {
+            'lease.paymentStatus': 'Paid',
+            'lease.lastPaymentDate': paymentData.date,
+            // Check if we need to roll over to the next month
+            'lease.startDate': newStartDate.toISOString().split('T')[0],
+            'lease.endDate': newEndDate.toISOString().split('T')[0],
+        };
+    }
+     await updateDoc(tenantRef, newLeaseData);
+
+     // After updating, check if the month has changed to reset status
+    const updatedTenantSnap = await getDoc(tenantRef);
+    const updatedTenant = updatedTenantSnap.data() as Tenant;
+    const lastPayment = updatedTenant.lease.lastPaymentDate ? new Date(updatedTenant.lease.lastPaymentDate) : new Date(0);
+    const today = new Date();
+
+    if (lastPayment.getMonth() !== today.getMonth() || lastPayment.getFullYear() !== today.getFullYear()) {
+        if(updatedTenant.lease.paymentStatus === 'Paid'){
+             await updateDoc(tenantRef, {
+                'lease.paymentStatus': 'Pending'
+            });
+        }
     }
 }

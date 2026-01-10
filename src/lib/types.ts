@@ -61,6 +61,7 @@ export type Tenant = {
     endDate: string;
     rent: number;
     paymentStatus: 'Paid' | 'Pending' | 'Overdue';
+    lastPaymentDate?: string;
   };
   waterReadings?: WaterMeterReading[];
 };
