@@ -46,7 +46,7 @@ export default function EditPropertyPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields } = useFieldArray({
     control: form.control,
     name: 'units',
   });
@@ -62,8 +62,8 @@ export default function EditPropertyPage() {
             type: propertyData.type,
             units: propertyData.units.map(u => ({
               ...u,
-              ownership: u.ownership || 'SM', // default value if not present
-              unitType: u.unitType || 'Studio' // default value if not present
+              ownership: u.ownership || 'SM', 
+              unitType: u.unitType || 'Studio'
             })) || [],
           });
         }
@@ -73,7 +73,7 @@ export default function EditPropertyPage() {
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
     if (property) {
-      await updateProperty(property.id, data);
+      await updateProperty(property.id, { units: data.units });
       router.push('/properties');
     }
   };
@@ -98,7 +98,7 @@ export default function EditPropertyPage() {
                     <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                        <Input {...field} />
+                        <Input {...field} readOnly className="bg-muted"/>
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -111,7 +111,7 @@ export default function EditPropertyPage() {
                     <FormItem>
                     <FormLabel>Address</FormLabel>
                     <FormControl>
-                        <Input {...field} />
+                        <Input {...field} readOnly className="bg-muted"/>
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -124,7 +124,7 @@ export default function EditPropertyPage() {
                     <FormItem>
                     <FormLabel>Type</FormLabel>
                     <FormControl>
-                        <Input {...field} />
+                        <Input {...field} readOnly className="bg-muted"/>
                     </FormControl>
                     <FormMessage />
                     </FormItem>

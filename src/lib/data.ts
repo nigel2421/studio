@@ -70,15 +70,15 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'status'> & {rent: number, securityDeposit: number}): Promise<void> {
-    const { rent, securityDeposit, ...restOfTenantData } = tenantData;
+export async function addTenant(tenantData: Omit<Tenant, 'id' | 'status'>): Promise<void> {
+    const { lease, securityDeposit, ...restOfTenantData } = tenantData;
     const newTenantData = {
         ...restOfTenantData,
         status: 'active' as const,
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-            rent: rent || 0,
+            rent: lease.rent || 0,
             paymentStatus: 'Pending' as const
         },
         securityDeposit: securityDeposit || 0,
@@ -133,9 +133,9 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
     await addDoc(collection(db, 'properties'), { ...property, imageId: `property-${imageId}` });
 }
 
-export async function updateProperty(propertyId: string, propertyData: Partial<Property>): Promise<void> {
+export async function updateProperty(propertyId: string, data: { units: Unit[] }): Promise<void> {
     const propertyRef = doc(db, 'properties', propertyId);
-    await updateDoc(propertyRef, propertyData);
+    await updateDoc(propertyRef, { units: data.units });
 }
 
 export async function archiveTenant(tenantId: string): Promise<void> {
