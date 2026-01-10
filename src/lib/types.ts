@@ -1,4 +1,5 @@
 
+
 export type Property = {
   id: string;
   name: string;
@@ -34,6 +35,15 @@ export type WaterMeterReading = {
     date: string;
     createdAt: Date;
 }
+
+export type Payment = {
+    id: string;
+    tenantId: string;
+    amount: number;
+    date: string;
+    notes?: string;
+    createdAt: Date;
+};
 
 export type Tenant = {
   id: string;

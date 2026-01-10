@@ -1,6 +1,6 @@
 
 
-import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading } from '@/lib/types';
+import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment } from '@/lib/types';
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
 
@@ -230,4 +230,30 @@ export async function addWaterMeterReading(data: {
     await updateDoc(tenantRef, {
         waterReadings: arrayUnion({ ...readingData, id: readingRef.id })
     });
+}
+
+export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>) {
+    const tenantRef = doc(db, 'tenants', paymentData.tenantId);
+    const tenantSnap = await getDoc(tenantRef);
+
+    if (!tenantSnap.exists()) {
+        throw new Error("Tenant not found");
+    }
+
+    const tenant = tenantSnap.data() as Tenant;
+
+    const payment = {
+        ...paymentData,
+        createdAt: serverTimestamp(),
+    };
+
+    // Add to payments collection
+    await addDoc(collection(db, 'payments'), payment);
+
+    // Update tenant's payment status
+    if (payment.amount >= tenant.lease.rent) {
+        await updateDoc(tenantRef, {
+            'lease.paymentStatus': 'Paid'
+        });
+    }
 }
