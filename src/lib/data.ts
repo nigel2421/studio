@@ -1,11 +1,14 @@
 
 
-import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile } from '@/lib/types';
+import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading } from '@/lib/types';
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
+
+const WATER_RATE = 150; // Ksh per unit
 
 async function getCollection<T>(collectionName: string): Promise<T[]> {
-  const querySnapshot = await getDocs(collection(db, collectionName));
+  const q = query(collection(db, collectionName));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
 }
 
@@ -48,7 +51,18 @@ export async function getProperty(id: string): Promise<Property | null> {
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
-    return getDocument<Tenant>('tenants', id);
+    const tenant = await getDocument<Tenant>('tenants', id);
+    if (tenant) {
+        const readingsQuery = query(
+            collection(db, 'waterReadings'), 
+            where('tenantId', '==', id),
+            orderBy('createdAt', 'desc'),
+            limit(12)
+        );
+        const readingsSnapshot = await getDocs(readingsQuery);
+        tenant.waterReadings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
+    }
+    return tenant;
 }
 
 export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'status' | 'securityDeposit'>): Promise<void> {
@@ -61,7 +75,7 @@ export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'statu
             rent: tenantData.rent || 0,
             paymentStatus: 'Pending' as const
         },
-        securityDeposit: 0,
+        securityDeposit: tenantData.securityDeposit || 0,
     };
     await addDoc(collection(db, 'tenants'), newTenant);
     
@@ -181,4 +195,39 @@ export async function getTenantMaintenanceRequests(tenantId: string): Promise<Ma
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+}
+
+export async function addWaterMeterReading(data: {
+    propertyId: string;
+    unitName: string;
+    priorReading: number;
+    currentReading: number;
+}) {
+    const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', data.propertyId), where('unitName', '==', data.unitName)));
+    if (tenantsSnapshot.empty) {
+        throw new Error("Tenant not found for the selected unit.");
+    }
+    const tenantDoc = tenantsSnapshot.docs[0];
+    const tenantId = tenantDoc.id;
+
+    const consumption = data.currentReading - data.priorReading;
+    const amount = consumption * WATER_RATE;
+
+    const readingData = {
+        ...data,
+        tenantId,
+        consumption,
+        rate: WATER_RATE,
+        amount,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp(),
+    };
+    
+    const readingRef = await addDoc(collection(db, 'waterReadings'), readingData);
+    
+    // Also update the tenant's subcollection for easy retrieval
+    const tenantRef = doc(db, 'tenants', tenantId);
+    await updateDoc(tenantRef, {
+        waterReadings: arrayUnion({ ...readingData, id: readingRef.id })
+    });
 }

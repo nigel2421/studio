@@ -21,6 +21,20 @@ export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felis
 
 export const agents: Agent[] = ['Susan', 'Beatrice', 'Nelly', 'Dennis', 'Peris', 'Felista', 'Martha', 'Thomas', 'Kiragu'];
 
+export type WaterMeterReading = {
+    id: string;
+    tenantId: string;
+    propertyId: string;
+    unitName: string;
+    priorReading: number;
+    currentReading: number;
+    consumption: number;
+    rate: number;
+    amount: number;
+    date: string;
+    createdAt: Date;
+}
+
 export type Tenant = {
   id: string;
   name: string;
@@ -39,6 +53,7 @@ export type Tenant = {
     rent: number;
     paymentStatus: 'Paid' | 'Pending' | 'Overdue';
   };
+  waterReadings?: WaterMeterReading[];
 };
 
 export type ArchivedTenant = Tenant & {
@@ -56,7 +71,7 @@ export type MaintenanceRequest = {
   createdAt: Date;
 };
 
-export type UserRole = 'admin' | 'viewer' | 'agent' | 'tenant';
+export type UserRole = 'admin' | 'viewer' | 'agent' | 'tenant' | 'water-meter-reader';
 
 export type UserProfile = {
     id: string;

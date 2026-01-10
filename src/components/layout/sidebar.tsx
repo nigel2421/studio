@@ -25,6 +25,7 @@ import {
   LogOut,
   Archive,
   Banknote,
+  Droplets,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +39,7 @@ const navItems = [
   { href: '/leases', icon: FileText, label: 'Lease Tracking' },
   { href: '/accounts', icon: Banknote, label: 'Accounts'},
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
+  { href: '/water-meter/add', icon: Droplets, label: 'Add Water Reading' },
   { href: '/properties', icon: Building2, label: 'Properties' },
 ];
 
