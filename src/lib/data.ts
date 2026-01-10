@@ -55,7 +55,7 @@ export async function addTenant(tenant: Omit<Tenant, 'id' | 'lease' | 'status'>)
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-            rent: 0,
+            rent: tenant.rent || 0,
             paymentStatus: 'Pending' as const
         }
     };
@@ -148,7 +148,14 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     const userProfileRef = doc(db, 'users', userId);
     const docSnap = await getDoc(userProfileRef);
     if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as UserProfile;
+        const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
+        if (userProfile.role === 'tenant' && userProfile.tenantId) {
+            const tenantData = await getTenant(userProfile.tenantId);
+            if (tenantData) {
+                userProfile.tenantDetails = tenantData;
+            }
+        }
+        return userProfile;
     }
     return null;
 }
