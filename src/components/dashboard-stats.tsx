@@ -1,3 +1,6 @@
+
+'use client';
+
 import {
   Card,
   CardContent,
@@ -6,18 +9,29 @@ import {
 } from "@/components/ui/card"
 import { Users, Building2, Wrench, AlertCircle, Building } from "lucide-react";
 import { getTenants, getProperties, getMaintenanceRequests } from "@/lib/data";
+import { useEffect, useState } from "react";
+import { Tenant, Property, MaintenanceRequest } from "@/lib/types";
 
-export async function DashboardStats() {
-  const tenants = await getTenants();
-  const properties = await getProperties();
-  const maintenanceRequests = await getMaintenanceRequests();
+export function DashboardStats() {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
+
+  useEffect(() => {
+    getTenants().then(setTenants);
+    getProperties().then(setProperties);
+    getMaintenanceRequests().then(setMaintenanceRequests);
+  }, []);
 
   const totalTenants = tenants.length;
   const totalProperties = properties.length;
-  const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
+  const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'completed').length;
   const overdueRents = tenants.filter(t => t.lease && t.lease.paymentStatus === 'Overdue').length;
   const occupiedUnits = properties.reduce((count, property) => {
-    return count + property.units.filter(unit => unit.status === 'rented').length;
+    if (Array.isArray(property.units)) {
+      return count + property.units.filter(unit => unit.status === 'rented').length;
+    }
+    return count;
   }, 0);
 
   const stats = [
