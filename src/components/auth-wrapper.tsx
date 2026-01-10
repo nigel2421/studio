@@ -17,14 +17,14 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
 
     const onLoginPage = pathname === '/login';
-    const isTenantRoute = pathname.startsWith('/tenant');
+    const isTenantRoute = pathname.startsWith('/tenant/');
     const isTenant = userProfile?.role === 'tenant';
 
     if (isAuth) {
       if (onLoginPage) {
         // If authenticated and on login page, redirect to the correct dashboard
-        router.push(isTenant ? '/tenant/dashboard' : '/dashboard');
-      } else if (isTenant && !isTenantRoute) {
+        window.location.href = isTenant ? '/tenant/dashboard' : '/dashboard';
+      } else if (isTenant && !isTenantRoute && !onLoginPage) {
         // If tenant is on an admin route, redirect to tenant dashboard
         router.push('/tenant/dashboard');
       } else if (!isTenant && isTenantRoute) {
@@ -39,21 +39,13 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
   }, [isLoading, isAuth, userProfile, pathname, router]);
 
-  if (isLoading) {
+  // Show loader while we are determining auth state or about to redirect
+  if (isLoading || (!isAuth && pathname !== '/login')) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader className="h-8 w-8 animate-spin" />
       </div>
     );
-  }
-
-  // If not authenticated and not on login page, show loader during redirect
-  if (!isAuth && pathname !== '/login') {
-      return (
-        <div className="flex h-screen items-center justify-center">
-            <Loader className="h-8 w-8 animate-spin" />
-        </div>
-      );
   }
 
   // If authenticated and on login page, show loader during redirect
