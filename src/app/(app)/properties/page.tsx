@@ -11,6 +11,14 @@ import {
   CardTitle,
   CardFooter,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getProperties, getTenants } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -19,12 +27,6 @@ import { Badge } from '@/components/ui/badge';
 import { useEffect, useState, useMemo } from 'react';
 import { Property, Tenant, Unit } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -141,40 +143,45 @@ export default function PropertiesPage() {
                 {property.units && Array.isArray(property.units) && (
                   <div className="mt-4">
                     <h4 className="font-medium mb-2">Units ({property.units.length})</h4>
-                    <Accordion type="single" collapsible className="w-full">
+                    <div className="flex flex-col gap-2">
                       {property.units.map((unit, index) => {
                         const tenant = getTenantForUnit(property.id, unit.name);
                         return (
-                          <AccordionItem value={`item-${index}`} key={`${unit.name}-${index}`}>
-                            <AccordionTrigger>
-                                <div className="flex items-center justify-between w-full pr-4">
+                           <Dialog key={`${unit.name}-${index}`}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full justify-between">
                                     <span>{unit.name}</span>
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant={unit.status === 'vacant' ? 'secondary' : unit.status === 'client occupied' ? 'outline' : 'default'} className="capitalize"> 
-                                          {unit.status}
-                                      </Badge>
+                                    <Badge variant={unit.status === 'vacant' ? 'secondary' : unit.status === 'client occupied' ? 'outline' : 'default'} className="capitalize"> 
+                                        {unit.status}
+                                    </Badge>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Unit Details: {unit.name}</DialogTitle>
+                                </DialogHeader>
+                                {tenant ? (
+                                    <div className="text-sm space-y-2">
+                                        <p><span className="font-medium text-foreground">Tenant:</span> {tenant.name}</p>
+                                        <p><span className="font-medium text-foreground">Email:</span> {tenant.email}</p>
+                                        <p><span className="font-medium text-foreground">Phone:</span> {tenant.phone}</p>
+                                        <p><span className="font-medium text-foreground">Rent:</span> Ksh {tenant.lease.rent.toLocaleString()}</p>
+                                        <p><span className="font-medium text-foreground">Payment Status:</span> <Badge variant={tenant.lease.paymentStatus === 'Paid' ? 'default' : tenant.lease.paymentStatus === 'Overdue' ? 'destructive' : 'secondary'} className="capitalize">{tenant.lease.paymentStatus}</Badge></p>
+                                        <p><span className="font-medium text-foreground">Ownership:</span> {unit.ownership}</p>
+                                        <p><span className="font-medium text-foreground">Type:</span> {unit.unitType}</p>
                                     </div>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              {tenant ? (
-                                <div className="text-sm text-muted-foreground space-y-1">
-                                  <p><span className="font-medium text-foreground">Tenant:</span> {tenant.name}</p>
-                                  <p><span className="font-medium text-foreground">Email:</span> {tenant.email}</p>
-                                  <p><span className="font-medium text-foreground">Phone:</span> {tenant.phone}</p>
-                                </div>
-                              ) : (
-                                <div className="text-sm text-muted-foreground space-y-1">
-                                    <p>This unit is {unit.status}.</p>
-                                    <p><span className="font-medium text-foreground">Ownership:</span> {unit.ownership}</p>
-                                    <p><span className="font-medium text-foreground">Type:</span> {unit.unitType}</p>
-                                </div>
-                              )}
-                            </AccordionContent>
-                          </AccordionItem>
+                                ) : (
+                                    <div className="text-sm space-y-2">
+                                        <p>This unit is currently <span className="font-medium">{unit.status}</span>.</p>
+                                        <p><span className="font-medium text-foreground">Ownership:</span> {unit.ownership}</p>
+                                        <p><span className="font-medium text-foreground">Type:</span> {unit.unitType}</p>
+                                    </div>
+                                )}
+                            </DialogContent>
+                           </Dialog>
                         )
                       })}
-                    </Accordion>
+                    </div>
                   </div>
                 )}
                 </CardContent>
