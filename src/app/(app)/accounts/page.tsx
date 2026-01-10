@@ -53,7 +53,7 @@ function AddPaymentDialog({ properties, tenants, onPaymentAdded }: { properties:
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedTenantId || !amount || !date) {
-            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Please select a tenant, amount, and date.' });
+            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Please select a unit, amount, and date.' });
             return;
         }
         setIsLoading(true);
@@ -110,12 +110,12 @@ function AddPaymentDialog({ properties, tenants, onPaymentAdded }: { properties:
                         </div>
 
                          <div className="space-y-2">
-                             <Label htmlFor="search">Search Tenant</Label>
+                             <Label htmlFor="search">Search Unit</Label>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input 
                                     id="search"
-                                    placeholder="Search by name or unit..."
+                                    placeholder="Search by unit or tenant name..."
                                     className="pl-10"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -124,14 +124,14 @@ function AddPaymentDialog({ properties, tenants, onPaymentAdded }: { properties:
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="tenant">Tenant</Label>
+                            <Label htmlFor="unit">Unit</Label>
                             <Select onValueChange={setSelectedTenantId} value={selectedTenantId} disabled={!selectedPropertyId}>
-                                <SelectTrigger id="tenant">
-                                    <SelectValue placeholder="Select a tenant" />
+                                <SelectTrigger id="unit">
+                                    <SelectValue placeholder="Select a unit" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {filteredTenants.map(tenant => (
-                                        <SelectItem key={tenant.id} value={tenant.id}>{tenant.name} - {tenant.unitName}</SelectItem>
+                                        <SelectItem key={tenant.id} value={tenant.id}>{tenant.unitName} - {tenant.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
