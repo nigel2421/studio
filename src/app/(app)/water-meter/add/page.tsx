@@ -1,52 +1,55 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading } from '@/lib/data';
-import type { Property, Unit } from '@/lib/types';
+import { getProperties, addWaterMeterReading, getTenants } from '@/lib/data';
+import type { Property, Tenant } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 export default function AddWaterMeterReadingPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>('');
-  const [rentedUnits, setRentedUnits] = useState<Unit[]>([]);
-  const [selectedUnit, setSelectedUnit] = useState<string>('');
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [priorReading, setPriorReading] = useState('');
   const [currentReading, setCurrentReading] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    async function fetchProperties() {
-      const props = await getProperties();
+    async function fetchData() {
+      const [tenantData, props] = await Promise.all([getTenants(), getProperties()]);
+      setTenants(tenantData);
       setProperties(props);
     }
-    fetchProperties();
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    if (selectedProperty) {
-      const property = properties.find(p => p.id === selectedProperty);
-      if (property) {
-        setRentedUnits(property.units.filter(u => u.status === 'rented'));
-      }
-    } else {
-      setRentedUnits([]);
-    }
-    setSelectedUnit('');
-  }, [selectedProperty, properties]);
+  const filteredTenants = useMemo(() => {
+    if (!searchQuery) return tenants;
+    return tenants.filter(tenant =>
+      tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tenant.unitName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery, tenants]);
+
+  const getPropertyName = (propertyId: string) => {
+    return properties.find(p => p.id === propertyId)?.name || 'Unknown';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProperty || !selectedUnit || priorReading === '' || currentReading === '') {
+    const selectedTenant = tenants.find(t => t.id === selectedTenantId);
+
+    if (!selectedTenant || priorReading === '' || currentReading === '') {
       toast({
         variant: "destructive",
         title: "Missing Information",
@@ -59,14 +62,14 @@ export default function AddWaterMeterReadingPage() {
 
     try {
       await addWaterMeterReading({
-        propertyId: selectedProperty,
-        unitName: selectedUnit,
+        propertyId: selectedTenant.propertyId,
+        unitName: selectedTenant.unitName,
         priorReading: Number(priorReading),
         currentReading: Number(currentReading),
       });
       toast({
         title: "Reading Added",
-        description: `Water meter reading for unit ${selectedUnit} has been saved.`,
+        description: `Water meter reading for ${selectedTenant.name} in unit ${selectedTenant.unitName} has been saved.`,
       });
       router.push('/dashboard');
     } catch (error: any) {
@@ -91,31 +94,35 @@ export default function AddWaterMeterReadingPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="property">Property</Label>
-              <Select onValueChange={setSelectedProperty} value={selectedProperty}>
-                <SelectTrigger id="property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map(property => (
-                    <SelectItem key={property.id} value={property.id}>{property.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Label htmlFor="search">Search Tenant / Unit</Label>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="search"
+                        placeholder="Search by name or unit..."
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="unit">Unit</Label>
-              <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedProperty}>
-                <SelectTrigger id="unit">
-                  <SelectValue placeholder="Select a unit" />
+              <Label htmlFor="tenant">Tenant & Unit</Label>
+              <Select onValueChange={setSelectedTenantId} value={selectedTenantId}>
+                <SelectTrigger id="tenant">
+                  <SelectValue placeholder="Select a tenant" />
                 </SelectTrigger>
                 <SelectContent>
-                  {rentedUnits.map((unit, index) => (
-                    <SelectItem key={`${unit.name}-${index}`} value={unit.name}>{unit.name}</SelectItem>
+                  {filteredTenants.map(tenant => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      {tenant.name} - {tenant.unitName} ({getPropertyName(tenant.propertyId)})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="prior-reading">Prior Reading</Label>
