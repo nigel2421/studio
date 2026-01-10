@@ -4,7 +4,7 @@ import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType } from '@/lib/types';
 import { db, firebaseConfig } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch } from 'firebase/firestore';
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -331,4 +331,38 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
             });
         }
     }
+}
+
+
+export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
+    const properties = await getProperties();
+    const propertyMap = new Map(properties.map(p => [p.name, p]));
+    const batch = writeBatch(db);
+    let updatedCount = 0;
+
+    data.forEach(row => {
+        const property = propertyMap.get(row.PropertyName);
+        if (property) {
+            let unitUpdated = false;
+            const newUnits = property.units.map(unit => {
+                if (unit.name === row.UnitName && unit.unitType !== row.UnitType) {
+                    unitUpdated = true;
+                    return { ...unit, unitType: row.UnitType as UnitType };
+                }
+                return unit;
+            });
+
+            if (unitUpdated) {
+                const propertyRef = doc(db, 'properties', property.id);
+                batch.update(propertyRef, { units: newUnits });
+                updatedCount++;
+            }
+        }
+    });
+
+    if (updatedCount > 0) {
+        await batch.commit();
+    }
+
+    return updatedCount;
 }

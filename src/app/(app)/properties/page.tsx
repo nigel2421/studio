@@ -17,13 +17,18 @@ import { PlusCircle, Search } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { Property } from '@/lib/types';
 import { Input } from '@/components/ui/input';
+import { UnitCsvUploader } from '@/components/unit-csv-uploader';
 
 export default function PropertiesListPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
+  const fetchProperties = () => {
     getProperties().then(setProperties);
+  };
+
+  useEffect(() => {
+    fetchProperties();
   }, []);
 
   const getImage = (imageId: string) => {
@@ -75,6 +80,7 @@ export default function PropertiesListPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <UnitCsvUploader onUploadComplete={fetchProperties} />
           <Button asChild>
             <Link href="/properties/add">
               <PlusCircle className="mr-2 h-4 w-4" />
