@@ -46,7 +46,7 @@ export default function EditPropertyPage() {
     },
   });
 
-  const { fields } = useFieldArray({
+  const { fields, update } = useFieldArray({
     control: form.control,
     name: 'units',
   });
