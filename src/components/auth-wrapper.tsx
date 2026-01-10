@@ -11,52 +11,50 @@ import { UserProfile } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { isLoading, userProfile, isAuth } = useAuth();
+  const { isLoading, isAuth, userProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuth && userProfile) {
-        const isTenantRoute = pathname.startsWith('/tenant');
-        const isAdminRoute = !isTenantRoute && pathname !== '/login';
-
-        if (userProfile.role === 'admin' || userProfile.role === 'agent' || userProfile.role === 'viewer') {
-          if (isTenantRoute) {
-            router.push('/dashboard');
-          }
-        } else if (userProfile.role === 'tenant') {
-          if (isAdminRoute) {
-            router.push('/tenant/dashboard');
-          }
-        }
-      } else {
-        if (pathname !== '/login') {
-          router.push('/login');
-        }
-      }
+    if (isLoading) {
+      return;
     }
+
+    if (!isAuth) {
+      if (pathname !== '/login') {
+        router.push('/login');
+      }
+      return;
+    }
+
+    // If we are here, user is authenticated (isAuth is true)
+    const isTenant = userProfile?.role === 'tenant';
+    const isTenantRoute = pathname.startsWith('/tenant');
+    const isAdminRoute = !isTenantRoute;
+    const onLoginPage = pathname === '/login';
+
+    if (onLoginPage) {
+      if (isTenant) {
+        router.push('/tenant/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
+    } else if (isTenant && isAdminRoute) {
+      // Tenant trying to access admin pages
+      router.push('/tenant/dashboard');
+    } else if (!isTenant && isTenantRoute) {
+      // Admin trying to access tenant pages
+      router.push('/dashboard');
+    }
+
   }, [isLoading, isAuth, userProfile, pathname, router]);
 
-  if (isLoading) {
+  if (isLoading || (!isAuth && pathname !== '/login')) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader className="h-8 w-8 animate-spin" />
       </div>
     );
-  }
-
-  if (!isAuth && pathname !== '/login') {
-    return null;
-  }
-  
-  if (isAuth && pathname === '/login' && userProfile) {
-    if (userProfile.role === 'tenant') {
-        router.push('/tenant/dashboard');
-    } else {
-        router.push('/dashboard');
-    }
-    return null;
   }
 
   return <>{children}</>;
