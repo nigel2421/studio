@@ -6,19 +6,23 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 import { auth } from '@/lib/firebase';
 import { createUserProfile } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { isAuth } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      window.location.href = '/dashboard';
+      // On successful login, AuthWrapper will handle redirection.
+      // A hard refresh can help ensure the correct context is loaded.
+      window.location.href = '/'; 
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         setError('No user found with this email. You can sign up instead.');
@@ -59,6 +63,10 @@ export default function LoginPage() {
       console.error(error);
     }
   };
+
+  if (isAuth) {
+      return null; // Don't render the form if the user is already authenticated and waiting for redirect.
+  }
 
   return (
     <div className="flex h-screen items-center justify-center bg-gray-100 dark:bg-gray-900">
