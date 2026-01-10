@@ -11,14 +11,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Property, managementTypes, Unit } from '@/lib/types';
+import { Property, ownershipTypes, Unit, unitTypes, OwnershipType, UnitType } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 
 const unitSchema = z.object({
   name: z.string(),
   status: z.enum(['vacant', 'rented']),
-  managementType: z.enum(managementTypes),
+  ownership: z.enum(ownershipTypes),
+  unitType: z.enum(unitTypes),
 });
 
 const formSchema = z.object({
@@ -59,7 +60,11 @@ export default function EditPropertyPage() {
             name: propertyData.name,
             address: propertyData.address,
             type: propertyData.type,
-            units: propertyData.units || [],
+            units: propertyData.units.map(u => ({
+              ...u,
+              ownership: u.ownership || 'SM', // default value if not present
+              unitType: u.unitType || 'Studio' // default value if not present
+            })) || [],
           });
         }
       });
@@ -133,7 +138,7 @@ export default function EditPropertyPage() {
                 <h3 className="text-lg font-medium mb-4">Units</h3>
                 <div className="space-y-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end p-4 border rounded-lg">
+                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end p-4 border rounded-lg">
                         <FormField
                             control={form.control}
                             name={`units.${index}.name`}
@@ -149,10 +154,10 @@ export default function EditPropertyPage() {
                         />
                         <FormField
                             control={form.control}
-                            name={`units.${index}.managementType`}
+                            name={`units.${index}.unitType`}
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Management Type</FormLabel>
+                                <FormLabel>Unit Type</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
                                     <SelectTrigger>
@@ -160,7 +165,31 @@ export default function EditPropertyPage() {
                                     </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                    {managementTypes.map((type) => (
+                                    {unitTypes.map((type) => (
+                                        <SelectItem key={type} value={type}>
+                                        {type}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name={`units.${index}.ownership`}
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Ownership</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {ownershipTypes.map((type) => (
                                         <SelectItem key={type} value={type}>
                                         {type}
                                         </SelectItem>

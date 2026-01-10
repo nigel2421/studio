@@ -37,9 +37,9 @@
       "type": "Apartment Building",
       "imageId": "property-1",
       "units": [
-        { "name": "GMA 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-1", "name": "John Doe", "email": "john.doe@example.com", "phone": "555-1234", "lease": { "id": "lease-1", "startDate": "2023-08-01", "endDate": "2024-07-31", "rent": 2200, "paymentStatus": "Paid", "lastPaymentDate": "2024-07-05" } } },
-        { "name": "GMA 10-B", "status": "vacant", "managementType": "owner" },
-        { "name": "GMA 10-C", "status": "vacant", "managementType": "owner" }
+        { "name": "GMA 10-A", "status": "rented", "ownership": "SM", "unitType": "One Bedroom", "tenant": { "id": "tenant-1", "name": "John Doe", "email": "john.doe@example.com", "phone": "555-1234", "lease": { "id": "lease-1", "startDate": "2023-08-01", "endDate": "2024-07-31", "rent": 2200, "paymentStatus": "Paid", "lastPaymentDate": "2024-07-05" } } },
+        { "name": "GMA 10-B", "status": "vacant", "ownership": "Landlord", "unitType": "Two Bedroom" },
+        { "name": "GMA 10-C", "status": "vacant", "ownership": "SM", "unitType": "Studio" }
       ]
     },
     {
@@ -49,9 +49,9 @@
       "type": "Apartment Complex",
       "imageId": "property-2",
       "units": [
-        { "name": "GMAnnex 10-A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-2", "name": "Jane Smith", "email": "jane.smith@example.com", "phone": "555-5678", "lease": { "id": "lease-2", "startDate": "2023-09-01", "endDate": "2024-08-31", "rent": 1850, "paymentStatus": "Pending" } } },
-        { "name": "GMAnnex 10-B", "status": "vacant", "managementType": "owner" },
-        { "name": "GMAnnex 10-C", "status": "vacant", "managementType": "owner" }
+        { "name": "GMAnnex 10-A", "status": "rented", "ownership": "SM", "unitType": "Two Bedroom", "tenant": { "id": "tenant-2", "name": "Jane Smith", "email": "jane.smith@example.com", "phone": "555-5678", "lease": { "id": "lease-2", "startDate": "2023-09-01", "endDate": "2024-08-31", "rent": 1850, "paymentStatus": "Pending" } } },
+        { "name": "GMAnnex 10-B", "status": "vacant", "ownership": "Landlord", "unitType": "One Bedroom" },
+        { "name": "GMAnnex 10-C", "status": "vacant", "ownership": "SM", "unitType": "One Bedroom" }
       ]
     },
     {
@@ -61,8 +61,8 @@
       "type": "Loft Apartments",
       "imageId": "property-3",
       "units": [
-        { "name": "TBL 1A", "status": "rented", "managementType": "owner", "tenant": { "id": "tenant-3", "name": "Bob Johnson", "email": "bob.j@example.com", "phone": "555-8765", "lease": { "id": "lease-3", "startDate": "2023-06-01", "endDate": "2024-05-31", "rent": 1600, "paymentStatus": "Overdue" } } },
-        { "name": "TBL 1B", "status": "vacant", "managementType": "owner" }
+        { "name": "TBL 1A", "status": "rented", "ownership": "Landlord", "unitType": "Studio", "tenant": { "id": "tenant-3", "name": "Bob Johnson", "email": "bob.j@example.com", "phone": "555-8765", "lease": { "id": "lease-3", "startDate": "2023-06-01", "endDate": "2024-05-31", "rent": 1600, "paymentStatus": "Overdue" } } },
+        { "name": "TBL 1B", "status": "vacant", "ownership": "SM", "unitType": "Studio" }
       ]
     },
     {
@@ -72,8 +72,8 @@
       "type": "Apartment Complex",
       "imageId": "property-1",
       "units": [
-        { "name": "MA 10-K1", "status": "vacant", "managementType": "owner" },
-        { "name": "MA 10-K2", "status": "vacant", "managementType": "owner" }
+        { "name": "MA 10-K1", "status": "vacant", "ownership": "Landlord", "unitType": "One Bedroom" },
+        { "name": "MA 10-K2", "status": "vacant", "ownership": "SM", "unitType": "Two Bedroom" }
       ]
     }
   ]

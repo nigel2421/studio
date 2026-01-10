@@ -2,9 +2,9 @@
 
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment } from '@/lib/types';
+import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType } from '@/lib/types';
 import { db, firebaseConfig } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -75,13 +75,13 @@ export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'statu
     const newTenantData = {
         ...restOfTenantData,
         status: 'active' as const,
-        securityDeposit: securityDeposit || 0,
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
             rent: rent || 0,
             paymentStatus: 'Pending' as const
         },
+        securityDeposit: securityDeposit || 0,
     };
     const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData);
     
@@ -128,14 +128,9 @@ export async function addTenant(tenantData: Omit<Tenant, 'id' | 'lease' | 'statu
     }
 }
 
-export async function addProperty(property: Omit<Property, 'id' | 'units' | 'imageId'> & { units: string }): Promise<void> {
-    const { units, ...propertyData } = property;
-    const unitArray = units.split(',')
-        .map(name => name.trim())
-        .filter(name => name)
-        .map(name => ({ name, status: 'vacant' as const, managementType: 'owner' as const }));
+export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
     const imageId = Math.floor(Math.random() * 3 + 1).toString();
-    await addDoc(collection(db, 'properties'), { ...propertyData, units: unitArray, imageId: `property-${imageId}` });
+    await addDoc(collection(db, 'properties'), { ...property, imageId: `property-${imageId}` });
 }
 
 export async function updateProperty(propertyId: string, propertyData: Partial<Property>): Promise<void> {
@@ -295,16 +290,9 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     // Update tenant's lease information
     let newLeaseData = {};
     if (payment.amount >= tenant.lease.rent) {
-        const today = new Date();
-        const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
         newLeaseData = {
             'lease.paymentStatus': 'Paid',
             'lease.lastPaymentDate': paymentData.date,
-            // Check if we need to roll over to the next month
-            'lease.startDate': newStartDate.toISOString().split('T')[0],
-            'lease.endDate': newEndDate.toISOString().split('T')[0],
         };
     }
      await updateDoc(tenantRef, newLeaseData);
@@ -316,9 +304,14 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     const today = new Date();
 
     if (lastPayment.getMonth() !== today.getMonth() || lastPayment.getFullYear() !== today.getFullYear()) {
+         const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+         const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
         if(updatedTenant.lease.paymentStatus === 'Paid'){
              await updateDoc(tenantRef, {
-                'lease.paymentStatus': 'Pending'
+                'lease.paymentStatus': 'Pending',
+                'lease.startDate': newStartDate.toISOString().split('T')[0],
+                'lease.endDate': newEndDate.toISOString().split('T')[0],
             });
         }
     }

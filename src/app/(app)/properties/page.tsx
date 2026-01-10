@@ -135,11 +135,12 @@ export default function PropertiesPage() {
                             <AccordionTrigger>
                                 <div className="flex items-center justify-between w-full pr-4">
                                     <span>{unit.name}</span>
-                                    <div>
+                                    <div className="flex items-center gap-2">
                                       <Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'}> 
                                           {unit.status}
                                       </Badge>
-                                      <Badge variant='outline' className="ml-2 capitalize">{unit.managementType}</Badge>
+                                      <Badge variant='outline' className="capitalize">{unit.ownership}</Badge>
+                                      <Badge variant='outline'>{unit.unitType}</Badge>
                                     </div>
                                 </div>
                             </AccordionTrigger>

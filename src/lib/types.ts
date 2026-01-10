@@ -9,13 +9,17 @@ export type Property = {
   imageId: string;
 };
 
-export type ManagementType = 'owner' | 'contract' | 'self-owned';
-export const managementTypes: ManagementType[] = ['owner', 'contract', 'self-owned'];
+export type OwnershipType = 'SM' | 'Landlord';
+export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
+
+export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom';
+export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom'];
 
 export type Unit = {
   name: string;
   status: 'vacant' | 'rented';
-  managementType: ManagementType;
+  ownership: OwnershipType;
+  unitType: UnitType;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
