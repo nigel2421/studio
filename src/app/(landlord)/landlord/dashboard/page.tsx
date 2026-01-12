@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { getProperties, getLandlord } from '@/lib/data';
-import type { Property, Unit, Landlord } from '@/lib/types';
+import { getProperties, getLandlord, getTenants } from '@/lib/data';
+import type { Property, Unit, Landlord, Tenant } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -15,16 +15,21 @@ import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 export default function LandlordDashboardPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, isLoading } = useAuth();
   const router = useRouter();
   const [ownedUnits, setOwnedUnits] = useState<({ propertyName: string } & Unit)[]>([]);
   const [landlord, setLandlord] = useState<Landlord | null>(null);
+  const [rentCollected, setRentCollected] = useState(0);
 
   useEffect(() => {
     async function fetchData() {
       if (userProfile?.role === 'landlord' && userProfile.landlordId) {
-        const allProperties = await getProperties();
-        const landlordData = await getLandlord(userProfile.landlordId);
+        const [allProperties, landlordData, allTenants] = await Promise.all([
+            getProperties(),
+            getLandlord(userProfile.landlordId),
+            getTenants()
+        ]);
+        
         setLandlord(landlordData);
 
         const units: ({ propertyName: string } & Unit)[] = [];
@@ -36,6 +41,19 @@ export default function LandlordDashboardPage() {
           });
         });
         setOwnedUnits(units);
+
+        const landlordUnitNames = units.map(u => u.name);
+        const collected = allTenants.reduce((acc, tenant) => {
+            if (
+                landlordUnitNames.includes(tenant.unitName) &&
+                tenant.lease?.paymentStatus === 'Paid' &&
+                typeof tenant.lease.rent === 'number'
+            ) {
+                return acc + tenant.lease.rent;
+            }
+            return acc;
+        }, 0);
+        setRentCollected(collected);
       }
     }
     fetchData();
@@ -46,7 +64,7 @@ export default function LandlordDashboardPage() {
     router.push('/login');
   };
   
-  const getStatusVariant = (status: UnitStatus) => {
+  const getStatusVariant = (status: Unit['status']) => {
     switch (status) {
       case 'vacant': return 'secondary';
       case 'rented': return 'default';
@@ -54,6 +72,10 @@ export default function LandlordDashboardPage() {
       default: return 'outline';
     }
   };
+
+  if (isLoading) {
+      return <div>Loading...</div>;
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -89,12 +111,12 @@ export default function LandlordDashboardPage() {
         </Card>
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Potential Earnings</CardTitle>
+                <CardTitle className="text-sm font-medium">Rent Collected</CardTitle>
                 <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">Pending...</div>
-                <p className="text-xs text-muted-foreground">Based on occupied units</p>
+                <div className="text-2xl font-bold">Ksh {rentCollected.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">From occupied units this period</p>
             </CardContent>
         </Card>
         <Card>
