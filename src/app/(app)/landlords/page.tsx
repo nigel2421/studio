@@ -22,21 +22,29 @@ export default function LandlordsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && userProfile?.role !== 'admin') {
-      router.push('/dashboard');
+    // Wait until authentication is resolved
+    if (isLoading) {
+      return; 
     }
+
+    // After loading, if the user is not an admin, redirect them.
+    if (userProfile?.role !== 'admin') {
+      router.push('/dashboard');
+      return;
+    }
+    
+    // If they are an admin, fetch the data.
+    getLandlords().then(setLandlords);
+
   }, [userProfile, isLoading, router]);
 
-  useEffect(() => {
-    if (userProfile?.role === 'admin') {
-      getLandlords().then(setLandlords);
-    }
-  }, [userProfile]);
-
-  if (isLoading || userProfile?.role !== 'admin') {
+  // While loading auth state, show a loading message and do nothing else.
+  if (isLoading) {
     return <div>Loading...</div>;
   }
-  
+
+  // If loading is complete and we're still here, it means user is an admin.
+  // We can safely render the page content.
   return (
     <div className="space-y-6">
       <div>
