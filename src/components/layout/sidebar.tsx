@@ -50,10 +50,6 @@ const otherItems = [
     { href: '/airbnb', icon: BedDouble, label: 'Airbnb Monitoring' },
 ]
 
-const adminItems = [
-    { href: '/logs', icon: History, label: 'Activity Logs' },
-]
-
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -113,24 +109,6 @@ export function AppSidebar() {
             </Link>
           </SidebarMenuItem>
         ))}
-        {userProfile?.role === 'admin' && (
-            <>
-                <Separator className="my-2" />
-                {adminItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                    <Link href={item.href}>
-                    <SidebarMenuButton
-                        isActive={isActive(item.href)}
-                        tooltip={item.label}
-                    >
-                        <item.icon />
-                        <span>{item.label}</span>
-                    </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
-                ))}
-            </>
-        )}
       </SidebarMenu>
 
       <SidebarFooter>
@@ -146,6 +124,19 @@ export function AppSidebar() {
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
+           {userProfile?.role === 'admin' && (
+             <SidebarMenuItem>
+               <Link href="/logs">
+                 <SidebarMenuButton
+                   isActive={isActive('/logs')}
+                   tooltip="Activity Logs"
+                 >
+                   <History />
+                   <span>Activity Logs</span>
+                 </SidebarMenuButton>
+               </Link>
+             </SidebarMenuItem>
+           )}
            <SidebarMenuItem>
             <SidebarMenuButton onClick={handleSignOut}>
               <LogOut />
