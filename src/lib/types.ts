@@ -1,5 +1,6 @@
 
 
+
 export type Property = {
   id: string;
   name: string;
@@ -7,6 +8,7 @@ export type Property = {
   type: string;
   units: Unit[];
   imageId: string;
+  landlordId?: string;
 };
 
 export type OwnershipType = 'SM' | 'Landlord';
@@ -106,3 +108,10 @@ export type Log = {
     action: string;
     timestamp: string;
 }
+
+export type Landlord = {
+  id: string;
+  name: string;
+  bankAccount: string;
+  earnings: number;
+};

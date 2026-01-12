@@ -1,10 +1,11 @@
 
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType, Log } from '@/lib/types';
+import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType, Log, Landlord } from '@/lib/types';
 import { db, firebaseConfig } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc } from 'firebase/firestore';
 import propertiesData from '../../backend.json';
 import { auth } from './firebase';
 
@@ -288,7 +289,7 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     await logActivity(`Added payment of ${paymentData.amount} for tenant ${tenant.name}`);
 
     let newLeaseData = {};
-    if (payment.amount >= tenant.lease.rent) {
+    if (tenant.lease && payment.amount >= tenant.lease.rent) {
         newLeaseData = {
             'lease.paymentStatus': 'Paid',
             'lease.lastPaymentDate': paymentData.date,
@@ -298,19 +299,21 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
 
     const updatedTenantSnap = await getDoc(tenantRef);
     const updatedTenant = updatedTenantSnap.data() as Tenant;
-    const lastPayment = updatedTenant.lease.lastPaymentDate ? new Date(updatedTenant.lease.lastPaymentDate) : new Date(0);
-    const today = new Date();
+    if (updatedTenant.lease && updatedTenant.lease.lastPaymentDate) {
+        const lastPayment = new Date(updatedTenant.lease.lastPaymentDate);
+        const today = new Date();
 
-    if (lastPayment.getMonth() !== today.getMonth() || lastPayment.getFullYear() !== today.getFullYear()) {
-         const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
-         const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        if (lastPayment.getMonth() !== today.getMonth() || lastPayment.getFullYear() !== today.getFullYear()) {
+            const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-        if(updatedTenant.lease.paymentStatus === 'Paid'){
-             await updateDoc(tenantRef, {
-                'lease.paymentStatus': 'Pending',
-                'lease.startDate': newStartDate.toISOString().split('T')[0],
-                'lease.endDate': newEndDate.toISOString().split('T')[0],
-            });
+            if(updatedTenant.lease.paymentStatus === 'Paid'){
+                await updateDoc(tenantRef, {
+                    'lease.paymentStatus': 'Pending',
+                    'lease.startDate': newStartDate.toISOString().split('T')[0],
+                    'lease.endDate': newEndDate.toISOString().split('T')[0],
+                });
+            }
         }
     }
 }
@@ -318,4 +321,16 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
 export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
     console.log("Updating from CSV is not fully supported when using local JSON data.");
     return 0;
+}
+
+
+// Landlord Functions
+export async function getLandlord(landlordId: string): Promise<Landlord | null> {
+    return getDocument<Landlord>('landlords', landlordId);
+}
+
+export async function updateLandlord(landlordId: string, data: Partial<Landlord>): Promise<void> {
+    const landlordRef = doc(db, 'landlords', landlordId);
+    await setDoc(landlordRef, data, { merge: true });
+    await logActivity(`Updated landlord details for ID: ${landlordId}`);
 }
