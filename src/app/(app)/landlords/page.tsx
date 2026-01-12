@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { Loader } from 'lucide-react';
 
 export default function LandlordsPage() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
@@ -22,7 +23,7 @@ export default function LandlordsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Wait until authentication is resolved
+    // Wait until authentication is resolved before doing anything
     if (isLoading) {
       return; 
     }
@@ -38,13 +39,19 @@ export default function LandlordsPage() {
 
   }, [userProfile, isLoading, router]);
 
-  // While loading auth state, show a loading message and do nothing else.
-  if (isLoading) {
-    return <div>Loading...</div>;
+  // While loading auth state, show a loading spinner and do not render the page.
+  // This prevents the "flash" of content before a potential redirect.
+  if (isLoading || !userProfile) {
+    return (
+        <div className="flex h-48 items-center justify-center">
+            <Loader className="h-8 w-8 animate-spin" />
+        </div>
+    );
   }
+  
+  // If loading is complete but the user is not an admin, they will have already been redirected.
+  // We can safely render the admin-only content here.
 
-  // If loading is complete and we're still here, it means user is an admin.
-  // We can safely render the page content.
   return (
     <div className="space-y-6">
       <div>

@@ -12,47 +12,28 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   useEffect(() => {
-    // 1. Wait until authentication status is fully resolved.
+    // Wait until authentication status is fully resolved.
     if (isLoading) {
       return;
     }
 
     const onLoginPage = pathname === '/login';
 
-    // 2. If user is not authenticated, redirect to login page if they are not already there.
-    if (!isAuth) {
-      if (!onLoginPage) {
+    // If user is not authenticated, redirect to login page if they are not already there.
+    if (!isAuth && !onLoginPage) {
         router.push('/login');
-      }
-      return;
-    }
-
-    // 3. At this point, the user is authenticated. We need to check their role.
-    // If userProfile is still loading for the authenticated user, wait.
-    if (!userProfile) {
         return;
     }
 
-    const role = userProfile.role;
-    const isTenantDashboard = pathname.startsWith('/tenant/dashboard');
-    const isLandlordDashboard = pathname.startsWith('/landlord/dashboard');
-
-    // 4. Perform role-based redirects.
-    if (role === 'tenant') {
-      // Tenants must be on their dashboard.
-      if (!isTenantDashboard) {
-        router.push('/tenant/dashboard');
-      }
-    } else if (role === 'landlord') {
-      // Landlords must be on their dashboard.
-      if (!isLandlordDashboard) {
-        router.push('/landlord/dashboard');
-      }
-    } else { 
-      // Admin or other roles should be redirected from login and role-specific dashboards.
-      if (onLoginPage || isTenantDashboard || isLandlordDashboard) {
-        router.push('/dashboard');
-      }
+    // If the user is authenticated and on the login page, redirect them based on role.
+    if(isAuth && onLoginPage) {
+        if(userProfile?.role === 'tenant') {
+            router.push('/tenant/dashboard');
+        } else if (userProfile?.role === 'landlord') {
+            router.push('/landlord/dashboard');
+        } else {
+            router.push('/dashboard');
+        }
     }
 
   }, [isLoading, isAuth, userProfile, pathname, router]);
