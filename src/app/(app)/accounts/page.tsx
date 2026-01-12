@@ -193,7 +193,7 @@ export default function AccountsPage() {
     return property ? property.name : 'N/A';
   };
 
-  const getPaymentStatusVariant = (status: Tenant['lease']['paymentStatus']) => {
+  const getPaymentStatusVariant = (status?: Tenant['lease']['paymentStatus']) => {
     switch (status) {
       case 'Paid':
         return 'default';
@@ -208,13 +208,15 @@ export default function AccountsPage() {
 
   const financialSummary = tenants.reduce(
     (acc, tenant) => {
-      const rent = tenant.lease.rent || 0;
-      if (tenant.lease.paymentStatus === 'Paid') {
-        acc.collected += rent;
-      } else if (tenant.lease.paymentStatus === 'Pending') {
-        acc.pending += rent;
-      } else if (tenant.lease.paymentStatus === 'Overdue') {
-        acc.overdue += rent;
+      if (tenant.lease && typeof tenant.lease.rent === 'number') {
+        const rent = tenant.lease.rent;
+        if (tenant.lease.paymentStatus === 'Paid') {
+          acc.collected += rent;
+        } else if (tenant.lease.paymentStatus === 'Pending') {
+          acc.pending += rent;
+        } else if (tenant.lease.paymentStatus === 'Overdue') {
+          acc.overdue += rent;
+        }
       }
       return acc;
     },
@@ -284,10 +286,15 @@ export default function AccountsPage() {
                     <div>{getPropertyName(tenant.propertyId)}</div>
                     <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
                   </TableCell>
-                  <TableCell>Ksh {tenant.lease.rent.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {tenant.lease && typeof tenant.lease.rent === 'number'
+                        ? `Ksh ${tenant.lease.rent.toLocaleString()}`
+                        : 'N/A'
+                    }
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={getPaymentStatusVariant(tenant.lease.paymentStatus)}>
-                      {tenant.lease.paymentStatus}
+                    <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
+                      {tenant.lease?.paymentStatus || 'N/A'}
                     </Badge>
                   </TableCell>
                 </TableRow>
