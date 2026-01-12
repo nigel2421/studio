@@ -2,12 +2,34 @@
 
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType } from '@/lib/types';
+import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType, Log } from '@/lib/types';
 import { db, firebaseConfig } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy } from 'firebase/firestore';
 import propertiesData from '../../backend.json';
+import { auth } from './firebase';
 
 const WATER_RATE = 150; // Ksh per unit
+
+export async function logActivity(action: string) {
+    const user = auth.currentUser;
+    if (!user) return; // Don't log if user isn't authenticated
+
+    try {
+        await addDoc(collection(db, 'logs'), {
+            userId: user.uid,
+            action,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error("Error logging activity:", error);
+    }
+}
+
+export async function getLogs(): Promise<Log[]> {
+    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log));
+}
 
 async function getCollection<T>(collectionName: string): Promise<T[]> {
   const q = query(collection(db, collectionName));
@@ -26,22 +48,20 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
     }
 }
 
-
 export async function getProperties(): Promise<Property[]> {
-  // Directly return the properties from the imported JSON file
   return Promise.resolve(propertiesData.properties as Property[]);
 }
 
 export async function getTenants(): Promise<Tenant[]> {
-    return Promise.resolve([]);
+    return getCollection<Tenant>('tenants');
 }
 
 export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
-    return Promise.resolve([]);
+    return getCollection<ArchivedTenant>('archived_tenants');
 }
 
 export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
-    return Promise.resolve([]);
+    return getCollection<MaintenanceRequest>('maintenanceRequests');
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
@@ -58,7 +78,6 @@ export async function getTenant(id: string): Promise<Tenant | null> {
         );
         const readingsSnapshot = await getDocs(readingsQuery);
         const readings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
-        // Sort in-memory to avoid needing a composite index
         readings.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
         tenant.waterReadings = readings.slice(0, 12);
     }
@@ -96,12 +115,8 @@ export async function addTenant({
     };
     const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData);
     
-    // This part will need to be re-evaluated as properties are no longer in Firestore
-    // For now, it will not update the JSON file, only client state if handled there.
-    console.log(`Unit ${unitName} in property ${propertyId} should be marked as rented.`);
+    await logActivity(`Created tenant: ${name} (${email})`);
 
-
-    // Create Firebase Auth user for the tenant
     const appName = 'tenant-creation-app-' + newTenantData.email;
     let secondaryApp;
     try {
@@ -115,7 +130,6 @@ export async function addTenant({
         const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, phone);
         const user = userCredential.user;
 
-        // Create user profile in Firestore
         await createUserProfile(user.uid, user.email || email, 'tenant', { 
             name: name, 
             tenantId: tenantDocRef.id,
@@ -124,8 +138,6 @@ export async function addTenant({
 
     } catch (error) {
         console.error("Error creating tenant auth user:", error);
-        // If auth user creation fails, we should ideally roll back the tenant creation.
-        // For now, we'll log the error.
         throw new Error("Failed to create tenant login credentials.");
     } finally {
         if (secondaryApp) {
@@ -135,12 +147,10 @@ export async function addTenant({
 }
 
 export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
-    // This would need to write back to the backend.json file, which is not possible from here.
     console.log("Adding properties is not fully supported when using local JSON data.");
 }
 
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
-    // This would need to write back to the backend.json file, which is not possible from here.
     console.log("Updating properties is not fully supported when using local JSON data.");
 }
 
@@ -148,11 +158,14 @@ export async function archiveTenant(tenantId: string): Promise<void> {
     const tenant = await getTenant(tenantId);
     if (tenant) {
         const tenantRef = doc(db, 'tenants', tenantId);
-        await updateDoc(tenantRef, { 
-            status: 'archived',
-            archivedAt: new Date().toISOString()
-        });
-
+        const archivedTenantRef = doc(db, 'archived_tenants', tenantId);
+        
+        const batch = writeBatch(db);
+        batch.set(archivedTenantRef, { ...tenant, archivedAt: new Date().toISOString(), status: 'archived' });
+        batch.delete(tenantRef);
+        await batch.commit();
+        
+        await logActivity(`Archived tenant: ${tenant.name}`);
         console.log(`Unit ${tenant.unitName} in property ${tenant.propertyId} should be marked as vacant.`);
     }
 }
@@ -161,6 +174,8 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
     const oldTenant = await getTenant(tenantId);
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, tenantData);
+    
+    await logActivity(`Updated tenant: ${tenantData.name || oldTenant?.name}`);
 
     if (oldTenant && (oldTenant.propertyId !== tenantData.propertyId || oldTenant.unitName !== tenantData.unitName)) {
         console.log(`Unit ${oldTenant.unitName} in property ${oldTenant.propertyId} should be marked as vacant.`);
@@ -202,6 +217,7 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
         createdAt: serverTimestamp(),
         status: 'New',
     });
+    await logActivity(`Submitted maintenance request`);
 }
 
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
@@ -212,7 +228,6 @@ export async function getTenantMaintenanceRequests(tenantId: string): Promise<Ma
     const querySnapshot = await getDocs(q);
     const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
     
-    // Sort in-memory to avoid needing a composite index
     requests.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
 
     return requests;
@@ -246,7 +261,8 @@ export async function addWaterMeterReading(data: {
     
     const readingRef = await addDoc(collection(db, 'waterReadings'), readingData);
     
-    // Also update the tenant's subcollection for easy retrieval
+    await logActivity(`Added water reading for unit ${data.unitName}`);
+    
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, {
         waterReadings: arrayUnion({ ...readingData, id: readingRef.id })
@@ -268,10 +284,9 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
         createdAt: serverTimestamp(),
     };
 
-    // Add to payments collection
     await addDoc(collection(db, 'payments'), payment);
+    await logActivity(`Added payment of ${paymentData.amount} for tenant ${tenant.name}`);
 
-    // Update tenant's lease information
     let newLeaseData = {};
     if (payment.amount >= tenant.lease.rent) {
         newLeaseData = {
@@ -281,7 +296,6 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     }
      await updateDoc(tenantRef, newLeaseData);
 
-     // After updating, check if the month has changed to reset status
     const updatedTenantSnap = await getDoc(tenantRef);
     const updatedTenant = updatedTenantSnap.data() as Tenant;
     const lastPayment = updatedTenant.lease.lastPaymentDate ? new Date(updatedTenant.lease.lastPaymentDate) : new Date(0);
@@ -301,9 +315,7 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     }
 }
 
-
 export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
-    // This function will need to be updated to write back to backend.json, which is not possible from client-side code.
     console.log("Updating from CSV is not fully supported when using local JSON data.");
     return 0;
 }

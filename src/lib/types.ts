@@ -99,3 +99,10 @@ export type UserProfile = {
     propertyId?: string;
     tenantDetails?: Tenant;
 }
+
+export type Log = {
+    id: string;
+    userId: string;
+    action: string;
+    timestamp: string;
+}

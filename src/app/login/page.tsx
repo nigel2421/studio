@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { createUserProfile } from '@/lib/data';
+import { createUserProfile, logActivity } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -19,7 +19,9 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Log activity after successful sign-in
+      await logActivity('User login');
       // On successful login, AuthWrapper will handle redirection.
       // A hard refresh can help ensure the correct context is loaded.
       window.location.href = '/'; 
@@ -43,6 +45,7 @@ export default function LoginPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const name = userCredential.user.email?.split('@')[0] || 'Admin';
       await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'admin', { name });
+      await logActivity(`Admin user created: ${email}`);
       toast({
         title: 'Sign Up Successful',
         description: 'You can now log in with the credentials you just created.',

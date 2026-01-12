@@ -26,6 +26,7 @@ import {
   Archive,
   Banknote,
   Droplets,
+  History,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,11 +50,15 @@ const otherItems = [
     { href: '/airbnb', icon: BedDouble, label: 'Airbnb Monitoring' },
 ]
 
+const adminItems = [
+    { href: '/logs', icon: History, label: 'Activity Logs' },
+]
+
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useSidebar();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
 
   const isActive = (href: string) => pathname === href;
 
@@ -108,6 +113,24 @@ export function AppSidebar() {
             </Link>
           </SidebarMenuItem>
         ))}
+        {userProfile?.role === 'admin' && (
+            <>
+                <Separator className="my-2" />
+                {adminItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                    <Link href={item.href}>
+                    <SidebarMenuButton
+                        isActive={isActive(item.href)}
+                        tooltip={item.label}
+                    >
+                        <item.icon />
+                        <span>{item.label}</span>
+                    </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
+                ))}
+            </>
+        )}
       </SidebarMenu>
 
       <SidebarFooter>
