@@ -18,7 +18,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
 
     const onLoginPage = pathname === '/login';
     const isTenantRoute = pathname.startsWith('/tenant/');
-    const isLandlordRoute = pathname.startsWith('/landlord/');
+    const isLandlordDashboardRoute = pathname === '/landlord/dashboard';
     const isTenant = userProfile?.role === 'tenant';
     const isLandlord = userProfile?.role === 'landlord';
 
@@ -32,10 +32,10 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       } else if (isTenant && !isTenantRoute) {
         // If tenant is on a non-tenant route, redirect
         router.push('/tenant/dashboard');
-      } else if (isLandlord && !isLandlordRoute) {
+      } else if (isLandlord && !isLandlordDashboardRoute) {
         // If landlord is on a non-landlord route, redirect
         router.push('/landlord/dashboard');
-      } else if (!isTenant && !isLandlord && (isTenantRoute || isLandlordRoute)) {
+      } else if (!isTenant && !isLandlord && (isTenantRoute || isLandlordDashboardRoute)) {
         // If admin/other is on a tenant or landlord route, redirect to admin dashboard
         router.push('/dashboard');
       }
