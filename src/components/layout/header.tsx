@@ -2,8 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
-import { Button } from '../ui/button';
-import { FilePlus2 } from 'lucide-react';
+import { AddTenantDialog } from '../add-tenant-dialog';
 
 const titleMap: { [key: string]: string } = {
   '/dashboard': 'Dashboard',
@@ -28,11 +27,7 @@ export function AppHeader() {
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
       </div>
        <div className="flex items-center gap-4">
-        {/* Example action button */}
-        <Button size="sm">
-            <FilePlus2 className="mr-2 h-4 w-4" />
-            Add New
-        </Button>
+        <AddTenantDialog onTenantAdded={() => {}} />
       </div>
     </header>
   );
