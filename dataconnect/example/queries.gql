@@ -1,0 +1,47 @@
+mutation AddNewMaintenanceRequest(
+    $propertyId: UUID!,
+    $tenantId: UUID!,
+    $description: String!,
+    $status: String!,
+    $submittedAt: Timestamp!
+) @auth(level: USER) {
+  maintenanceRequest_insert(data: {
+    propertyId: $propertyId,
+    tenantId: $tenantId,
+    description: $description,
+    status: $status,
+    submittedAt: $submittedAt
+  })
+}
+
+query GetTenantPayments($tenantId: UUID!) @auth(level: USER) {
+  payments(where: {tenantId: {eq: $tenantId}}) {
+    id
+    amount
+    paymentDate
+    paymentMethod
+    status
+    transactionId
+  }
+}
+
+mutation UpdateLeaseTerms($leaseId: UUID!, $leaseTerms: String!) @auth(level: USER) {
+  lease_update(
+    id: $leaseId,
+    data: {
+      leaseTerms: $leaseTerms
+    }
+  )
+}
+
+query ListProperties @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  properties {
+    id
+    address
+    city
+    state
+    zipCode
+    propertyType
+    rentAmount
+  }
+}

@@ -1,0 +1,50 @@
+mutation CreateDemoData @auth(level: USER) @transaction {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      displayName: "demouser1",
+      email: "demouser1@example.com",
+      role: "tenant"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      displayName: "demouser2",
+      email: "demouser2@example.com",
+      role: "manager"
+    }
+  ])
+  property_insertMany(data: [
+    {
+      id: "650e8400-e29b-41d4-a716-446655440002",
+      ownerId: "550e8400-e29b-41d4-a716-446655440000",
+      address: "123 Main St",
+      city: "Anytown",
+      propertyType: "Apartment",
+      state: "CA",
+      zipCode: "91234"
+    }
+  ])
+  tenant_insertMany(data: [
+    {
+      id: "750e8400-e29b-41d4-a716-446655440003",
+      managerId: "550e8400-e29b-41d4-a716-446655440001",
+      propertyId: "650e8400-e29b-41d4-a716-446655440002",
+      firstName: "Tenant",
+      lastName: "One",
+      email: "tenant1@example.com",
+      phoneNumber: "555-1212",
+      moveInDate: "2024-01-01"
+    }
+  ])
+  lease_insertMany(data: [
+    {
+      id: "850e8400-e29b-41d4-a716-446655440004",
+      propertyId: "650e8400-e29b-41d4-a716-446655440002",
+      tenantId: "750e8400-e29b-41d4-a716-446655440003",
+      startDate: "2024-01-01",
+      endDate: "2024-12-31",
+      rentAmount: 1500.00,
+      paymentDueDate: 1
+    }
+  ])
+}

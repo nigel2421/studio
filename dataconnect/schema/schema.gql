@@ -1,0 +1,68 @@
+type User @table {
+  email: String!
+  displayName: String!
+  role: String!
+  phoneNumber: String
+  photoUrl: String
+  createdAt: Timestamp
+}
+
+type Property @table {
+  owner: User
+  address: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  propertyType: String!
+  numberOfUnits: Int
+  yearBuilt: Int
+  description: String
+  rentAmount: Float
+}
+
+type Tenant @table {
+  property: Property
+  manager: User
+  firstName: String!
+  lastName: String!
+  email: String!
+  phoneNumber: String!
+  moveInDate: Date!
+  moveOutDate: Date
+  emergencyContactName: String
+  emergencyContactPhone: String
+}
+
+type Lease @table {
+  property: Property
+  tenant: Tenant
+  startDate: Date!
+  endDate: Date!
+  rentAmount: Float!
+  paymentDueDate: Int!
+  leaseTerms: String
+  securityDeposit: Float
+  lateFee: Float
+}
+
+type MaintenanceRequest @table {
+  property: Property
+  tenant: Tenant
+  description: String!
+  status: String!
+  submittedAt: Timestamp!
+  priority: String
+  assignedTo: User
+  resolutionNotes: String
+  completedAt: Timestamp
+}
+
+type Payment @table {
+  lease: Lease
+  tenant: Tenant
+  amount: Float!
+  paymentDate: Date!
+  status: String!
+  paymentMethod: String
+  transactionId: String
+}
