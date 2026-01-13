@@ -14,7 +14,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const isEditPropertyPage = /^\/properties\/edit\/[^/]+$/.test(pathname);
   
   // Define paths where the standard header should be shown
-  const showHeader = !['/tenants', '/properties', '/water-meter/add', '/accounts', '/airbnb'].includes(pathname) 
+  const showHeader = !['/tenants', '/properties', '/water-meter/add', '/accounts', '/airbnb', '/dashboard'].includes(pathname) 
                      && !isPropertyDetailPage 
                      && !isEditPropertyPage;
   
