@@ -10,8 +10,13 @@ import { usePathname } from 'next/navigation';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isPropertyDetailPage = /^\/properties\/[^/]+$/.test(pathname);
-  const showHeader = !['/tenants', '/properties', '/water-meter/add', '/accounts', '/airbnb'].includes(pathname) && !isPropertyDetailPage;
+  const isPropertyDetailPage = /^\/properties\/[^/]+$/.test(pathname) && !pathname.includes('/edit');
+  const isEditPropertyPage = /^\/properties\/edit\/[^/]+$/.test(pathname);
+  
+  // Define paths where the standard header should be shown
+  const showHeader = !['/tenants', '/properties', '/water-meter/add', '/accounts', '/airbnb'].includes(pathname) 
+                     && !isPropertyDetailPage 
+                     && !isEditPropertyPage;
   
   return (
     <AuthWrapper>
@@ -20,7 +25,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <SidebarInset>
           {showHeader && <AppHeader />}
           <div className="min-h-[calc(100vh-4rem)] w-full">
-              <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+              <main className={!isEditPropertyPage ? "p-4 sm:p-6 lg:p-8" : ""}>{children}</main>
           </div>
         </SidebarInset>
       </SidebarProvider>

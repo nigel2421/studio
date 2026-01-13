@@ -7,13 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { getProperty, updateProperty, getLandlords } from '@/lib/data';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import { EditPropertyHeader } from '@/components/layout/edit-property-header';
+import { Input } from '@/components/ui/input';
 
 const unitSchema = z.object({
   name: z.string(),
@@ -30,7 +30,7 @@ const formSchema = z.object({
   units: z.array(unitSchema),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+export type EditPropertyFormValues = z.infer<typeof formSchema>;
 
 export default function EditPropertyPage() {
   const { id } = useParams();
@@ -38,7 +38,7 @@ export default function EditPropertyPage() {
   const [property, setProperty] = useState<Property | null>(null);
   const [landlords, setLandlords] = useState<Landlord[]>([]);
 
-  const form = useForm<FormValues>({
+  const form = useForm<EditPropertyFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
@@ -84,7 +84,7 @@ export default function EditPropertyPage() {
     fetchData();
   }, [id, form]);
 
-  const onSubmit: SubmitHandler<FormValues> = async (data) => {
+  const onSubmit: SubmitHandler<EditPropertyFormValues> = async (data) => {
     if (property) {
       await updateProperty(property.id, data);
       router.push('/properties');
@@ -96,57 +96,10 @@ export default function EditPropertyPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Edit Property</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                        <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                        <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <FormControl>
-                        <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
-            
-            <Separator />
-
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <EditPropertyHeader form={form} onSubmit={form.handleSubmit(onSubmit)} />
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
             <div>
                 <h3 className="text-lg font-medium mb-4">Units</h3>
                 <div className="space-y-4">
@@ -268,11 +221,8 @@ export default function EditPropertyPage() {
                 ))}
                 </div>
             </div>
-
-            <Button type="submit">Save Changes</Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </Form>
   );
 }
