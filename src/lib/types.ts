@@ -1,5 +1,4 @@
 
-
 export type Property = {
   id: string;
   name: string;
@@ -16,8 +15,8 @@ export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
 export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';
 export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'];
 
-export type UnitStatus = 'vacant' | 'rented' | 'client occupied' | 'Handed Over';
-export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'client occupied', 'Handed Over'];
+export type UnitStatus = 'vacant' | 'rented' | 'client occupied' | 'Handed Over' | 'airbnb';
+export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'client occupied', 'Handed Over', 'airbnb'];
 
 export type Unit = {
   name: string;
