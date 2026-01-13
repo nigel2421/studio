@@ -16,7 +16,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { addMaintenanceRequest, getTenantMaintenanceRequests } from '@/lib/data';
 import type { MaintenanceRequest, Tenant } from '@/lib/types';
-import { DollarSign, FileText, Calendar, Loader2, Home } from 'lucide-react';
+import { DollarSign, FileText, Calendar, Loader2, Home, LogOut } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   details: z.string().min(10, 'Please provide more details about the issue.'),
@@ -29,6 +32,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function TenantDashboardPage() {
   const { userProfile } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
@@ -86,6 +90,11 @@ export default function TenantDashboardPage() {
       });
     }
   };
+  
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
 
   const getStatusVariant = (status: MaintenanceRequest['status']) => {
     switch (status) {
@@ -107,10 +116,16 @@ export default function TenantDashboardPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
-        <p className="text-muted-foreground">Manage your tenancy, payments, and maintenance requests.</p>
-      </div>
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
+          <p className="text-muted-foreground">Manage your tenancy, payments, and maintenance requests.</p>
+        </div>
+        <Button onClick={handleSignOut} variant="outline" className="w-full sm:w-auto">
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </Button>
+      </header>
 
       {tenantDetails && (
         <div className="mb-8">
