@@ -37,7 +37,6 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants'},
-  { href: '/leases', icon: FileText, label: 'Lease Tracking' },
   { href: '/accounts', icon: Banknote, label: 'Accounts'},
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Add Water Reading' },
