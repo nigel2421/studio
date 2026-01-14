@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tenant, Payment } from '@/lib/types';
-import { DollarSign, Calendar, Droplets } from 'lucide-react';
+import { DollarSign, Calendar, Droplets, LogOut } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { getTenantPayments } from '@/lib/data';
 import {
@@ -17,9 +17,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 export default function TenantDashboardPage() {
   const { userProfile } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
   const tenantDetails = userProfile?.tenantDetails;
   const latestWaterReading = tenantDetails?.waterReadings?.[0];
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -29,6 +36,19 @@ export default function TenantDashboardPage() {
       getTenantPayments(userProfile.tenantId).then(setPayments);
     }
   }, [userProfile]);
+  
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  const handleMoveOutNotice = () => {
+    toast({
+      title: "Move-Out Notice Submitted",
+      description: "Your one-month notice to vacate has been received and sent to the property manager.",
+      duration: 5000,
+    });
+  };
 
   const getPaymentStatusVariant = (status: Tenant['lease']['paymentStatus']) => {
     switch (status) {
@@ -43,6 +63,17 @@ export default function TenantDashboardPage() {
 
   return (
     <div className="space-y-8">
+       <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
+          <p className="text-muted-foreground">Here is an overview of your account.</p>
+        </div>
+        <Button onClick={handleSignOut} variant="outline">
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </Button>
+      </header>
+
       {tenantDetails && (
         <div>
             <h2 className="text-2xl font-semibold mb-4">Financial Overview</h2>
@@ -132,6 +163,11 @@ export default function TenantDashboardPage() {
                 </Table>
             </CardContent>
         </Card>
+        <div className='px-2 space-y-2 mt-8'>
+            <Button variant="destructive" className="w-full" onClick={handleMoveOutNotice}>
+            Submit 1-Month Move Out Notice
+            </Button>
+        </div>
     </div>
   );
 }

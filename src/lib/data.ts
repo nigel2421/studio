@@ -4,7 +4,7 @@ import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import type { Property, Tenant, MaintenanceRequest, Unit, ArchivedTenant, UserProfile, WaterMeterReading, Payment, UnitType, OwnershipType, Log, Landlord } from '@/lib/types';
 import { db, firebaseConfig } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit } from 'firebase/firestore';
 import propertiesData from '../../backend.json';
 import { auth } from './firebase';
 
@@ -76,10 +76,10 @@ export async function getTenant(id: string): Promise<Tenant | null> {
             collection(db, 'waterReadings'), 
             where('tenantId', '==', id),
             orderBy('createdAt', 'desc'),
-            // limit(12)
+            limit(12)
         );
         const readingsSnapshot = await getDocs(readingsQuery);
-        const readings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
+        const readings = readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
         tenant.waterReadings = readings;
     }
     return tenant;
@@ -288,14 +288,8 @@ export async function addWaterMeterReading(data: {
         createdAt: serverTimestamp(),
     };
     
-    const readingRef = await addDoc(collection(db, 'waterReadings'), readingData);
-    
+    await addDoc(collection(db, 'waterReadings'), readingData);
     await logActivity(`Added water reading for unit ${data.unitName}`);
-    
-    const tenantRef = doc(db, 'tenants', tenantId);
-    await updateDoc(tenantRef, {
-        waterReadings: arrayUnion({ ...readingData, id: readingRef.id })
-    });
 }
 
 export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
