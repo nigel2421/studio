@@ -15,8 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { addMaintenanceRequest, getTenantMaintenanceRequests } from '@/lib/data';
-import type { MaintenanceRequest, Tenant } from '@/lib/types';
-import { DollarSign, FileText, Calendar, Loader2, Home, LogOut } from 'lucide-react';
+import type { MaintenanceRequest, Tenant, WaterMeterReading } from '@/lib/types';
+import { DollarSign, FileText, Calendar, Loader2, Home, LogOut, Droplets } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -37,6 +37,8 @@ export default function TenantDashboardPage() {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
   const tenantDetails = userProfile?.tenantDetails;
+  
+  const latestWaterReading = tenantDetails?.waterReadings?.[0];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -145,12 +147,23 @@ export default function TenantDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Security Deposit</CardTitle>
-                        <Home className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Water Bill</CardTitle>
+                        <Droplets className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {tenantDetails.securityDeposit.toLocaleString()}</div>
-                         <p className="text-xs text-muted-foreground">Held by property management</p>
+                        {latestWaterReading ? (
+                            <>
+                                <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
+                                <p className="text-xs text-muted-foreground">
+                                    Current: {latestWaterReading.currentReading}, Prior: {latestWaterReading.priorReading}
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-xl font-bold">Not Available</div>
+                                <p className="text-xs text-muted-foreground">No recent reading found.</p>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
                 <Card>
@@ -267,3 +280,5 @@ export default function TenantDashboardPage() {
     </div>
   );
 }
+
+    
