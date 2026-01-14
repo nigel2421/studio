@@ -80,7 +80,7 @@ export function TenantSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="flex-1">
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
