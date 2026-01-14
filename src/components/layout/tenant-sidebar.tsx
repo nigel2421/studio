@@ -32,7 +32,6 @@ import { useToast } from '@/hooks/use-toast';
 const navItems = [
   { href: '/tenant/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tenant/maintenance', icon: Wrench, label: 'Maintenance' },
-  { href: '/tenant/documents', icon: FolderArchive, label: 'Documents' },
 ];
 
 export function TenantSidebar() {
