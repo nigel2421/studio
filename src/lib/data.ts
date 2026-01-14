@@ -75,11 +75,12 @@ export async function getTenant(id: string): Promise<Tenant | null> {
         const readingsQuery = query(
             collection(db, 'waterReadings'), 
             where('tenantId', '==', id),
+            orderBy('createdAt', 'desc'),
+            // limit(12)
         );
         const readingsSnapshot = await getDocs(readingsQuery);
         const readings = readingsSnapshot.docs.map(doc => doc.data() as WaterMeterReading);
-        readings.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
-        tenant.waterReadings = readings.slice(0, 12);
+        tenant.waterReadings = readings;
     }
     return tenant;
 }
@@ -252,13 +253,12 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
     const q = query(
         collection(db, "maintenanceRequests"), 
-        where("tenantId", "==", tenantId)
+        where("tenantId", "==", tenantId),
+        orderBy('createdAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
     const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
     
-    requests.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
-
     return requests;
 }
 
@@ -296,6 +296,16 @@ export async function addWaterMeterReading(data: {
     await updateDoc(tenantRef, {
         waterReadings: arrayUnion({ ...readingData, id: readingRef.id })
     });
+}
+
+export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
+    const q = query(
+        collection(db, "payments"), 
+        where("tenantId", "==", tenantId),
+        orderBy('date', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 }
 
 export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>) {

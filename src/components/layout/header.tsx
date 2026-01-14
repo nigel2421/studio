@@ -15,6 +15,9 @@ const titleMap: { [key: string]: string } = {
   '/landlords': 'Landlords',
   '/airbnb': 'Airbnb Monitoring',
   '/logs': 'Activity Logs',
+  '/tenant/dashboard': 'Dashboard',
+  '/tenant/maintenance': 'Maintenance',
+  '/tenant/documents': 'Documents',
 };
 
 export function AppHeader() {
