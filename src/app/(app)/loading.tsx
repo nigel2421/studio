@@ -2,9 +2,7 @@
 import { Loader } from "lucide-react";
 
 export default function Loading() {
-  return (
-    <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-      <Loader className="h-8 w-8 animate-spin text-primary"/>
-    </div>
-  )
+  // The global PageLoader component now handles the visual loading state.
+  // This file is still useful to ensure Next.js's streaming and suspense work correctly.
+  return null;
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -94,8 +93,8 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => (
-            <SidebarMenuItem key={item.href} onClick={handleLinkClick}>
-              <Link href={item.href}>
+            <SidebarMenuItem key={item.href}>
+              <Link href={item.href} onClick={handleLinkClick}>
                 <SidebarMenuButton
                   isActive={isActive(item.href)}
                   tooltip={item.label}
@@ -108,8 +107,8 @@ export function AppSidebar() {
           ))}
           <Separator className="my-2" />
           {otherItems.map((item) => (
-            <SidebarMenuItem key={item.href} onClick={handleLinkClick}>
-              <Link href={item.href}>
+            <SidebarMenuItem key={item.href}>
+              <Link href={item.href} onClick={handleLinkClick}>
                 <SidebarMenuButton
                   isActive={isActive(item.href)}
                   tooltip={item.label}
@@ -121,8 +120,8 @@ export function AppSidebar() {
             </SidebarMenuItem>
           ))}
           {(userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com') && (
-            <SidebarMenuItem onClick={handleLinkClick}>
-              <Link href="/logs">
+            <SidebarMenuItem>
+              <Link href="/logs" onClick={handleLinkClick}>
                 <SidebarMenuButton
                   isActive={isActive('/logs')}
                   tooltip="Activity Logs"

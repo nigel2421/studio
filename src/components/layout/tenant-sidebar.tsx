@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -84,8 +83,8 @@ export function TenantSidebar() {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => (
-            <SidebarMenuItem key={item.href} onClick={handleLinkClick}>
-              <Link href={item.href}>
+            <SidebarMenuItem key={item.href}>
+              <Link href={item.href} onClick={handleLinkClick}>
                 <SidebarMenuButton
                   isActive={isActive(item.href)}
                   tooltip={item.label}
