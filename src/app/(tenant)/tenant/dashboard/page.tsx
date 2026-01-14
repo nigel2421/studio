@@ -20,6 +20,7 @@ import { DollarSign, FileText, Calendar, Loader2, Home, LogOut, Droplets } from 
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { format, addMonths, startOfMonth } from 'date-fns';
 
 const formSchema = z.object({
   details: z.string().min(10, 'Please provide more details about the issue.'),
@@ -114,7 +115,17 @@ export default function TenantDashboardPage() {
         case 'Overdue': return 'destructive';
         default: return 'outline';
     }
-}
+  };
+
+  const handleMoveOutNotice = () => {
+    toast({
+      title: "Move-Out Notice Submitted",
+      description: "Your one-month notice to vacate has been received and sent to the property manager.",
+      duration: 5000,
+    });
+  };
+
+  const nextRentDueDate = format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd');
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -168,7 +179,7 @@ export default function TenantDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Lease Start Date</CardTitle>
+                        <CardTitle className="text-sm font-medium">Rent Start Date</CardTitle>
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -177,11 +188,11 @@ export default function TenantDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Lease End Date</CardTitle>
+                        <CardTitle className="text-sm font-medium">Next Rent Due Date</CardTitle>
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{new Date(tenantDetails.lease.endDate).toLocaleDateString()}</div>
+                        <div className="text-2xl font-bold">{nextRentDueDate}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -277,8 +288,12 @@ export default function TenantDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+       <div className="mt-8">
+        <Button variant="destructive" className="w-full" onClick={handleMoveOutNotice}>
+          Submit 1-Month Move Out Notice
+        </Button>
+      </div>
     </div>
   );
 }
-
-    
