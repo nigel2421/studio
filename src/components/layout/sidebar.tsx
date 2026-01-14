@@ -29,6 +29,7 @@ import {
   Banknote,
   Droplets,
   History,
+  Mail,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +50,7 @@ const otherItems = [
   { href: '/clients', icon: Briefcase, label: 'Client Properties' },
   { href: '/landlords', icon: Users, label: 'Landlords' },
   { href: '/airbnb', icon: BedDouble, label: 'Airbnb Monitoring' },
+  { href: '/communications', icon: Mail, label: 'Communications'},
 ]
 
 export function AppSidebar() {

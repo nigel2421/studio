@@ -26,7 +26,8 @@ setGlobalOptions({ maxInstances: 10 });
 const createTransporter = () => {
     const port = parseInt(emailPort.value(), 10);
     if (isNaN(port)) {
-        throw new Error("Invalid EMAIL_PORT value. It must be a number.");
+        // This is a server-side configuration error, so we throw to fail fast.
+        throw new Error(`Invalid EMAIL_PORT value: "${emailPort.value()}". It must be a number.`);
     }
     return nodemailer.createTransport({
         host: emailHost.value(),
@@ -42,6 +43,11 @@ const createTransporter = () => {
 // Callable function to send a payment receipt
 export const sendPaymentReceipt = onCall(async (request) => {
     const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes } = request.data;
+
+    // Validate essential data
+    if (!tenantEmail || !tenantName || !amount || !date || !propertyName || !unitName) {
+        throw new HttpsError('invalid-argument', 'Missing required data for sending a receipt.');
+    }
 
     const transporter = createTransporter();
 
@@ -74,6 +80,7 @@ export const sendPaymentReceipt = onCall(async (request) => {
         return { success: true, message: "Receipt sent successfully." };
     } catch (error) {
         logger.error("Error sending email:", error);
-        throw new HttpsError("internal", "Failed to send email.");
+        // Throw a specific error for the client
+        throw new HttpsError("internal", "Failed to send email. Please check server logs for details.");
     }
 });

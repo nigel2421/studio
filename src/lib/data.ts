@@ -344,6 +344,7 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
             unitName: tenant.unitName,
             notes: paymentData.notes,
         });
+        await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
     } catch (error) {
         console.error("Failed to send receipt email via cloud function:", error);
         // We don't throw here because the payment was still successful.
