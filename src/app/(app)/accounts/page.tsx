@@ -47,8 +47,10 @@ function AddPaymentDialog({ properties, tenants, onPaymentAdded }: { properties:
     } = useUnitFilter(properties);
 
     const occupiedUnitsOnFloor = useMemo(() => {
-        const tenantUnits = tenants.filter(t => t.propertyId === selectedProperty).map(t => t.unitName);
-        return unitsOnFloor.filter(u => tenantUnits.includes(u.name));
+        if (!unitsOnFloor.length) return [];
+        const tenantsOnProperty = tenants.filter(t => t.propertyId === selectedProperty);
+        const occupiedUnitNames = new Set(tenantsOnProperty.map(t => t.unitName));
+        return unitsOnFloor.filter(u => occupiedUnitNames.has(u.name));
     }, [unitsOnFloor, tenants, selectedProperty]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -316,5 +318,3 @@ export default function AccountsPage() {
     </div>
   );
 }
-
-    
