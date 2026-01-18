@@ -156,7 +156,7 @@ export default function ClientsPage() {
           {clientProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {clientProperties.map(property => {
-                const ownersForProperty = propertyOwners.filter(o => o.assignedUnits.some(au => au.propertyId === property.id));
+                const ownersForProperty = propertyOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
                 const assignedUnitNamesForProperty = new Set(
                     ownersForProperty.flatMap(o => o.assignedUnits.find(au => au.propertyId === property.id)?.unitNames || [])
                 );
