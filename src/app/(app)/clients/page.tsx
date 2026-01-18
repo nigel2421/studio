@@ -46,14 +46,14 @@ export default function ClientsPage() {
   const handleManageLandlordClick = (property: Property) => {
     setSelectedProperty(property);
     const landlordId = `landlord-for-${property.id}-${Date.now()}`;
-    const newLandlord: Landlord = { id: landlordId, name: '', email: '', phone: '', bankAccount: '', earnings: 0 };
+    const newLandlord: Landlord = { id: landlordId, name: '', email: '', phone: '', bankAccount: '' };
     setSelectedLandlord(newLandlord);
     setIsLandlordDialogOpen(true);
   };
 
   const handleManageOwnerClick = (property: Property) => {
     setSelectedProperty(property);
-    const existingOwner = propertyOwners.find(o => o.propertyId === property.id);
+    const existingOwner = propertyOwners.find(o => o.assignedUnits.some(au => au.propertyId === property.id));
     setSelectedOwner(existingOwner || null);
     setIsOwnerDialogOpen(true);
   };
@@ -70,10 +70,21 @@ export default function ClientsPage() {
     }
   }
 
-  const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
+ const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
+    
+    const updatedAssignedUnits = ownerData.assignedUnits?.filter(au => au.propertyId !== selectedProperty.id) || [];
+    if (selectedUnitNames.length > 0) {
+        updatedAssignedUnits.push({ propertyId: selectedProperty.id, unitNames: selectedUnitNames });
+    }
+
+    const dataToSave: PropertyOwner = {
+        ...ownerData,
+        assignedUnits: updatedAssignedUnits
+    };
+
     try {
-      await updatePropertyOwner(ownerData.id, { ...ownerData, unitNames: selectedUnitNames });
+      await updatePropertyOwner(ownerData.id, dataToSave);
       toast({ title: 'Owner Saved', description: `Contact details for ${ownerData.name} have been saved.` });
       fetchData();
       setIsOwnerDialogOpen(false);
@@ -145,9 +156,11 @@ export default function ClientsPage() {
           {clientProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {clientProperties.map(property => {
-                const ownersForProperty = propertyOwners.filter(o => o.propertyId === property.id);
-                const assignedUnitNames = new Set(ownersForProperty.flatMap(o => o.unitNames));
-                const unassignedUnits = property.units.filter(u => u.ownership === 'Client' && !assignedUnitNames.has(u.name));
+                const ownersForProperty = propertyOwners.filter(o => o.assignedUnits.some(au => au.propertyId === property.id));
+                const assignedUnitNamesForProperty = new Set(
+                    ownersForProperty.flatMap(o => o.assignedUnits.find(au => au.propertyId === property.id)?.unitNames || [])
+                );
+                const unassignedUnits = property.units.filter(u => u.ownership === 'Client' && !assignedUnitNamesForProperty.has(u.name));
 
                 return (
                   <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-amber-500/10">
@@ -194,7 +207,7 @@ export default function ClientsPage() {
                                 </Button>
                               </div>
                               <div className="flex gap-1.5 flex-wrap">
-                                {owner.unitNames?.map(unitName => (
+                                {owner.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames.map(unitName => (
                                   <span key={unitName} className="px-2 py-0.5 rounded bg-white border text-[10px] font-bold shadow-sm">
                                     Unit {unitName}
                                   </span>

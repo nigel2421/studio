@@ -1,11 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { logActivity, createUserProfile } from '@/lib/data';
-import { useToast } from '@/hooks/use-toast';
+import { logActivity } from '@/lib/data';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { Loader } from 'lucide-react';
@@ -15,7 +13,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { toast } = useToast();
   const { isAuth, userProfile, isLoading } = useAuth();
   const router = useRouter();
 
@@ -25,6 +22,8 @@ export default function LoginPage() {
         router.push('/tenant/dashboard');
       } else if (userProfile?.role === 'landlord') {
         router.push('/landlord/dashboard');
+      } else if (userProfile?.role === 'homeowner') {
+        router.push('/owner/dashboard');
       } else {
         router.push('/dashboard');
       }
@@ -42,40 +41,13 @@ export default function LoginPage() {
       // Redirection is handled by the useEffect hook.
     } catch (error: any) {
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        setError('Incorrect email or password. If you are an administrator and do not have an account, please use the Sign Up option.');
+        setError('Incorrect email or password. Please try again.');
       } else if (error.code === 'auth/invalid-email') {
         setError('Please enter a valid email address.');
       } else {
-        setError('Failed to log in. Please try again later.');
+        setError('An error occurred during login. Please try again later.');
       }
       setIsLoggingIn(false);
-    }
-  };
-  
-  const handleSignUp = async () => {
-    setError(null);
-    setIsLoggingIn(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const name = userCredential.user.email?.split('@')[0] || 'Admin';
-      await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'admin', { name });
-      toast({
-        title: 'Sign Up Successful',
-        description: 'You can now log in with the credentials you just created.',
-      });
-    } catch (error: any) {
-       if (error.code === 'auth/email-already-in-use') {
-        setError('This email is already in use. Try logging in instead.');
-       } else if (error.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address to sign up.');
-       } else if (error.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters.');
-       }
-       else {
-        setError('Failed to sign up. Please try again later.');
-      }
-    } finally {
-        setIsLoggingIn(false);
     }
   };
 
@@ -93,7 +65,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Eracov Properties</h1>
-            <p className="text-gray-500 dark:text-gray-400">Welcome Back</p>
+            <p className="text-gray-500 dark:text-gray-400">Management Portal</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
@@ -127,15 +99,8 @@ export default function LoginPage() {
             >
               {isLoggingIn ? <Loader className="mx-auto h-5 w-5 animate-spin" /> : 'Login'}
             </button>
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-              No admin account?{' '}
-              <button
-                type="button"
-                onClick={handleSignUp}
-                className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                Sign Up
-              </button>
+             <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              Contact an administrator if you have trouble logging in.
             </p>
           </div>
         </form>

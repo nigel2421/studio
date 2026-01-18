@@ -19,6 +19,7 @@ export type PropertyOwner = {
     propertyId: string;
     unitNames: string[];
   }[];
+  userId?: string;
 };
 
 export type OwnershipType = 'SM' | 'Landlord' | 'Client';
@@ -116,7 +117,11 @@ export type UserProfile = {
   tenantId?: string;
   propertyId?: string;
   landlordId?: string;
+  propertyOwnerId?: string;
   tenantDetails?: Tenant;
+  propertyOwnerDetails?: {
+    properties: { property: Property, units: Unit[] }[]
+  };
 }
 
 export type Log = {

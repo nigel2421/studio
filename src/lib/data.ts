@@ -237,10 +237,27 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     const docSnap = await getDoc(userProfileRef);
     if (docSnap.exists()) {
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
-        if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
+
+        if (userProfile.role === 'tenant' && userProfile.tenantId) {
             const tenantData = await getTenant(userProfile.tenantId);
             if (tenantData) {
                 userProfile.tenantDetails = tenantData;
+            }
+        }
+        
+        if (userProfile.role === 'homeowner' && userProfile.propertyOwnerId) {
+            const allProperties = await getProperties();
+            const owner = await getPropertyOwner(userProfile.propertyOwnerId);
+            if (owner) {
+                const ownerProperties: { property: Property, units: Unit[] }[] = [];
+                owner.assignedUnits.forEach(assigned => {
+                    const property = allProperties.find(p => p.id === assigned.propertyId);
+                    if (property) {
+                        const units = property.units.filter(u => assigned.unitNames.includes(u.name));
+                        ownerProperties.push({ property, units });
+                    }
+                });
+                userProfile.propertyOwnerDetails = { properties: ownerProperties };
             }
         }
         return userProfile;
@@ -645,10 +662,47 @@ export async function getPropertyOwner(ownerId: string): Promise<PropertyOwner |
 
 export async function updatePropertyOwner(
     ownerId: string,
-    data: Partial<PropertyOwner>
+    data: Partial<PropertyOwner> & { email: string; phone: string; name: string }
 ): Promise<void> {
     const ownerRef = doc(db, 'propertyOwners', ownerId);
-    await setDoc(ownerRef, data, { merge: true });
+    let userId = data.userId;
+    
+    if (data.email && data.phone && !userId) {
+        const appName = 'owner-creation-app-' + Date.now();
+        let secondaryApp;
+        try {
+            secondaryApp = initializeApp(firebaseConfig, appName);
+        } catch(e) {
+            secondaryApp = getApp(appName);
+        }
+
+        const secondaryAuth = getAuth(secondaryApp);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.phone);
+            userId = userCredential.user.uid;
+
+            await createUserProfile(userId, data.email, 'homeowner', {
+                name: data.name,
+                propertyOwnerId: ownerId,
+            });
+            await logActivity(`Created property owner user: ${data.email}`);
+        } catch (error: any) {
+             if (error.code !== 'auth/email-already-in-use') {
+                console.error("Error creating property owner auth user:", error);
+                throw new Error("Failed to create property owner login credentials.");
+            } else {
+                 console.log("Email for property owner already in use, skipping auth creation.");
+            }
+        } finally {
+            if (secondaryApp) {
+                await deleteApp(secondaryApp);
+            }
+        }
+    }
+
+    const finalData = { ...data, userId: userId || data.userId };
+
+    await setDoc(ownerRef, finalData, { merge: true });
     await logActivity(`Updated property owner details: ${data.name || ownerId}`);
 }
 

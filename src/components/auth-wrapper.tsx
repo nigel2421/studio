@@ -19,6 +19,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     const onLoginPage = pathname === '/login';
     const isLandlordDashboard = pathname.startsWith('/landlord');
     const isTenantDashboard = pathname.startsWith('/tenant');
+    const isOwnerDashboard = pathname.startsWith('/owner');
 
     if (!isAuth && !onLoginPage) {
       router.push('/login');
@@ -32,6 +33,8 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
           router.push('/landlord/dashboard');
         } else if (userProfile?.role === 'tenant') {
           router.push('/tenant/dashboard');
+        } else if (userProfile?.role === 'homeowner') {
+          router.push('/owner/dashboard');
         } else {
           router.push('/dashboard');
         }
@@ -41,7 +44,9 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
           router.push('/landlord/dashboard');
         } else if (userProfile?.role === 'tenant' && !isTenantDashboard) {
           router.push('/tenant/dashboard');
-        } else if ((userProfile?.role === 'admin' || userProfile?.role === 'agent') && (isLandlordDashboard || isTenantDashboard)) {
+        } else if (userProfile?.role === 'homeowner' && !isOwnerDashboard) {
+          router.push('/owner/dashboard');
+        } else if ((userProfile?.role === 'admin' || userProfile?.role === 'agent') && (isLandlordDashboard || isTenantDashboard || isOwnerDashboard)) {
           router.push('/dashboard');
         }
       }

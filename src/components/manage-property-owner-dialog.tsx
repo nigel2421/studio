@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -25,29 +26,30 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
         email: '',
         phone: '',
         bankAccount: '',
-        propertyId: property.id,
-        unitNames: [],
+        assignedUnits: [],
     });
     const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
-    const { startLoading, stopLoading } = useLoading();
+    const { startLoading, stopLoading, isLoading } = useLoading();
 
     useEffect(() => {
-        if (owner) {
-            setFormData(owner);
-            setSelectedUnits(owner.unitNames || []);
-        } else {
-            setFormData({
-                id: `owner-${property.id}-${Date.now()}`,
-                name: '',
-                email: '',
-                phone: '',
-                bankAccount: '',
-                propertyId: property.id,
-                unitNames: [],
-            });
-            setSelectedUnits([]);
+        if (isOpen) {
+            if (owner) {
+                setFormData(owner);
+                const unitsForThisProperty = owner.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames || [];
+                setSelectedUnits(unitsForThisProperty);
+            } else {
+                setFormData({
+                    id: `owner-${property.id}-${Date.now()}`,
+                    name: '',
+                    email: '',
+                    phone: '',
+                    bankAccount: '',
+                    assignedUnits: [],
+                });
+                setSelectedUnits([]);
+            }
         }
-    }, [owner, property]);
+    }, [owner, property, isOpen]);
 
     const handleUnitToggle = (unitName: string) => {
         setSelectedUnits(prev =>
@@ -150,7 +152,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button type="submit">Save Details</Button>
+                        <Button type="submit" disabled={isLoading}>Save Details</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
