@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { logActivity } from '@/lib/data';
+import { logActivity, createUserProfile } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -53,6 +52,34 @@ export default function LoginPage() {
     }
   };
   
+  const handleSignUp = async () => {
+    setError(null);
+    setIsLoggingIn(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const name = userCredential.user.email?.split('@')[0] || 'Admin';
+      await createUserProfile(userCredential.user.uid, userCredential.user.email || email, 'admin', { name });
+      toast({
+        title: 'Sign Up Successful',
+        description: 'You can now log in with the credentials you just created.',
+      });
+    } catch (error: any) {
+       if (error.code === 'auth/email-already-in-use') {
+        setError('This email is already in use. Try logging in instead.');
+       } else if (error.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address to sign up.');
+       } else if (error.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters.');
+       }
+       else {
+        setError('Failed to sign up. Please try again later.');
+      }
+      console.error(error);
+    } finally {
+        setIsLoggingIn(false);
+    }
+  };
+
   if (isLoading || isAuth) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -101,6 +128,16 @@ export default function LoginPage() {
             >
               {isLoggingIn ? <Loader className="mx-auto h-5 w-5 animate-spin" /> : 'Login'}
             </button>
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              No admin account?{' '}
+              <button
+                type="button"
+                onClick={handleSignUp}
+                className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Sign Up
+              </button>
+            </p>
           </div>
         </form>
       </div>
