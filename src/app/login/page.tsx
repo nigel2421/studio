@@ -7,7 +7,6 @@ import { logActivity } from '@/lib/data';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { Loader2, Mail, Lock, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,10 +65,7 @@ export default function LoginPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Side: Hero / Brand Area */}
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+      <div
         className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 text-white bg-slate-900 border-r border-slate-800"
       >
         {/* Background Gradient/Pattern */}
@@ -94,14 +90,11 @@ export default function LoginPage() {
         <div className="relative z-10 text-sm text-slate-400">
           © {new Date().getFullYear()} Eracov Properties. All rights reserved.
         </div>
-      </motion.div>
+      </div>
 
       {/* Right Side: Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 lg:p-12 relative">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+        <div
           className="w-full max-w-md space-y-8"
         >
           <div className="text-center lg:text-left">
@@ -151,16 +144,13 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <motion.div
-              animate={error ? { x: [-5, 5, -5, 5, 0] } : {}}
-              transition={{ duration: 0.3 }}
-            >
+            <div>
               {error && (
                 <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-md">
                   {error}
                 </div>
               )}
-            </motion.div>
+            </div>
 
             <Button
               className="w-full h-11 text-base font-medium shadow-lg shadow-blue-500/20"
@@ -187,7 +177,7 @@ export default function LoginPage() {
             </a>
             {" "} if you are having trouble access your account.
           </p>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
