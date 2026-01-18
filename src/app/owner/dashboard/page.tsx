@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { FinancialSummary, aggregateFinancials } from '@/lib/financial-utils';
 import { Loader2 } from 'lucide-react';
@@ -22,13 +21,12 @@ import { Loader2 } from 'lucide-react';
 // This component is for owners who are also residents, showing their personal bills.
 function ResidentOwnerDashboard() {
     const { userProfile } = useAuth();
-    const { toast } = useToast();
     const router = useRouter();
     const [payments, setPayments] = useState<Payment[]>([]);
 
     const tenantDetails = userProfile?.tenantDetails;
-    const latestWaterReading = tenantDetails?.waterReadings?.[0];
     const waterReadingHistory = tenantDetails?.waterReadings || [];
+    const latestWaterReading = waterReadingHistory[0];
     
     useEffect(() => {
         if (userProfile?.tenantId) {
@@ -63,7 +61,7 @@ function ResidentOwnerDashboard() {
                         <div className="flex items-center gap-2">
                              <Building className="h-4 w-4 text-muted-foreground" />
                              <strong>Property:</strong>
-                             <span>{userProfile.propertyOwnerDetails?.properties.find(p => p.property.id === tenantDetails.propertyId)?.property.name || tenantDetails.propertyId}</span>
+                             <span>{userProfile?.propertyOwnerDetails?.properties.find(p => p.property.id === tenantDetails.propertyId)?.property.name || tenantDetails.propertyId}</span>
                         </div>
                          <div className="flex items-center gap-2">
                              <Home className="h-4 w-4 text-muted-foreground" />
@@ -279,12 +277,13 @@ export default function OwnerDashboardPage() {
         );
     }
 
-    const hasResidentDetails = !!userProfile?.tenantDetails;
+    // This is the crucial check. If the user has tenantDetails, they are a resident.
+    const isResident = !!userProfile?.tenantDetails;
 
     return (
         <div className="space-y-6">
             <header className="flex items-center justify-between">
-                <div>
+                 <div>
                     {/* Title is rendered inside the child components */}
                 </div>
                 <Button onClick={handleSignOut} variant="outline">
@@ -293,7 +292,7 @@ export default function OwnerDashboardPage() {
                 </Button>
             </header>
             
-            {hasResidentDetails ? <ResidentOwnerDashboard /> : <InvestorDashboard />}
+            {isResident ? <ResidentOwnerDashboard /> : <InvestorDashboard />}
         </div>
     );
 }
