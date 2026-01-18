@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -41,13 +42,12 @@ export default function LoginPage() {
       // Redirection is handled by the useEffect hook.
     } catch (error: any) {
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        setError('Incorrect email or password. Please try again.');
+        setError('Incorrect email or password. If you are an administrator and do not have an account, please use the Sign Up option.');
       } else if (error.code === 'auth/invalid-email') {
         setError('Please enter a valid email address.');
       } else {
         setError('Failed to log in. Please try again later.');
       }
-      console.error(error);
       setIsLoggingIn(false);
     }
   };
@@ -74,7 +74,6 @@ export default function LoginPage() {
        else {
         setError('Failed to sign up. Please try again later.');
       }
-      console.error(error);
     } finally {
         setIsLoggingIn(false);
     }
