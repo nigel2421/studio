@@ -5,19 +5,23 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Loader2, FileText } from 'lucide-react';
-import { Tenant, Payment } from '@/lib/types';
+import { Download, Loader2, FileText, PlusCircle } from 'lucide-react';
+import { Tenant, Payment, Property } from '@/lib/types';
 import { getTenantPayments } from '@/lib/data';
 import { downloadCSV } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { AddPaymentDialog } from './add-payment-dialog';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onPaymentAdded: () => void;
+    allTenants: Tenant[];
+    allProperties: Property[];
 }
 
-export function TransactionHistoryDialog({ tenant, open, onOpenChange }: TransactionHistoryDialogProps) {
+export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPaymentAdded, allProperties, allTenants }: TransactionHistoryDialogProps) {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -30,6 +34,14 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange }: Transac
                 .finally(() => setIsLoading(false));
         }
     }, [tenant, open]);
+    
+    // This effect runs when onPaymentAdded is called from the inner dialog
+    useEffect(() => {
+        if (tenant && open) {
+            getTenantPayments(tenant.id).then(setPayments);
+        }
+    }, [tenant, open, onPaymentAdded]);
+
 
     const handleDownloadCSV = () => {
         if (!tenant) return;
@@ -57,7 +69,18 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange }: Transac
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-between items-center mb-4">
+                     <AddPaymentDialog
+                        properties={allProperties}
+                        tenants={allTenants}
+                        onPaymentAdded={onPaymentAdded}
+                        tenant={tenant}
+                    >
+                        <Button variant="outline" size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Record Payment
+                        </Button>
+                    </AddPaymentDialog>
                     <Button variant="outline" size="sm" onClick={handleDownloadCSV} disabled={payments.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
                         Export Statement
