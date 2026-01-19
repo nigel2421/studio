@@ -56,7 +56,7 @@ Your goal:
 Be specific and actionable.`,
 });
 
-export const propertyInsightsFlow = ai.defineFlow(
+const propertyInsightsFlow = ai.defineFlow(
     {
         name: 'propertyInsightsFlow',
         inputSchema: PropertyInsightsInputSchema,
