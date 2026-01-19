@@ -119,7 +119,7 @@ export function AppSidebar() {
 
           <SidebarMenuItem>
             <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen}>
-              <CollapsibleTrigger className="w-full">
+              <CollapsibleTrigger asChild className="w-full">
                 <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')}>
                   <Banknote />
                   <span>Accounts</span>
