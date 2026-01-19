@@ -1,30 +1,61 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getTasks } from '@/lib/data';
-import { Task } from '@/lib/types';
+import { getTasks, getTenants, getProperties } from '@/lib/data';
+import { Task, Tenant, Property } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CheckSquare, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckSquare, Clock, AlertCircle, Loader2, DollarSign } from 'lucide-react';
+import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
+import { Button } from '@/components/ui/button';
 
 export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [properties, setProperties] = useState<Property[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+    const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+
+    const fetchData = async () => {
+        try {
+            const [tasksData, tenantsData, propertiesData] = await Promise.all([
+                getTasks(),
+                getTenants(),
+                getProperties(),
+            ]);
+            setTasks(tasksData);
+            setTenants(tenantsData);
+            setProperties(propertiesData);
+        } catch (error) {
+            console.error("Failed to fetch tasks:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        async function fetchData() {
-            try {
-                const tasksData = await getTasks();
-                setTasks(tasksData);
-            } catch (error) {
-                console.error("Failed to fetch tasks:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
         fetchData();
     }, []);
+    
+    const handleRecordPayment = (task: Task) => {
+        if (task.tenantId) {
+            const tenant = tenants.find(t => t.id === task.tenantId);
+            if (tenant) {
+                setSelectedTenant(tenant);
+                setIsPaymentDialogOpen(true);
+            }
+        }
+    };
+    
+    const handlePaymentAdded = () => {
+        setIsPaymentDialogOpen(false);
+        // Optionally, you might want to refresh tasks or related data here
+        fetchData();
+    };
+
 
     const getStatusVariant = (status: Task['status']) => {
         switch (status) {
@@ -106,6 +137,7 @@ export default function TasksPage() {
                                 <TableHead>Due Date</TableHead>
                                 <TableHead>Priority</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -129,11 +161,19 @@ export default function TasksPage() {
                                         <TableCell>
                                             <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
                                         </TableCell>
+                                        <TableCell className="text-right">
+                                            {task.category === 'Financial' && task.tenantId && (
+                                                <Button variant="outline" size="sm" onClick={() => handleRecordPayment(task)}>
+                                                    <DollarSign className="mr-2 h-4 w-4"/>
+                                                    Record Payment
+                                                </Button>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                                         No tasks found.
                                     </TableCell>
                                 </TableRow>
@@ -142,6 +182,18 @@ export default function TasksPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <AddPaymentDialog
+                properties={properties}
+                tenants={tenants}
+                onPaymentAdded={handlePaymentAdded}
+                tenant={selectedTenant}
+            >
+                {/* This dialog is now controlled externally by `isPaymentDialogOpen` state */}
+                <div style={{ display: isPaymentDialogOpen ? 'block' : 'none' }}></div>
+            </AddPaymentDialog>
+
         </div>
     );
 }
+

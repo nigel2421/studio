@@ -31,23 +31,24 @@ import {
   History,
   Mail,
   CheckSquare,
+  ChevronDown,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useLoading } from '@/hooks/useLoading';
+import { useState } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
-  { href: '/accounts', icon: Banknote, label: 'Accounts' },
   { href: '/documents', icon: FileText, label: 'My Documents' },
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Add Water Reading' },
   { href: '/properties', icon: Building2, label: 'Properties' },
-  { href: '/tasks', icon: CheckSquare, label: 'Tasks' },
 ];
 
 const otherItems = [
@@ -63,6 +64,7 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { user, userProfile } = useAuth();
   const { startLoading } = useLoading();
+  const [isAccountingOpen, setIsAccountingOpen] = useState(true);
 
   const isActive = (href: string) => pathname === href;
 
@@ -114,6 +116,39 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuItem>
           ))}
+
+          <SidebarMenuItem>
+            <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen}>
+              <CollapsibleTrigger className="w-full">
+                <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')}>
+                  <Banknote />
+                  <span>Accounts</span>
+                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="pl-8 py-1 space-y-1">
+                  <SidebarMenuItem>
+                    <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
+                      <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
+                        <span>Overview</span>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
+                      <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
+                        <CheckSquare />
+                        <span>Tasks</span>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
+          </SidebarMenuItem>
+
+
           <Separator className="my-2" />
           {otherItems.map((item) => (
             <SidebarMenuItem key={item.href}>
