@@ -30,6 +30,7 @@ import {
   Droplets,
   History,
   Mail,
+  CheckSquare,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,6 +47,7 @@ const navItems = [
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Add Water Reading' },
   { href: '/properties', icon: Building2, label: 'Properties' },
+  { href: '/tasks', icon: CheckSquare, label: 'Tasks' },
 ];
 
 const otherItems = [

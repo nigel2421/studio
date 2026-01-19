@@ -77,6 +77,20 @@ export type WaterMeterReading = {
   createdAt: Date;
 }
 
+export type Task = {
+  id: string;
+  title: string;
+  description: string;
+  status: 'Pending' | 'In Progress' | 'Completed';
+  priority: 'Low' | 'Medium' | 'High';
+  dueDate: string;
+  category: 'Onboarding' | 'Maintenance' | 'Administrative' | 'Financial';
+  tenantId?: string;
+  propertyId?: string;
+  unitName?: string;
+  createdAt: string;
+};
+
 export type Payment = {
   id: string;
   tenantId: string;
@@ -109,6 +123,8 @@ export type Tenant = {
     paymentStatus: 'Paid' | 'Pending' | 'Overdue';
     lastPaymentDate?: string;
   };
+  accountBalance: number; // For overpayments
+  dueBalance: number;      // For carry-over debts
   waterReadings?: WaterMeterReading[];
 };
 

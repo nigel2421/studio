@@ -1,15 +1,15 @@
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
-    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication
+    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit } from 'firebase/firestore';
 import propertiesData from '../../backend.json';
 import { auth } from './firebase';
+import { reconcileMonthlyBilling, processPayment, calculateTargetDue } from './financial-logic';
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -102,6 +102,8 @@ export async function addTenant({
     securityDeposit
 }: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number }): Promise<void> {
 
+    const initialDue = (rent * 2) + 0; // Rent + Deposit. Service charge handling can be added if needed here.
+
     const newTenantData = {
         name,
         email,
@@ -118,8 +120,23 @@ export async function addTenant({
             paymentStatus: 'Pending' as const
         },
         securityDeposit: securityDeposit || 0,
+        dueBalance: initialDue,
+        accountBalance: 0,
     };
     const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData);
+
+    // Create onboarding task
+    await addTask({
+        title: `Onboard Tenant: ${name}`,
+        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} is pending.`,
+        status: 'Pending',
+        priority: 'High',
+        category: 'Onboarding',
+        tenantId: tenantDocRef.id,
+        propertyId,
+        unitName,
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+    });
 
     await logActivity(`Created tenant: ${name} (${email})`);
 
@@ -362,7 +379,7 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
 }
 
-export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>) {
+export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>): Promise<void> {
     const tenantRef = doc(db, 'tenants', paymentData.tenantId);
     const tenantSnap = await getDoc(tenantRef);
 
@@ -370,30 +387,30 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
         throw new Error("Tenant not found");
     }
 
-    const tenant = tenantSnap.data() as Tenant;
+    const tenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
-    const payment = {
+    // 1. Record the payment in Firestore
+    const paymentsRef = collection(db, 'payments');
+    const paymentDoc = await addDoc(paymentsRef, {
         ...paymentData,
         createdAt: serverTimestamp(),
-    };
+    });
 
-    await addDoc(collection(db, 'payments'), payment);
-    await logActivity(`Added payment of ${paymentData.amount} for tenant ${tenant.name}`);
+    // 2. Process balances using logic
+    const updates = processPayment(tenant, paymentData.amount);
 
-    // Update lease payment status
-    let newLeaseData = {};
-    if (tenant.lease && payment.amount >= tenant.lease.rent) {
-        newLeaseData = {
-            'lease.paymentStatus': 'Paid',
-            'lease.lastPaymentDate': paymentData.date,
-        };
-    }
-    await updateDoc(tenantRef, newLeaseData);
+    // 3. Update tenant in Firestore
+    await updateDoc(tenantRef, {
+        dueBalance: updates.dueBalance,
+        accountBalance: updates.accountBalance,
+        'lease.paymentStatus': updates.lease?.paymentStatus,
+        'lease.lastPaymentDate': updates.lease?.lastPaymentDate,
+    });
 
-    // Send receipt email
+    // 4. Send receipt email
     const property = await getProperty(tenant.propertyId);
     try {
-        const result = await sendPaymentReceipt({
+        await sendPaymentReceipt({
             tenantEmail: tenant.email,
             tenantName: tenant.name,
             amount: paymentData.amount,
@@ -402,36 +419,32 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
             unitName: tenant.unitName,
             notes: paymentData.notes,
         });
-
-        // Log on successful call
         await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
-
     } catch (error) {
-        console.error("Failed to send receipt email via cloud function:", error);
-        // We don't throw here because the payment was still successful.
-        // We should log this to a more robust monitoring service in a real app.
+        console.error("Failed to send receipt email:", error);
+    }
+}
+
+export async function runMonthlyReconciliation(): Promise<void> {
+    const tenantsRef = collection(db, 'tenants');
+    const tenantsSnap = await getDocs(tenantsRef);
+    const today = new Date();
+
+    const batch = writeBatch(db);
+
+    for (const tenantDoc of tenantsSnap.docs) {
+        const tenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
+        const updates = reconcileMonthlyBilling(tenant, today);
+
+        batch.update(tenantDoc.ref, {
+            dueBalance: updates.dueBalance,
+            accountBalance: updates.accountBalance,
+            'lease.paymentStatus': updates.lease?.paymentStatus,
+        });
     }
 
-
-    const updatedTenantSnap = await getDoc(tenantRef);
-    const updatedTenant = updatedTenantSnap.data() as Tenant;
-    if (updatedTenant.lease && updatedTenant.lease.lastPaymentDate) {
-        const lastPayment = new Date(updatedTenant.lease.lastPaymentDate);
-        const today = new Date();
-
-        if (lastPayment.getMonth() !== today.getMonth() || lastPayment.getFullYear() !== today.getFullYear()) {
-            const newStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            const newEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-            if (updatedTenant.lease.paymentStatus === 'Paid') {
-                await updateDoc(tenantRef, {
-                    'lease.paymentStatus': 'Pending',
-                    'lease.startDate': newStartDate.toISOString().split('T')[0],
-                    'lease.endDate': newEndDate.toISOString().split('T')[0],
-                });
-            }
-        }
-    }
+    await batch.commit();
+    await logActivity(`Monthly reconciliation completed for ${tenantsSnap.size} tenants.`);
 }
 
 export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
@@ -827,4 +840,16 @@ export async function getLandlordPropertiesAndUnits(landlordId: string): Promise
 
 export async function getAllPayments(): Promise<Payment[]> {
     return getCollection<Payment>('payments');
+}
+
+export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
+    await addDoc(collection(db, 'tasks'), {
+        ...task,
+        createdAt: new Date().toISOString(),
+    });
+    await logActivity(`Created task: ${task.title}`);
+}
+
+export async function getTasks(): Promise<Task[]> {
+    return getCollection<Task>('tasks');
 }

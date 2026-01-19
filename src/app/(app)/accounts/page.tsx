@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getTenants, getProperties, addPayment } from '@/lib/data';
+import { getTenants, getProperties, addPayment, runMonthlyReconciliation } from '@/lib/data';
 import type { Tenant, Property, Payment, Unit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -213,9 +213,19 @@ export default function AccountsPage() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  const fetchAllData = () => {
-    getTenants().then(setTenants);
-    getProperties().then(setProperties);
+  const fetchAllData = async () => {
+    try {
+      // Run reconciliation first to ensure latest balances
+      await runMonthlyReconciliation();
+      const [tenantsData, propertiesData] = await Promise.all([
+        getTenants(),
+        getProperties()
+      ]);
+      setTenants(tenantsData);
+      setProperties(propertiesData);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    }
   };
 
   useEffect(() => {
@@ -262,9 +272,9 @@ export default function AccountsPage() {
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Rent Collected", value: `Ksh ${financialSummary.collected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Rent Pending", value: `Ksh ${financialSummary.pending.toLocaleString()}`, icon: Users, color: "text-yellow-500" },
-    { title: "Rent Overdue", value: `Ksh ${financialSummary.overdue.toLocaleString()}`, icon: UserX, color: "text-red-500" },
+    { title: "Total Due", value: `Ksh ${tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-red-500" },
+    { title: "Advance Payments", value: `Ksh ${tenants.reduce((sum, t) => sum + (t.accountBalance || 0), 0).toLocaleString()}`, icon: PlusCircle, color: "text-green-500" },
+    { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-blue-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
   ];
 
@@ -338,6 +348,8 @@ export default function AccountsPage() {
                 <TableHead>Tenant</TableHead>
                 <TableHead>Property</TableHead>
                 <TableHead>Rent Amount</TableHead>
+                <TableHead>Due Balance</TableHead>
+                <TableHead>Excess (Cr)</TableHead>
                 <TableHead className="text-right">Payment Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -358,6 +370,12 @@ export default function AccountsPage() {
                       ? `Ksh ${tenant.lease.rent.toLocaleString()}`
                       : 'N/A'
                     }
+                  </TableCell>
+                  <TableCell className="text-red-600 font-semibold">
+                    Ksh {(tenant.dueBalance || 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-green-600 font-semibold">
+                    Ksh {(tenant.accountBalance || 0).toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
