@@ -405,7 +405,7 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
 
     // 1. Record the payment in Firestore
     const paymentsRef = collection(db, 'payments');
-    const paymentDoc = await addDoc(paymentsRef, {
+    await addDoc(paymentsRef, {
         ...paymentData,
         createdAt: serverTimestamp(),
     });
@@ -414,12 +414,7 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
     const updates = processPayment(tenant, paymentData.amount);
 
     // 3. Update tenant in Firestore
-    await updateDoc(tenantRef, {
-        dueBalance: updates.dueBalance,
-        accountBalance: updates.accountBalance,
-        'lease.paymentStatus': updates.lease?.paymentStatus,
-        'lease.lastPaymentDate': updates.lease?.lastPaymentDate,
-    });
+    await updateDoc(tenantRef, updates);
 
     // 4. Send receipt email
     const property = await getProperty(tenant.propertyId);
@@ -451,12 +446,7 @@ export async function runMonthlyReconciliation(): Promise<void> {
         const updates = reconcileMonthlyBilling(tenant, today);
 
         if (updates && Object.keys(updates).length > 0) {
-            batch.update(tenantDoc.ref, {
-                dueBalance: updates.dueBalance,
-                accountBalance: updates.accountBalance,
-                'lease.paymentStatus': updates.lease?.paymentStatus,
-                'lease.lastBilledPeriod': updates.lease?.lastBilledPeriod,
-            });
+            batch.update(tenantDoc.ref, updates);
         }
     }
 

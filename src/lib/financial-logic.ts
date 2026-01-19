@@ -41,7 +41,7 @@ export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Dat
 /**
  * Process a new payment and update the tenant's balances.
  */
-export function processPayment(tenant: Tenant, paymentAmount: number): Partial<Tenant> {
+export function processPayment(tenant: Tenant, paymentAmount: number): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
 
@@ -61,11 +61,8 @@ export function processPayment(tenant: Tenant, paymentAmount: number): Partial<T
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
-        lease: {
-            ...tenant.lease,
-            paymentStatus: newDueBalance <= 0 ? 'Paid' : 'Pending',
-            lastPaymentDate: format(new Date(), 'yyyy-MM-dd')
-        }
+        'lease.paymentStatus': newDueBalance <= 0 ? 'Paid' : 'Pending',
+        'lease.lastPaymentDate': format(new Date(), 'yyyy-MM-dd')
     };
 }
 
@@ -73,7 +70,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number): Partial<T
  * Monthly reconciliation logic (should run on the 1st or when dashboard loads)
  * This adds the monthly rent/service charge to the dueBalance.
  */
-export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): Partial<Tenant> {
+export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): { [key: string]: any } {
     if (!tenant.lease) {
         console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease information.`);
         return {};
@@ -85,7 +82,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     if (tenant.lease.lastBilledPeriod === currentPeriod) {
         const updatedStatus = getRecommendedPaymentStatus(tenant, date);
         if (tenant.lease.paymentStatus !== updatedStatus) {
-            return { lease: { ...tenant.lease, paymentStatus: updatedStatus } };
+            return { 'lease.paymentStatus': updatedStatus };
         }
         return {}; // No changes needed
     }
@@ -108,10 +105,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
-        lease: {
-            ...tenant.lease,
-            paymentStatus: getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
-            lastBilledPeriod: currentPeriod,
-        }
+        'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
+        'lease.lastBilledPeriod': currentPeriod,
     };
 }
