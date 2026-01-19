@@ -14,15 +14,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { EditPropertyHeader } from '@/components/layout/edit-property-header';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { DynamicLoader } from '@/components/ui/dynamic-loader';
 
 const unitSchema = z.object({
     name: z.string(),
-    status: z.enum(unitStatuses),
-    ownership: z.enum(ownershipTypes),
-    unitType: z.enum(unitTypes),
+    status: z.enum(unitStatuses as any),
+    ownership: z.enum(ownershipTypes as any),
+    unitType: z.enum(unitTypes as any),
     landlordId: z.string().optional(),
-    managementStatus: z.enum(managementStatuses).optional(),
-    handoverStatus: z.enum(handoverStatuses).optional(),
+    managementStatus: z.enum(managementStatuses as any).optional(),
+    handoverStatus: z.enum(handoverStatuses as any).optional(),
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
 });
@@ -41,6 +43,8 @@ export default function EditPropertyPage() {
     const router = useRouter();
     const [property, setProperty] = useState<Property | null>(null);
     const [landlords, setLandlords] = useState<Landlord[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const { toast } = useToast();
 
     const form = useForm<EditPropertyFormValues>({
         resolver: zodResolver(formSchema),
@@ -106,8 +110,24 @@ export default function EditPropertyPage() {
 
     const onSubmit: SubmitHandler<EditPropertyFormValues> = async (data) => {
         if (property) {
-            await updateProperty(property.id, data);
-            router.push('/properties');
+            setIsSaving(true);
+            try {
+                await updateProperty(property.id, data as any);
+                toast({
+                    title: "Success",
+                    description: "Property and unit records updated successfully.",
+                });
+                router.push('/properties');
+            } catch (error) {
+                console.error("Error updating property:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to update property details.",
+                });
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -118,10 +138,14 @@ export default function EditPropertyPage() {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
-                <EditPropertyHeader form={form} onSubmit={form.handleSubmit(onSubmit)} />
+                <EditPropertyHeader form={form} onSubmit={form.handleSubmit(onSubmit)} isSaving={isSaving} />
                 <div className="p-4 sm:p-6 lg:p-8 space-y-6">
                     <div>
-                        <h3 className="text-lg font-medium mb-4">Units</h3>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium">Units</h3>
+                            {isSaving && <div className="flex items-center text-sm text-blue-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving changes...</div>}
+                        </div>
+                        <DynamicLoader isLoading={isSaving} className="mb-4" />
                         <div className="space-y-4">
                             {fields.map((field, index) => (
                                 <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end p-4 border rounded-lg">

@@ -24,655 +24,764 @@
           "name": "GMA 1-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-ZA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 2-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 2-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 2-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 2-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 2-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 3-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 3-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 4-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 4-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 4-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 4-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 5-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 5-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 6-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 7-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 7-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 7-Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 8-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 9-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 9-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 10-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 11-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 12-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 12-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 13-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 15-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 16-FA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 16-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 16-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 16-ZB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 16-ZD",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 17-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 17-ZC",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 18-MA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 19-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 19-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 19-MA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 19-ZA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 19-ZD",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 20-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 20-MA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 20-ZB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 20-ZC",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 20-ZD",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-X",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21-ZA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-X",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 22-ZA",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21 - Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 21 - J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMA 1-A",
@@ -3537,925 +3646,1079 @@
           "name": "GMAnnex 1-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 2-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 3-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 4-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 5-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 6-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 7-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 8-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 9-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 9-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 10-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 17-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-X",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 18-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 19-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 20-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-X",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 21-Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-A",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-B",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-C",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-D",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-E",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-F",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-G",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-H",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-I",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-J",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-K",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-L",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-M",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-N",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-O",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-P",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-Q",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-R",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-S",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-T",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-U",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-V",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-W",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-X",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-Y",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 22-Z",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Studio"
+          "unitType": "Studio",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 8-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 2-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 3-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 4-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 5-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 6-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 7-AB",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "GMAnnex 1-K",
@@ -5958,379 +6221,442 @@
           "name": "MA 1-A1",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 1-A2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 1-A3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 1-A4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA1-A5",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA1-A6",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA1-A7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 1-A8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA1-A9",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B1",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B5",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B6",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C1",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 3-C8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D6",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 4-D8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 5-E2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 5-E4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 5-E6",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 5-E7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 5-E8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 6-F3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 6-F4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 6-F7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 6-F8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 7-G2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 7-G3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 7-G4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 7-G7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 7-G8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 8-H3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 8-H7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 8-H8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 9-J2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 9-J3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 9-J4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 9-J7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 10-K3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 10-K7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 10-K8",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 11-L2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 11-L3",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "One Bedroom"
+          "unitType": "One Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 11-L5",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 11-L7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M1",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M2",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M4",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M5",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M7",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Two Bedroom"
+          "unitType": "Two Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 12-M9",
           "status": "vacant",
           "ownership": "SM",
-          "unitType": "Three Bedroom"
+          "unitType": "Three Bedroom",
+          "managementStatus": "Renting Mngd by Eracov for SM"
         },
         {
           "name": "MA 2-B9",
