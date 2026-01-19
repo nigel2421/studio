@@ -321,6 +321,12 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
     await logActivity(`Submitted maintenance request`);
 }
 
+export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceRequest['status']) {
+    const requestRef = doc(db, 'maintenanceRequests', requestId);
+    await updateDoc(requestRef, { status });
+    await logActivity(`Updated maintenance request ${requestId} to ${status}`);
+}
+
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
     const q = query(
         collection(db, "maintenanceRequests"),

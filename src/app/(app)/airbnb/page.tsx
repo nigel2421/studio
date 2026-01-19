@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BedDouble, Home } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
 interface AirbnbUnit extends Unit {
   propertyName: string;
@@ -17,6 +18,8 @@ interface AirbnbUnit extends Unit {
 export default function AirbnbPage() {
   const [airbnbUnits, setAirbnbUnits] = useState<AirbnbUnit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     async function fetchAndFilterProperties() {
@@ -39,6 +42,12 @@ export default function AirbnbPage() {
 
     fetchAndFilterProperties();
   }, []);
+
+  const totalPages = Math.ceil(airbnbUnits.length / pageSize);
+  const paginatedUnits = airbnbUnits.slice(
+      (currentPage - 1) * pageSize,
+      currentPage * pageSize
+  );
 
   if (loading) {
     return (
@@ -70,7 +79,7 @@ export default function AirbnbPage() {
               Found {airbnbUnits.length} unit(s) marked for Airbnb.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -81,7 +90,7 @@ export default function AirbnbPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {airbnbUnits.map((unit, index) => (
+                {paginatedUnits.map((unit, index) => (
                   <TableRow key={`${unit.propertyName}-${unit.name}-${index}`}>
                     <TableCell>
                       <div className="font-medium">{unit.propertyName}</div>
@@ -99,6 +108,16 @@ export default function AirbnbPage() {
               </TableBody>
             </Table>
           </CardContent>
+          <div className="p-4 border-t">
+              <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={airbnbUnits.length}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+              />
+          </div>
         </Card>
       ) : (
         <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg text-center">

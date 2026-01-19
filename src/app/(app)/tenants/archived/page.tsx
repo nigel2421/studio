@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { getArchivedTenants, getProperties } from "@/lib/data";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { ArchivedTenant, Property } from '@/lib/types';
 import {
   Table,
@@ -13,11 +13,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { PaginationControls } from '@/components/ui/pagination-controls';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function ArchivedTenantsPage() {
     const [tenants, setTenants] = useState<ArchivedTenant[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [searchTerm, setSearchTerm] = useState('');
+
 
     useEffect(() => {
         getArchivedTenants().then(setTenants);
@@ -29,10 +37,28 @@ export default function ArchivedTenantsPage() {
         return property ? property.name : 'N/A';
     };
 
+    const filteredTenants = tenants.filter(tenant =>
+        tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tenant.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const totalPages = Math.ceil(filteredTenants.length / pageSize);
+    const paginatedTenants = filteredTenants.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
+
+
     return (
         <div>
             <div className="flex items-center justify-between w-full mb-6">
-                <h2 className="text-2xl font-semibold">Archived Tenants</h2>
+                <div>
+                    <h2 className="text-2xl font-semibold">Archived Tenants</h2>
+                    <p className="text-muted-foreground">List of former tenants and homeowners.</p>
+                </div>
+                <Button asChild variant="outline">
+                    <Link href="/tenants">Back to Active Tenants</Link>
+                </Button>
             </div>
 
             {tenants.length === 0 ? (
@@ -44,6 +70,20 @@ export default function ArchivedTenantsPage() {
                 </div>
             ) : (
                 <Card>
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                             <CardTitle>Archived Records</CardTitle>
+                             <div className="relative w-full sm:w-[300px]">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by name or email..."
+                                    className="pl-9"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </CardHeader>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader>
@@ -57,7 +97,7 @@ export default function ArchivedTenantsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {tenants.map(tenant => (
+                                {paginatedTenants.map(tenant => (
                                     <TableRow key={tenant.id}>
                                         <TableCell>{tenant.name}</TableCell>
                                         <TableCell>{getPropertyName(tenant.propertyId)}</TableCell>
@@ -70,6 +110,16 @@ export default function ArchivedTenantsPage() {
                             </TableBody>
                         </Table>
                     </CardContent>
+                    <div className="p-4 border-t">
+                        <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalItems={filteredTenants.length}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                        />
+                    </div>
                 </Card>
             )}
         </div>
