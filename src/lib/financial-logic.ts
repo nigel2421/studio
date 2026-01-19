@@ -1,3 +1,4 @@
+
 import { Tenant, Payment } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth } from 'date-fns';
 
@@ -7,8 +8,16 @@ import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, is
  * Other months: Rent + Service Charge.
  */
 export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): number {
+    if (!tenant.lease) {
+        return 0;
+    }
     const rent = tenant.lease.rent || 0;
     const serviceCharge = tenant.lease.serviceCharge || 0;
+    
+    if (!tenant.lease.startDate) {
+        return rent + serviceCharge;
+    }
+
     const startDate = parseISO(tenant.lease.startDate);
 
     const isFirstMonth = isSameMonth(startDate, date);
@@ -79,6 +88,15 @@ export function processPayment(tenant: Tenant, paymentAmount: number): Partial<T
  * This adds the monthly rent/service charge to the dueBalance.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): Partial<Tenant> {
+    // If a tenant has no lease information, we cannot perform billing.
+    if (!tenant.lease) {
+        console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease information.`);
+        return {
+            dueBalance: tenant.dueBalance,
+            accountBalance: tenant.accountBalance,
+        };
+    }
+
     // Check if we've already billed for this month
     // In a real app, you'd track "lastBilledMonth"
     // For this simulation, we'll assume this function is called only once per month
