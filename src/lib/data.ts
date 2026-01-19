@@ -140,6 +140,17 @@ export async function addTenant({
 
     await logActivity(`Created tenant: ${name} (${email})`);
 
+    // Update unit status to occupied
+    const props = await getProperties();
+    const currentProperty = props.find(p => p.id === propertyId);
+    if (currentProperty) {
+        const updatedUnits = currentProperty.units.map(u =>
+            u.name === unitName ? { ...u, status: 'rented' as const } : u
+        );
+        await updateProperty(propertyId, { units: updatedUnits });
+    }
+
+
     const appName = 'tenant-creation-app-' + newTenantData.email;
     let secondaryApp;
     try {
@@ -437,9 +448,9 @@ export async function runMonthlyReconciliation(): Promise<void> {
         const updates = reconcileMonthlyBilling(tenant, today);
 
         batch.update(tenantDoc.ref, {
-            dueBalance: updates.dueBalance,
-            accountBalance: updates.accountBalance,
-            'lease.paymentStatus': updates.lease?.paymentStatus,
+            dueBalance: updates.dueBalance ?? 0,
+            accountBalance: updates.accountBalance ?? 0,
+            'lease.paymentStatus': updates.lease?.paymentStatus || 'Pending',
         });
     }
 

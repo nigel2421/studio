@@ -32,7 +32,7 @@ export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Dat
     // If we are before the 5th, it's not "Overdue" yet, maybe "Pending"
     // If we are after the 5th and dueBalance > 0, it should be "Pending" or "Overdue"
 
-    if (tenant.dueBalance <= 0 && tenant.accountBalance >= 0) {
+    if ((tenant.dueBalance || 0) <= 0 && (tenant.accountBalance || 0) >= 0) {
         return 'Paid';
     }
 
@@ -47,8 +47,8 @@ export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Dat
  * Process a new payment and update the tenant's balances.
  */
 export function processPayment(tenant: Tenant, paymentAmount: number): Partial<Tenant> {
-    let newDueBalance = tenant.dueBalance;
-    let newAccountBalance = tenant.accountBalance;
+    let newDueBalance = tenant.dueBalance || 0;
+    let newAccountBalance = tenant.accountBalance || 0;
 
     // Total available = payment + existing overpayment
     let totalAvailable = paymentAmount + newAccountBalance;
@@ -84,8 +84,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     // For this simulation, we'll assume this function is called only once per month
 
     const monthlyCharge = calculateTargetDue(tenant, date);
-    let newDueBalance = tenant.dueBalance + monthlyCharge;
-    let newAccountBalance = tenant.accountBalance;
+    let newDueBalance = (tenant.dueBalance || 0) + monthlyCharge;
+    let newAccountBalance = tenant.accountBalance || 0;
 
     // Apply overpayment credit if any
     if (newAccountBalance > 0) {
