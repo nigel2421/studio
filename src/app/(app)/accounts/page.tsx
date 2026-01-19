@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Percent, Users, UserX, PlusCircle, Calendar as CalendarIcon, Loader2, Search, Eye } from 'lucide-react';
+import { DollarSign, Percent, Users, PlusCircle, Calendar as CalendarIcon, Loader2, Search, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -250,30 +249,21 @@ export default function AccountsPage() {
     }
   };
 
-  const financialSummary = tenants.reduce(
-    (acc, tenant) => {
-      if (tenant.lease && typeof tenant.lease.rent === 'number') {
-        const rent = tenant.lease.rent;
-        if (tenant.lease.paymentStatus === 'Paid') {
-          acc.collected += rent;
-        } else if (tenant.lease.paymentStatus === 'Pending') {
-          acc.pending += rent;
-        } else if (tenant.lease.paymentStatus === 'Overdue') {
-          acc.overdue += rent;
-        }
-      }
-      return acc;
-    },
-    { collected: 0, pending: 0, overdue: 0 }
-  );
+  const rentCollected = tenants
+    .filter(t => t.lease?.paymentStatus === 'Paid')
+    .reduce((sum, t) => sum + (t.lease?.rent || 0), 0);
+
+  const rentDue = tenants
+    .filter(t => t.lease?.paymentStatus === 'Pending')
+    .reduce((sum, t) => sum + (t.lease?.rent || 0), 0);
 
   const totalUnits = properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0);
   const occupiedUnits = tenants.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Total Due", value: `Ksh ${tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-red-500" },
-    { title: "Advance Payments", value: `Ksh ${tenants.reduce((sum, t) => sum + (t.accountBalance || 0), 0).toLocaleString()}`, icon: PlusCircle, color: "text-green-500" },
+    { title: "Rent Collected", value: `Ksh ${rentCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
+    { title: "Rent Due", value: `Ksh ${rentDue.toLocaleString()}`, icon: AlertCircle, color: "text-amber-500" },
     { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-blue-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
   ];
@@ -348,7 +338,6 @@ export default function AccountsPage() {
                 <TableHead>Tenant</TableHead>
                 <TableHead>Property</TableHead>
                 <TableHead>Rent Amount</TableHead>
-                <TableHead>Due Balance</TableHead>
                 <TableHead>Excess (Cr)</TableHead>
                 <TableHead className="text-right">Payment Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -370,9 +359,6 @@ export default function AccountsPage() {
                       ? `Ksh ${tenant.lease.rent.toLocaleString()}`
                       : 'N/A'
                     }
-                  </TableCell>
-                  <TableCell className="text-red-600 font-semibold">
-                    Ksh {(tenant.dueBalance || 0).toLocaleString()}
                   </TableCell>
                   <TableCell className="text-green-600 font-semibold">
                     Ksh {(tenant.accountBalance || 0).toLocaleString()}
@@ -413,4 +399,3 @@ export default function AccountsPage() {
     </div>
   );
 }
-
