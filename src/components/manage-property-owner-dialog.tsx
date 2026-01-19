@@ -145,7 +145,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">No units marked as 'Client' owned.</p>
+                                <p className="text-sm text-muted-foreground text-center py-4">No units with 'Client' ownership found.</p>
                             )}
                         </ScrollArea>
                     </div>

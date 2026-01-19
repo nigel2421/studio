@@ -22,8 +22,8 @@ export type PropertyOwner = {
   userId?: string;
 };
 
-export type OwnershipType = 'SM' | 'Landlord';
-export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
+export type OwnershipType = 'SM' | 'Landlord' | 'Client';
+export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord', 'Client'];
 
 export type ManagementStatus =
   | 'Renting Mngd by Eracov for SM'

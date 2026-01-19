@@ -41,7 +41,7 @@ export default function ClientsPage() {
   }, []);
 
   const landlordProperties = allProperties.filter(p => p.units?.some(u => u.ownership === 'Landlord'));
-  const clientProperties = allProperties.filter(p => p.units?.some(u => u.managementStatus === 'Renting Mngd by Eracov for Client' || u.managementStatus === 'Client Self Fully Managed'));
+  const clientProperties = allProperties.filter(p => p.units?.some(u => u.ownership === 'Client'));
 
   const handleManageLandlordClick = (property: Property) => {
     setSelectedProperty(property);
@@ -160,7 +160,7 @@ export default function ClientsPage() {
                 const assignedUnitNamesForProperty = new Set(
                     ownersForProperty.flatMap(o => o.assignedUnits.find(au => au.propertyId === property.id)?.unitNames || [])
                 );
-                const unassignedUnits = property.units.filter(u => (u.managementStatus === 'Renting Mngd by Eracov for Client' || u.managementStatus === 'Client Self Fully Managed') && !assignedUnitNamesForProperty.has(u.name));
+                const unassignedUnits = property.units.filter(u => u.ownership === 'Client' && !assignedUnitNamesForProperty.has(u.name));
 
                 return (
                   <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-amber-500/10">
@@ -179,7 +179,7 @@ export default function ClientsPage() {
                       <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
                         <span>Property Owners</span>
                         <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full lowercase font-medium">
-                          {property.units.filter(u => u.managementStatus === 'Renting Mngd by Eracov for Client' || u.managementStatus === 'Client Self Fully Managed').length} total client units
+                          {property.units.filter(u => u.ownership === 'Client').length} total client units
                         </span>
                       </div>
 
