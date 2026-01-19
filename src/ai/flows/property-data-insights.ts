@@ -2,6 +2,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { vertexAI } from '@genkit-ai/google-genai';
 
 const PropertyInsightsInputSchema = z.object({
     propertyName: z.string().describe('The name of the property being analyzed.'),
@@ -63,7 +64,9 @@ const propertyInsightsFlow = ai.defineFlow(
         outputSchema: PropertyInsightsOutputSchema,
     },
     async input => {
-        const { output } = await propertyInsightsPrompt(input);
+        const { output } = await propertyInsightsPrompt(input, {
+            model: vertexAI.model('gemini-1.5-flash-001'),
+        });
         return output!;
     }
 );
