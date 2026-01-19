@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getTenants, getProperties, addPayment, runMonthlyReconciliation } from '@/lib/data';
+import { getTenants, getProperties, addPayment, runMonthlyReconciliation, getAllPayments } from '@/lib/data';
 import type { Tenant, Property, Payment, Unit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -206,6 +207,7 @@ function AddPaymentDialog({ properties, tenants, onPaymentAdded }: { properties:
 export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -216,12 +218,14 @@ export default function AccountsPage() {
     try {
       // Run reconciliation first to ensure latest balances
       await runMonthlyReconciliation();
-      const [tenantsData, propertiesData] = await Promise.all([
+      const [tenantsData, propertiesData, paymentsData] = await Promise.all([
         getTenants(),
-        getProperties()
+        getProperties(),
+        getAllPayments()
       ]);
       setTenants(tenantsData);
       setProperties(propertiesData);
+      setPayments(paymentsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -249,13 +253,13 @@ export default function AccountsPage() {
     }
   };
 
-  const rentCollected = tenants
-    .filter(t => t.lease?.paymentStatus === 'Paid')
-    .reduce((sum, t) => sum + (t.lease?.rent || 0), 0);
+  const rentCollected = payments
+    .filter(p => p.type === 'Rent' && p.status === 'completed')
+    .reduce((sum, p) => sum + p.amount, 0);
 
   const rentDue = tenants
-    .filter(t => t.lease?.paymentStatus === 'Pending')
-    .reduce((sum, t) => sum + (t.lease?.rent || 0), 0);
+    .filter(t => t.lease?.paymentStatus === 'Pending' || t.lease?.paymentStatus === 'Overdue')
+    .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
 
   const totalUnits = properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0);
   const occupiedUnits = tenants.length;

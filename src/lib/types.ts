@@ -122,6 +122,7 @@ export type Tenant = {
     serviceCharge?: number;
     paymentStatus: 'Paid' | 'Pending' | 'Overdue';
     lastPaymentDate?: string;
+    lastBilledPeriod?: string;
   };
   accountBalance: number; // For overpayments
   dueBalance: number;      // For carry-over debts

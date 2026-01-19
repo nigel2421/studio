@@ -14,19 +14,8 @@ export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): num
     const rent = tenant.lease.rent || 0;
     const serviceCharge = tenant.lease.serviceCharge || 0;
     
-    if (!tenant.lease.startDate) {
-        return rent + serviceCharge;
-    }
-
-    const startDate = parseISO(tenant.lease.startDate);
-
-    const isFirstMonth = isSameMonth(startDate, date);
-
-    if (isFirstMonth) {
-        // Rent + Deposit + Service Charge
-        return (rent * 2) + serviceCharge;
-    }
-
+    // For monthly reconciliation, only charge rent + service charge. 
+    // Deposit is handled at tenant creation.
     return rent + serviceCharge;
 }
 
@@ -38,15 +27,12 @@ export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Dat
     const dueDay = 5;
     const currentDay = date.getDate();
 
-    // If we are before the 5th, it's not "Overdue" yet, maybe "Pending"
-    // If we are after the 5th and dueBalance > 0, it should be "Pending" or "Overdue"
-
-    if ((tenant.dueBalance || 0) <= 0 && (tenant.accountBalance || 0) >= 0) {
+    if ((tenant.dueBalance || 0) <= 0) {
         return 'Paid';
     }
 
     if (currentDay > dueDay) {
-        return 'Pending'; // Or 'Overdue' if you want to be stricter
+        return 'Overdue';
     }
 
     return 'Pending';
@@ -88,20 +74,23 @@ export function processPayment(tenant: Tenant, paymentAmount: number): Partial<T
  * This adds the monthly rent/service charge to the dueBalance.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): Partial<Tenant> {
-    // If a tenant has no lease information, we cannot perform billing.
     if (!tenant.lease) {
         console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease information.`);
-        return {
-            dueBalance: tenant.dueBalance,
-            accountBalance: tenant.accountBalance,
-        };
+        return {};
     }
 
-    // Check if we've already billed for this month
-    // In a real app, you'd track "lastBilledMonth"
-    // For this simulation, we'll assume this function is called only once per month
+    const currentPeriod = format(date, 'yyyy-MM');
 
-    const monthlyCharge = calculateTargetDue(tenant, date);
+    // If we've already billed for this period, just update the status if needed and exit.
+    if (tenant.lease.lastBilledPeriod === currentPeriod) {
+        const updatedStatus = getRecommendedPaymentStatus(tenant, date);
+        if (tenant.lease.paymentStatus !== updatedStatus) {
+            return { lease: { ...tenant.lease, paymentStatus: updatedStatus } };
+        }
+        return {}; // No changes needed
+    }
+
+    const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
     let newDueBalance = (tenant.dueBalance || 0) + monthlyCharge;
     let newAccountBalance = tenant.accountBalance || 0;
 
@@ -121,7 +110,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         accountBalance: newAccountBalance,
         lease: {
             ...tenant.lease,
-            paymentStatus: newDueBalance <= 0 ? 'Paid' : 'Pending'
+            paymentStatus: getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
+            lastBilledPeriod: currentPeriod,
         }
     };
 }

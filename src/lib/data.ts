@@ -1,3 +1,4 @@
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -10,6 +11,7 @@ import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setD
 import propertiesData from '../../backend.json';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, calculateTargetDue } from './financial-logic';
+import { format } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -102,7 +104,7 @@ export async function addTenant({
     securityDeposit
 }: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number }): Promise<void> {
 
-    const initialDue = (rent * 2) + 0; // Rent + Deposit. Service charge handling can be added if needed here.
+    const initialDue = rent + securityDeposit;
 
     const newTenantData = {
         name,
@@ -117,7 +119,8 @@ export async function addTenant({
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
             rent: rent || 0,
-            paymentStatus: 'Pending' as const
+            paymentStatus: 'Pending' as const,
+            lastBilledPeriod: format(new Date(), 'yyyy-MM'),
         },
         securityDeposit: securityDeposit || 0,
         dueBalance: initialDue,
@@ -447,11 +450,14 @@ export async function runMonthlyReconciliation(): Promise<void> {
         const tenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
         const updates = reconcileMonthlyBilling(tenant, today);
 
-        batch.update(tenantDoc.ref, {
-            dueBalance: updates.dueBalance ?? 0,
-            accountBalance: updates.accountBalance ?? 0,
-            'lease.paymentStatus': updates.lease?.paymentStatus || 'Pending',
-        });
+        if (updates && Object.keys(updates).length > 0) {
+            batch.update(tenantDoc.ref, {
+                dueBalance: updates.dueBalance,
+                accountBalance: updates.accountBalance,
+                'lease.paymentStatus': updates.lease?.paymentStatus,
+                'lease.lastBilledPeriod': updates.lease?.lastBilledPeriod,
+            });
+        }
     }
 
     await batch.commit();
