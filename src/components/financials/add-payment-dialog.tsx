@@ -31,13 +31,28 @@ interface AddPaymentDialogProps {
   onPaymentAdded: () => void;
   tenant?: Tenant | null;
   children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  taskId?: string;
 }
 
-export function AddPaymentDialog({ properties, tenants, onPaymentAdded, tenant = null, children }: AddPaymentDialogProps) {
+export function AddPaymentDialog({ 
+  properties, 
+  tenants, 
+  onPaymentAdded, 
+  tenant = null, 
+  children,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+  taskId
+}: AddPaymentDialogProps) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '' }]);
+
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = setControlledOpen ?? setInternalOpen;
 
   const {
     selectedProperty,
@@ -60,19 +75,21 @@ export function AddPaymentDialog({ properties, tenants, onPaymentAdded, tenant =
 
   const resetForm = () => {
     setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '' }]);
-    setSelectedProperty('');
-    setSelectedFloor('');
-    setSelectedUnit('');
+    if (!tenant) { // Don't reset if a tenant is pre-selected
+        setSelectedProperty('');
+        setSelectedFloor('');
+        setSelectedUnit('');
+    }
   };
 
   useEffect(() => {
-    if (tenant && open) {
+    if (!open) {
+      resetForm();
+    } else if (tenant) {
       setSelectedProperty(tenant.propertyId);
       setSelectedUnit(tenant.unitName);
-    } else if (!open) {
-      resetForm();
     }
-  }, [tenant, open, setSelectedProperty, setSelectedUnit]);
+  }, [tenant, open]);
 
   const { startLoading, stopLoading } = useLoading();
 
@@ -134,7 +151,7 @@ export function AddPaymentDialog({ properties, tenants, onPaymentAdded, tenant =
           notes: entry.notes,
           status: 'completed',
           type: 'Rent',
-        })
+        }, taskId) // Pass taskId here
       );
 
       await Promise.all(paymentPromises);
@@ -154,12 +171,13 @@ export function AddPaymentDialog({ properties, tenants, onPaymentAdded, tenant =
   const trigger = children ? (
     <DialogTrigger asChild>{children}</DialogTrigger>
   ) : (
+    !controlledOpen ? 
     <DialogTrigger asChild>
       <Button>
         <PlusCircle className="mr-2 h-4 w-4" />
         Add Payment
       </Button>
-    </DialogTrigger>
+    </DialogTrigger> : null
   );
 
   return (
@@ -237,7 +255,7 @@ export function AddPaymentDialog({ properties, tenants, onPaymentAdded, tenant =
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={entry.date} onSelect={(d) => handleEntryChange(entry.id, 'date', d)} initialFocus />
+                          <Calendar mode="single" selected={entry.date} onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)} initialFocus />
                         </PopoverContent>
                       </Popover>
                     </div>

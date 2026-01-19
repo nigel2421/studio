@@ -134,7 +134,7 @@ export async function addTenant({
         description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} is pending.`,
         status: 'Pending',
         priority: 'High',
-        category: 'Onboarding',
+        category: 'Financial',
         tenantId: tenantDocRef.id,
         propertyId,
         unitName,
@@ -393,7 +393,7 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
 }
 
-export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>): Promise<void> {
+export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
     const tenantRef = doc(db, 'tenants', paymentData.tenantId);
     const tenantSnap = await getDoc(tenantRef);
 
@@ -415,8 +415,21 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>)
 
     // 3. Update tenant in Firestore
     await updateDoc(tenantRef, updates);
+    
+    // 4. If a taskId is provided, update the task status
+    if (taskId) {
+        try {
+            const taskRef = doc(db, 'tasks', taskId);
+            await updateDoc(taskRef, { status: 'Completed' });
+            await logActivity(`Completed task ${taskId} via payment for ${tenant.name}.`);
+        } catch (error) {
+            console.error("Failed to update task status:", error);
+            // We don't throw here because the payment itself was successful.
+        }
+    }
 
-    // 4. Send receipt email
+
+    // 5. Send receipt email
     const property = await getProperty(tenant.propertyId);
     try {
         await sendPaymentReceipt({

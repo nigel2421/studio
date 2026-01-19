@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getTasks, getTenants, getProperties } from '@/lib/data';
 import { Task, Tenant, Property } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,10 +16,16 @@ export default function TasksPage() {
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
+    const selectedTenant = useMemo(() => {
+        if (!selectedTask || !selectedTask.tenantId) return null;
+        return tenants.find(t => t.id === selectedTask.tenantId) || null;
+    }, [selectedTask, tenants]);
+
     const fetchData = async () => {
+        setLoading(true);
         try {
             const [tasksData, tenantsData, propertiesData] = await Promise.all([
                 getTasks(),
@@ -39,23 +45,16 @@ export default function TasksPage() {
     useEffect(() => {
         fetchData();
     }, []);
-    
+
     const handleRecordPayment = (task: Task) => {
-        if (task.tenantId) {
-            const tenant = tenants.find(t => t.id === task.tenantId);
-            if (tenant) {
-                setSelectedTenant(tenant);
-                setIsPaymentDialogOpen(true);
-            }
-        }
-    };
-    
-    const handlePaymentAdded = () => {
-        setIsPaymentDialogOpen(false);
-        // Optionally, you might want to refresh tasks or related data here
-        fetchData();
+        setSelectedTask(task);
+        setIsPaymentDialogOpen(true);
     };
 
+    const handlePaymentAdded = () => {
+        setIsPaymentDialogOpen(false);
+        fetchData(); // Refresh tasks and other data
+    };
 
     const getStatusVariant = (status: Task['status']) => {
         switch (status) {
@@ -162,9 +161,9 @@ export default function TasksPage() {
                                             <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {task.category === 'Financial' && task.tenantId && (
+                                            {task.category === 'Financial' && task.tenantId && task.status === 'Pending' && (
                                                 <Button variant="outline" size="sm" onClick={() => handleRecordPayment(task)}>
-                                                    <DollarSign className="mr-2 h-4 w-4"/>
+                                                    <DollarSign className="mr-2 h-4 w-4" />
                                                     Record Payment
                                                 </Button>
                                             )}
@@ -187,13 +186,11 @@ export default function TasksPage() {
                 properties={properties}
                 tenants={tenants}
                 onPaymentAdded={handlePaymentAdded}
+                open={isPaymentDialogOpen}
+                onOpenChange={setIsPaymentDialogOpen}
                 tenant={selectedTenant}
-            >
-                {/* This dialog is now controlled externally by `isPaymentDialogOpen` state */}
-                <div style={{ display: isPaymentDialogOpen ? 'block' : 'none' }}></div>
-            </AddPaymentDialog>
-
+                taskId={selectedTask?.id}
+            />
         </div>
     );
 }
-

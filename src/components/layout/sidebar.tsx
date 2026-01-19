@@ -64,7 +64,7 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { user, userProfile } = useAuth();
   const { startLoading } = useLoading();
-  const [isAccountingOpen, setIsAccountingOpen] = useState(true);
+  const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
 
   const isActive = (href: string) => pathname === href;
 
@@ -120,11 +120,11 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen}>
               <CollapsibleTrigger asChild className="w-full">
-                <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')}>
-                  <Banknote />
-                  <span>Accounts</span>
-                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
-                </SidebarMenuButton>
+                  <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')}>
+                    <Banknote />
+                    <span>Accounts</span>
+                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
+                  </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="pl-8 py-1 space-y-1">
