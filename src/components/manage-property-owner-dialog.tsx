@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Property, PropertyOwner } from '@/lib/types';
+import type { Property, PropertyOwner, Unit } from '@/lib/types';
 import { useLoading } from '@/hooks/useLoading';
 
 interface Props {
@@ -72,7 +72,12 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
         }
     };
 
-    const clientUnits = property.units.filter(u => u.ownership === 'Client');
+    const clientUnits = property.units.filter(u =>
+        u.status === 'client occupied' &&
+        u.ownership === 'Landlord' &&
+        u.managementStatus === 'Client Self Fully Managed' &&
+        u.handoverStatus === 'Handed Over'
+    );
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -145,7 +150,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">No units with 'Client' ownership found.</p>
+                                <p className="text-sm text-muted-foreground text-center py-4">No units matching client-managed criteria found.</p>
                             )}
                         </ScrollArea>
                     </div>
@@ -159,3 +164,5 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
         </Dialog>
     );
 }
+
+    

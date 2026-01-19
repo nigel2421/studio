@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { getProperties, getLandlords, updateLandlord, getPropertyOwners, updatePropertyOwner } from '@/lib/data';
-import type { Property, Landlord, PropertyOwner } from '@/lib/types';
+import type { Property, Landlord, PropertyOwner, Unit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Edit, UserCog, Users, PlusCircle } from 'lucide-react';
@@ -40,8 +40,14 @@ export default function ClientsPage() {
     fetchData();
   }, []);
 
+  const isClientManagedUnit = (u: Unit) =>
+    u.status === 'client occupied' &&
+    u.ownership === 'Landlord' &&
+    u.managementStatus === 'Client Self Fully Managed' &&
+    u.handoverStatus === 'Handed Over';
+
   const landlordProperties = allProperties.filter(p => p.units?.some(u => u.ownership === 'Landlord'));
-  const clientProperties = allProperties.filter(p => p.units?.some(u => u.ownership === 'Client'));
+  const clientProperties = allProperties.filter(p => p.units?.some(isClientManagedUnit));
 
   const handleManageLandlordClick = (property: Property) => {
     setSelectedProperty(property);
@@ -160,7 +166,7 @@ export default function ClientsPage() {
                 const assignedUnitNamesForProperty = new Set(
                     ownersForProperty.flatMap(o => o.assignedUnits.find(au => au.propertyId === property.id)?.unitNames || [])
                 );
-                const unassignedUnits = property.units.filter(u => u.ownership === 'Client' && !assignedUnitNamesForProperty.has(u.name));
+                const unassignedUnits = property.units.filter(u => isClientManagedUnit(u) && !assignedUnitNamesForProperty.has(u.name));
 
                 return (
                   <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-amber-500/10">
@@ -179,7 +185,7 @@ export default function ClientsPage() {
                       <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
                         <span>Property Owners</span>
                         <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full lowercase font-medium">
-                          {property.units.filter(u => u.ownership === 'Client').length} total client units
+                          {property.units.filter(isClientManagedUnit).length} total client units
                         </span>
                       </div>
 
@@ -258,7 +264,7 @@ export default function ClientsPage() {
               })}
             </div>
           ) : (
-            <EmptyState message="No properties with client-owned units found." />
+            <EmptyState message="No properties with client-managed units found." />
           )}
         </TabsContent>
       </Tabs>
@@ -294,3 +300,5 @@ function EmptyState({ message }: { message: string }) {
     </div>
   );
 }
+
+    
