@@ -163,7 +163,7 @@ export async function updateProperty(propertyId: string, data: Partial<Property>
     const propertyIndex = propertiesData.properties.findIndex(p => p.id === propertyId);
 
     if (propertyIndex !== -1) {
-        const propertyToUpdate = propertiesData.properties[propertyIndex];
+        const propertyToUpdate = propertiesData.properties[propertyIndex] as unknown as Property;
 
         // Update top-level fields
         if (data.name) propertyToUpdate.name = data.name;
@@ -259,7 +259,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
                 userProfile.landlordDetails = { properties: landlordProperties };
             }
         }
-        
+
         if (userProfile.role === 'homeowner' && userProfile.propertyOwnerId) {
             const allProperties = await getProperties();
             const owner = await getPropertyOwner(userProfile.propertyOwnerId);
@@ -467,6 +467,37 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                         if (u.landlordId === landlord.id) {
                             associatedUnitNames.push(u.name);
                             if (!associatedPropertyIds.includes(p.id)) associatedPropertyIds.push(p.id);
+
+                            // Logic: If unit is vacant and handed over, Landlord pays service charge
+                            if (u.status === 'vacant' && u.handoverStatus === 'Handed Over') {
+                                const scAmount = u.serviceCharge ?? (u.unitType === 'Studio' ? 2000 : u.unitType === 'One Bedroom' ? 3000 : u.unitType === 'Two Bedroom' ? 4000 : 0);
+                                if (scAmount > 0) {
+                                    const today = new Date();
+                                    const currentPeriod = today.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+
+                                    // Generate a service charge document
+                                    documents.push({
+                                        id: `sc-landlord-${u.name}-${currentPeriod.replace(' ', '-')}`,
+                                        type: 'Service Charge',
+                                        date: today.toISOString(),
+                                        amount: scAmount,
+                                        title: `Service Charge (Vacant) - ${u.name}`,
+                                        status: 'Pending',
+                                        sourceData: {
+                                            id: `sc-stmt-${u.name}-${Date.now()}`,
+                                            tenantId: 'vacant',
+                                            propertyId: p.id,
+                                            unitName: u.name,
+                                            period: currentPeriod,
+                                            amount: scAmount,
+                                            items: [{ description: 'Vacant Unit Service Charge', amount: scAmount }],
+                                            date: today.toISOString(),
+                                            status: 'Pending',
+                                            createdAt: today
+                                        } as ServiceChargeStatement
+                                    });
+                                }
+                            }
                         }
                     });
                 });
@@ -661,13 +692,13 @@ export async function updateLandlord(
     // Update the in-memory property data to reflect unit assignments.
     const propertyIndex = propertiesData.properties.findIndex(p => p.id === propertyId);
     if (propertyIndex !== -1) {
-        const propertyToUpdate = propertiesData.properties[propertyIndex];
+        const propertyToUpdate = propertiesData.properties[propertyIndex] as unknown as Property;
 
-        propertyToUpdate.units.forEach(unit => {
+        propertyToUpdate.units.forEach((unit: any) => {
             // If the unit is now selected for this landlord, assign it.
             if (assignedUnits.includes(unit.name)) {
                 unit.landlordId = landlordId;
-            } 
+            }
             // If the unit was previously assigned to this landlord but is no longer selected, un-assign it.
             else if (unit.landlordId === landlordId) {
                 delete (unit as Partial<Unit>).landlordId;
@@ -704,7 +735,7 @@ export async function addLandlordsFromCSV(data: { name: string; email: string; p
             ...landlordData,
             id: newLandlordRef.id,
         };
-        
+
         batch.set(newLandlordRef, landlordWithId);
         existingEmails.add(landlordData.email); // Add to set to handle duplicates within the same CSV
         added++;
@@ -732,13 +763,13 @@ export async function updatePropertyOwner(
 ): Promise<void> {
     const ownerRef = doc(db, 'propertyOwners', ownerId);
     let userId = data.userId;
-    
+
     if (data.email && data.phone && !userId) {
         const appName = 'owner-creation-app-' + Date.now();
         let secondaryApp;
         try {
             secondaryApp = initializeApp(firebaseConfig, appName);
-        } catch(e) {
+        } catch (e) {
             secondaryApp = getApp(appName);
         }
 
@@ -753,11 +784,11 @@ export async function updatePropertyOwner(
             });
             await logActivity(`Created property owner user: ${data.email}`);
         } catch (error: any) {
-             if (error.code !== 'auth/email-already-in-use') {
+            if (error.code !== 'auth/email-already-in-use') {
                 console.error("Error creating property owner auth user:", error);
                 throw new Error("Failed to create property owner login credentials.");
             } else {
-                 console.log("Email for property owner already in use, skipping auth creation.");
+                console.log("Email for property owner already in use, skipping auth creation.");
             }
         } finally {
             if (secondaryApp) {

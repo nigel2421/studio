@@ -44,6 +44,9 @@ export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'S
 export type UnitStatus = 'vacant' | 'rented' | 'client occupied' | 'Handed Over' | 'airbnb';
 export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'client occupied', 'Handed Over', 'airbnb'];
 
+export type HandoverStatus = 'Pending' | 'Handed Over' | 'Maintenance';
+export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over', 'Maintenance'];
+
 export type Unit = {
   name: string;
   status: UnitStatus;
@@ -51,6 +54,9 @@ export type Unit = {
   unitType: UnitType;
   landlordId?: string;
   managementStatus?: ManagementStatus;
+  rentAmount?: number;
+  serviceCharge?: number;
+  handoverStatus?: HandoverStatus;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
