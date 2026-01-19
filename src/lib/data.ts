@@ -665,6 +665,41 @@ export async function updateLandlord(
     await logActivity(`Updated landlord details for: ${data.name || 'ID ' + landlordId}`);
 }
 
+export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount: string }[]): Promise<{ added: number; skipped: number }> {
+    const landlordsRef = collection(db, 'landlords');
+    const batch = writeBatch(db);
+    let added = 0;
+    let skipped = 0;
+
+    // Get all existing emails to avoid querying in a loop
+    const existingLandlordsSnap = await getDocs(query(landlordsRef));
+    const existingEmails = new Set(existingLandlordsSnap.docs.map(doc => doc.data().email));
+
+    for (const landlordData of data) {
+        if (!landlordData.email || existingEmails.has(landlordData.email)) {
+            // Skip existing landlords or rows without an email to prevent duplicates/errors
+            skipped++;
+            continue;
+        }
+
+        const newLandlordRef = doc(landlordsRef); // Auto-generates an ID
+        const landlordWithId = {
+            ...landlordData,
+            id: newLandlordRef.id,
+        };
+        
+        batch.set(newLandlordRef, landlordWithId);
+        existingEmails.add(landlordData.email); // Add to set to handle duplicates within the same CSV
+        added++;
+    }
+
+    await batch.commit();
+    if (added > 0) {
+        await logActivity(`Bulk added ${added} landlords via CSV.`);
+    }
+    return { added, skipped };
+}
+
 // Property Owner (Client) Functions
 export async function getPropertyOwners(): Promise<PropertyOwner[]> {
     return getCollection<PropertyOwner>('propertyOwners');

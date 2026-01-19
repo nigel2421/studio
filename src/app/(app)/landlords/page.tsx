@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -13,19 +12,27 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
 
 export default function LandlordsPage() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
 
-  useEffect(() => {
+  const fetchLandlords = () => {
     getLandlords().then(setLandlords);
+  }
+
+  useEffect(() => {
+    fetchLandlords();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Landlords</h2>
-        <p className="text-muted-foreground">A list of all landlords in the system.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Landlords</h2>
+          <p className="text-muted-foreground">A list of all landlords in the system.</p>
+        </div>
+        <LandlordCsvUploader onUploadComplete={fetchLandlords} />
       </div>
       <Card>
         <CardHeader>
