@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, PlusCircle, Building2, Upload } from 'lucide-react';
 import Link from 'next/link';
-import { UnitCsvUploader } from '@/components/unit-csv-uploader';
+import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -44,7 +44,7 @@ export default function PropertiesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-           <UnitCsvUploader onUploadComplete={fetchProperties} />
+           <UnitBulkUpdateDialog onUploadComplete={fetchProperties} />
           <Button asChild>
             <Link href="/properties/add">
               <PlusCircle className="mr-2 h-4 w-4" />

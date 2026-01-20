@@ -5,7 +5,8 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
-    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType
+    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
+    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot } from 'firebase/firestore';
@@ -520,8 +521,9 @@ export async function runMonthlyReconciliation(): Promise<void> {
     await logActivity(`Monthly reconciliation completed for ${tenantsSnap.size} tenants.`);
 }
 
-export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
-    let updatedCount = 0;
+export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Promise<{ updatedCount: number; errors: string[] }> {
+    const errors: string[] = [];
+
     const propertiesSnapshot = await getDocs(collection(db, 'properties'));
     const properties: Record<string, Property> = {};
     propertiesSnapshot.forEach(doc => {
@@ -529,33 +531,125 @@ export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitN
     });
 
     const batch = writeBatch(db);
+    let totalUnitsUpdated = 0;
 
-    for (const row of data) {
-        const property = properties[row.PropertyName];
-        if (property) {
-            let unitUpdated = false;
-            const updatedUnits = property.units.map(unit => {
-                if (unit.name === row.UnitName && unit.unitType !== row.UnitType) {
-                    unitUpdated = true;
-                    return { ...unit, unitType: row.UnitType as UnitType };
-                }
-                return unit;
-            });
+    const propertyUpdates: Record<string, Unit[]> = {};
 
-            if (unitUpdated) {
-                const propertyRef = doc(db, 'properties', property.id);
-                batch.update(propertyRef, { units: updatedUnits });
-                updatedCount++;
+    for (const [index, row] of data.entries()) {
+        const {
+            PropertyName,
+            UnitName,
+            Status,
+            Ownership,
+            UnitType,
+            ManagementStatus,
+            HandoverStatus,
+            RentAmount,
+            ServiceCharge,
+        } = row;
+
+        if (!PropertyName || !UnitName) {
+            errors.push(`Row ${index + 2}: Missing PropertyName or UnitName.`);
+            continue;
+        }
+
+        const property = properties[PropertyName];
+        if (!property) {
+            errors.push(`Row ${index + 2}: Property "${PropertyName}" not found.`);
+            continue;
+        }
+
+        // Use a copy of units for modification to not affect other rows in case of error
+        const unitsCopy = propertyUpdates[property.id] || JSON.parse(JSON.stringify(property.units));
+        const unitIndex = unitsCopy.findIndex((u: Unit) => u.name === UnitName);
+
+        if (unitIndex === -1) {
+            errors.push(`Row ${index + 2}: Unit "${UnitName}" not found in property "${PropertyName}".`);
+            continue;
+        }
+        
+        const unit = unitsCopy[unitIndex];
+        let unitWasUpdated = false;
+
+        if (Status !== undefined && unit.status !== Status) {
+            if (!unitStatuses.includes(Status as any)) {
+                errors.push(`Row ${index + 2}: Invalid Status "${Status}". Valid: ${unitStatuses.join(', ')}`);
+            } else {
+                unit.status = Status as UnitStatus;
+                unitWasUpdated = true;
             }
         }
+        if (Ownership !== undefined && unit.ownership !== Ownership) {
+            if (!ownershipTypes.includes(Ownership as any)) {
+                errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}". Valid: ${ownershipTypes.join(', ')}`);
+            } else {
+                unit.ownership = Ownership as OwnershipType;
+                unitWasUpdated = true;
+            }
+        }
+        if (UnitType !== undefined && unit.unitType !== UnitType) {
+            if (!unitTypes.includes(UnitType as any)) {
+                errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}". Valid: ${unitTypes.join(', ')}`);
+            } else {
+                unit.unitType = UnitType as UnitType;
+                unitWasUpdated = true;
+            }
+        }
+        if (ManagementStatus !== undefined && unit.managementStatus !== ManagementStatus) {
+            if (!managementStatuses.includes(ManagementStatus as any)) {
+                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}". Valid: ${managementStatuses.join(', ')}`);
+            } else {
+                unit.managementStatus = ManagementStatus as ManagementStatus;
+                unitWasUpdated = true;
+            }
+        }
+        if (HandoverStatus !== undefined && unit.handoverStatus !== HandoverStatus) {
+            if (!handoverStatuses.includes(HandoverStatus as any)) {
+                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}". Valid: ${handoverStatuses.join(', ')}`);
+            } else {
+                unit.handoverStatus = HandoverStatus as HandoverStatus;
+                unitWasUpdated = true;
+            }
+        }
+        if (RentAmount !== undefined && String(unit.rentAmount || '') !== RentAmount) {
+            const rent = Number(RentAmount);
+            if (isNaN(rent) || rent < 0) {
+                errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}". Must be a non-negative number.`);
+            } else {
+                unit.rentAmount = rent;
+                unitWasUpdated = true;
+            }
+        }
+        if (ServiceCharge !== undefined && String(unit.serviceCharge || '') !== ServiceCharge) {
+            const charge = Number(ServiceCharge);
+            if (isNaN(charge) || charge < 0) {
+                errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}". Must be a non-negative number.`);
+            } else {
+                unit.serviceCharge = charge;
+                unitWasUpdated = true;
+            }
+        }
+
+        if (unitWasUpdated) {
+            totalUnitsUpdated++;
+            propertyUpdates[property.id] = unitsCopy;
+        }
     }
-    
-    if (updatedCount > 0) {
-      await batch.commit();
-      await logActivity(`Bulk updated ${updatedCount} unit types via CSV.`);
+
+    if (errors.length > 0) {
+        return { updatedCount: 0, errors };
     }
-    
-    return updatedCount;
+
+    if (totalUnitsUpdated > 0) {
+        for (const propId in propertyUpdates) {
+            const propertyRef = doc(db, 'properties', propId);
+            batch.update(propertyRef, { units: propertyUpdates[propId] });
+        }
+        await batch.commit();
+        await logActivity(`Bulk updated ${totalUnitsUpdated} units via CSV.`);
+    }
+
+    return { updatedCount: totalUnitsUpdated, errors: [] };
 }
 
 

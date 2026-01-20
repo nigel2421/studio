@@ -1,4 +1,5 @@
 
+
 export type Property = {
   id: string;
   name: string;
@@ -41,8 +42,8 @@ export const managementStatuses: ManagementStatus[] = [
 export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';
 export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'];
 
-export type UnitStatus = 'vacant' | 'rented';
-export const unitStatuses: UnitStatus[] = ['vacant', 'rented'];
+export type UnitStatus = 'vacant' | 'rented' | 'airbnb' | 'client occupied';
+export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'airbnb', 'client occupied'];
 
 export type HandoverStatus = 'Pending' | 'Handed Over';
 export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over'];
