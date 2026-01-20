@@ -921,13 +921,23 @@ export async function getAllPayments(): Promise<Payment[]> {
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
     await addDoc(collection(db, 'tasks'), {
         ...task,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
     });
     await logActivity(`Created task: ${task.title}`);
 }
 
 export async function getTasks(): Promise<Task[]> {
-    return getCollection<Task>('tasks');
+    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'asc')); // FIFO
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = data.createdAt;
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : createdAt
+        } as Task;
+    });
 }
 
 // Real-time listener functions
@@ -976,9 +986,17 @@ export function listenToPayments(callback: (payments: Payment[]) => void): () =>
 }
 
 export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
-    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'asc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const tasks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+        const tasks = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt;
+            return { 
+                id: doc.id, 
+                ...data,
+                createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : createdAt
+            } as Task;
+        });
         callback(tasks);
     }, (error) => {
         console.error("Error listening to tasks:", error);
