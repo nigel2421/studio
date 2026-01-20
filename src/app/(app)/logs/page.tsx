@@ -49,14 +49,15 @@ export default function LogsPage() {
     }
   }, [userProfile, user]);
 
-  const getUserEmail = (userId: string) => {
-    return users.get(userId)?.email || 'Unknown';
+  const getUserNameOrEmail = (userId: string) => {
+    const user = users.get(userId);
+    return user?.name || user?.email || 'Unknown';
   };
 
   const handleDownloadCSV = () => {
     const dataToExport = logs.map(log => ({
       Date: new Date(log.timestamp).toLocaleString(),
-      User: getUserEmail(log.userId),
+      User: getUserNameOrEmail(log.userId),
       Action: log.action,
     }));
     downloadCSV(dataToExport, 'activity_logs.csv');
@@ -99,7 +100,7 @@ export default function LogsPage() {
               {paginatedLogs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>{getUserEmail(log.userId)}</TableCell>
+                  <TableCell>{getUserNameOrEmail(log.userId)}</TableCell>
                   <TableCell>{log.action}</TableCell>
                 </TableRow>
               ))}

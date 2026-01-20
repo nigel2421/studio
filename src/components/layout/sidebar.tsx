@@ -198,10 +198,10 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton>
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{userProfile?.name?.[0] || user?.email?.[0].toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
-                <span className="font-semibold">{user?.email}</span>
+                <span className="font-semibold">{userProfile?.name || user?.email}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
