@@ -45,8 +45,8 @@ const propertyInsightsPrompt = ai.definePrompt({
     prompt: `You are an expert AI Property Consultant. Analyze the following data for the development "{{{propertyName}}}" and provide management with strategic insights.
 
 Data Provided:
-- Water Consumption history
-- Maintenance requests history
+- Water Consumption history: {{{json waterReadings}}}
+- Maintenance requests history: {{{json maintenanceRequests}}}
 
 Your goal:
 1. Detect potential leaks (unusually high consumption compared to patterns).

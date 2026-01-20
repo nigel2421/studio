@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getProperties, getTenants } from '@/lib/data';
 import type { Property, Tenant, UnitType } from '@/lib/types';
 import {
   Card,
@@ -27,20 +26,20 @@ type AnalyticsData = {
   bookedWithDeposit: number;
 };
 
+interface UnitAnalyticsProps {
+  property: Property;
+  tenants: Tenant[];
+}
+
 const unitTypesToTrack: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom'];
 
-export function UnitAnalytics() {
+export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   const [analytics, setAnalytics] = useState<Record<UnitType, AnalyticsData> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function calculateAnalytics() {
+    function calculateAnalytics() {
       setLoading(true);
-      const [properties, tenants] = await Promise.all([
-        getProperties(),
-        getTenants(),
-      ]);
-
       const analyticsData = unitTypesToTrack.reduce((acc, type) => {
         acc[type] = {
           rentedSM: 0,
@@ -51,52 +50,57 @@ export function UnitAnalytics() {
         return acc;
       }, {} as Record<UnitType, AnalyticsData>);
 
-      properties.forEach(property => {
-        if (!Array.isArray(property.units)) return;
-        property.units.forEach(unit => {
-          if (!unitTypesToTrack.includes(unit.unitType)) return;
+      if (!Array.isArray(property.units)) {
+        setAnalytics(analyticsData);
+        setLoading(false);
+        return;
+      }
 
-          const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
+      property.units.forEach(unit => {
+        if (!unitTypesToTrack.includes(unit.unitType)) return;
 
-          if (tenant) { // Unit is occupied by a tenant
-            if (unit.ownership === 'SM') {
-              analyticsData[unit.unitType].rentedSM++;
-            } else if (unit.ownership === 'Landlord') {
-              analyticsData[unit.unitType].rentedLandlord++;
-            }
-            
-            if (tenant.securityDeposit > 0) {
-              analyticsData[unit.unitType].bookedWithDeposit++;
-            }
-          } else if (unit.status === 'vacant') { // Unit is vacant
-            analyticsData[unit.unitType].vacant++;
+        const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
+
+        if (tenant) { // Unit is occupied by a tenant
+          if (unit.ownership === 'SM') {
+            analyticsData[unit.unitType].rentedSM++;
+          } else if (unit.ownership === 'Landlord') {
+            analyticsData[unit.unitType].rentedLandlord++;
           }
-        });
+
+          if (tenant.securityDeposit > 0) {
+            analyticsData[unit.unitType].bookedWithDeposit++;
+          }
+        } else if (unit.status === 'vacant') { // Unit is vacant
+          analyticsData[unit.unitType].vacant++;
+        }
       });
 
       setAnalytics(analyticsData);
       setLoading(false);
     }
 
-    calculateAnalytics();
-  }, []);
+    if (property && tenants) {
+      calculateAnalytics();
+    }
+  }, [property, tenants]);
 
   if (loading) {
-      return (
-          <Card>
-              <CardHeader>
-                  <Skeleton className="h-6 w-1/2" />
-                  <Skeleton className="h-4 w-3/4 mt-2" />
-              </CardHeader>
-              <CardContent>
-                  <div className="space-y-4 p-6 pt-0">
-                      <Skeleton className="h-10 w-full" />
-                      <Skeleton className="h-10 w-full" />
-                      <Skeleton className="h-10 w-full" />
-                  </div>
-              </CardContent>
-          </Card>
-      )
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-1/2" />
+          <Skeleton className="h-4 w-3/4 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 p-6 pt-0">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!analytics) return null;
@@ -104,9 +108,9 @@ export function UnitAnalytics() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Unit Analytics</CardTitle>
+        <CardTitle>{property.name} - Unit Analytics</CardTitle>
         <CardDescription>
-          A detailed breakdown of your units by type and status.
+          A detailed breakdown of units for this property by type and status.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">

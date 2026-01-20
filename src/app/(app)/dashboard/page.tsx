@@ -43,7 +43,9 @@ export default function DashboardPage() {
         <AIPropertyInsights property={properties[0]} />
       )}
 
-      <UnitAnalytics />
+      {properties.map(property => (
+        <UnitAnalytics key={property.id} property={property} tenants={tenants} />
+      ))}
 
       <div className="grid gap-8 lg:grid-cols-3">
         <Card className="lg:col-span-1">
