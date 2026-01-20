@@ -32,6 +32,7 @@ import {
   Mail,
   CheckSquare,
   ChevronDown,
+  UserCog,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -189,17 +190,30 @@ export function AppSidebar() {
             </SidebarMenuItem>
           ))}
           {isAdmin && (
-            <SidebarMenuItem>
-              <Link href="/logs" onClick={() => handleLinkClick('Activity Logs')}>
-                <SidebarMenuButton
-                  isActive={isActive('/logs')}
-                  tooltip="Activity Logs"
-                >
-                  <History />
-                  <span>Activity Logs</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
+            <>
+              <SidebarMenuItem>
+                <Link href="/users" onClick={() => handleLinkClick('User Management')}>
+                  <SidebarMenuButton
+                    isActive={isActive('/users')}
+                    tooltip="User Management"
+                  >
+                    <UserCog />
+                    <span>User Management</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <Link href="/logs" onClick={() => handleLinkClick('Activity Logs')}>
+                  <SidebarMenuButton
+                    isActive={isActive('/logs')}
+                    tooltip="Activity Logs"
+                  >
+                    <History />
+                    <span>Activity Logs</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            </>
           )}
           {userProfile?.role === 'homeowner' && (
             <SidebarMenuItem>

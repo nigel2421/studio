@@ -71,6 +71,16 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
     }
 }
 
+export async function getUsers(): Promise<UserProfile[]> {
+    return getCollection<UserProfile>('users');
+}
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { role });
+    await logActivity(`Updated role for user ${userId} to ${role}`);
+}
+
 export async function getLogs(): Promise<Log[]> {
     const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);

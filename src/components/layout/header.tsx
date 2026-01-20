@@ -15,6 +15,7 @@ const titleMap: { [key: string]: string } = {
   '/landlords': 'Landlords',
   '/airbnb': 'Airbnb Monitoring',
   '/logs': 'Activity Logs',
+  '/users': 'User Management',
   '/communications': 'Communications',
   '/tenant/dashboard': 'Dashboard',
   '/tenant/maintenance': 'Maintenance',
