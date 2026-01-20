@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Edit, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AIPropertyInsights } from '@/components/ai-property-insights';
 
 export default function PropertyDetailsPage() {
     const { id } = useParams();
@@ -118,8 +117,6 @@ export default function PropertyDetailsPage() {
                     </Table>
                 </CardContent>
             </Card>
-
-            <AIPropertyInsights property={property} />
         </div>
     );
 }

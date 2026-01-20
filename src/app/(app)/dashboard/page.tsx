@@ -10,7 +10,6 @@ import { ArrowRight, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MaintenanceRequest, Tenant, Property } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
-import { AIPropertyInsights } from "@/components/ai-property-insights";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -38,10 +37,6 @@ export default function DashboardPage() {
       </div>
 
       <DashboardStats />
-
-      {properties.length > 0 && (
-        <AIPropertyInsights property={properties[0]} />
-      )}
 
       {properties.map(property => (
         <UnitAnalytics key={property.id} property={property} tenants={tenants} />
