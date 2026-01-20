@@ -61,13 +61,13 @@ export default function TenantsPage() {
     }, []);
 
     const handleArchive = async (tenantId: string) => {
-        startLoading('Archiving Resident...');
+        startLoading('Archiving resident...');
         try {
             await archiveTenant(tenantId);
             fetchTenants();
             toast({
                 title: "Resident Archived",
-                description: "The resident has been moved to the archived list.",
+                description: "The occupant has been moved to the archived list.",
             });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to archive resident.' });
@@ -104,12 +104,12 @@ export default function TenantsPage() {
     return (
         <div>
             <div className="flex items-center justify-between w-full mb-6">
-                <h2 className="text-2xl font-semibold">Residents</h2>
+                <h2 className="text-2xl font-semibold">Tenants & Homeowners</h2>
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search residents..."
+                            placeholder="Search by name or email..."
                             className="pl-10"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -124,7 +124,7 @@ export default function TenantsPage() {
                     <Button asChild>
                         <Link href="/tenants/add">
                             <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Resident
+                            Add Tenant/Homeowner
                         </Link>
                     </Button>
                 </div>
@@ -132,15 +132,15 @@ export default function TenantsPage() {
 
             {tenants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-16 border-dashed border-2 rounded-lg">
-                    <h2 className="text-2xl font-semibold">No Active Tenants Found</h2>
+                    <h2 className="text-2xl font-semibold">No Active Tenants or Homeowners Found</h2>
                     <p className="mt-2 text-muted-foreground">
-                        Get started by adding your first tenant.
+                        Get started by adding your first occupant.
                     </p>
                 </div>
             ) : (
                 <>
                     <div className="flex justify-end mb-4">
-                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'residents_export.csv')}>
+                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'tenants_and_homeowners_export.csv')}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Export CSV
                         </Button>
@@ -152,7 +152,7 @@ export default function TenantsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Resident</TableHead>
+                                        <TableHead>Name</TableHead>
                                         <TableHead>Property</TableHead>
                                         <TableHead>Billing Amount</TableHead>
                                         <TableHead>Payment Status</TableHead>
@@ -216,7 +216,7 @@ export default function TenantsPage() {
                                                                     <AlertDialogHeader>
                                                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                                         <AlertDialogDescription>
-                                                                            This action will archive the tenant and mark their unit as vacant. You can view archived tenants later.
+                                                                            This action will archive the occupant and mark their unit as vacant. You can view archived records later.
                                                                         </AlertDialogDescription>
                                                                     </AlertDialogHeader>
                                                                     <AlertDialogFooter>
@@ -284,9 +284,9 @@ export default function TenantsPage() {
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
-                                                    <AlertDialogTitle>Archive Tenant?</AlertDialogTitle>
+                                                    <AlertDialogTitle>Archive Occupant?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        This action will archive the tenant.
+                                                        This action will archive the occupant.
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>

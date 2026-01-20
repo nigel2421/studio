@@ -53,7 +53,7 @@ export default function ArchivedTenantsPage() {
         <div>
             <div className="flex items-center justify-between w-full mb-6">
                 <div>
-                    <h2 className="text-2xl font-semibold">Archived Tenants</h2>
+                    <h2 className="text-2xl font-semibold">Archived Residents</h2>
                     <p className="text-muted-foreground">List of former tenants and homeowners.</p>
                 </div>
                 <Button asChild variant="outline">
@@ -63,16 +63,16 @@ export default function ArchivedTenantsPage() {
 
             {tenants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                    <h2 className="text-2xl font-semibold">No Archived Tenants Found</h2>
+                    <h2 className="text-2xl font-semibold">No Archived Residents Found</h2>
                     <p className="mt-2 text-muted-foreground">
-                        When tenants are archived, they will appear here.
+                        When tenants or homeowners are archived, they will appear here.
                     </p>
                 </div>
             ) : (
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
-                             <CardTitle>Archived Records</CardTitle>
+                             <CardTitle>Archived Resident Records</CardTitle>
                              <div className="relative w-full sm:w-[300px]">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input

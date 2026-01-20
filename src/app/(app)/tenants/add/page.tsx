@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -78,15 +78,15 @@ export default function AddTenantPage() {
         rent: residentType === 'Tenant' ? rent : 0,
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
         residentType,
-      } as any); // Use any for now to bypass strict Omit checks if needed, but data.ts is updated
+      } as any);
 
       toast({
-        title: `${residentType} Added`,
+        title: `${residentType === 'Tenant' ? 'Tenant' : 'Homeowner'} Added`,
         description: `${name} has been added and their login credentials have been created.`,
       });
       router.push('/tenants');
     } catch (error) {
-      console.error('Error adding resident:', error);
+      console.error('Error adding occupant:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -102,13 +102,14 @@ export default function AddTenantPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add New Resident</CardTitle>
+        <CardTitle>Add New Tenant / Homeowner</CardTitle>
+        <CardDescription>Onboard a new long-term occupant and create their system account.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="residentType">Resident Category</Label>
+              <Label htmlFor="residentType">Occupant Type</Label>
               <Select onValueChange={(v) => setResidentType(v as any)} value={residentType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
@@ -202,7 +203,7 @@ export default function AddTenantPage() {
           </div>
           <Button type="submit" className="w-full" disabled={!selectedProperty || !unitName || !agent || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save {residentType}
+            Save {residentType === 'Tenant' ? 'Tenant' : 'Homeowner'}
           </Button>
         </form>
       </CardContent>

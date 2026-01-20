@@ -150,18 +150,9 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant({
-    name,
-    email,
-    phone,
-    idNumber,
-    propertyId,
-    unitName,
-    agent,
-    rent,
-    securityDeposit
-}: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number }): Promise<void> {
+export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number }): Promise<void> {
 
+    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, residentType } = data;
     const initialDue = rent + securityDeposit;
 
     const newTenantData = {
@@ -173,6 +164,7 @@ export async function addTenant({
         unitName,
         agent,
         status: 'active' as const,
+        residentType: residentType || 'Tenant',
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
@@ -188,7 +180,7 @@ export async function addTenant({
 
     // Create onboarding task
     await addTask({
-        title: `Onboard Tenant: ${name}`,
+        title: `Onboard: ${name}`,
         description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} is pending.`,
         status: 'Pending',
         priority: 'High',
@@ -199,7 +191,7 @@ export async function addTenant({
         dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
     });
 
-    await logActivity(`Created tenant: ${name} (${email})`);
+    await logActivity(`Created ${residentType}: ${name} (${email})`);
 
     // Update unit status to occupied
     const property = await getProperty(propertyId);
@@ -225,7 +217,7 @@ export async function addTenant({
         const user = userCredential.user;
 
         // Determine role based on residentType (default to tenant)
-        const role: UserRole = (newTenantData as any).residentType === 'Homeowner' ? 'homeowner' : 'tenant';
+        const role: UserRole = newTenantData.residentType === 'Homeowner' ? 'homeowner' : 'tenant';
 
         await createUserProfile(user.uid, user.email || email, role, {
             name: name,
@@ -279,7 +271,7 @@ export async function archiveTenant(tenantId: string): Promise<void> {
             await updateProperty(property.id, { units: updatedUnits });
         }
 
-        await logActivity(`Archived tenant: ${tenant.name}`);
+        await logActivity(`Archived resident: ${tenant.name}`);
     }
 }
 
