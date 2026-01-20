@@ -70,7 +70,7 @@ export function AppSidebar() {
   const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+  const isAdmin = userProfile?.role === 'admin';
   const isAgent = userProfile?.role === 'agent';
 
   useEffect(() => {
