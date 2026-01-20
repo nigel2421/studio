@@ -20,7 +20,7 @@ export default function AddTenantPage() {
   const { toast } = useToast();
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>('');
-  const [vacantUnits, setVacantUnits] = useState<Unit[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const [name, setName] = useState('');
@@ -45,14 +45,20 @@ export default function AddTenantPage() {
     if (selectedProperty) {
       const property = properties.find(p => p.id === selectedProperty);
       if (property) {
-        const availableUnits = property.units.filter(u =>
-          u.status === 'vacant' &&
-          (u.managementStatus === 'Renting Mngd by Eracov for SM' || u.managementStatus === 'Renting Mngd by Eracov for Client')
-        );
-        setVacantUnits(availableUnits);
+        const units = property.units.filter(u => {
+          if (u.status !== 'vacant') {
+            return false;
+          }
+          const isSMManaged = u.ownership === 'SM';
+          const isClientManaged = u.ownership === 'Landlord' &&
+            u.handoverStatus === 'Handed Over' &&
+            u.managementStatus === 'Renting Mngd by Eracov for Client';
+          return isSMManaged || isClientManaged;
+        });
+        setAvailableUnits(units);
       }
     } else {
-      setVacantUnits([]);
+      setAvailableUnits([]);
     }
     setUnitName('');
   }, [selectedProperty, properties]);
@@ -147,7 +153,7 @@ export default function AddTenantPage() {
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  {vacantUnits.filter(unit => unit.name !== '').map((unit, index) => (
+                  {availableUnits.filter(unit => unit.name !== '').map((unit, index) => (
                     <SelectItem key={`${unit.name}-${index}`} value={unit.name}>{unit.name}</SelectItem>
                   ))}
                 </SelectContent>

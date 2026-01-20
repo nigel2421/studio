@@ -34,7 +34,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
   const [open, setOpen] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>('');
-  const [vacantUnits, setVacantUnits] = useState<Unit[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const [name, setName] = useState('');
@@ -61,15 +61,20 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
     if (selectedProperty) {
       const property = properties.find(p => p.id === selectedProperty);
       if (property) {
-        setVacantUnits(property.units.filter(u =>
-          u.status === 'vacant' &&
-          u.handoverStatus === 'Handed Over' &&
-          (u.managementStatus === 'Renting Mngd by Eracov for SM' ||
-            u.managementStatus === 'Renting Mngd by Eracov for Client')
-        ));
+        const units = property.units.filter(u => {
+          if (u.status !== 'vacant') {
+            return false;
+          }
+          const isSMManaged = u.ownership === 'SM';
+          const isClientManaged = u.ownership === 'Landlord' &&
+            u.handoverStatus === 'Handed Over' &&
+            u.managementStatus === 'Renting Mngd by Eracov for Client';
+          return isSMManaged || isClientManaged;
+        });
+        setAvailableUnits(units);
       }
     } else {
-      setVacantUnits([]);
+      setAvailableUnits([]);
     }
     setUnitName('');
   }, [selectedProperty, properties]);
@@ -182,7 +187,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
                     <SelectValue placeholder="Select a unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vacantUnits.filter(unit => unit.name !== '').map((unit, index) => (
+                    {availableUnits.filter(unit => unit.name !== '').map((unit, index) => (
                       <SelectItem key={`${unit.name}-${index}`} value={unit.name}>{unit.name}</SelectItem>
                     ))}
                   </SelectContent>
