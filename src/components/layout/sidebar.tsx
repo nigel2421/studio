@@ -70,10 +70,15 @@ export function AppSidebar() {
   const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+  const isAgent = userProfile?.role === 'agent';
+
   useEffect(() => {
-    const unsub = listenToTasks(setTasks);
-    return () => unsub();
-  }, []);
+    if (isAdmin || isAgent) {
+      const unsub = listenToTasks(setTasks);
+      return () => unsub();
+    }
+  }, [isAdmin, isAgent]);
 
   const hasPendingTasks = tasks.some(task => task.status === 'Pending');
 
@@ -115,19 +120,22 @@ export function AppSidebar() {
 
       <SidebarContent className="flex-1">
         <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
-                <SidebarMenuButton
-                  isActive={isActive(item.href)}
-                  tooltip={item.label}
-                >
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
+          {navItems.map((item) => {
+            if (isAgent && item.href === '/documents') return null;
+            return (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
+                  <SidebarMenuButton
+                    isActive={isActive(item.href)}
+                    tooltip={item.label}
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            );
+          })}
 
           <SidebarMenuItem>
             <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen} className="w-full">
@@ -140,13 +148,15 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="pl-8 py-1 space-y-1">
-                  <SidebarMenuItem>
-                    <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
-                      <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
-                        <span>Overview</span>
-                      </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
+                  {!isAgent && (
+                    <SidebarMenuItem>
+                      <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
+                        <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
+                          <span>Overview</span>
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
+                  )}
                   <SidebarMenuItem>
                      <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
                         <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
@@ -178,7 +188,7 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuItem>
           ))}
-          {(userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com') && (
+          {isAdmin && (
             <SidebarMenuItem>
               <Link href="/logs" onClick={() => handleLinkClick('Activity Logs')}>
                 <SidebarMenuButton
