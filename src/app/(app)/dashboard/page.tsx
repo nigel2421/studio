@@ -1,25 +1,35 @@
 
+
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { getMaintenanceRequests, getTenants, getProperties } from "@/lib/data";
+import { listenToMaintenanceRequests, listenToTenants, listenToProperties, listenToPayments } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MaintenanceRequest, Tenant, Property } from "@/lib/types";
+import { MaintenanceRequest, Tenant, Property, Payment } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
-    getMaintenanceRequests().then(setMaintenanceRequests);
-    getTenants().then(setTenants);
-    getProperties().then(setProperties);
+    const unsubMaintenance = listenToMaintenanceRequests(setMaintenanceRequests);
+    const unsubTenants = listenToTenants(setTenants);
+    const unsubProperties = listenToProperties(setProperties);
+    const unsubPayments = listenToPayments(setPayments);
+
+    return () => {
+      unsubMaintenance();
+      unsubTenants();
+      unsubProperties();
+      unsubPayments();
+    };
   }, []);
 
   const recentRequests = maintenanceRequests
@@ -36,7 +46,12 @@ export default function DashboardPage() {
         <p className="text-muted-foreground text-sm sm:text-base">Here's a summary of your properties today.</p>
       </div>
 
-      <DashboardStats />
+      <DashboardStats 
+        tenants={tenants} 
+        properties={properties} 
+        maintenanceRequests={maintenanceRequests} 
+        payments={payments} 
+      />
 
       {properties.map(property => (
         <UnitAnalytics key={property.id} property={property} tenants={tenants} />

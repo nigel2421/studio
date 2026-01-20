@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -7,7 +8,7 @@ import {
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot } from 'firebase/firestore';
 import propertiesData from '../../backend.json';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, calculateTargetDue } from './financial-logic';
@@ -927,4 +928,49 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<voi
 
 export async function getTasks(): Promise<Task[]> {
     return getCollection<Task>('tasks');
+}
+
+// Real-time listener functions
+export function listenToProperties(callback: (properties: Property[]) => void): () => void {
+    const q = query(collection(db, 'properties'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
+        callback(properties);
+    }, (error) => {
+        console.error("Error listening to properties:", error);
+    });
+    return unsubscribe;
+}
+
+export function listenToTenants(callback: (tenants: Tenant[]) => void): () => void {
+    const q = query(collection(db, 'tenants'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const tenants = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tenant));
+        callback(tenants);
+    }, (error) => {
+        console.error("Error listening to tenants:", error);
+    });
+    return unsubscribe;
+}
+
+export function listenToMaintenanceRequests(callback: (requests: MaintenanceRequest[]) => void): () => void {
+    const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+        callback(requests);
+    }, (error) => {
+        console.error("Error listening to maintenance requests:", error);
+    });
+    return unsubscribe;
+}
+
+export function listenToPayments(callback: (payments: Payment[]) => void): () => void {
+    const q = query(collection(db, 'payments'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const payments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        callback(payments);
+    }, (error) => {
+        console.error("Error listening to payments:", error);
+    });
+    return unsubscribe;
 }

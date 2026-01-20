@@ -8,24 +8,17 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Users, Building2, Wrench, AlertCircle, Building } from "lucide-react";
-import { getTenants, getProperties, getMaintenanceRequests, getAllPayments } from "@/lib/data";
-import { useEffect, useState } from "react";
-import { Tenant, Property, MaintenanceRequest, Payment } from "@/lib/types";
+import type { Tenant, Property, MaintenanceRequest, Payment } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 
-export function DashboardStats() {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+interface DashboardStatsProps {
+  tenants: Tenant[];
+  properties: Property[];
+  maintenanceRequests: MaintenanceRequest[];
+  payments: Payment[];
+}
 
-  useEffect(() => {
-    getTenants().then(setTenants);
-    getProperties().then(setProperties);
-    getMaintenanceRequests().then(setMaintenanceRequests);
-    getAllPayments().then(setPayments);
-  }, []);
-
+export function DashboardStats({ tenants, properties, maintenanceRequests, payments }: DashboardStatsProps) {
   const totalTenants = tenants.length;
   const totalProperties = properties.length;
   const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
