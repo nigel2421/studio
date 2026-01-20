@@ -22,13 +22,15 @@ export default function LogsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && userProfile?.role !== 'admin') {
+    const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+    if (!isLoading && !isAdmin) {
       router.push('/dashboard');
     }
   }, [userProfile, user, isLoading, router]);
 
   useEffect(() => {
-    if (userProfile?.role === 'admin') {
+    const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+    if (isAdmin) {
       async function fetchData() {
         const logData = await getLogs();
         setLogs(logData);
@@ -68,8 +70,9 @@ export default function LogsPage() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
-
-  if (isLoading || (userProfile?.role !== 'admin')) {
+  
+  const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+  if (isLoading || !isAdmin) {
     return <div>Loading...</div>; // Or a more sophisticated loading/access denied component
   }
 

@@ -71,7 +71,7 @@ export function AppSidebar() {
   const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const isAdmin = userProfile?.role === 'admin';
+  const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
   const isAgent = userProfile?.role === 'agent';
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="pl-8 py-1 space-y-1">
-                  {!isAgent && (
+                  {isAdmin && (
                     <SidebarMenuItem>
                       <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
                         <SidebarMenuButton isActive={isActive('/accounts')} size="sm">

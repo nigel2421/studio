@@ -24,18 +24,20 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const { userProfile, isLoading } = useAuth();
+  const { user, userProfile, isLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!isLoading && userProfile?.role !== 'admin') {
+    const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+    if (!isLoading && !isAdmin) {
       router.push('/dashboard');
     }
-  }, [userProfile, isLoading, router]);
+  }, [user, userProfile, isLoading, router]);
 
   const fetchUsers = async () => {
-    if (userProfile?.role === 'admin') {
+    const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+    if (isAdmin) {
       const userData = await getUsers();
       setUsers(userData);
     }
@@ -43,7 +45,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [userProfile]);
+  }, [user, userProfile]);
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     // Prevent admin from changing their own role to something else
@@ -93,7 +95,8 @@ export default function UsersPage() {
     currentPage * pageSize
   );
 
-  if (isLoading || userProfile?.role !== 'admin') {
+  const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
+  if (isLoading || !isAdmin) {
     return <div>Loading...</div>; // Or a more sophisticated loading/access denied component
   }
 
