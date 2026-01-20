@@ -4,7 +4,7 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
-    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task
+    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit } from 'firebase/firestore';
@@ -14,6 +14,35 @@ import { reconcileMonthlyBilling, processPayment, calculateTargetDue } from './f
 import { format } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
+
+// One-time migration of property data from JSON to Firestore
+async function migratePropertiesToFirestore() {
+    const propertiesRef = collection(db, 'properties');
+    const snapshot = await getDocs(query(propertiesRef, limit(1)));
+    if (!snapshot.empty) {
+        return; // Data already migrated
+    }
+
+    console.log("No properties found in Firestore. Migrating from local data...");
+    // The user's original `backend.json` is provided in the context, but since the file is now empty,
+    // we need to use a hardcoded version for this one-time migration.
+    const originalProperties = [{"id":"property-1","name":"Grand Midtown Apartments","address":"123 Main St, Anytown USA","type":"Apartment Building","imageId":"property-1","units":[{"name":"GMA 1-C","status":"vacant","ownership":"Client","unitType":"Studio"},{"name":"GMA 1-D","status":"vacant","ownership":"Client","unitType":"Two Bedroom"},{"name":"GMA 1-E","status":"vacant","ownership":"SM","unitType":"One Bedroom","managementStatus":"Renting Mngd by Eracov for SM"}]},{"id":"property-2","name":"Grand Midtown Annex Apartments","address":"456 Oak Ave, Anytown USA","type":"Apartment Complex","imageId":"property-2","units":[]},{"id":"property-3","name":"Midtown Apartments","address":"321 Center St, Anytown USA","type":"Apartment Complex","imageId":"property-3","units":[]}];
+
+    const batch = writeBatch(db);
+    originalProperties.forEach((property: any) => {
+        const docRef = doc(db, 'properties', property.id);
+        batch.set(docRef, property);
+    });
+
+    try {
+        await batch.commit();
+        console.log("Property data migrated to Firestore successfully.");
+        await logActivity('Migrated property data from JSON to Firestore.');
+    } catch (error) {
+        console.error("Error migrating properties to Firestore:", error);
+    }
+}
+
 
 export async function logActivity(action: string) {
     const user = auth.currentUser;
@@ -54,7 +83,10 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
 }
 
 export async function getProperties(): Promise<Property[]> {
-    return Promise.resolve(propertiesData.properties as Property[]);
+    await migratePropertiesToFirestore();
+    const propertiesCol = collection(db, 'properties');
+    const propertiesSnapshot = await getDocs(propertiesCol);
+    return propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
 }
 
 export async function getTenants(): Promise<Tenant[]> {
@@ -72,8 +104,12 @@ export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
-    const property = propertiesData.properties.find(p => p.id === id);
-    return Promise.resolve(property as Property || null);
+    const docRef = doc(db, 'properties', id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() } as Property;
+    }
+    return null;
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
@@ -144,10 +180,9 @@ export async function addTenant({
     await logActivity(`Created tenant: ${name} (${email})`);
 
     // Update unit status to occupied
-    const props = await getProperties();
-    const currentProperty = props.find(p => p.id === propertyId);
-    if (currentProperty) {
-        const updatedUnits = currentProperty.units.map(u =>
+    const property = await getProperty(propertyId);
+    if (property) {
+        const updatedUnits = property.units.map(u =>
             u.name === unitName ? { ...u, status: 'rented' as const } : u
         );
         await updateProperty(propertyId, { units: updatedUnits });
@@ -187,40 +222,20 @@ export async function addTenant({
 }
 
 export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
-    console.log("Adding properties is not fully supported when using local JSON data.");
+    const newDocRef = doc(collection(db, "properties"));
+    const newPropertyData: Property = {
+        id: newDocRef.id,
+        imageId: `property-${Math.floor(Math.random() * 3) + 1}`,
+        ...property,
+    };
+    await setDoc(newDocRef, newPropertyData);
+    await logActivity(`Added new property: ${property.name}`);
 }
 
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
-    const propertyIndex = propertiesData.properties.findIndex(p => p.id === propertyId);
-
-    if (propertyIndex !== -1) {
-        const propertyToUpdate = propertiesData.properties[propertyIndex] as unknown as Property;
-
-        // Update top-level fields
-        if (data.name) propertyToUpdate.name = data.name;
-        if (data.address) propertyToUpdate.address = data.address;
-        if (data.type) propertyToUpdate.type = data.type;
-
-        // Update units
-        if (data.units) {
-            propertyToUpdate.units = data.units.map(updatedUnit => {
-                const existingUnit = propertyToUpdate.units.find(u => u.name === updatedUnit.name);
-                const finalUnit = { ...existingUnit, ...updatedUnit };
-
-                if (finalUnit.landlordId === 'none') {
-                    delete finalUnit.landlordId;
-                }
-
-                return finalUnit;
-            }) as Unit[];
-        }
-
-        propertiesData.properties[propertyIndex] = propertyToUpdate;
-
-        await logActivity(`Updated property: ${data.name || propertyToUpdate.name}`);
-    } else {
-        console.error("Could not find property to update with ID:", propertyId);
-    }
+    const propertyRef = doc(db, 'properties', propertyId);
+    await updateDoc(propertyRef, data);
+    await logActivity(`Updated property: ID ${propertyId}`);
 }
 
 export async function archiveTenant(tenantId: string): Promise<void> {
@@ -234,8 +249,15 @@ export async function archiveTenant(tenantId: string): Promise<void> {
         batch.delete(tenantRef);
         await batch.commit();
 
+        const property = await getProperty(tenant.propertyId);
+        if (property) {
+            const updatedUnits = property.units.map(u =>
+                u.name === tenant.unitName ? { ...u, status: 'vacant' as const } : u
+            );
+            await updateProperty(property.id, { units: updatedUnits });
+        }
+
         await logActivity(`Archived tenant: ${tenant.name}`);
-        console.log(`Unit ${tenant.unitName} in property ${tenant.propertyId} should be marked as vacant.`);
     }
 }
 
@@ -247,9 +269,20 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
     await logActivity(`Updated tenant: ${tenantData.name || oldTenant?.name}`);
 
     if (oldTenant && (oldTenant.propertyId !== tenantData.propertyId || oldTenant.unitName !== tenantData.unitName)) {
-        console.log(`Unit ${oldTenant.unitName} in property ${oldTenant.propertyId} should be marked as vacant.`);
+        // Mark old unit as vacant
+        const oldProperty = await getProperty(oldTenant.propertyId);
+        if (oldProperty) {
+            const oldUnits = oldProperty.units.map(u => u.name === oldTenant.unitName ? { ...u, status: 'vacant' as const } : u);
+            await updateProperty(oldProperty.id, { units: oldUnits });
+        }
+
+        // Mark new unit as rented
         if (tenantData.propertyId && tenantData.unitName) {
-            console.log(`Unit ${tenantData.unitName} in property ${tenantData.propertyId} should be marked as rented.`);
+            const newProperty = await getProperty(tenantData.propertyId);
+            if (newProperty) {
+                const newUnits = newProperty.units.map(u => u.name === tenantData.unitName ? { ...u, status: 'rented' as const } : u);
+                await updateProperty(newProperty.id, { units: newUnits });
+            }
         }
     }
 }
@@ -474,8 +507,41 @@ export async function runMonthlyReconciliation(): Promise<void> {
 }
 
 export async function updateUnitTypesFromCSV(data: { PropertyName: string; UnitName: string; UnitType: string }[]): Promise<number> {
-    console.log("Updating from CSV is not fully supported when using local JSON data.");
-    return 0;
+    let updatedCount = 0;
+    const propertiesSnapshot = await getDocs(collection(db, 'properties'));
+    const properties: Record<string, Property> = {};
+    propertiesSnapshot.forEach(doc => {
+        properties[doc.data().name] = { id: doc.id, ...doc.data() } as Property;
+    });
+
+    const batch = writeBatch(db);
+
+    for (const row of data) {
+        const property = properties[row.PropertyName];
+        if (property) {
+            let unitUpdated = false;
+            const updatedUnits = property.units.map(unit => {
+                if (unit.name === row.UnitName && unit.unitType !== row.UnitType) {
+                    unitUpdated = true;
+                    return { ...unit, unitType: row.UnitType as UnitType };
+                }
+                return unit;
+            });
+
+            if (unitUpdated) {
+                const propertyRef = doc(db, 'properties', property.id);
+                batch.update(propertyRef, { units: updatedUnits });
+                updatedCount++;
+            }
+        }
+    }
+    
+    if (updatedCount > 0) {
+      await batch.commit();
+      await logActivity(`Bulk updated ${updatedCount} unit types via CSV.`);
+    }
+    
+    return updatedCount;
 }
 
 
@@ -498,8 +564,6 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
             const allLandlords = await getLandlords();
             const landlord = allLandlords.find(l => l.email === userId || l.userId === userId); // Basic matching
             if (landlord) {
-                // In a real app we'd query properties where landlordId matches. 
-                // For now, we'll scan properties for units assigned to this landlord.
                 const allProps = await getProperties();
                 allProps.forEach(p => {
                     p.units.forEach(u => {
@@ -712,8 +776,6 @@ export async function updateLandlord(
             if (error.code !== 'auth/email-already-in-use') {
                 throw new Error("Failed to create landlord login credentials.");
             }
-            // If email is in use, we should try to find the user and link them if they are not already.
-            // This part is complex and is omitted for now for simplicity.
         } finally {
             if (secondaryApp) {
                 await deleteApp(secondaryApp);
@@ -728,23 +790,20 @@ export async function updateLandlord(
 
     await setDoc(landlordRef, finalData, { merge: true });
 
-    // Update the in-memory property data to reflect unit assignments.
-    const propertyIndex = propertiesData.properties.findIndex(p => p.id === propertyId);
-    if (propertyIndex !== -1) {
-        const propertyToUpdate = propertiesData.properties[propertyIndex] as unknown as Property;
-
-        propertyToUpdate.units.forEach((unit: any) => {
-            // If the unit is now selected for this landlord, assign it.
+    // Update the property document in Firestore
+    const property = await getProperty(propertyId);
+    if (property) {
+        const updatedUnits = property.units.map(unit => {
             if (assignedUnits.includes(unit.name)) {
-                unit.landlordId = landlordId;
+                return { ...unit, landlordId: landlordId };
             }
-            // If the unit was previously assigned to this landlord but is no longer selected, un-assign it.
-            else if (unit.landlordId === landlordId) {
-                delete (unit as Partial<Unit>).landlordId;
+            if (unit.landlordId === landlordId && !assignedUnits.includes(unit.name)) {
+                const { landlordId: _, ...rest } = unit as any;
+                return rest;
             }
+            return unit;
         });
-
-        propertiesData.properties[propertyIndex] = propertyToUpdate;
+        await updateProperty(propertyId, { units: updatedUnits });
     } else {
         console.error(`Could not find property with ID ${propertyId} to assign units.`);
     }
@@ -758,25 +817,23 @@ export async function addLandlordsFromCSV(data: { name: string; email: string; p
     let added = 0;
     let skipped = 0;
 
-    // Get all existing emails to avoid querying in a loop
     const existingLandlordsSnap = await getDocs(query(landlordsRef));
     const existingEmails = new Set(existingLandlordsSnap.docs.map(doc => doc.data().email));
 
     for (const landlordData of data) {
         if (!landlordData.email || existingEmails.has(landlordData.email)) {
-            // Skip existing landlords or rows without an email to prevent duplicates/errors
             skipped++;
             continue;
         }
 
-        const newLandlordRef = doc(landlordsRef); // Auto-generates an ID
+        const newLandlordRef = doc(landlordsRef);
         const landlordWithId = {
             ...landlordData,
             id: newLandlordRef.id,
         };
 
         batch.set(newLandlordRef, landlordWithId);
-        existingEmails.add(landlordData.email); // Add to set to handle duplicates within the same CSV
+        existingEmails.add(landlordData.email);
         added++;
     }
 
@@ -847,17 +904,9 @@ export async function getLandlordPropertiesAndUnits(landlordId: string): Promise
     const result: { property: Property, units: Unit[] }[] = [];
 
     allProperties.forEach(p => {
-        // Logic: Find units that have this landlordId
-        // If property has landlordId, include all units unless they have a different landlordId (which is rare but possible)
-        // Or if unit specifically has this landlordId
-
         const units = p.units.filter(u => u.landlordId === landlordId || (p.landlordId === landlordId));
-
         if (units.length > 0) {
-            result.push({
-                property: p,
-                units: units
-            });
+            result.push({ property: p, units: units });
         }
     });
 
