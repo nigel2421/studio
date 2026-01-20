@@ -974,3 +974,14 @@ export function listenToPayments(callback: (payments: Payment[]) => void): () =>
     });
     return unsubscribe;
 }
+
+export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
+    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const tasks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+        callback(tasks);
+    }, (error) => {
+        console.error("Error listening to tasks:", error);
+    });
+    return unsubscribe;
+}

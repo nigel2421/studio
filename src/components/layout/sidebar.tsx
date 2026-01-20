@@ -36,10 +36,13 @@ import {
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useLoading } from '@/hooks/useLoading';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { Task } from '@/lib/types';
+import { listenToTasks } from '@/lib/data';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -65,6 +68,15 @@ export function AppSidebar() {
   const { user, userProfile } = useAuth();
   const { startLoading } = useLoading();
   const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const unsub = listenToTasks(setTasks);
+    return () => unsub();
+  }, []);
+
+  const hasPendingTasks = tasks.some(task => task.status === 'Pending');
+
 
   const isActive = (href: string) => pathname === href;
 
@@ -118,12 +130,12 @@ export function AppSidebar() {
           ))}
 
           <SidebarMenuItem>
-            <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen}>
-              <CollapsibleTrigger asChild className="w-full">
-                  <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')}>
+            <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen} className="w-full">
+              <CollapsibleTrigger asChild>
+                  <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')} className="w-full">
                     <Banknote />
                     <span>Accounts</span>
-                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
+                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200" />
                   </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -136,11 +148,14 @@ export function AppSidebar() {
                     </Link>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
-                      <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
-                        <CheckSquare />
-                        <span>Tasks</span>
-                      </SidebarMenuButton>
+                     <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
+                        <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
+                            <span>Tasks</span>
+                            <div className={cn(
+                                "ml-auto h-2 w-2 rounded-full",
+                                hasPendingTasks ? "bg-red-500" : "bg-green-500"
+                            )} />
+                        </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
                 </ul>
