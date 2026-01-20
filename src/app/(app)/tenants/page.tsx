@@ -104,7 +104,7 @@ export default function TenantsPage() {
     return (
         <div>
             <div className="flex items-center justify-between w-full mb-6">
-                <h2 className="text-2xl font-semibold">Tenants & Homeowners</h2>
+                <h2 className="text-2xl font-semibold">Tenants</h2>
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -124,7 +124,7 @@ export default function TenantsPage() {
                     <Button asChild>
                         <Link href="/tenants/add">
                             <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Tenant/Homeowner
+                            Add Tenant
                         </Link>
                     </Button>
                 </div>
@@ -132,15 +132,15 @@ export default function TenantsPage() {
 
             {tenants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-16 border-dashed border-2 rounded-lg">
-                    <h2 className="text-2xl font-semibold">No Active Tenants or Homeowners Found</h2>
+                    <h2 className="text-2xl font-semibold">No Active Tenants Found</h2>
                     <p className="mt-2 text-muted-foreground">
-                        Get started by adding your first occupant.
+                        Get started by adding your first tenant.
                     </p>
                 </div>
             ) : (
                 <>
                     <div className="flex justify-end mb-4">
-                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'tenants_and_homeowners_export.csv')}>
+                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'tenants_export.csv')}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Export CSV
                         </Button>
@@ -166,9 +166,6 @@ export default function TenantsPage() {
                                                 <div className="font-medium">{tenant.name}</div>
                                                 <div className="text-sm text-muted-foreground flex items-center gap-2">
                                                     {tenant.email}
-                                                    {tenant.residentType === 'Homeowner' && (
-                                                        <Badge variant="outline" className="text-[10px] py-0 px-1 font-normal">Homeowner</Badge>
-                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -178,10 +175,10 @@ export default function TenantsPage() {
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium">
-                                                        Ksh {(tenant.lease?.serviceCharge || tenant.lease?.rent || 0).toLocaleString()}
+                                                        Ksh {(tenant.lease?.rent || 0).toLocaleString()}
                                                     </span>
                                                     <span className="text-[10px] text-muted-foreground uppercase">
-                                                        {tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'}
+                                                        Rent
                                                     </span>
                                                 </div>
                                             </TableCell>
@@ -262,10 +259,10 @@ export default function TenantsPage() {
                                     </div>
                                     <div className="flex justify-between items-center pt-1">
                                         <span className="text-muted-foreground">
-                                            {tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'}
+                                            Rent
                                         </span>
                                         <span className="font-bold text-base text-primary">
-                                            Ksh {(tenant.lease?.serviceCharge || tenant.lease?.rent || 0).toLocaleString()}
+                                            Ksh {(tenant.lease?.rent || 0).toLocaleString()}
                                         </span>
                                     </div>
 

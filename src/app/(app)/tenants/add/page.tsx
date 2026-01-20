@@ -28,7 +28,6 @@ export default function AddTenantPage() {
   const [phone, setPhone] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [unitName, setUnitName] = useState('');
-  const [residentType, setResidentType] = useState<'Tenant' | 'Homeowner'>('Tenant');
   const [agent, setAgent] = useState<Agent>();
   const [rent, setRent] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
@@ -65,7 +64,7 @@ export default function AddTenantPage() {
     if (!selectedProperty || !unitName || !agent) return;
 
     setIsLoading(true);
-    startLoading(`Adding ${residentType}...`);
+    startLoading(`Adding Tenant...`);
     try {
       await addTenant({
         name,
@@ -75,22 +74,22 @@ export default function AddTenantPage() {
         propertyId: selectedProperty,
         unitName,
         agent,
-        rent: residentType === 'Tenant' ? rent : 0,
+        rent,
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
-        residentType,
+        residentType: 'Tenant',
       } as any);
 
       toast({
-        title: `${residentType === 'Tenant' ? 'Tenant' : 'Homeowner'} Added`,
+        title: `Tenant Added`,
         description: `${name} has been added and their login credentials have been created.`,
       });
       router.push('/tenants');
     } catch (error) {
-      console.error('Error adding occupant:', error);
+      console.error('Error adding tenant:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to add ${residentType.toLowerCase()}. Please try again.`,
+        description: `Failed to add tenant. Please try again.`,
       });
       stopLoading(); // Stop only if we don't navigate away
     } finally {
@@ -102,44 +101,32 @@ export default function AddTenantPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add New Tenant / Homeowner</CardTitle>
-        <CardDescription>Onboard a new long-term occupant and create their system account.</CardDescription>
+        <CardTitle>Add New Tenant</CardTitle>
+        <CardDescription>Onboard a new tenant and create their system account.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="residentType">Occupant Type</Label>
-              <Select onValueChange={(v) => setResidentType(v as any)} value={residentType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tenant">Tenant (Pays Rent)</SelectItem>
-                  <SelectItem value="Homeowner">Homeowner (Pays Service Charge)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="phone">Phone Number</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="idNumber">ID Number</Label>
               <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} required />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="property">Property</Label>
               <Select onValueChange={setSelectedProperty} value={selectedProperty}>
@@ -153,8 +140,6 @@ export default function AddTenantPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="unit">Unit</Label>
               <Select onValueChange={setUnitName} value={unitName} disabled={!selectedProperty}>
@@ -168,6 +153,8 @@ export default function AddTenantPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="agent">Agent/Point of Contact</Label>
               <Select onValueChange={(value) => setAgent(value as Agent)} value={agent}>
@@ -181,19 +168,16 @@ export default function AddTenantPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="rent">{residentType === 'Tenant' ? 'Monthly Rent (Ksh)' : 'Monthly Service Charge (Ksh)'}</Label>
+              <Label htmlFor="rent">Monthly Rent (Ksh)</Label>
               <Input id="rent" type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} required />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center space-x-2 pt-6">
               <Checkbox id="bookedWithDeposit" checked={bookedWithDeposit} onCheckedChange={(checked) => setBookedWithDeposit(Boolean(checked))} />
-              <Label htmlFor="bookedWithDeposit">{residentType === 'Tenant' ? 'Booked with deposit' : 'Initial service charge paid'}</Label>
+              <Label htmlFor="bookedWithDeposit">Booked with deposit</Label>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 items-center">
-            <div />
             {bookedWithDeposit && (
               <div>
                 <Label htmlFor="securityDeposit">Amount (Ksh)</Label>
@@ -203,7 +187,7 @@ export default function AddTenantPage() {
           </div>
           <Button type="submit" className="w-full" disabled={!selectedProperty || !unitName || !agent || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save {residentType === 'Tenant' ? 'Tenant' : 'Homeowner'}
+            Save Tenant
           </Button>
         </form>
       </CardContent>
