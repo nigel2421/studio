@@ -151,10 +151,10 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number }): Promise<void> {
+export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease' | 'residentType'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant' }): Promise<void> {
 
-    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit } = data;
-    const initialDue = rent + securityDeposit;
+    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit } = data;
+    const initialDue = rent + securityDeposit + (waterDeposit || 0);
 
     const newTenantData = {
         name,
@@ -174,6 +174,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
             lastBilledPeriod: format(new Date(), 'yyyy-MM'),
         },
         securityDeposit: securityDeposit || 0,
+        waterDeposit: waterDeposit || 0,
         dueBalance: initialDue,
         accountBalance: 0,
     };
@@ -182,7 +183,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     // Create onboarding task
     await addTask({
         title: `Onboard: ${name}`,
-        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} is pending.`,
+        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${rent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
         status: 'Pending',
         priority: 'High',
         category: 'Financial',

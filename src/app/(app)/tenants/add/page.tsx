@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLoading } from '@/hooks/useLoading';
+
+const WATER_DEPOSIT_AMOUNT = 5000;
 
 export default function AddTenantPage() {
   const router = useRouter();
@@ -32,6 +35,7 @@ export default function AddTenantPage() {
   const [rent, setRent] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
   const [bookedWithDeposit, setBookedWithDeposit] = useState(false);
+  const [collectWaterDeposit, setCollectWaterDeposit] = useState(false);
 
   useEffect(() => {
     async function fetchProperties() {
@@ -82,8 +86,9 @@ export default function AddTenantPage() {
         agent,
         rent,
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
+        waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
         residentType: 'Tenant',
-      } as any);
+      });
 
       toast({
         title: `Tenant Added`,
@@ -182,15 +187,19 @@ export default function AddTenantPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center space-x-2 pt-6">
               <Checkbox id="bookedWithDeposit" checked={bookedWithDeposit} onCheckedChange={(checked) => setBookedWithDeposit(Boolean(checked))} />
-              <Label htmlFor="bookedWithDeposit">Booked with deposit</Label>
+              <Label htmlFor="bookedWithDeposit">Booked with security deposit</Label>
             </div>
             {bookedWithDeposit && (
               <div>
-                <Label htmlFor="securityDeposit">Amount (Ksh)</Label>
+                <Label htmlFor="securityDeposit">Security Deposit Amount (Ksh)</Label>
                 <Input id="securityDeposit" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value))} required={bookedWithDeposit} />
               </div>
             )}
           </div>
+           <div className="flex items-center space-x-2">
+              <Checkbox id="collectWaterDeposit" checked={collectWaterDeposit} onCheckedChange={(checked) => setCollectWaterDeposit(Boolean(checked))} />
+              <Label htmlFor="collectWaterDeposit">Collect Water Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+            </div>
           <Button type="submit" className="w-full" disabled={!selectedProperty || !unitName || !agent || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Tenant

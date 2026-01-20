@@ -28,6 +28,8 @@ interface AddTenantDialogProps {
   onTenantAdded: () => void;
 }
 
+const WATER_DEPOSIT_AMOUNT = 5000;
+
 export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -46,6 +48,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
   const [rent, setRent] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
   const [bookedWithDeposit, setBookedWithDeposit] = useState(false);
+  const [collectWaterDeposit, setCollectWaterDeposit] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -90,6 +93,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
     setRent(0);
     setSecurityDeposit(0);
     setBookedWithDeposit(false);
+    setCollectWaterDeposit(false);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +112,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         agent,
         rent,
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
+        waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
         residentType: 'Tenant',
       });
       toast({
@@ -216,7 +221,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
             <div className="grid grid-cols-2 gap-4 items-center">
               <div className="flex items-center space-x-2">
                 <Checkbox id="bookedWithDeposit-dialog" checked={bookedWithDeposit} onCheckedChange={(checked) => setBookedWithDeposit(Boolean(checked))} />
-                <Label htmlFor="bookedWithDeposit-dialog">Booked with deposit</Label>
+                <Label htmlFor="bookedWithDeposit-dialog">Booked with security deposit</Label>
               </div>
               {bookedWithDeposit && (
                 <div>
@@ -224,6 +229,10 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
                   <Input id="securityDeposit-dialog" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value))} required={bookedWithDeposit} />
                 </div>
               )}
+            </div>
+             <div className="flex items-center space-x-2">
+              <Checkbox id="collectWaterDeposit-dialog" checked={collectWaterDeposit} onCheckedChange={(checked) => setCollectWaterDeposit(Boolean(checked))} />
+              <Label htmlFor="collectWaterDeposit-dialog">Collect Water Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
             </div>
           </div>
           <DialogFooter>

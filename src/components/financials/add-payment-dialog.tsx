@@ -72,6 +72,14 @@ export function AddPaymentDialog({
     );
     return unitsOnFloor.filter(unit => tenantUnitsForProperty.has(unit.name));
   }, [selectedProperty, selectedFloor, unitsOnFloor, tenants]);
+  
+  const tenantForDisplay = useMemo(() => {
+    if (tenant) return tenant; // From props
+    if (selectedUnit) {
+        return tenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
+    }
+    return null;
+  }, [tenant, selectedUnit, selectedProperty, tenants]);
 
   const resetForm = () => {
     setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '' }]);
@@ -235,6 +243,27 @@ export function AddPaymentDialog({
                 </div>
               )}
             </div>
+
+            {tenantForDisplay && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 my-2 border rounded-lg bg-muted/30 text-xs">
+                    <div>
+                        <div className="text-muted-foreground">Rent</div>
+                        <div className="font-bold">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div className="text-muted-foreground">Sec. Deposit</div>
+                        <div className="font-bold">Ksh {(tenantForDisplay.securityDeposit || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div className="text-muted-foreground">Water Deposit</div>
+                        <div className="font-bold">Ksh {(tenantForDisplay.waterDeposit || 0).toLocaleString()}</div>
+                    </div>
+                    <div className="text-red-600">
+                        <div className="text-red-500">Due Balance</div>
+                        <div className="font-bold text-sm">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
+                    </div>
+                </div>
+            )}
 
             <div className="space-y-2 pt-4">
               <Label>Payment Records</Label>

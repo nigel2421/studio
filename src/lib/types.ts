@@ -42,8 +42,8 @@ export const managementStatuses: ManagementStatus[] = [
 export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';
 export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'];
 
-export type UnitStatus = 'vacant' | 'rented' | 'airbnb' | 'client occupied';
-export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'airbnb', 'client occupied'];
+export type UnitStatus = 'vacant' | 'rented';
+export const unitStatuses: UnitStatus[] = ['vacant', 'rented'];
 
 export type HandoverStatus = 'Pending' | 'Handed Over';
 export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over'];
@@ -115,7 +115,8 @@ export type Tenant = {
   agent: Agent;
   status: 'active' | 'archived';
   securityDeposit: number;
-  residentType: 'Tenant' | 'Homeowner';
+  waterDeposit?: number;
+  residentType: 'Tenant';
   lease: {
     startDate: string;
     endDate: string;
