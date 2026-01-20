@@ -22,8 +22,8 @@ export type PropertyOwner = {
   userId?: string;
 };
 
-export type OwnershipType = 'SM' | 'Landlord' | 'Client';
-export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord', 'Client'];
+export type OwnershipType = 'SM' | 'Landlord';
+export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
 
 export type ManagementStatus =
   | 'Renting Mngd by Eracov for SM'
@@ -41,11 +41,11 @@ export const managementStatuses: ManagementStatus[] = [
 export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';
 export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'];
 
-export type UnitStatus = 'vacant' | 'rented' | 'client occupied' | 'Handed Over' | 'airbnb';
-export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'client occupied', 'Handed Over', 'airbnb'];
+export type UnitStatus = 'vacant' | 'rented';
+export const unitStatuses: UnitStatus[] = ['vacant', 'rented'];
 
-export type HandoverStatus = 'Pending' | 'Handed Over' | 'Maintenance';
-export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over', 'Maintenance'];
+export type HandoverStatus = 'Pending' | 'Handed Over';
+export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over'];
 
 export type Unit = {
   name: string;
