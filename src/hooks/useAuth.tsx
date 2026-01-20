@@ -4,8 +4,8 @@
 import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getUserProfile } from '@/lib/data';
-import { UserProfile } from '@/lib/types';
+import { getUserProfile, createUserProfile } from '@/lib/data';
+import { UserProfile, UserRole } from '@/lib/types';
 
 interface AuthContextType {
   user: User | null;
@@ -23,20 +23,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoading(true); // Start loading when auth state changes
+      setIsLoading(true);
       setUser(user);
       if (user) {
-        try {
-          const profile = await getUserProfile(user.uid);
-          setUserProfile(profile);
-        } catch (error) {
-          console.error("Failed to fetch user profile:", error);
-          setUserProfile(null);
+        let profile = await getUserProfile(user.uid);
+        if (!profile) {
+          // User exists in Auth, but not in Firestore. Create a profile.
+          // This is for users added manually via the Firebase console.
+          try {
+            // Default role for manually added users. Admins can then elevate them.
+            const defaultRole: UserRole = 'viewer';
+            await createUserProfile(user.uid, user.email!, defaultRole);
+            // Re-fetch the newly created profile
+            profile = await getUserProfile(user.uid);
+          } catch (error) {
+            console.error("Failed to create user profile on-the-fly:", error);
+            profile = null;
+          }
         }
+        setUserProfile(profile);
       } else {
         setUserProfile(null);
       }
-      setIsLoading(false); // Stop loading after all async operations are done
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
