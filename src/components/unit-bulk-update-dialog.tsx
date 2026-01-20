@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -136,29 +137,29 @@ export function UnitBulkUpdateDialog({ onUploadComplete }: Props) {
         <DialogHeader>
           <DialogTitle>Bulk Update Units via CSV</DialogTitle>
           <DialogDescription>
-             <p className="mb-2">Upload a CSV to update multiple unit details at once.</p>
-             <div className="text-left text-xs space-y-2 text-muted-foreground">
-                 <div>
-                     <h4 className="font-bold text-foreground">Required Columns:</h4>
-                     <ul className="list-disc list-inside">
-                         <li>UnitName (must be unique across all properties)</li>
-                     </ul>
-                 </div>
-                 <div>
-                     <h4 className="font-bold text-foreground mt-2">Optional Columns:</h4>
-                      <ul className="list-disc list-inside">
-                         <li>Status (e.g., vacant, rented)</li>
-                         <li>Ownership (SM or Landlord)</li>
-                         <li>UnitType (e.g., Studio, One Bedroom)</li>
-                         <li>ManagementStatus</li>
-                         <li>HandoverStatus (Pending or Handed Over)</li>
-                         <li>RentAmount (number only, e.g., 25000)</li>
-                         <li>ServiceCharge (number only, e.g., 3000)</li>
-                     </ul>
-                 </div>
-             </div>
+            Upload a CSV to update multiple unit details at once.
           </DialogDescription>
         </DialogHeader>
+        <div className="text-left text-xs space-y-2 text-muted-foreground">
+            <div>
+                <h4 className="font-bold text-foreground">Required Columns:</h4>
+                <ul className="list-disc list-inside">
+                    <li>UnitName (must be unique across all properties)</li>
+                </ul>
+            </div>
+            <div>
+                <h4 className="font-bold text-foreground mt-2">Optional Columns:</h4>
+                <ul className="list-disc list-inside">
+                    <li>Status (e.g., vacant, rented, airbnb)</li>
+                    <li>Ownership (SM or Landlord)</li>
+                    <li>UnitType (e.g., Studio, One Bedroom)</li>
+                    <li>ManagementStatus</li>
+                    <li>HandoverStatus (Pending or Handed Over)</li>
+                    <li>RentAmount (number only, e.g., 25000)</li>
+                    <li>ServiceCharge (number only, e.g., 3000)</li>
+                </ul>
+            </div>
+        </div>
         <div className="grid gap-4 py-4">
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="csv-file">CSV File</Label>
