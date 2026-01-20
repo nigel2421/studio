@@ -86,8 +86,8 @@ export default function CommunicationsPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!subject || !message) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please provide both a subject and a message.' });
+    if (!subject || !message || !user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please provide a subject, message, and be logged in.' });
       return;
     }
 
@@ -113,7 +113,7 @@ export default function CommunicationsPage() {
 
     startLoading(`Sending message to ${recipientEmails.length} recipients...`);
     try {
-      const result = await performSendCustomEmail(recipientEmails, subject, message);
+      const result = await performSendCustomEmail(recipientEmails, subject, message, user.uid);
       if (result.success) {
         toast({ title: 'Success', description: `Message sent to ${recipientEmails.length} recipients.` });
         setIsComposeOpen(false);

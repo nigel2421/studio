@@ -60,6 +60,17 @@ export async function logActivity(action: string) {
     }
 }
 
+export async function logCommunication(data: Omit<Communication, 'id'>) {
+    try {
+        await addDoc(collection(db, 'communications'), {
+            ...data,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error("Error logging communication:", error);
+    }
+}
+
 export async function getLogs(): Promise<Log[]> {
     const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);
