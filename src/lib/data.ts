@@ -19,14 +19,6 @@ const WATER_RATE = 150; // Ksh per unit
 
 // One-time migration of property data from JSON to Firestore
 async function migratePropertiesToFirestore() {
-    const propertiesRef = collection(db, 'properties');
-    const snapshot = await getDocs(query(propertiesRef, limit(1)));
-    if (!snapshot.empty) {
-        return; // Data already migrated
-    }
-
-    console.log("No properties found in Firestore. Migrating from local data...");
-    // Seeding data for all properties.
     const originalProperties: Property[] = [
         {
             "id": "property-1",
@@ -82,11 +74,11 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "Studio", "name": "GMA 2-R", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 2-S", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 2-T", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 2-U", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 2-V", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 2-W", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 2-X", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 2-Y", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
+                { "unitType": "Studio", "name": "GMA 2-U", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
+                { "unitType": "Studio", "name": "GMA 2-V", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
+                { "unitType": "Studio", "name": "GMA 2-W", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
+                { "unitType": "Studio", "name": "GMA 2-X", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
+                { "unitType": "Studio", "name": "GMA 2-Y", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
                 { "unitType": "One Bedroom", "name": "GMA 2-Z", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 2-ZA", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 3-A", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
@@ -146,7 +138,7 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "One Bedroom", "name": "GMA 5-A", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 5-B", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 5-C", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Two Bedroom", "name": "GMA 5-D", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
+                { "unitType": "Two Bedroom", "name": "GMA 5-D", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 5-E", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 5-F", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 50000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 5-G", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
@@ -171,7 +163,7 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "One Bedroom", "name": "GMA 5-Z", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 5-ZA", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 6-A", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
-                { "unitType": "One Bedroom", "name": "GMA 6-B", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
+                { "unitType": "One Bedroom", "name": "GMA 6-B", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "client occupied" },
                 { "unitType": "Studio", "name": "GMA 6-C", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 6-D", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 6-E", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
@@ -234,12 +226,12 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "Studio", "name": "GMA 8-H", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-I", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-J", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 8-K", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
+                { "unitType": "Studio", "name": "GMA 8-K", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
                 { "unitType": "Studio", "name": "GMA 8-L", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 8-M", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 50000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-N", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-O", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 8-P", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
+                { "unitType": "Studio", "name": "GMA 8-P", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "client occupied" },
                 { "unitType": "One Bedroom", "name": "GMA 8-Q", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-R", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 8-S", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
@@ -368,8 +360,8 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "Studio", "name": "GMA 13-G", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 13-H", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 13-I", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 13-J", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Studio", "name": "GMA 13-K", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
+                { "unitType": "Studio", "name": "GMA 13-J", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
+                { "unitType": "Studio", "name": "GMA 13-K", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "client occupied" },
                 { "unitType": "Studio", "name": "GMA 13-L", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 13-M", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 50000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 13-N", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
@@ -387,9 +379,9 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "One Bedroom", "name": "GMA 13-Z", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 13-ZA", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 14-A", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
-                { "unitType": "One Bedroom", "name": "GMA 14-B", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
+                { "unitType": "One Bedroom", "name": "GMA 14-B", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 14-C", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
-                { "unitType": "Two Bedroom", "name": "GMA 14-D", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
+                { "unitType": "Two Bedroom", "name": "GMA 14-D", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "One Bedroom", "name": "GMA 14-E", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 14-F", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 50000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 14-G", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 22000, "serviceCharge": 2000, "status": "vacant" },
@@ -512,7 +504,7 @@ async function migratePropertiesToFirestore() {
                 { "unitType": "Two Bedroom", "name": "GMA 19-ZB", "ownership": "Landlord", "managementStatus": "Renting Mngd by Eracov for Client", "handoverStatus": "Handed Over", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 19-ZC", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 19-ZD", "ownership": "SM", "managementStatus": "Renting Mngd by Eracov for SM", "handoverStatus": "Handed Over", "rentAmount": 50000, "serviceCharge": 4000, "status": "vacant" },
-                { "unitType": "One Bedroom", "name": "GMA 20-A", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
+                { "unitType": "One Bedroom", "name": "GMA 20-A", "ownership": "Landlord", "managementStatus": "Client Self Fully Managed", "handoverStatus": "Handed Over", "rentAmount": 35000, "serviceCharge": 3000, "status": "client occupied" },
                 { "unitType": "One Bedroom", "name": "GMA 20-B", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 35000, "serviceCharge": 3000, "status": "vacant" },
                 { "unitType": "Studio", "name": "GMA 20-C", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 25000, "serviceCharge": 2000, "status": "vacant" },
                 { "unitType": "Two Bedroom", "name": "GMA 20-D", "ownership": "Landlord", "managementStatus": undefined, "handoverStatus": "Pending", "rentAmount": 45000, "serviceCharge": 4000, "status": "vacant" },
@@ -600,18 +592,45 @@ async function migratePropertiesToFirestore() {
         }
     ];
 
-    const batch = writeBatch(db);
-    originalProperties.forEach((property: any) => {
-        const docRef = doc(db, 'properties', property.id);
-        batch.set(docRef, property);
-    });
+    const propertiesRef = collection(db, 'properties');
+    const propertiesSnap = await getDocs(propertiesRef);
+    const existingProperties = propertiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
 
-    try {
-        await batch.commit();
-        console.log("Property data migrated to Firestore successfully.");
-        await logActivity('Migrated property data from JSON to Firestore.');
-    } catch (error) {
-        console.error("Error migrating properties to Firestore:", error);
+    const batch = writeBatch(db);
+    let migrationNeeded = false;
+
+    for (const localProp of originalProperties) {
+        const existingProp = existingProperties.find(p => p.name === localProp.name);
+
+        if (existingProp) {
+            // Property exists, check if units need updating.
+            // A simple JSON.stringify is a good enough heuristic for this use case.
+            if (JSON.stringify(existingProp.units) !== JSON.stringify(localProp.units)) {
+                console.log(`Updating units for existing property "${localProp.name}".`);
+                const docRef = doc(db, 'properties', existingProp.id);
+                batch.update(docRef, { units: localProp.units }); // Only update the units field
+                migrationNeeded = true;
+            }
+        } else {
+            // Property does not exist, create it.
+            console.log(`Creating new property "${localProp.name}".`);
+            const docRef = doc(db, 'properties', localProp.id); // Use the predefined ID for new ones
+            batch.set(docRef, localProp);
+            migrationNeeded = true;
+        }
+    }
+
+    if (migrationNeeded) {
+        console.log("Applying property data migration...");
+        try {
+            await batch.commit();
+            console.log("Property data migration to Firestore completed successfully.");
+            await logActivity('Migrated/Updated property data from local source.');
+        } catch (error) {
+            console.error("Error migrating properties to Firestore:", error);
+        }
+    } else {
+        console.log("All property data in Firestore is up-to-date. No migration needed.");
     }
 }
 
@@ -1728,3 +1747,6 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 }
 
 
+
+
+    
