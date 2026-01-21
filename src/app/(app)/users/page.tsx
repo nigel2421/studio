@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
-const editableRoles: UserRole[] = ['admin', 'agent', 'viewer', 'water-meter-reader'];
+const editableRoles: UserRole[] = ['admin', 'agent', 'viewer', 'water-meter-reader', 'investment-consultant'];
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -154,7 +154,7 @@ export default function UsersPage() {
                          </SelectTrigger>
                          <SelectContent>
                            {editableRoles.map(role => (
-                             <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>
+                             <SelectItem key={role} value={role} className="capitalize">{role.replace('-', ' ')}</SelectItem>
                            ))}
                          </SelectContent>
                        </Select>

@@ -73,6 +73,7 @@ export function AppSidebar() {
 
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
   const isAgent = userProfile?.role === 'agent';
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
   useEffect(() => {
     if (isAdmin || isAgent) {
@@ -123,6 +124,7 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => {
             if (isAgent && item.href === '/documents') return null;
+            if (isInvestmentConsultant && (item.href === '/documents' || item.href === '/properties')) return null;
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
@@ -138,57 +140,62 @@ export function AppSidebar() {
             );
           })}
 
-          <SidebarMenuItem>
-            <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen} className="w-full">
-              <CollapsibleTrigger asChild>
-                  <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')} className="w-full">
-                    <Banknote />
-                    <span>Accounts</span>
-                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200" />
-                  </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <ul className="pl-8 py-1 space-y-1">
-                  {isAdmin && (
+          {(isAdmin || isAgent) && (
+            <SidebarMenuItem>
+              <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen} className="w-full">
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')} className="w-full">
+                      <Banknote />
+                      <span>Accounts</span>
+                      <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200" />
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ul className="pl-8 py-1 space-y-1">
+                    {isAdmin && (
+                      <SidebarMenuItem>
+                        <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
+                          <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
+                            <span>Overview</span>
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
+                    )}
                     <SidebarMenuItem>
-                      <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
-                        <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
-                          <span>Overview</span>
-                        </SidebarMenuButton>
+                      <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
+                          <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
+                              <span>Tasks</span>
+                              <div className={cn(
+                                  "ml-auto h-2 w-2 rounded-full",
+                                  hasPendingTasks ? "bg-red-500" : "bg-green-500"
+                              )} />
+                          </SidebarMenuButton>
                       </Link>
                     </SidebarMenuItem>
-                  )}
-                  <SidebarMenuItem>
-                     <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
-                        <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
-                            <span>Tasks</span>
-                            <div className={cn(
-                                "ml-auto h-2 w-2 rounded-full",
-                                hasPendingTasks ? "bg-red-500" : "bg-green-500"
-                            )} />
-                        </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
-                </ul>
-              </CollapsibleContent>
-            </Collapsible>
-          </SidebarMenuItem>
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
+            </SidebarMenuItem>
+          )}
 
 
           <Separator className="my-2" />
-          {otherItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
-                <SidebarMenuButton
-                  isActive={isActive(item.href)}
-                  tooltip={item.label}
-                >
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
+          {otherItems.map((item) => {
+            if (isInvestmentConsultant && item.href === '/communications') return null;
+            return (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
+                  <SidebarMenuButton
+                    isActive={isActive(item.href)}
+                    tooltip={item.label}
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            );
+          })}
           {isAdmin && (
             <>
               <SidebarMenuItem>
