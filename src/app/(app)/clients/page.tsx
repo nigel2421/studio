@@ -2,37 +2,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getProperties, getLandlords, updateLandlord, getPropertyOwners, updatePropertyOwner } from '@/lib/data';
-import type { Property, Landlord, PropertyOwner, Unit } from '@/lib/types';
+import { getProperties, getPropertyOwners, updatePropertyOwner } from '@/lib/data';
+import type { Property, PropertyOwner, Unit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2, Edit, UserCog, Users, PlusCircle } from 'lucide-react';
-import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
+import { Edit, UserCog, PlusCircle } from 'lucide-react';
 import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
-  const [landlords, setLandlords] = useState<Landlord[]>([]);
   const [propertyOwners, setPropertyOwners] = useState<PropertyOwner[]>([]);
-
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [selectedLandlord, setSelectedLandlord] = useState<Landlord | null>(null);
   const [selectedOwner, setSelectedOwner] = useState<PropertyOwner | null>(null);
-
-  const [isLandlordDialogOpen, setIsLandlordDialogOpen] = useState(false);
   const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
-
   const { toast } = useToast();
 
   const fetchData = async () => {
     const props = await getProperties();
-    const lords = await getLandlords();
     const owners = await getPropertyOwners();
-
     setAllProperties(props);
-    setLandlords(lords);
     setPropertyOwners(owners);
   }
 
@@ -46,37 +35,9 @@ export default function ClientsPage() {
     u.managementStatus === 'Client Self Fully Managed' &&
     u.handoverStatus === 'Handed Over';
 
-  const landlordProperties = allProperties.filter(p => p.units?.some(u => u.ownership === 'Landlord'));
   const clientProperties = allProperties.filter(p => p.units?.some(isClientManagedUnit));
 
-  const handleManageLandlordClick = (property: Property) => {
-    setSelectedProperty(property);
-    const landlordId = `landlord-for-${property.id}-${Date.now()}`;
-    const newLandlord: Landlord = { id: landlordId, name: '', email: '', phone: '', bankAccount: '' };
-    setSelectedLandlord(newLandlord);
-    setIsLandlordDialogOpen(true);
-  };
-
-  const handleManageOwnerClick = (property: Property) => {
-    setSelectedProperty(property);
-    const existingOwner = propertyOwners.find(o => o.assignedUnits.some(au => au.propertyId === property.id));
-    setSelectedOwner(existingOwner || null);
-    setIsOwnerDialogOpen(true);
-  };
-
-  const handleSaveLandlord = async (landlordData: Landlord, selectedUnitNames: string[]) => {
-    if (!selectedProperty) return;
-    try {
-      await updateLandlord(landlordData.id, landlordData, selectedProperty.id, selectedUnitNames);
-      toast({ title: 'Landlord Saved', description: `Details for ${landlordData.name} have been saved.` });
-      fetchData();
-      setIsLandlordDialogOpen(false);
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save landlord.' });
-    }
-  }
-
- const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
+  const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
     
     const updatedAssignedUnits = ownerData.assignedUnits?.filter(au => au.propertyId !== selectedProperty.id) || [];
@@ -103,62 +64,12 @@ export default function ClientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Clients & Owners</h2>
-          <p className="text-muted-foreground">Manage landlord and property owner relationships.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Property Owners (Clients)</h2>
+          <p className="text-muted-foreground">Manage property owner contact information and unit assignments.</p>
         </div>
       </div>
 
-      <Tabs defaultValue="landlords" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1">
-          <TabsTrigger value="landlords" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Landlords
-          </TabsTrigger>
-          <TabsTrigger value="owners" className="flex items-center gap-2">
-            <UserCog className="h-4 w-4" />
-            Property Owners (Clients)
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="landlords" className="space-y-6">
-          {landlordProperties.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {landlordProperties.map(property => (
-                <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-primary/10">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{property.name}</CardTitle>
-                        <CardDescription>{property.address}</CardDescription>
-                      </div>
-                      <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                        <Building2 className="h-6 w-6" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <div className="flex justify-between items-center text-sm font-medium">
-                      <span className="text-muted-foreground">{property.type}</span>
-                      <span className="bg-primary/5 text-primary px-2 py-1 rounded-md">
-                        {property.units.filter(u => u.ownership === 'Landlord').length} Landlord Units
-                      </span>
-                    </div>
-                  </CardContent>
-                  <div className="p-6 pt-0">
-                    <Button onClick={() => handleManageLandlordClick(property)} className="w-full">
-                      <Edit className="mr-2 h-4 w-4" />
-                      Manage Landlords
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <EmptyState message="No properties with landlord-owned units found." />
-          )}
-        </TabsContent>
-
-        <TabsContent value="owners" className="space-y-6">
+      <div className="space-y-6">
           {clientProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {clientProperties.map(property => {
@@ -266,18 +177,7 @@ export default function ClientsPage() {
           ) : (
             <EmptyState message="No properties with client-managed units found." />
           )}
-        </TabsContent>
-      </Tabs>
-
-      {selectedProperty && selectedLandlord && (
-        <ManageLandlordDialog
-          isOpen={isLandlordDialogOpen}
-          onClose={() => setIsLandlordDialogOpen(false)}
-          landlord={selectedLandlord}
-          property={selectedProperty}
-          onSave={handleSaveLandlord}
-        />
-      )}
+      </div>
 
       {selectedProperty && (
         <ManagePropertyOwnerDialog
@@ -300,5 +200,3 @@ function EmptyState({ message }: { message: string }) {
     </div>
   );
 }
-
-    

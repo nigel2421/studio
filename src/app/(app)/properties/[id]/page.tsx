@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -140,13 +141,35 @@ export default function PropertyManagementPage() {
 
     const handleSaveUnit = async (unitData: any) => {
         if (!property) return;
-        const updatedUnits = units.map(u => u.name === unitData.name ? { ...u, ...unitData } : u);
-        setUnits(updatedUnits);
-
+    
+        const updatedUnits = units.map(u => {
+            if (u.name === unitData.name) {
+                const updatedUnit: { [key: string]: any } = { ...u, ...unitData };
+                
+                // If landlordId is 'none', remove it completely.
+                if (updatedUnit.landlordId === 'none') {
+                    delete updatedUnit.landlordId;
+                }
+                
+                // Firestore doesn't allow 'undefined', so remove keys with undefined values.
+                Object.keys(updatedUnit).forEach(key => {
+                    if (updatedUnit[key] === undefined) {
+                        delete updatedUnit[key];
+                    }
+                });
+    
+                return updatedUnit;
+            }
+            return u;
+        });
+    
+        setUnits(updatedUnits as Unit[]);
+    
         try {
-            await updateProperty(property.id, { units: updatedUnits } as any);
+            await updateProperty(property.id, { units: updatedUnits });
             toast({ title: "Unit Updated", description: `Unit ${unitData.name} has been updated successfully.` });
         } catch (error) {
+            console.error(error); // Log for debugging
             toast({ variant: "destructive", title: "Error", description: "Failed to update unit details." });
         }
     };
