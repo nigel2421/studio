@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +26,17 @@ const updatableFields: (keyof Omit<Unit, 'name' | 'landlordId'>)[] = [
 export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
-    const { control, handleSubmit, register, reset, watch, formState: { dirtyFields } } = useForm();
+    const { control, handleSubmit, register, reset, getValues } = useForm({
+        defaultValues: {
+            status: '',
+            ownership: '',
+            unitType: '',
+            managementStatus: '',
+            handoverStatus: '',
+            rentAmount: '',
+            serviceCharge: ''
+        }
+    });
     const [activeFields, setActiveFields] = useState<Partial<Record<keyof Unit, boolean>>>({});
     
     useEffect(() => {
@@ -40,13 +49,10 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
     const handleToggleField = (field: keyof Unit, checked: boolean) => {
         setActiveFields(prev => ({ ...prev, [field]: checked }));
         if (!checked) {
-            // Reset field value when unchecked
-            const defaultValues:any = { rentAmount: '', serviceCharge: ''};
-            form.reset({ ...form.getValues(), [field]: defaultValues[field] || undefined });
+            const newValues = { ...getValues(), [field]: '' };
+            reset(newValues);
         }
     };
-    
-    const { ...form } = useForm();
 
     const processSubmit = async (data: any) => {
         const updateData: Partial<Unit> = {};
@@ -62,7 +68,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                     value = value !== '' ? Number(value) : undefined;
                 }
                 
-                if (value !== undefined && value !== '') {
+                if (value !== undefined && value !== '' && value !== null) {
                     (updateData as any)[fieldKey] = value;
                 }
             }
@@ -156,7 +162,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                 );
             case 'rentAmount':
             case 'serviceCharge':
-                return <Input type="number" {...commonProps} />;
+                return <Input type="number" {...commonProps} placeholder="Enter new value" />;
             default:
                 return null;
         }
