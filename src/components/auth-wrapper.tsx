@@ -17,9 +17,9 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
 
     const onLoginPage = pathname === '/login';
-    const isLandlordDashboard = pathname.startsWith('/landlord');
-    const isTenantDashboard = pathname.startsWith('/tenant');
-    const isOwnerDashboard = pathname.startsWith('/owner');
+    const isLandlordDashboard = pathname.startsWith('/landlord/');
+    const isTenantDashboard = pathname.startsWith('/tenant/');
+    const isOwnerDashboard = pathname.startsWith('/owner/');
 
     if (!isAuth && !onLoginPage) {
       router.push('/login');
