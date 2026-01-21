@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { vertexAI } from '@genkit-ai/google-genai';
 
 const MaintenanceRequestInputSchema = z.object({
   tenantName: z.string().describe('The name of the tenant making the request.'),
@@ -28,29 +29,28 @@ export async function generateMaintenanceResponseDraft(input: MaintenanceRequest
   return maintenanceResponseDraftFlow(input);
 }
 
-const maintenanceResponsePrompt = ai.definePrompt({
-  name: 'maintenanceResponsePrompt',
-  input: {schema: MaintenanceRequestInputSchema},
-  output: {schema: MaintenanceResponseDraftOutputSchema},
-  prompt: `You are an experienced property manager. A tenant has submitted a maintenance request, and you need to draft a response.
-
-Tenant Name: {{{tenantName}}}
-Property Address: {{{propertyAddress}}}
-Request Details: {{{requestDetails}}}
-Urgency: {{{urgency}}}
-
-Draft a response to the tenant acknowledging their request, providing an estimated timeline for resolution, and any relevant instructions.
-Also, suggest any additional actions that might be needed, such as contacting a plumber, electrician, or other outside resource.`,
-});
-
 const maintenanceResponseDraftFlow = ai.defineFlow(
   {
     name: 'maintenanceResponseDraftFlow',
     inputSchema: MaintenanceRequestInputSchema,
     outputSchema: MaintenanceResponseDraftOutputSchema,
   },
-  async input => {
-    const {output} = await maintenanceResponsePrompt(input);
+  async (input) => {
+    const { output } = await ai.generate({
+      model: vertexAI.model('gemini-2.5-flash-lite'),
+      prompt: `You are an experienced property manager. A tenant has submitted a maintenance request, and you need to draft a response.
+
+Tenant Name: ${input.tenantName}
+Property Address: ${input.propertyAddress}
+Request Details: ${input.requestDetails}
+Urgency: ${input.urgency}
+
+Draft a response to the tenant acknowledging their request, providing an estimated timeline for resolution, and any relevant instructions.
+Also, suggest any additional actions that might be needed, such as contacting a plumber, electrician, or other outside resource.`,
+      output: {
+        schema: MaintenanceResponseDraftOutputSchema,
+      },
+    });
     return output!;
   }
 );
