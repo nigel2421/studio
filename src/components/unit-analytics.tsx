@@ -1,8 +1,8 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Property, Tenant } from '@/lib/types';
+import type { Property, Tenant, UnitType } from '@/lib/types';
+import { unitTypes } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from './ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type FloorAnalyticsData = {
   rentedSM: number;
@@ -43,6 +44,7 @@ const parseFloorFromUnitName = (unitName: string): string | null => {
 export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   const [analytics, setAnalytics] = useState<Record<string, FloorAnalyticsData> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
 
   useEffect(() => {
     function calculateAnalytics() {
@@ -54,15 +56,17 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
         setLoading(false);
         return;
       }
+
+      const filteredUnits = property.units.filter(unit =>
+        unitTypeFilter === 'all' || unit.unitType === unitTypeFilter
+      );
       
-      // Initialize map with all floor-unittype combinations
-      property.units.forEach(unit => {
+      // Initialize map with all floors
+      filteredUnits.forEach(unit => {
         const floorNumber = parseFloorFromUnitName(unit.name);
-        const unitType = unit.unitType;
-        if (floorNumber && unitType) {
-          const key = `${floorNumber} - ${unitType}`;
-          if (!floors.has(key)) {
-            floors.set(key, {
+        if (floorNumber) {
+          if (!floors.has(floorNumber)) {
+            floors.set(floorNumber, {
               rentedSM: 0,
               rentedLandlord: 0,
               vacant: 0,
@@ -73,13 +77,11 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
       });
 
       // Populate the analytics data
-      property.units.forEach(unit => {
+      filteredUnits.forEach(unit => {
         const floorNumber = parseFloorFromUnitName(unit.name);
-        const unitType = unit.unitType;
-        if (!floorNumber || !unitType) return;
+        if (!floorNumber) return;
 
-        const key = `${floorNumber} - ${unitType}`;
-        const floorData = floors.get(key);
+        const floorData = floors.get(floorNumber);
         if (!floorData) return;
 
         floorData.totalUnits++;
@@ -98,16 +100,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
       });
       
       const sortedFloors = new Map([...floors.entries()].sort((a, b) => {
-          const [floorA, typeA] = a[0].split(' - ');
-          const [floorB, typeB] = b[0].split(' - ');
-          
-          const floorNumA = parseInt(floorA);
-          const floorNumB = parseInt(floorB);
-
-          if (floorNumA !== floorNumB) {
-              return floorNumA - floorNumB;
-          }
-          return typeA.localeCompare(typeB);
+          return parseInt(a[0]) - parseInt(b[0]);
       }));
 
       setAnalytics(Object.fromEntries(sortedFloors));
@@ -117,7 +110,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
     if (property && tenants) {
       calculateAnalytics();
     }
-  }, [property, tenants]);
+  }, [property, tenants, unitTypeFilter]);
 
   if (loading) {
     return (
@@ -138,23 +131,35 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   }
 
   if (!analytics || Object.keys(analytics).length === 0) {
-    // Don't render the card if there are no floors to analyze
     return null;
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{property.name} - Unit Type Analytics</CardTitle>
-        <CardDescription>
-          A detailed breakdown of units for this property by floor and type.
-        </CardDescription>
+        <div className="flex justify-between items-center">
+            <div>
+                <CardTitle>{property.name} - Unit Analytics</CardTitle>
+                <CardDescription>
+                  A detailed breakdown of units for this property by floor.
+                </CardDescription>
+            </div>
+            <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by Unit Type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Unit Types</SelectItem>
+                    {unitTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                </SelectContent>
+            </Select>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Floor - Unit Type</TableHead>
+              <TableHead>Floor</TableHead>
               <TableHead className="text-center">Rented (SM)</TableHead>
               <TableHead className="text-center">Rented (Landlord)</TableHead>
               <TableHead className="text-center">Vacant</TableHead>
@@ -162,9 +167,9 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Object.entries(analytics).map(([key, data]) => (
-              <TableRow key={key}>
-                <TableCell className="font-medium">{key}</TableCell>
+            {Object.entries(analytics).map(([floor, data]) => (
+              <TableRow key={floor}>
+                <TableCell className="font-medium">Floor {floor}</TableCell>
                 <TableCell className="text-center">{data.rentedSM}</TableCell>
                 <TableCell className="text-center">{data.rentedLandlord}</TableCell>
                 <TableCell className="text-center">{data.vacant}</TableCell>
