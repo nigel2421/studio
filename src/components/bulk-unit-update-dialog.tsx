@@ -1,0 +1,200 @@
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface BulkUnitUpdateDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSave: (data: Partial<Omit<Unit, 'name'>>) => Promise<void>;
+    unitCount: number;
+}
+
+const updatableFields: (keyof Omit<Unit, 'name' | 'landlordId'>)[] = [
+    'status', 'ownership', 'unitType', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
+];
+
+export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const { control, handleSubmit, register, reset, watch, formState: { dirtyFields } } = useForm();
+    const [activeFields, setActiveFields] = useState<Partial<Record<keyof Unit, boolean>>>({});
+    
+    useEffect(() => {
+        if (!open) {
+            reset();
+            setActiveFields({});
+        }
+    }, [open, reset]);
+
+    const handleToggleField = (field: keyof Unit, checked: boolean) => {
+        setActiveFields(prev => ({ ...prev, [field]: checked }));
+        if (!checked) {
+            // Reset field value when unchecked
+            const defaultValues:any = { rentAmount: '', serviceCharge: ''};
+            form.reset({ ...form.getValues(), [field]: defaultValues[field] || undefined });
+        }
+    };
+    
+    const { ...form } = useForm();
+
+    const processSubmit = async (data: any) => {
+        const updateData: Partial<Unit> = {};
+        let hasActiveField = false;
+
+        for (const key in activeFields) {
+            if (activeFields[key as keyof Unit]) {
+                hasActiveField = true;
+                const fieldKey = key as keyof Unit;
+                let value = data[fieldKey];
+                
+                if (fieldKey === 'rentAmount' || fieldKey === 'serviceCharge') {
+                    value = value !== '' ? Number(value) : undefined;
+                }
+                
+                if (value !== undefined && value !== '') {
+                    (updateData as any)[fieldKey] = value;
+                }
+            }
+        }
+        
+        if (!hasActiveField || Object.keys(updateData).length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'No Changes',
+                description: 'Please select and fill at least one field to update.',
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        await onSave(updateData);
+        setIsSaving(false);
+    };
+
+    const renderFieldInput = (field: keyof Unit) => {
+        const commonProps = {
+            disabled: !activeFields[field],
+            ...register(field)
+        };
+
+        switch (field) {
+            case 'status':
+                return (
+                    <Controller
+                        name="status"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.status}>
+                                <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+                                <SelectContent>{unitStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'ownership':
+                return (
+                     <Controller
+                        name="ownership"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.ownership}>
+                                <SelectTrigger><SelectValue placeholder="Select Ownership" /></SelectTrigger>
+                                <SelectContent>{ownershipTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'unitType':
+                 return (
+                     <Controller
+                        name="unitType"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.unitType}>
+                                <SelectTrigger><SelectValue placeholder="Select Unit Type" /></SelectTrigger>
+                                <SelectContent>{unitTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'managementStatus':
+                 return (
+                     <Controller
+                        name="managementStatus"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.managementStatus}>
+                                <SelectTrigger><SelectValue placeholder="Select Management Status" /></SelectTrigger>
+                                <SelectContent>{managementStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'handoverStatus':
+                 return (
+                     <Controller
+                        name="handoverStatus"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.handoverStatus}>
+                                <SelectTrigger><SelectValue placeholder="Select Handover Status" /></SelectTrigger>
+                                <SelectContent>{handoverStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'rentAmount':
+            case 'serviceCharge':
+                return <Input type="number" {...commonProps} />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Bulk Edit Units</DialogTitle>
+                    <DialogDescription>
+                        You are editing {unitCount} units. Select the fields you want to change and provide the new values.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(processSubmit)} className="space-y-4 py-4">
+                    {updatableFields.map(field => (
+                        <div key={field} className="grid grid-cols-[auto,1fr] items-center gap-4">
+                             <Checkbox
+                                id={`cb-${field}`}
+                                onCheckedChange={(checked) => handleToggleField(field, !!checked)}
+                            />
+                            <div className="grid w-full items-center gap-1.5">
+                                <Label htmlFor={field} className="capitalize text-sm font-medium">
+                                    {field.replace(/([A-Z])/g, ' $1')}
+                                </Label>
+                                {renderFieldInput(field)}
+                            </div>
+                        </div>
+                    ))}
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Apply Changes
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
