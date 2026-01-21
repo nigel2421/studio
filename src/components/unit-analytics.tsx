@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -54,23 +55,33 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
         return;
       }
       
+      // Initialize map with all floor-unittype combinations
       property.units.forEach(unit => {
         const floorNumber = parseFloorFromUnitName(unit.name);
-        if (floorNumber && !floors.has(floorNumber)) {
-          floors.set(floorNumber, {
-            rentedSM: 0,
-            rentedLandlord: 0,
-            vacant: 0,
-            totalUnits: 0,
-          });
+        const unitType = unit.unitType;
+        if (floorNumber && unitType) {
+          const key = `${floorNumber} - ${unitType}`;
+          if (!floors.has(key)) {
+            floors.set(key, {
+              rentedSM: 0,
+              rentedLandlord: 0,
+              vacant: 0,
+              totalUnits: 0,
+            });
+          }
         }
       });
 
+      // Populate the analytics data
       property.units.forEach(unit => {
         const floorNumber = parseFloorFromUnitName(unit.name);
-        if (!floorNumber) return;
+        const unitType = unit.unitType;
+        if (!floorNumber || !unitType) return;
 
-        const floorData = floors.get(floorNumber)!;
+        const key = `${floorNumber} - ${unitType}`;
+        const floorData = floors.get(key);
+        if (!floorData) return;
+
         floorData.totalUnits++;
 
         const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
@@ -86,7 +97,19 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
         }
       });
       
-      const sortedFloors = new Map([...floors.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0])));
+      const sortedFloors = new Map([...floors.entries()].sort((a, b) => {
+          const [floorA, typeA] = a[0].split(' - ');
+          const [floorB, typeB] = b[0].split(' - ');
+          
+          const floorNumA = parseInt(floorA);
+          const floorNumB = parseInt(floorB);
+
+          if (floorNumA !== floorNumB) {
+              return floorNumA - floorNumB;
+          }
+          return typeA.localeCompare(typeB);
+      }));
+
       setAnalytics(Object.fromEntries(sortedFloors));
       setLoading(false);
     }
@@ -122,16 +145,16 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{property.name} - Floor Analytics</CardTitle>
+        <CardTitle>{property.name} - Unit Type Analytics</CardTitle>
         <CardDescription>
-          A detailed breakdown of units for this property by floor.
+          A detailed breakdown of units for this property by floor and type.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Floor</TableHead>
+              <TableHead>Floor - Unit Type</TableHead>
               <TableHead className="text-center">Rented (SM)</TableHead>
               <TableHead className="text-center">Rented (Landlord)</TableHead>
               <TableHead className="text-center">Vacant</TableHead>
@@ -139,9 +162,9 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Object.entries(analytics).map(([floor, data]) => (
-              <TableRow key={floor}>
-                <TableCell className="font-medium">Floor {floor}</TableCell>
+            {Object.entries(analytics).map(([key, data]) => (
+              <TableRow key={key}>
+                <TableCell className="font-medium">{key}</TableCell>
                 <TableCell className="text-center">{data.rentedSM}</TableCell>
                 <TableCell className="text-center">{data.rentedLandlord}</TableCell>
                 <TableCell className="text-center">{data.vacant}</TableCell>
