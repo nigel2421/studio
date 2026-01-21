@@ -1513,21 +1513,18 @@ export async function getLandlord(landlordId: string): Promise<Landlord | null> 
 export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
     const landlordRef = doc(db, 'landlords', landlord.id);
     let finalLandlordData = { ...landlord };
-    
+
     // Auth user creation logic
     if (landlord.email && landlord.phone && !landlord.userId) {
-        // Check if a user with this email already exists to get the UID
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where("email", "==", landlord.email), limit(1));
         const userSnap = await getDocs(q);
-        
+
         if (!userSnap.empty) {
             const existingUser = userSnap.docs[0];
             finalLandlordData.userId = existingUser.id;
-            // Ensure the user profile is updated with landlord role and ID
             await setDoc(existingUser.ref, { role: 'landlord', landlordId: landlord.id }, { merge: true });
         } else {
-            // No existing user, create one
             const appName = 'landlord-creation-app-' + Date.now();
             let secondaryApp;
             try {
@@ -1551,42 +1548,48 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     }
 
     const batch = writeBatch(db);
-
-    // 1. Set/update the landlord document
     batch.set(landlordRef, finalLandlordData, { merge: true });
-    
-    // 2. Fetch all properties to manage unit assignments
+
     const propertiesSnapshot = await getDocs(collection(db, 'properties'));
     const properties = propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-    
-    for(const prop of properties) {
+
+    for (const prop of properties) {
         let needsUpdate = false;
-        const updatedUnits = prop.units.map(unit => {
-            // Case 1: The unit is in the new assignment list
+        const updatedUnits = prop.units.map(originalUnit => {
+            let unit = { ...originalUnit };
+
             if (assignedUnitNames.includes(unit.name)) {
                 if (unit.landlordId !== landlord.id) {
+                    unit.landlordId = landlord.id;
                     needsUpdate = true;
-                    return { ...unit, landlordId: landlord.id };
                 }
-            } 
-            // Case 2: The unit was previously assigned to this landlord but is no longer
-            else if (unit.landlordId === landlord.id) {
+            } else if (unit.landlordId === landlord.id) {
+                delete (unit as any).landlordId;
                 needsUpdate = true;
-                const { landlordId, ...rest } = unit as any; // Use 'as any' to bypass strict type checking for deletion
-                return rest;
             }
             return unit;
         });
 
         if (needsUpdate) {
             const propRef = doc(db, 'properties', prop.id);
-            batch.update(propRef, { units: updatedUnits });
+            const sanitizedUnits = updatedUnits.map(u => {
+                const cleanUnit: { [key: string]: any } = {};
+                Object.keys(u).forEach(key => {
+                    const value = (u as any)[key];
+                    if (value !== undefined) {
+                        cleanUnit[key] = value;
+                    }
+                });
+                return cleanUnit as Unit;
+            });
+            batch.update(propRef, { units: sanitizedUnits });
         }
     }
 
     await batch.commit();
     await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
 }
+
 
 export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount: string }[]): Promise<{ added: number; skipped: number }> {
     const landlordsRef = collection(db, 'landlords');
@@ -1786,3 +1789,4 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+

@@ -139,38 +139,40 @@ export default function PropertyManagementPage() {
         setIsEditDialogOpen(true);
     };
 
-    const handleSaveUnit = async (unitData: any) => {
+    const handleSaveUnit = async (unitData: Unit) => {
         if (!property) return;
     
         const updatedUnits = units.map(u => {
             if (u.name === unitData.name) {
+                // Build a new object from scratch to avoid undefined values
                 const updatedUnit: { [key: string]: any } = { ...u, ...unitData };
-                
-                // If landlordId is 'none', remove it completely.
-                if (updatedUnit.landlordId === 'none') {
+    
+                if (updatedUnit.landlordId === 'none' || updatedUnit.landlordId === '') {
                     delete updatedUnit.landlordId;
                 }
-                
-                // Firestore doesn't allow 'undefined', so remove keys with undefined values.
+    
+                // Ensure all undefined keys are removed
                 Object.keys(updatedUnit).forEach(key => {
                     if (updatedUnit[key] === undefined) {
                         delete updatedUnit[key];
                     }
                 });
     
-                return updatedUnit;
+                return updatedUnit as Unit;
             }
             return u;
         });
     
-        setUnits(updatedUnits as Unit[]);
+        setUnits(updatedUnits); // Optimistic update
     
         try {
             await updateProperty(property.id, { units: updatedUnits });
             toast({ title: "Unit Updated", description: `Unit ${unitData.name} has been updated successfully.` });
+            fetchData(); // Re-fetch to ensure consistency
         } catch (error) {
-            console.error(error); // Log for debugging
-            toast({ variant: "destructive", title: "Error", description: "Failed to update unit details." });
+            console.error("Firestore update error:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to update unit details in the database." });
+            fetchData(); // Revert optimistic update by re-fetching
         }
     };
     

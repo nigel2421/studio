@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -39,7 +40,7 @@ interface UnitEditDialogProps {
     landlords: Landlord[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSave: (data: UnitFormValues) => Promise<void>;
+    onSave: (data: Unit) => Promise<void>;
 }
 
 export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: UnitEditDialogProps) {
@@ -74,7 +75,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
     const handleSubmit = async (data: UnitFormValues) => {
         setIsSaving(true);
         try {
-            await onSave(data);
+            await onSave(data as Unit);
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving unit:", error);
