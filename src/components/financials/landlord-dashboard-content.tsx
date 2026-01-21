@@ -22,14 +22,15 @@ interface LandlordDashboardContentProps {
 export function LandlordDashboardContent({ properties, tenants, payments, financialSummary }: LandlordDashboardContentProps) {
     const [lastMonths, setLastMonths] = useState(12);
 
-    const getUnitName = (tenantId: string) => {
-        const tenant = tenants.find(t => t.id === tenantId);
-        return tenant ? `${tenant.unitName}` : 'Unknown';
-    };
-
-    const getTenantName = (tenantId: string) => {
-        const tenant = tenants.find(t => t.id === tenantId);
-        return tenant ? tenant.name : 'Unknown';
+    const getUnitTypeForTenant = (tenant: Tenant | undefined): string => {
+        if (!tenant) return 'N/A';
+        for (const propData of properties) {
+            if (propData.property.id === tenant.propertyId) {
+                const unit = propData.units.find(u => u.name === tenant.unitName);
+                return unit?.unitType || 'N/A';
+            }
+        }
+        return 'N/A';
     };
 
     const handleExport = () => {
@@ -41,7 +42,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
 
             return {
                 Date: new Date(p.date).toLocaleDateString(),
-                Tenant: t?.name || 'Unknown',
                 Unit: t?.unitName || 'Unknown',
                 Type: p.type || 'Rent',
                 "Gross Amount": breakdown.gross,
@@ -120,7 +120,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Tenant/Unit</TableHead>
+                                <TableHead>Unit</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">S. Charge</TableHead>
@@ -133,13 +133,14 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                 const tenant = tenants.find(t => t.id === payment.tenantId);
                                 const serviceCharge = tenant?.lease?.serviceCharge || 0;
                                 const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
+                                const unitType = getUnitTypeForTenant(tenant);
 
                                 return (
                                     <TableRow key={payment.id}>
                                         <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
                                         <TableCell>
                                             <div className="font-medium">{tenant?.unitName}</div>
-                                            <div className="text-xs text-muted-foreground">{tenant?.name}</div>
+                                            <div className="text-xs text-muted-foreground">{unitType}</div>
                                         </TableCell>
                                         <TableCell><Badge variant="outline">{payment.type || 'Rent'}</Badge></TableCell>
                                         <TableCell className="text-right">Ksh {breakdown.gross.toLocaleString()}</TableCell>

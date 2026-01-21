@@ -756,7 +756,19 @@ export async function getTenant(id: string): Promise<Tenant | null> {
 export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant' }): Promise<void> {
 
     const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit } = data;
-    const initialDue = rent + securityDeposit + (waterDeposit || 0);
+
+    const property = await getProperty(propertyId);
+    if (!property) {
+        throw new Error("Cannot add tenant: selected property not found.");
+    }
+    const unit = property.units.find(u => u.name === unitName);
+    if (!unit) {
+        throw new Error("Cannot add tenant: selected unit not found in property.");
+    }
+    const serviceCharge = unit.serviceCharge || 0;
+    const rentFromUnit = unit.rentAmount || 0;
+    const finalRent = rent > 0 ? rent : rentFromUnit;
+    const initialDue = finalRent + securityDeposit + (waterDeposit || 0);
 
     const newTenantData = {
         name,
@@ -771,7 +783,8 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
         lease: {
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-            rent: rent || 0,
+            rent: finalRent,
+            serviceCharge: serviceCharge,
             paymentStatus: 'Pending' as const,
             lastBilledPeriod: format(new Date(), 'yyyy-MM'),
         },
@@ -785,7 +798,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     // Create onboarding task
     await addTask({
         title: `Onboard: ${name}`,
-        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${rent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
+        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${finalRent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
         status: 'Pending',
         priority: 'High',
         category: 'Financial',
@@ -798,7 +811,6 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     await logActivity(`Created tenant: ${name} (${email})`);
 
     // Update unit status to occupied
-    const property = await getProperty(propertyId);
     if (property) {
         const updatedUnits = property.units.map(u =>
             u.name === unitName ? { ...u, status: 'rented' as const } : u
