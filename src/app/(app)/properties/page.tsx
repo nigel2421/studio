@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,9 +6,8 @@ import type { Property } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, PlusCircle, Building2, Upload } from 'lucide-react';
+import { Search, PlusCircle, Building2 } from 'lucide-react';
 import Link from 'next/link';
-import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -44,7 +42,6 @@ export default function PropertiesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-           <UnitBulkUpdateDialog onUploadComplete={fetchProperties} />
           <Button asChild>
             <Link href="/properties/add">
               <PlusCircle className="mr-2 h-4 w-4" />

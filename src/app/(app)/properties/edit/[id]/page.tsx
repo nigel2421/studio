@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -22,6 +22,7 @@ import { Search, Edit2, Loader2, Filter, X } from 'lucide-react';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BulkUnitUpdateDialog } from '@/components/bulk-unit-update-dialog';
+import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -58,33 +59,37 @@ export default function EditPropertyPage() {
         resolver: zodResolver(formSchema),
         defaultValues: { name: '', address: '', type: '' },
     });
+    
+    const fetchData = useCallback(() => {
+        if (id) {
+            Promise.all([
+                getProperty(id as string),
+                getLandlords().catch(() => [])
+            ]).then(([propertyData, landlordData]) => {
+                if (propertyData) {
+                    setProperty(propertyData);
+                    setUnits(propertyData.units || []);
+                }
+                setLandlords(landlordData);
+            }).catch(error => {
+                console.error("Error fetching property data:", error);
+            });
+        }
+    }, [id]);
 
     useEffect(() => {
-        async function fetchData() {
-            if (id) {
-                try {
-                    const [propertyData, landlordData] = await Promise.all([
-                        getProperty(id as string),
-                        getLandlords().catch(() => [])
-                    ]);
-
-                    if (propertyData) {
-                        setProperty(propertyData);
-                        setUnits(propertyData.units || []);
-                        form.reset({
-                            name: propertyData.name,
-                            address: propertyData.address,
-                            type: propertyData.type,
-                        });
-                    }
-                    setLandlords(landlordData);
-                } catch (error) {
-                    console.error("Error fetching property data:", error);
-                }
-            }
-        }
         fetchData();
-    }, [id, form]);
+    }, [fetchData]);
+    
+    useEffect(() => {
+        if (property) {
+            form.reset({
+                name: property.name,
+                address: property.address,
+                type: property.type,
+            });
+        }
+    }, [property, form.reset]);
 
     const handleFilterChange = (filterName: keyof typeof filters, value: string) => {
         setFilters(prev => ({ ...prev, [filterName]: value }));
@@ -205,6 +210,7 @@ export default function EditPropertyPage() {
                                    Bulk Edit ({selectedUnitNames.length})
                                  </Button>
                                )}
+                               <UnitBulkUpdateDialog onUploadComplete={fetchData} />
                                 <div className="relative w-full md:w-48">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search units..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
