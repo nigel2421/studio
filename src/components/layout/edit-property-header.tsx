@@ -11,11 +11,10 @@ import { Save, Loader2 } from 'lucide-react';
 
 interface EditPropertyHeaderProps {
   form: UseFormReturn<EditPropertyFormValues>;
-  onSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
   isSaving: boolean;
 }
 
-export function EditPropertyHeader({ form, onSubmit, isSaving }: EditPropertyHeaderProps) {
+export function EditPropertyHeader({ form, isSaving }: EditPropertyHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-auto items-center justify-between gap-4 border-b bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6 lg:px-8">
       <div className="flex flex-1 items-center gap-4">
@@ -65,7 +64,7 @@ export function EditPropertyHeader({ form, onSubmit, isSaving }: EditPropertyHea
         </div>
       </div>
       <div className="flex items-center gap-4 pl-4">
-        <Button onClick={onSubmit} size="sm" disabled={isSaving}>
+        <Button type="submit" size="sm" disabled={isSaving}>
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           {isSaving ? 'Saving...' : 'Save Property'}
         </Button>

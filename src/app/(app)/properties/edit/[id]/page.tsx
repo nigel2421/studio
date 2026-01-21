@@ -191,7 +191,7 @@ export default function EditPropertyPage() {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
-                <EditPropertyHeader form={form} onSubmit={form.handleSubmit(onSubmit)} isSaving={isSaving} />
+                <EditPropertyHeader form={form} isSaving={isSaving} />
                 <div className="p-4 sm:p-6 lg:p-8 space-y-8">
                     <div className="space-y-4">
                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
