@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { BulkUnitUpdateDialog } from '@/components/bulk-unit-update-dialog';
 import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useAuth } from '@/hooks/useAuth';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -39,6 +40,8 @@ export default function PropertyManagementPage() {
     const [landlords, setLandlords] = useState<Landlord[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
+    const { userProfile } = useAuth();
+    const isReadOnly = userProfile?.role === 'investment-consultant';
 
     // Unit list state
     const [units, setUnits] = useState<Unit[]>([]);
@@ -214,7 +217,7 @@ export default function PropertyManagementPage() {
                                 <FormItem>
                                   <FormLabel className="text-xs text-muted-foreground">Name</FormLabel>
                                   <FormControl>
-                                    <Input {...field} className="h-9" />
+                                    <Input {...field} className="h-9" disabled={isReadOnly} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -227,7 +230,7 @@ export default function PropertyManagementPage() {
                                 <FormItem>
                                   <FormLabel className="text-xs text-muted-foreground">Address</FormLabel>
                                   <FormControl>
-                                    <Input {...field} className="h-9" />
+                                    <Input {...field} className="h-9" disabled={isReadOnly} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -240,7 +243,7 @@ export default function PropertyManagementPage() {
                                 <FormItem>
                                   <FormLabel className="text-xs text-muted-foreground">Type</FormLabel>
                                   <FormControl>
-                                    <Input {...field} className="h-9" />
+                                    <Input {...field} className="h-9" disabled={isReadOnly} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -249,12 +252,14 @@ export default function PropertyManagementPage() {
                           </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4 pl-4">
-                        <Button type="submit" size="sm" disabled={isSaving}>
-                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {isSaving ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </div>
+                    {!isReadOnly && (
+                        <div className="flex items-center gap-4 pl-4">
+                            <Button type="submit" size="sm" disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    )}
                 </header>
 
                 <div className="p-4 sm:p-6 lg:p-8 space-y-8">
@@ -265,12 +270,12 @@ export default function PropertyManagementPage() {
                                 <p className="text-sm text-muted-foreground">Manage and edit individual unit details.</p>
                             </div>
                              <div className="flex items-center gap-2">
-                               {selectedUnitNames.length > 0 && (
+                               {!isReadOnly && selectedUnitNames.length > 0 && (
                                  <Button size="sm" onClick={() => setIsBulkDialogOpen(true)}>
                                    Bulk Edit ({selectedUnitNames.length})
                                  </Button>
                                )}
-                               <UnitBulkUpdateDialog onUploadComplete={fetchData} />
+                               {!isReadOnly && <UnitBulkUpdateDialog onUploadComplete={fetchData} />}
                                 <div className="relative w-full md:w-48">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search units..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -316,43 +321,51 @@ export default function PropertyManagementPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-12 text-center">
-                                                <Checkbox
-                                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                                                    checked={selectedUnitNames.length > 0 && selectedUnitNames.length === paginatedUnits.length}
-                                                    aria-label="Select all units on this page"
-                                                />
-                                            </TableHead>
+                                            {!isReadOnly && (
+                                                <TableHead className="w-12 text-center">
+                                                    <Checkbox
+                                                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                                        checked={selectedUnitNames.length > 0 && selectedUnitNames.length === paginatedUnits.length}
+                                                        aria-label="Select all units on this page"
+                                                    />
+                                                </TableHead>
+                                            )}
                                             <TableHead>Unit Name</TableHead>
                                             <TableHead>Type</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Ownership</TableHead>
+                                            <TableHead>Management Status</TableHead>
                                             <TableHead>Rent (Ksh)</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            {!isReadOnly && <TableHead className="text-right">Actions</TableHead>}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {paginatedUnits.map((unit) => (
                                             <TableRow key={unit.name} data-state={selectedUnitNames.includes(unit.name) && "selected"}>
-                                                <TableCell className="text-center">
-                                                    <Checkbox
-                                                         onCheckedChange={(checked) => handleSelectUnit(unit.name, !!checked)}
-                                                         checked={selectedUnitNames.includes(unit.name)}
-                                                         aria-label={`Select unit ${unit.name}`}
-                                                    />
-                                                </TableCell>
+                                                {!isReadOnly && (
+                                                    <TableCell className="text-center">
+                                                        <Checkbox
+                                                            onCheckedChange={(checked) => handleSelectUnit(unit.name, !!checked)}
+                                                            checked={selectedUnitNames.includes(unit.name)}
+                                                            aria-label={`Select unit ${unit.name}`}
+                                                        />
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="font-medium">{unit.name}</TableCell>
                                                 <TableCell>{unit.unitType}</TableCell>
                                                 <TableCell><Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'} className="capitalize">{unit.status}</Badge></TableCell>
                                                 <TableCell><span className="text-sm">{unit.ownership}</span></TableCell>
+                                                <TableCell><span className="text-xs">{unit.managementStatus || 'N/A'}</span></TableCell>
                                                 <TableCell>{unit.rentAmount?.toLocaleString()}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm" type="button" onClick={() => handleEditUnit(unit)}><Edit2 className="h-4 w-4 mr-2" />Edit</Button>
-                                                </TableCell>
+                                                {!isReadOnly && (
+                                                    <TableCell className="text-right">
+                                                        <Button variant="ghost" size="sm" type="button" onClick={() => handleEditUnit(unit)}><Edit2 className="h-4 w-4 mr-2" />Edit</Button>
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         ))}
                                         {paginatedUnits.length === 0 && (
-                                            <TableRow><TableCell colSpan={7} className="h-24 text-center">No units found.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isReadOnly ? 6 : 7} className="h-24 text-center">No units found.</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>

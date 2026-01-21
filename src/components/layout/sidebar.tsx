@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -124,7 +123,7 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => {
             if (isAgent && item.href === '/documents') return null;
-            if (isInvestmentConsultant && (item.href === '/documents' || item.href === '/properties')) return null;
+            if (isInvestmentConsultant && item.href === '/documents') return null;
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.label)}>

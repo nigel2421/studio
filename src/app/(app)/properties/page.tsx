@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, PlusCircle, Building2 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const { userProfile } = useAuth();
+  const isReadOnly = userProfile?.role === 'investment-consultant';
 
   const fetchProperties = () => {
     getProperties().then(setProperties);
@@ -42,12 +45,14 @@ export default function PropertiesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button asChild>
-            <Link href="/properties/add">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Property
-            </Link>
-          </Button>
+          {!isReadOnly && (
+            <Button asChild>
+              <Link href="/properties/add">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Property
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
       
