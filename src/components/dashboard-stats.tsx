@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -7,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Users, Building2, Wrench, AlertCircle, Building } from "lucide-react";
+import { Users, Building2, Wrench, AlertCircle, Building, Briefcase } from "lucide-react";
 import type { Tenant, Property, MaintenanceRequest, Payment } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 
@@ -54,17 +53,23 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     return sum + breakdown.managementFee;
   }, 0);
 
+  const totalUnitsSM = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.ownership === 'SM').length || 0), 0);
+  const totalUnitsLandlord = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.ownership === 'Landlord').length || 0), 0);
+
+
   const stats = [
     { title: "Total Tenants", value: totalTenants, icon: Users, color: "text-blue-500" },
     { title: "Properties Managed", value: totalProperties, icon: Building2, color: "text-green-500" },
     { title: "Occupied Units", value: occupiedUnits, icon: Building, color: "text-purple-500" },
     { title: "Agency Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Building2, color: "text-emerald-500" },
+    { title: "Units (SM)", value: totalUnitsSM, icon: Building, color: "text-sky-500" },
+    { title: "Units (Landlord)", value: totalUnitsLandlord, icon: Briefcase, color: "text-amber-500" },
     { title: "Pending Maintenance", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
     { title: "Overdue Rents", value: overdueRents, icon: AlertCircle, color: "text-red-500" },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, index) => (
         <Card key={index}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

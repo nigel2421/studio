@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Property, Tenant, UnitType } from '@/lib/types';
+import type { Property, Tenant } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -19,11 +19,11 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from './ui/skeleton';
 
-type AnalyticsData = {
+type FloorAnalyticsData = {
   rentedSM: number;
   rentedLandlord: number;
   vacant: number;
-  bookedWithDeposit: number;
+  totalUnits: number;
 };
 
 interface UnitAnalyticsProps {
@@ -31,52 +31,63 @@ interface UnitAnalyticsProps {
   tenants: Tenant[];
 }
 
-const unitTypesToTrack: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom'];
+const parseFloorFromUnitName = (unitName: string): string | null => {
+  const match = unitName.match(/(?:\s|-)(\d{1,2})(?:-|\s|$|[A-Z])/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return null;
+};
 
 export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
-  const [analytics, setAnalytics] = useState<Record<UnitType, AnalyticsData> | null>(null);
+  const [analytics, setAnalytics] = useState<Record<string, FloorAnalyticsData> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     function calculateAnalytics() {
       setLoading(true);
-      const analyticsData = unitTypesToTrack.reduce((acc, type) => {
-        acc[type] = {
-          rentedSM: 0,
-          rentedLandlord: 0,
-          vacant: 0,
-          bookedWithDeposit: 0,
-        };
-        return acc;
-      }, {} as Record<UnitType, AnalyticsData>);
+      const floors = new Map<string, FloorAnalyticsData>();
 
       if (!Array.isArray(property.units)) {
-        setAnalytics(analyticsData);
+        setAnalytics({});
         setLoading(false);
         return;
       }
-
+      
       property.units.forEach(unit => {
-        if (!unitTypesToTrack.includes(unit.unitType)) return;
-
-        const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
-
-        if (tenant) { // Unit is occupied by a tenant
-          if (unit.ownership === 'SM') {
-            analyticsData[unit.unitType].rentedSM++;
-          } else if (unit.ownership === 'Landlord') {
-            analyticsData[unit.unitType].rentedLandlord++;
-          }
-
-          if (tenant.securityDeposit > 0) {
-            analyticsData[unit.unitType].bookedWithDeposit++;
-          }
-        } else if (unit.status === 'vacant') { // Unit is vacant
-          analyticsData[unit.unitType].vacant++;
+        const floorNumber = parseFloorFromUnitName(unit.name);
+        if (floorNumber && !floors.has(floorNumber)) {
+          floors.set(floorNumber, {
+            rentedSM: 0,
+            rentedLandlord: 0,
+            vacant: 0,
+            totalUnits: 0,
+          });
         }
       });
 
-      setAnalytics(analyticsData);
+      property.units.forEach(unit => {
+        const floorNumber = parseFloorFromUnitName(unit.name);
+        if (!floorNumber) return;
+
+        const floorData = floors.get(floorNumber)!;
+        floorData.totalUnits++;
+
+        const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
+
+        if (tenant) {
+          if (unit.ownership === 'SM') {
+            floorData.rentedSM++;
+          } else if (unit.ownership === 'Landlord') {
+            floorData.rentedLandlord++;
+          }
+        } else if (unit.status === 'vacant') {
+          floorData.vacant++;
+        }
+      });
+      
+      const sortedFloors = new Map([...floors.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0])));
+      setAnalytics(Object.fromEntries(sortedFloors));
       setLoading(false);
     }
 
@@ -103,35 +114,38 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
     );
   }
 
-  if (!analytics) return null;
+  if (!analytics || Object.keys(analytics).length === 0) {
+    // Don't render the card if there are no floors to analyze
+    return null;
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{property.name} - Unit Analytics</CardTitle>
+        <CardTitle>{property.name} - Floor Analytics</CardTitle>
         <CardDescription>
-          A detailed breakdown of units for this property by type and status.
+          A detailed breakdown of units for this property by floor.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Unit Type</TableHead>
+              <TableHead>Floor</TableHead>
               <TableHead className="text-center">Rented (SM)</TableHead>
               <TableHead className="text-center">Rented (Landlord)</TableHead>
               <TableHead className="text-center">Vacant</TableHead>
-              <TableHead className="text-center">Booked w/ Deposit</TableHead>
+              <TableHead className="text-center">Total Units</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {unitTypesToTrack.map((unitType) => (
-              <TableRow key={unitType}>
-                <TableCell className="font-medium">{unitType}</TableCell>
-                <TableCell className="text-center">{analytics[unitType].rentedSM}</TableCell>
-                <TableCell className="text-center">{analytics[unitType].rentedLandlord}</TableCell>
-                <TableCell className="text-center">{analytics[unitType].vacant}</TableCell>
-                <TableCell className="text-center">{analytics[unitType].bookedWithDeposit}</TableCell>
+            {Object.entries(analytics).map(([floor, data]) => (
+              <TableRow key={floor}>
+                <TableCell className="font-medium">Floor {floor}</TableCell>
+                <TableCell className="text-center">{data.rentedSM}</TableCell>
+                <TableCell className="text-center">{data.rentedLandlord}</TableCell>
+                <TableCell className="text-center">{data.vacant}</TableCell>
+                <TableCell className="text-center">{data.totalUnits}</TableCell>
               </TableRow>
             ))}
           </TableBody>
