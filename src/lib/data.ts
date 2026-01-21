@@ -1663,6 +1663,8 @@ export async function getTasks(): Promise<Task[]> {
 
 // Real-time listener functions
 export function listenToProperties(callback: (properties: Property[]) => void): () => void {
+    migratePropertiesToFirestore().catch(console.error);
+
     const q = query(collection(db, 'properties'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
@@ -1724,4 +1726,5 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     });
     return unsubscribe;
 }
+
 
