@@ -637,7 +637,6 @@ async function migratePropertiesToFirestore() {
         console.log("Applying property data migration...");
         try {
             await batch.commit();
-            console.log("Property data migration to Firestore completed successfully.");
             await logActivity('Migrated/Updated property data from local source.');
         } catch (error) {
             console.error("Error migrating properties to Firestore:", error);
@@ -1511,70 +1510,82 @@ export async function getLandlord(landlordId: string): Promise<Landlord | null> 
     return getDocument<Landlord>('landlords', landlordId);
 }
 
-export async function updateLandlord(
-    landlordId: string,
-    data: Partial<Landlord>,
-    propertyId: string,
-    assignedUnits: string[]
-): Promise<void> {
-    const landlordRef = doc(db, 'landlords', landlordId);
-    let userId = data.userId;
+export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
+    const landlordRef = doc(db, 'landlords', landlord.id);
+    let finalLandlordData = { ...landlord };
+    
+    // Auth user creation logic
+    if (landlord.email && landlord.phone && !landlord.userId) {
+        // Check if a user with this email already exists to get the UID
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where("email", "==", landlord.email), limit(1));
+        const userSnap = await getDocs(q);
+        
+        if (!userSnap.empty) {
+            const existingUser = userSnap.docs[0];
+            finalLandlordData.userId = existingUser.id;
+            // Ensure the user profile is updated with landlord role and ID
+            await setDoc(existingUser.ref, { role: 'landlord', landlordId: landlord.id }, { merge: true });
+        } else {
+            // No existing user, create one
+            const appName = 'landlord-creation-app-' + Date.now();
+            let secondaryApp;
+            try {
+                secondaryApp = initializeApp(firebaseConfig, appName);
+                const secondaryAuth = getAuth(secondaryApp);
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, landlord.email, landlord.phone);
+                const userId = userCredential.user.uid;
+                finalLandlordData.userId = userId;
 
-    // Create auth user if email and phone are provided and user doesn't exist
-    if (data.email && data.phone && !userId) {
-        const appName = 'landlord-creation-app-' + data.email;
-        let secondaryApp;
-        try {
-            secondaryApp = getApp(appName);
-        } catch (e) {
-            secondaryApp = initializeApp(firebaseConfig, appName);
-        }
-
-        const secondaryAuth = getAuth(secondaryApp);
-        try {
-            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.phone);
-            userId = userCredential.user.uid;
-
-            await createUserProfile(userId, data.email, 'landlord', { name: data.name, landlordId: landlordId });
-            await logActivity(`Created landlord user: ${data.email}`);
-        } catch (error: any) {
-            console.error("Error creating landlord auth user:", error);
-            if (error.code !== 'auth/email-already-in-use') {
-                throw new Error("Failed to create landlord login credentials.");
-            }
-        } finally {
-            if (secondaryApp) {
-                await deleteApp(secondaryApp);
+                await createUserProfile(userId, landlord.email, 'landlord', { name: landlord.name, landlordId: landlord.id });
+                await logActivity(`Created landlord user: ${landlord.email}`);
+            } catch (error: any) {
+                console.error("Error creating landlord auth user:", error);
+                if (error.code !== 'auth/email-already-in-use') {
+                    throw new Error("Failed to create landlord login credentials.");
+                }
+            } finally {
+                if (secondaryApp) await deleteApp(secondaryApp);
             }
         }
     }
 
-    const finalData = { ...data };
-    if (userId) {
-        finalData.userId = userId;
-    }
+    const batch = writeBatch(db);
 
-    await setDoc(landlordRef, finalData, { merge: true });
-
-    // Update the property document in Firestore
-    const property = await getProperty(propertyId);
-    if (property) {
-        const updatedUnits = property.units.map(unit => {
-            if (assignedUnits.includes(unit.name)) {
-                return { ...unit, landlordId: landlordId };
-            }
-            if (unit.landlordId === landlordId && !assignedUnits.includes(unit.name)) {
-                const { landlordId: _, ...rest } = unit as any;
+    // 1. Set/update the landlord document
+    batch.set(landlordRef, finalLandlordData, { merge: true });
+    
+    // 2. Fetch all properties to manage unit assignments
+    const propertiesSnapshot = await getDocs(collection(db, 'properties'));
+    const properties = propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
+    
+    for(const prop of properties) {
+        let needsUpdate = false;
+        const updatedUnits = prop.units.map(unit => {
+            // Case 1: The unit is in the new assignment list
+            if (assignedUnitNames.includes(unit.name)) {
+                if (unit.landlordId !== landlord.id) {
+                    needsUpdate = true;
+                    return { ...unit, landlordId: landlord.id };
+                }
+            } 
+            // Case 2: The unit was previously assigned to this landlord but is no longer
+            else if (unit.landlordId === landlord.id) {
+                needsUpdate = true;
+                const { landlordId, ...rest } = unit as any; // Use 'as any' to bypass strict type checking for deletion
                 return rest;
             }
             return unit;
         });
-        await updateProperty(propertyId, { units: updatedUnits });
-    } else {
-        console.error(`Could not find property with ID ${propertyId} to assign units.`);
+
+        if (needsUpdate) {
+            const propRef = doc(db, 'properties', prop.id);
+            batch.update(propRef, { units: updatedUnits });
+        }
     }
 
-    await logActivity(`Updated landlord details for: ${data.name || 'ID ' + landlordId}`);
+    await batch.commit();
+    await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
 }
 
 export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount: string }[]): Promise<{ added: number; skipped: number }> {

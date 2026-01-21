@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,34 +21,47 @@ import { useLoading } from '@/hooks/useLoading';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  landlord: Landlord;
-  property: Property;
-  onSave: (landlord: Landlord, selectedUnitNames: string[]) => void;
+  landlord: Landlord | null;
+  properties: Property[];
+  onSave: (landlord: Landlord, selectedUnitNames: string[]) => Promise<void>;
 }
 
-export function ManageLandlordDialog({ isOpen, onClose, landlord, property, onSave }: Props) {
-  const [name, setName] = useState(landlord.name);
-  const [email, setEmail] = useState(landlord.email);
-  const [phone, setPhone] = useState(landlord.phone);
-  const [bankAccount, setBankAccount] = useState(landlord.bankAccount);
-  const [isLoading, setIsLoading] = useState(false);
+export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, onSave }: Props) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
-
-  const landlordUnits = property.units.filter(u => u.ownership === 'Landlord');
-
+  const { isLoading, startLoading, stopLoading } = useLoading();
+  
+  const allLandlordOwnedUnits = useMemo(() => {
+    return properties.flatMap(p => 
+      p.units
+        .filter(u => u.ownership === 'Landlord')
+        .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
+    );
+  }, [properties]);
+  
   useEffect(() => {
-    setName(landlord.name || '');
-    setEmail(landlord.email || '');
-    setPhone(landlord.phone || '');
-    setBankAccount(landlord.bankAccount || '');
-
-    // Pre-select units already assigned to this landlord
-    const currentlyAssignedUnits = property.units
-      .filter(u => u.landlordId === landlord.id)
-      .map(u => u.name);
-    setSelectedUnits(currentlyAssignedUnits);
-
-  }, [landlord, property]);
+    if (landlord) {
+      setName(landlord.name || '');
+      setEmail(landlord.email || '');
+      setPhone(landlord.phone || '');
+      setBankAccount(landlord.bankAccount || '');
+      // Pre-select units already assigned to this landlord
+      const currentlyAssigned = allLandlordOwnedUnits
+        .filter(u => u.landlordId === landlord.id)
+        .map(u => u.name);
+      setSelectedUnits(currentlyAssigned);
+    } else {
+      // Reset for new landlord
+      setName('');
+      setEmail('');
+      setPhone('');
+      setBankAccount('');
+      setSelectedUnits([]);
+    }
+  }, [landlord, allLandlordOwnedUnits]);
 
   const handleUnitToggle = (unitName: string) => {
     setSelectedUnits(prev =>
@@ -59,55 +71,50 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, property, onSa
     );
   }
 
-  const { startLoading, stopLoading } = useLoading();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    startLoading('Saving Landlord Details...');
+    startLoading(landlord ? 'Updating Landlord...' : 'Adding Landlord...');
     try {
-      await onSave({
-        ...landlord,
+      const landlordData: Landlord = {
+        id: landlord?.id || `landlord_${Date.now()}`,
         name,
         email,
         phone,
         bankAccount,
-      }, selectedUnits);
+      };
+      await onSave(landlordData, selectedUnits);
     } catch (error) {
-      // Toast handles error usually, but we need to stop loader if not closing
+      // Toast is handled in parent component
     } finally {
-      setIsLoading(false);
       stopLoading();
     }
   }
-  // Placeholder for earnings calculation
-  const earnings = `Calculation pending...`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Manage Landlord for {property.name}</DialogTitle>
+          <DialogTitle>{landlord ? 'Edit' : 'Add'} Landlord</DialogTitle>
           <DialogDescription>
-            Edit landlord details, create login credentials, and assign their units.
+            {landlord ? 'Edit landlord details and unit assignments.' : 'Add a new landlord and assign their units.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="landlord-name">Landlord Name</Label>
-              <Input id="landlord-name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="landlord-email">Landlord Email</Label>
+                <div className="grid gap-2">
+                    <Label htmlFor="landlord-name">Full Name</Label>
+                    <Input id="landlord-name" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="landlord-phone">Phone</Label>
+                    <Input id="landlord-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                </div>
+            </div>
+             <div className="grid gap-2">
+                <Label htmlFor="landlord-email">Email</Label>
                 <Input id="landlord-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="landlord-phone">Landlord Phone</Label>
-                <Input id="landlord-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-              </div>
-            </div>
             <div className="grid gap-2">
               <Label htmlFor="bank-account">Bank Account Details</Label>
               <Input id="bank-account" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
@@ -116,29 +123,24 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, property, onSa
               <Label>Assign Landlord Units</Label>
               <ScrollArea className="h-40 rounded-md border p-4">
                 <div className="space-y-2">
-                  {landlordUnits.map(unit => (
-                    <div key={unit.name} className="flex items-center space-x-2">
+                  {allLandlordOwnedUnits.map(unit => (
+                    <div key={`${unit.propertyId}-${unit.name}`} className="flex items-center space-x-2">
                       <Checkbox
                         id={`unit-${unit.name}`}
                         checked={selectedUnits.includes(unit.name)}
                         onCheckedChange={() => handleUnitToggle(unit.name)}
-                        // Disable checkbox if the unit is assigned to a *different* landlord
-                        disabled={unit.landlordId !== undefined && unit.landlordId !== landlord.id}
+                        disabled={unit.landlordId !== undefined && unit.landlordId !== landlord?.id}
                       />
                       <label
                         htmlFor={`unit-${unit.name}`}
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
-                        {unit.name}
+                        {unit.propertyName}: Unit {unit.name}
                       </label>
                     </div>
                   ))}
                 </div>
               </ScrollArea>
-            </div>
-            <div className="grid gap-2">
-              <Label>Potential Earnings (from occupied units)</Label>
-              <p className="text-lg font-semibold">{earnings}</p>
             </div>
           </div>
           <DialogFooter>
