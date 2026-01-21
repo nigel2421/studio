@@ -1,8 +1,9 @@
+
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getLandlords, getProperties } from '@/lib/data';
-import type { Landlord, Property } from '@/lib/types';
+import type { Landlord, Property, Unit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
 import { Building2 } from 'lucide-react';
@@ -20,6 +21,25 @@ export default function LandlordsPage() {
     fetchData();
   }, []);
 
+  const landlordUnitsMap = useMemo(() => {
+    const map = new Map<string, (Unit & { propertyName: string })[]>();
+    if (!properties || properties.length === 0) return map;
+
+    properties.forEach(p => {
+        if (p.units) {
+            p.units.forEach(u => {
+                if (u.landlordId) {
+                    if (!map.has(u.landlordId)) {
+                        map.set(u.landlordId, []);
+                    }
+                    map.get(u.landlordId)!.push({ ...u, propertyName: p.name });
+                }
+            });
+        }
+    });
+    return map;
+  }, [properties]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,11 +52,7 @@ export default function LandlordsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {landlords.map((landlord) => {
-          const assignedUnits = properties.flatMap(p =>
-            p.units
-              .filter(u => u.landlordId === landlord.id)
-              .map(u => ({ ...u, propertyName: p.name }))
-          );
+          const assignedUnits = landlordUnitsMap.get(landlord.id) || [];
 
           return (
             <Card key={landlord.id} className="flex flex-col">
