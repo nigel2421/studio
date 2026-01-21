@@ -172,17 +172,19 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {properties.flatMap(p => p.units.map(unit => ({ ...unit, propertyName: p.property.name }))).map((unit, index) => (
-                            <TableRow key={index}>
-                                <TableCell className="font-medium">{unit.propertyName}</TableCell>
-                                <TableCell>{unit.name}</TableCell>
-                                <TableCell>{unit.unitType}</TableCell>
-                                <TableCell className="text-right">
-                                <Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'} className="capitalize">
-                                    {unit.status}
-                                </Badge>
-                                </TableCell>
-                            </TableRow>
+                            {properties.map(propData => (
+                                propData.units.map(unit => (
+                                    <TableRow key={`${propData.property.id}-${unit.name}`}>
+                                        <TableCell className="font-medium">{propData.property.name}</TableCell>
+                                        <TableCell>{unit.name}</TableCell>
+                                        <TableCell>{unit.unitType}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'} className="capitalize">
+                                                {unit.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             ))}
                         </TableBody>
                         </Table>
