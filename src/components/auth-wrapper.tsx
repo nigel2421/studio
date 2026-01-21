@@ -17,38 +17,41 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
 
     const onLoginPage = pathname === '/login';
-    const isLandlordDashboard = pathname.startsWith('/landlord/');
-    const isTenantDashboard = pathname.startsWith('/tenant/');
-    const isOwnerDashboard = pathname.startsWith('/owner/');
 
+    // 1. Handle not logged in
     if (!isAuth && !onLoginPage) {
       router.push('/login');
       return;
     }
 
     if (isAuth) {
+      const role = userProfile?.role;
+      const isAdminType = role && ['admin', 'agent', 'viewer', 'water-meter-reader', 'investment-consultant'].includes(role);
+      
+      // These are the *dashboards* for specific roles, not the admin management pages
+      const isLandlordDashboard = pathname.startsWith('/landlord/');
+      const isTenantDashboard = pathname.startsWith('/tenant/');
+      const isOwnerDashboard = pathname.startsWith('/owner/');
+      const isRoleSpecificDashboard = isLandlordDashboard || isTenantDashboard || isOwnerDashboard;
+
+      // 2. Handle logged in on login page
       if (onLoginPage) {
-        // If logged in and on login page, redirect to appropriate dashboard
-        if (userProfile?.role === 'landlord') {
-          router.push('/landlord/dashboard');
-        } else if (userProfile?.role === 'tenant') {
-          router.push('/tenant/dashboard');
-        } else if (userProfile?.role === 'homeowner') {
-          router.push('/owner/dashboard');
-        } else {
-          router.push('/dashboard');
-        }
-      } else {
-        // If logged in but on the wrong dashboard, redirect
-        if (userProfile?.role === 'landlord' && !isLandlordDashboard) {
-          router.push('/landlord/dashboard');
-        } else if (userProfile?.role === 'tenant' && !isTenantDashboard) {
-          router.push('/tenant/dashboard');
-        } else if (userProfile?.role === 'homeowner' && !isOwnerDashboard) {
-          router.push('/owner/dashboard');
-        } else if ((userProfile?.role === 'admin' || userProfile?.role === 'agent') && (isLandlordDashboard || isTenantDashboard || isOwnerDashboard)) {
-          router.push('/dashboard');
-        }
+        if (role === 'landlord') router.push('/landlord/dashboard');
+        else if (role === 'tenant') router.push('/tenant/dashboard');
+        else if (role === 'homeowner') router.push('/owner/dashboard');
+        else router.push('/dashboard');
+        return;
+      }
+      
+      // 3. Handle role-based routing
+      if (isAdminType && isRoleSpecificDashboard) {
+          router.push('/dashboard'); // Admins shouldn't be on role-specific dashboards
+      } else if (role === 'landlord' && !isLandlordDashboard) {
+          router.push('/landlord/dashboard'); // Landlords should ONLY be on their dashboard
+      } else if (role === 'tenant' && !isTenantDashboard) {
+          router.push('/tenant/dashboard'); // Tenants should ONLY be on their dashboard
+      } else if (role === 'homeowner' && !isOwnerDashboard) {
+          router.push('/owner/dashboard'); // Homeowners should ONLY be on their dashboard
       }
     }
   }, [isLoading, isAuth, userProfile, pathname, router]);
