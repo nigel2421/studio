@@ -2,27 +2,39 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getProperties, getPropertyOwners, updatePropertyOwner } from '@/lib/data';
-import type { Property, PropertyOwner, Unit } from '@/lib/types';
+import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments } from '@/lib/data';
+import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, UserCog, PlusCircle } from 'lucide-react';
+import { Edit, UserCog, PlusCircle, FileSignature } from 'lucide-react';
 import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useLoading } from '@/hooks/useLoading';
+import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [propertyOwners, setPropertyOwners] = useState<PropertyOwner[]>([]);
+  const [allTenants, setAllTenants] = useState<Tenant[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedOwner, setSelectedOwner] = useState<PropertyOwner | null>(null);
   const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { startLoading, stopLoading } = useLoading();
 
   const fetchData = async () => {
-    const props = await getProperties();
-    const owners = await getPropertyOwners();
+    const [props, owners, tenants, payments] = await Promise.all([
+      getProperties(),
+      getPropertyOwners(),
+      getTenants(),
+      getAllPayments()
+    ]);
     setAllProperties(props);
     setPropertyOwners(owners);
+    setAllTenants(tenants);
+    setAllPayments(payments);
   }
 
   useEffect(() => {
@@ -34,8 +46,6 @@ export default function ClientsPage() {
     u.ownership === 'Landlord' &&
     u.managementStatus === 'Client Self Fully Managed' &&
     u.handoverStatus === 'Handed Over';
-
-  const clientProperties = allProperties.filter(p => p.units?.some(isClientManagedUnit));
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
@@ -59,6 +69,47 @@ export default function ClientsPage() {
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save owner.' });
     }
   }
+
+  const handleGenerateStatement = (ownerId: string) => {
+    startLoading('Generating Statement...');
+    try {
+        const owner = propertyOwners.find(o => o.id === ownerId);
+        if (!owner) {
+            throw new Error("Owner not found");
+        }
+
+        const ownerAssignedUnitIdentifiers = new Set(
+            owner.assignedUnits.flatMap(au => au.unitNames.map(un => `${au.propertyId}-${un}`))
+        );
+
+        const relevantTenants = allTenants.filter(t => 
+            ownerAssignedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`)
+        );
+        const relevantTenantIds = relevantTenants.map(t => t.id);
+
+        const serviceChargePayments = allPayments.filter(p =>
+            relevantTenantIds.includes(p.tenantId) && p.type === 'ServiceCharge'
+        );
+
+        const paymentsForPDF = serviceChargePayments.map(p => {
+            const tenant = allTenants.find(t => t.id === p.tenantId);
+            const property = allProperties.find(prop => prop.id === tenant?.propertyId);
+            return {
+                date: p.date,
+                property: property?.name || 'N/A',
+                unit: tenant?.unitName || 'N/A',
+                amount: p.amount
+            };
+        });
+
+        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF);
+    } catch (error: any) {
+        console.error("Error generating statement:", error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to generate statement.' });
+    } finally {
+        stopLoading();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -110,18 +161,28 @@ export default function ClientsPage() {
                                   <p className="text-xs text-muted-foreground">{owner.email}</p>
                                   <p className="text-xs text-muted-foreground">{owner.phone}</p>
                                 </div>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
-                                  onClick={() => {
-                                    setSelectedProperty(property);
-                                    setSelectedOwner(owner);
-                                    setIsOwnerDialogOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center">
+                                   <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 hover:bg-green-500 hover:text-white transition-colors"
+                                      onClick={() => handleGenerateStatement(owner.id)}
+                                  >
+                                      <FileSignature className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
+                                    onClick={() => {
+                                      setSelectedProperty(property);
+                                      setSelectedOwner(owner);
+                                      setIsOwnerDialogOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                               <div className="flex gap-1.5 flex-wrap">
                                 {owner.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames.map(unitName => (
