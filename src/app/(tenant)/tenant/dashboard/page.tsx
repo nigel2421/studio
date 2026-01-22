@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -165,7 +164,7 @@ export default function TenantDashboardPage() {
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Amount</TableHead>
-                                <TableHead>Notes</TableHead>
+                                <TableHead>Rent For</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -174,7 +173,7 @@ export default function TenantDashboardPage() {
                                     <TableRow key={payment.id}>
                                         <TableCell>{format(new Date(payment.date), 'PPP')}</TableCell>
                                         <TableCell>Ksh {payment.amount.toLocaleString()}</TableCell>
-                                        <TableCell>{payment.notes}</TableCell>
+                                        <TableCell>{payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMMM yyyy') : 'N/A'}</TableCell>
                                     </TableRow>
                                 ))
                             ) : (
