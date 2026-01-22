@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -81,6 +82,7 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, on
         email,
         phone,
         bankAccount,
+        userId: landlord?.userId
       };
       await onSave(landlordData, selectedUnits);
     } catch (error) {
@@ -155,3 +157,4 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, on
     </Dialog>
   );
 }
+

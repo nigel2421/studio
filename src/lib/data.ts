@@ -305,11 +305,10 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
         if (userProfile.role === 'landlord' && userProfile.landlordId) {
             const allProperties = await getProperties();
-            const landlord = await getLandlord(userProfile.landlordId);
-            if (landlord) {
-                const landlordProperties: { property: Property, units: Unit[] }[] = [];
-                allProperties.forEach(p => {
-                    const units = p.units.filter(u => u.landlordId === landlord.id);
+            if (userProfile.landlordId) {
+                 const landlordProperties: { property: Property, units: Unit[] }[] = [];
+                 allProperties.forEach(p => {
+                    const units = p.units.filter(u => u.landlordId === userProfile.landlordId);
                     if (units.length > 0) {
                         landlordProperties.push({ property: p, units });
                     }
@@ -880,19 +879,23 @@ export async function getLandlord(landlordId: string): Promise<Landlord | null> 
 
 export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
     const landlordRef = doc(db, 'landlords', landlord.id);
+    const batch = writeBatch(db);
+
     let finalLandlordData = { ...landlord };
 
-    // Auth user creation logic
+    // --- Auth User & Profile Linking ---
     if (landlord.email && landlord.phone && !landlord.userId) {
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where("email", "==", landlord.email), limit(1));
         const userSnap = await getDocs(q);
 
         if (!userSnap.empty) {
+            // User with this email already exists, link them.
             const existingUser = userSnap.docs[0];
             finalLandlordData.userId = existingUser.id;
             await setDoc(existingUser.ref, { role: 'landlord', landlordId: landlord.id }, { merge: true });
         } else {
+            // No user exists, create a new one.
             const appName = 'landlord-creation-app-' + Date.now();
             let secondaryApp;
             try {
@@ -914,43 +917,34 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
             }
         }
     }
+    // --- End Auth Logic ---
 
-    const batch = writeBatch(db);
+    // Set/update the landlord document itself
     batch.set(landlordRef, finalLandlordData, { merge: true });
 
-    const propertiesSnapshot = await getDocs(collection(db, 'properties'));
-    const properties = propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-
+    const properties = await getProperties();
     for (const prop of properties) {
         let needsUpdate = false;
-        const updatedUnits = prop.units.map(originalUnit => {
-            let unit = { ...originalUnit };
-
+        const newUnits = prop.units.map(unit => {
+            let newUnit = { ...unit };
+            // Case 1: This unit is in the new list of assignments for the current landlord
             if (assignedUnitNames.includes(unit.name)) {
                 if (unit.landlordId !== landlord.id) {
-                    unit.landlordId = landlord.id;
                     needsUpdate = true;
+                    newUnit.landlordId = landlord.id;
                 }
-            } else if (unit.landlordId === landlord.id) {
-                delete (unit as any).landlordId;
-                needsUpdate = true;
             }
-            return unit;
+            // Case 2: This unit is NOT in the new list, but IS currently assigned to this landlord
+            else if (unit.landlordId === landlord.id) {
+                needsUpdate = true;
+                delete (newUnit as Partial<Unit>).landlordId;
+            }
+            return newUnit;
         });
 
         if (needsUpdate) {
             const propRef = doc(db, 'properties', prop.id);
-            const sanitizedUnits = updatedUnits.map(u => {
-                const cleanUnit: { [key: string]: any } = {};
-                Object.keys(u).forEach(key => {
-                    const value = (u as any)[key];
-                    if (value !== undefined) {
-                        cleanUnit[key] = value;
-                    }
-                });
-                return cleanUnit as Unit;
-            });
-            batch.update(propRef, { units: sanitizedUnits });
+            batch.update(propRef, { units: newUnits });
         }
     }
 
@@ -1155,6 +1149,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 
