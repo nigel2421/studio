@@ -273,6 +273,20 @@ export function AddPaymentDialog({
                            </>
                         )}
 
+                        {(tenantForDisplay.securityDeposit || 0) > 0 && (
+                           <>
+                            <div className="text-muted-foreground">Security Deposit:</div>
+                            <div className="font-medium text-right">Ksh {(tenantForDisplay.securityDeposit || 0).toLocaleString()}</div>
+                           </>
+                        )}
+
+                        {(tenantForDisplay.waterDeposit || 0) > 0 && (
+                           <>
+                            <div className="text-muted-foreground">Water Deposit:</div>
+                            <div className="font-medium text-right">Ksh {(tenantForDisplay.waterDeposit || 0).toLocaleString()}</div>
+                           </>
+                        )}
+
                         <div className="text-muted-foreground font-bold text-red-600">Total Outstanding:</div>
                         <div className="font-bold text-red-600 text-right">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
                     </div>
