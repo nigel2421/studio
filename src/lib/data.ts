@@ -177,13 +177,12 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
 
     await logActivity(`Created tenant: ${name} (${email})`);
 
-    // Update unit status to occupied
-    if (property) {
-        const updatedUnits = property.units.map(u =>
-            u.name === unitName ? { ...u, status: 'rented' as const } : u
-        );
-        await updateProperty(propertyId, { units: updatedUnits });
-    }
+    // Update unit status to 'rented'
+    const updatedUnits = property.units.map(u =>
+        u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
+    );
+    await updateProperty(propertyId, { units: updatedUnits });
+    await logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
 
 
     const appName = 'tenant-creation-app-' + newTenantData.email;
@@ -1149,6 +1148,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 
