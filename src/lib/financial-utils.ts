@@ -1,5 +1,6 @@
 
-import { Payment, Tenant } from "./types";
+
+import { Payment, Property, Tenant, Unit } from "./types";
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -40,7 +41,7 @@ export interface FinancialSummary {
     transactionCount: number;
 }
 
-export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): FinancialSummary {
+export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
     let summary: FinancialSummary = {
         totalRevenue: 0,
         totalManagementFees: 0,
@@ -65,7 +66,24 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): Fin
         if (payment.status !== 'completed' || payment.type !== 'Rent') return;
 
         const tenant = tenants.find(t => t.id === payment.tenantId);
-        const serviceCharge = tenant?.lease?.serviceCharge || 0;
+        
+        let serviceCharge = 0;
+        if (tenant) {
+            // Find the property that contains this tenant's unit
+            const propertyForTenant = properties.find(pData => pData.property.id === tenant.propertyId);
+            if (propertyForTenant) {
+                // Find the specific unit within that property
+                const unitForTenant = propertyForTenant.units.find(u => u.name === tenant.unitName);
+                if (unitForTenant) {
+                    serviceCharge = unitForTenant.serviceCharge || 0;
+                }
+            }
+        }
+
+        // Fallback to what's on the lease if lookup fails, though the direct lookup is preferred.
+        if (serviceCharge === 0) {
+            serviceCharge = tenant?.lease?.serviceCharge || 0;
+        }
 
         const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
         

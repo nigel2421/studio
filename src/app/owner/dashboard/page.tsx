@@ -223,7 +223,7 @@ function InvestorDashboard() {
                 const relevantTenantIds = relevantTenants.map(t => t.id);
                 const relevantPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
 
-                const summary = aggregateFinancials(relevantPayments, relevantTenants);
+                const summary = aggregateFinancials(relevantPayments, relevantTenants, ownerProperties);
                 
                 setDashboardData({
                     properties: ownerProperties,

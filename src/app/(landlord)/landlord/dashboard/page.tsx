@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -42,7 +43,7 @@ export default function LandlordDashboardPage() {
                 const relevantTenantIds = relevantTenants.map(t => t.id);
                 const relevantPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
 
-                const summary = aggregateFinancials(relevantPayments, relevantTenants);
+                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
                 
                 setDashboardData({
                     properties: landlordProperties,
