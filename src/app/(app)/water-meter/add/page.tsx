@@ -11,9 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getProperties, addWaterMeterReading, getTenants } from '@/lib/data';
 import type { Property } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export default function AddWaterMeterReadingPage() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export default function AddWaterMeterReadingPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [priorReading, setPriorReading] = useState('');
   const [currentReading, setCurrentReading] = useState('');
+  const [readingDate, setReadingDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -65,6 +70,7 @@ export default function AddWaterMeterReadingPage() {
         unitName: selectedUnit,
         priorReading: Number(priorReading),
         currentReading: Number(currentReading),
+        date: readingDate ? format(readingDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
       });
       toast({
         title: "Reading Added",
@@ -134,6 +140,32 @@ export default function AddWaterMeterReadingPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="reading-date">Reading Date</Label>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !readingDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {readingDate ? format(readingDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar
+                        mode="single"
+                        selected={readingDate}
+                        onSelect={setReadingDate}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

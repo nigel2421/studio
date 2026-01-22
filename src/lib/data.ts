@@ -120,9 +120,9 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant' }): Promise<void> {
+export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant', leaseStartDate: string }): Promise<void> {
 
-    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit } = data;
+    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate } = data;
 
     const property = await getProperty(propertyId);
     if (!property) {
@@ -148,12 +148,12 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
         status: 'active' as const,
         residentType: 'Tenant' as const,
         lease: {
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+            startDate: leaseStartDate,
+            endDate: new Date(new Date(leaseStartDate).setFullYear(new Date(leaseStartDate).getFullYear() + 1)).toISOString().split('T')[0],
             rent: finalRent,
             serviceCharge: serviceCharge,
             paymentStatus: 'Pending' as const,
-            lastBilledPeriod: format(new Date(), 'yyyy-MM'),
+            lastBilledPeriod: format(new Date(leaseStartDate), 'yyyy-MM'),
         },
         securityDeposit: securityDeposit || 0,
         waterDeposit: waterDeposit || 0,
@@ -371,6 +371,7 @@ export async function addWaterMeterReading(data: {
     unitName: string;
     priorReading: number;
     currentReading: number;
+    date: string;
 }) {
     const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', data.propertyId), where('unitName', '==', data.unitName)));
     if (tenantsSnapshot.empty) {
@@ -388,7 +389,6 @@ export async function addWaterMeterReading(data: {
         consumption,
         rate: WATER_RATE,
         amount,
-        date: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp(),
     };
 
@@ -1155,5 +1155,6 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 

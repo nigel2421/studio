@@ -12,9 +12,13 @@ import { getProperties, addTenant } from '@/lib/data';
 import { agents } from '@/lib/types';
 import type { Property, Unit, Agent } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLoading } from '@/hooks/useLoading';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const WATER_DEPOSIT_AMOUNT = 5000;
 
@@ -33,6 +37,7 @@ export default function AddTenantPage() {
   const [unitName, setUnitName] = useState('');
   const [agent, setAgent] = useState<Agent>();
   const [rent, setRent] = useState(0);
+  const [leaseStartDate, setLeaseStartDate] = useState<Date | undefined>(new Date());
   const [securityDeposit, setSecurityDeposit] = useState(0);
   const [bookedWithDeposit, setBookedWithDeposit] = useState(false);
   const [collectWaterDeposit, setCollectWaterDeposit] = useState(false);
@@ -85,6 +90,7 @@ export default function AddTenantPage() {
         unitName,
         agent,
         rent,
+        leaseStartDate: leaseStartDate ? format(leaseStartDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
         waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
         residentType: 'Tenant',
@@ -179,10 +185,35 @@ export default function AddTenantPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+             <div>
               <Label htmlFor="rent">Monthly Rent (Ksh)</Label>
               <Input id="rent" type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} required />
             </div>
+          </div>
+          <div>
+            <Label htmlFor="leaseStartDate">Lease Start Date</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                <Button
+                    variant={"outline"}
+                    className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !leaseStartDate && "text-muted-foreground"
+                    )}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {leaseStartDate ? format(leaseStartDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                <Calendar
+                    mode="single"
+                    selected={leaseStartDate}
+                    onSelect={setLeaseStartDate}
+                    initialFocus
+                />
+                </PopoverContent>
+            </Popover>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center space-x-2 pt-6">
