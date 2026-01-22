@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -265,13 +264,6 @@ export function AddPaymentDialog({
                           </>
                         )}
                         
-                        {(tenantForDisplay.lease.serviceCharge || 0) > 0 && (
-                           <>
-                            <div className="text-muted-foreground">Monthly Service Charge:</div>
-                            <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
-                           </>
-                        )}
-
                         {(tenantForDisplay.securityDeposit || 0) > 0 && (
                            <>
                             <div className="text-muted-foreground">Security Deposit:</div>
