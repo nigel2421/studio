@@ -154,7 +154,7 @@ export default function TenantsPage() {
                                     <TableRow>
                                         <TableHead>Name</TableHead>
                                         <TableHead>Property</TableHead>
-                                        <TableHead>Billing Amount</TableHead>
+                                        <TableHead>Rent Amount</TableHead>
                                         <TableHead>Payment Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>

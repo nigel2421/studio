@@ -14,16 +14,6 @@ import { Payment, Tenant } from "./types";
  * @param serviceCharge The service charge amount for the unit (monthly)
  */
 export function calculateTransactionBreakdown(amount: number, serviceCharge: number = 0) {
-    // If the amount is less than service charge, we assume it all goes to service charge arrears first
-    // But for simplicity in this version, we stick to the standard model where:
-    // Rent = Amount - Service Charge
-
-    // Safety check: specific payments might not have service charge included if they are partial
-    // For now, we rely on the defined service charge amount
-
-    // If the payment is explicitly marked as "Deposit" or "Other", different rules might apply
-    // maximizing robustness here for "Rent"
-
     let rentPortion = Math.max(0, amount - serviceCharge);
 
     // Management fee is 5% of the Rent collected
@@ -59,22 +49,20 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): Fin
     };
 
     payments.forEach(payment => {
-        if (payment.status !== 'completed') return;
+        // Explicitly only count 'Rent' type payments towards landlord revenue.
+        // Deposits and other types are excluded.
+        if (payment.status !== 'completed' || payment.type !== 'Rent') return;
 
         const tenant = tenants.find(t => t.id === payment.tenantId);
-        // Default service charge to 0 if not found
         const serviceCharge = tenant?.lease?.serviceCharge || 0;
 
-        // We only apply this logic to Rent payments currently
-        if (payment.type === 'Rent') {
-            const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
+        const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
 
-            summary.totalRevenue += breakdown.rentCollected; // Landlord revenue is based on rent portion only
-            summary.totalManagementFees += breakdown.managementFee;
-            summary.totalServiceCharges += breakdown.serviceChargeDeduction;
-            summary.totalNetRemittance += breakdown.netToLandlord;
-            summary.transactionCount++;
-        }
+        summary.totalRevenue += breakdown.rentCollected;
+        summary.totalManagementFees += breakdown.managementFee;
+        summary.totalServiceCharges += breakdown.serviceChargeDeduction;
+        summary.totalNetRemittance += breakdown.netToLandlord;
+        summary.transactionCount++;
     });
 
     return summary;
