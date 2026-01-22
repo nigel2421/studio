@@ -65,7 +65,13 @@ export default function TenantDashboardPage() {
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
-                    <p className="text-muted-foreground">Here is an overview of your account.</p>
+                    {tenantDetails ? (
+                        <p className="text-muted-foreground">
+                            Unit {tenantDetails.unitName} &bull; Rent: Ksh {tenantDetails.lease.rent.toLocaleString()}
+                        </p>
+                    ) : (
+                        <p className="text-muted-foreground">Here is an overview of your account.</p>
+                    )}
                 </div>
                 <Button onClick={handleSignOut} variant="outline">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -163,7 +169,7 @@ export default function TenantDashboardPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Amount</TableHead>
+                                <TableHead>Amount Paid</TableHead>
                                 <TableHead>Rent For</TableHead>
                             </TableRow>
                         </TableHeader>
