@@ -258,11 +258,20 @@ export function AddPaymentDialog({
                 <div className="p-4 my-2 border rounded-lg bg-blue-50 border-blue-200">
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
-                        <div className="text-muted-foreground">Monthly Rent:</div>
-                        <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
                         
-                        <div className="text-muted-foreground">Service Charge:</div>
-                        <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
+                        {(tenantForDisplay.lease.rent || 0) > 0 && (
+                          <>
+                            <div className="text-muted-foreground">Monthly Rent:</div>
+                            <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
+                          </>
+                        )}
+                        
+                        {(tenantForDisplay.lease.rent || 0) === 0 && (tenantForDisplay.lease.serviceCharge || 0) > 0 && (
+                           <>
+                            <div className="text-muted-foreground">Monthly Service Charge:</div>
+                            <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
+                           </>
+                        )}
 
                         <div className="text-muted-foreground font-bold text-red-600">Total Outstanding:</div>
                         <div className="font-bold text-red-600 text-right">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
@@ -337,3 +346,5 @@ export function AddPaymentDialog({
     </Dialog>
   );
 }
+
+    
