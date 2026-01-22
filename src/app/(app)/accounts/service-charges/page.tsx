@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -274,14 +275,14 @@ export default function ServiceChargesPage() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
-                                                onClick={() => handleConfirmPayment(acc)}
+                                                onSelect={() => handleConfirmPayment(acc)}
                                                 disabled={acc.paymentStatus === 'Vacant' || !acc.tenantId}
                                             >
                                                 <CheckCircle className="mr-2 h-4 w-4" />
                                                 Confirm Payment
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                onClick={() => handleGenerateStatement(acc.ownerId!)}
+                                                onSelect={() => handleGenerateStatement(acc.ownerId!)}
                                                 disabled={!acc.ownerId}
                                             >
                                                 <FileSignature className="mr-2 h-4 w-4" />
