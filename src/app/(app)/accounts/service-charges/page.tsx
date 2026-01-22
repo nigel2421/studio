@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getProperties, getPropertyOwners, getTenants, getAllPayments } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { Loader2, Search, FileSignature } from 'lucide-react';
 import { isSameMonth, startOfMonth } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { useLoading } from '@/hooks/useLoading';
+import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 
 interface ServiceChargeAccount {
   propertyId: string;
@@ -33,20 +35,31 @@ export default function ServiceChargesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
+  const [allTenants, setAllTenants] = useState<Tenant[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  const { startLoading, stopLoading } = useLoading();
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const [properties, owners, tenants, payments] = await Promise.all([
+        const [propertiesData, ownersData, tenantsData, paymentsData] = await Promise.all([
           getProperties(),
           getPropertyOwners(),
           getTenants(),
           getAllPayments(),
         ]);
+        
+        setAllProperties(propertiesData);
+        setAllOwners(ownersData);
+        setAllTenants(tenantsData);
+        setAllPayments(paymentsData);
 
         const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
-        properties.forEach(p => {
+        propertiesData.forEach(p => {
           p.units.forEach(u => {
             if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
               selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
@@ -57,17 +70,16 @@ export default function ServiceChargesPage() {
         const currentMonthStart = startOfMonth(new Date());
 
         const serviceChargeAccounts = selfManagedUnits.map(unit => {
-          const owner = owners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
-          const tenant = tenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+          const owner = ownersData.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+          const tenant = tenantsData.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
           
           let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
           let paymentAmount: number | undefined;
-          let paymentDate: string | undefined;
           
           if (!tenant) {
             paymentStatus = 'Vacant';
           } else {
-            const relevantPayment = payments.find(p => 
+            const relevantPayment = paymentsData.find(p => 
               p.tenantId === tenant.id &&
               p.type === 'ServiceCharge' &&
               isSameMonth(new Date(p.date), currentMonthStart)
@@ -76,7 +88,6 @@ export default function ServiceChargesPage() {
             if (relevantPayment) {
               paymentStatus = 'Paid';
               paymentAmount = relevantPayment.amount;
-              paymentDate = new Date(relevantPayment.date).toLocaleDateString();
             }
           }
 
@@ -91,7 +102,6 @@ export default function ServiceChargesPage() {
             tenantName: tenant?.name,
             paymentStatus,
             paymentAmount,
-            paymentDate,
           };
         });
         
@@ -107,14 +117,54 @@ export default function ServiceChargesPage() {
     fetchData();
   }, []);
 
+  const handleGenerateStatement = (ownerId: string) => {
+    startLoading('Generating Statement...');
+    try {
+        const owner = allOwners.find(o => o.id === ownerId);
+        if (!owner) {
+            throw new Error("Owner not found");
+        }
+
+        const ownerAssignedUnitIdentifiers = new Set(
+            owner.assignedUnits.flatMap(au => au.unitNames.map(un => `${au.propertyId}-${un}`))
+        );
+
+        const relevantTenants = allTenants.filter(t => 
+            ownerAssignedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`)
+        );
+        const relevantTenantIds = relevantTenants.map(t => t.id);
+
+        const serviceChargePayments = allPayments.filter(p =>
+            relevantTenantIds.includes(p.tenantId) && p.type === 'ServiceCharge'
+        );
+
+        const paymentsForPDF = serviceChargePayments.map(p => {
+            const tenant = allTenants.find(t => t.id === p.tenantId);
+            const property = allProperties.find(prop => prop.id === tenant?.propertyId);
+            return {
+                date: p.date,
+                property: property?.name || 'N/A',
+                unit: tenant?.unitName || 'N/A',
+                amount: p.amount
+            };
+        });
+
+        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF);
+    } catch (error: any) {
+        console.error("Error generating statement:", error);
+    } finally {
+        stopLoading();
+    }
+  };
+
+
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
     const lowercasedFilter = searchTerm.toLowerCase();
     return accounts.filter(acc =>
         acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
         acc.unitName.toLowerCase().includes(lowercasedFilter) ||
-        acc.ownerName?.toLowerCase().includes(lowercasedFilter) ||
-        acc.tenantName?.toLowerCase().includes(lowercasedFilter)
+        acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
   }, [accounts, searchTerm]);
 
@@ -148,7 +198,7 @@ export default function ServiceChargesPage() {
                  <div className="relative w-full sm:w-[300px]">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search by unit, owner, tenant..."
+                        placeholder="Search by unit, owner..."
                         className="pl-9"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -167,9 +217,8 @@ export default function ServiceChargesPage() {
                         <TableRow>
                             <TableHead>Property / Unit</TableHead>
                             <TableHead>Owner</TableHead>
-                            <TableHead>Tenant</TableHead>
-                            <TableHead>Expected Amount</TableHead>
-                            <TableHead>Status (Current Month)</TableHead>
+                            <TableHead>Service Charge</TableHead>
+                            <TableHead>Payment Status</TableHead>
                             <TableHead>Paid Amount</TableHead>
                             <TableHead>Actions</TableHead>
                         </TableRow>
@@ -182,7 +231,6 @@ export default function ServiceChargesPage() {
                                     <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
                                 </TableCell>
                                 <TableCell>{acc.ownerName}</TableCell>
-                                <TableCell>{acc.tenantName || <Badge variant="outline">Vacant</Badge>}</TableCell>
                                 <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
                                 <TableCell>
                                     <Badge variant={getStatusVariant(acc.paymentStatus)}>
@@ -191,7 +239,7 @@ export default function ServiceChargesPage() {
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
                                 <TableCell>
-                                    <Button variant="ghost" size="sm" disabled={!acc.ownerId}>
+                                    <Button variant="ghost" size="sm" disabled={!acc.ownerId} onClick={() => handleGenerateStatement(acc.ownerId!)}>
                                         <FileSignature className="mr-2 h-4 w-4" />
                                         Statement
                                     </Button>

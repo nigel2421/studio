@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property } from '@/lib/types';
+import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property, PropertyOwner } from '@/lib/types';
 import { format } from 'date-fns';
 
 // Helper to add company header
@@ -125,6 +125,43 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
     });
 
     doc.text('This statement is for your records.', 14, (doc as any).lastAutoTable.finalY + 20);
+};
+
+export const generateOwnerServiceChargeStatementPDF = (
+    owner: PropertyOwner,
+    payments: { date: string; property: string; unit: string; amount: number }[]
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    addHeader(doc, 'Service Charge Statement');
+    
+    // Owner Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(owner.name, 196, 48, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(owner.email, 196, 54, { align: 'right' });
+    doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+
+    autoTable(doc, {
+        startY: 70,
+        head: [['Date', 'Property', 'Unit', 'Amount Paid']],
+        body: payments.map(p => [
+            new Date(p.date).toLocaleDateString(),
+            p.property,
+            p.unit,
+            formatCurrency(p.amount)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        columnStyles: {
+            3: { halign: 'right' }
+        }
+    });
+
+    doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
 
