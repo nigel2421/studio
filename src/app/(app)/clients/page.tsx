@@ -111,6 +111,10 @@ export default function ClientsPage() {
     }
   };
 
+  const clientProperties = allProperties.filter(p => 
+    p.units.some(isClientManagedUnit)
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
