@@ -22,22 +22,27 @@ interface LandlordDashboardContentProps {
 export function LandlordDashboardContent({ properties, tenants, payments, financialSummary }: LandlordDashboardContentProps) {
     const [lastMonths, setLastMonths] = useState(12);
 
+    const unitMap = useMemo(() => {
+        const map = new Map<string, Unit>();
+        properties.forEach(p => {
+            p.units.forEach(u => {
+                map.set(`${p.property.id}-${u.name}`, u);
+            });
+        });
+        return map;
+    }, [properties]);
+
     const getUnitTypeForTenant = (tenant: Tenant | undefined): string => {
         if (!tenant) return 'N/A';
-        for (const propData of properties) {
-            if (propData.property.id === tenant.propertyId) {
-                const unit = propData.units.find(u => u.name === tenant.unitName);
-                return unit?.unitType || 'N/A';
-            }
-        }
-        return 'N/A';
+        const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+        return unit?.unitType || 'N/A';
     };
 
     const handleExport = () => {
         const data = payments.map(p => {
-            // For each payment, re-calculate to show breakdown in CSV
             const t = tenants.find(t => t.id === p.tenantId);
-            const serviceCharge = t?.lease?.serviceCharge || 0;
+            const unit = t ? unitMap.get(`${t.propertyId}-${t.unitName}`) : undefined;
+            const serviceCharge = unit?.serviceCharge || t?.lease?.serviceCharge || 0;
             const breakdown = calculateTransactionBreakdown(p.amount, serviceCharge);
 
             return {
@@ -131,7 +136,8 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <TableBody>
                             {payments.slice(0, 10).map((payment) => {
                                 const tenant = tenants.find(t => t.id === payment.tenantId);
-                                const serviceCharge = tenant?.lease?.serviceCharge || 0;
+                                const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
+                                const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
                                 const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
                                 const unitType = getUnitTypeForTenant(tenant);
 

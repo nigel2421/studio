@@ -49,10 +49,20 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         transactionCount: payments.filter(p => p.status === 'completed' && p.type === 'Rent').length
     };
 
+    const unitMap = new Map<string, Unit>();
+    properties.forEach(p => {
+        p.units.forEach(u => {
+            unitMap.set(`${p.property.id}-${u.name}`, u);
+        });
+    });
+
     // Calculate potential monthly rent and service charges from all of the landlord's tenants.
     tenants.forEach(tenant => {
         summary.totalRevenue += tenant.lease?.rent || 0;
-        summary.totalServiceCharges += tenant.lease?.serviceCharge || 0;
+        
+        // Get the most up-to-date service charge from the unit definition
+        const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+        summary.totalServiceCharges += unit?.serviceCharge || tenant.lease?.serviceCharge || 0;
     });
 
     // Management fee is 5% of the total potential rent (total revenue).
