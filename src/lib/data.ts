@@ -132,7 +132,22 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     if (!unit) {
         throw new Error("Cannot add tenant: selected unit not found in property.");
     }
-    const serviceCharge = unit.serviceCharge || 0;
+    
+    let serviceCharge: number;
+    switch (unit.unitType) {
+        case 'Studio':
+            serviceCharge = 2000;
+            break;
+        case 'One Bedroom':
+            serviceCharge = 3000;
+            break;
+        case 'Two Bedroom':
+            serviceCharge = 4000;
+            break;
+        default:
+            serviceCharge = unit.serviceCharge || 0;
+    }
+
     const rentFromUnit = unit.rentAmount || 0;
     const finalRent = rent > 0 ? rent : rentFromUnit;
     const initialDue = finalRent + securityDeposit + (waterDeposit || 0);
@@ -1149,6 +1164,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 

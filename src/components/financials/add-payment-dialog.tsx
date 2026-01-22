@@ -1,9 +1,10 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { addPayment } from '@/lib/data';
-import type { Tenant, Property } from '@/lib/types';
+import type { Tenant, Property, Payment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
   taskId
 }: AddPaymentDialogProps) {
@@ -50,6 +51,7 @@ export function AddPaymentDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '' }]);
+  const [paymentType, setPaymentType] = useState<Payment['type']>('Rent');
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
@@ -83,6 +85,7 @@ export function AddPaymentDialog({
 
   const resetForm = () => {
     setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '' }]);
+    setPaymentType('Rent');
     if (!tenant) { // Don't reset if a tenant is pre-selected
         setSelectedProperty('');
         setSelectedFloor('');
@@ -158,7 +161,7 @@ export function AddPaymentDialog({
           date: format(entry.date, 'yyyy-MM-dd'),
           notes: entry.notes,
           status: 'completed',
-          type: 'Rent',
+          type: paymentType,
         }, taskId) // Pass taskId here
       );
 
@@ -264,6 +267,19 @@ export function AddPaymentDialog({
                     </div>
                 </div>
             )}
+             <div className="space-y-2 pt-2">
+                <Label htmlFor="payment-type">Payment Type</Label>
+                <Select value={paymentType} onValueChange={(v) => setPaymentType(v as Payment['type'])}>
+                    <SelectTrigger id="payment-type">
+                        <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Rent">Rent Payment</SelectItem>
+                        <SelectItem value="Deposit">Security/Water Deposit</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
 
             <div className="space-y-2 pt-4">
               <Label>Payment Records</Label>
