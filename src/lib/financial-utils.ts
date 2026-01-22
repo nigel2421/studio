@@ -1,5 +1,4 @@
 
-
 import { Payment, Property, Tenant, Unit } from "./types";
 
 /**
@@ -58,36 +57,25 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
 
     summary.totalRevenue = totalPotentialRent;
 
+    // Management fee is 5% of the total *potential* rent (total revenue)
+    const managementFeeRate = 0.05;
+    summary.totalManagementFees = totalPotentialRent * managementFeeRate;
 
-    // The rest of the calculations remain based on actual payments made.
+
+    // Service charges and Net Remittance are still based on actual payments.
     payments.forEach(payment => {
-        // Explicitly only count 'Rent' type payments towards landlord revenue.
-        // Deposits and other types are excluded.
         if (payment.status !== 'completed' || payment.type !== 'Rent') return;
 
         const tenant = tenants.find(t => t.id === payment.tenantId);
         
         let serviceCharge = 0;
-        if (tenant) {
-            // Find the property that contains this tenant's unit
-            const propertyForTenant = properties.find(pData => pData.property.id === tenant.propertyId);
-            if (propertyForTenant) {
-                // Find the specific unit within that property
-                const unitForTenant = propertyForTenant.units.find(u => u.name === tenant.unitName);
-                if (unitForTenant) {
-                    serviceCharge = unitForTenant.serviceCharge || 0;
-                }
-            }
+        if (tenant && tenant.lease) {
+             serviceCharge = tenant.lease.serviceCharge || 0;
         }
 
-        // Fallback to what's on the lease if lookup fails, though the direct lookup is preferred.
-        if (serviceCharge === 0) {
-            serviceCharge = tenant?.lease?.serviceCharge || 0;
-        }
 
         const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
         
-        summary.totalManagementFees += breakdown.managementFee;
         summary.totalServiceCharges += breakdown.serviceChargeDeduction;
         summary.totalNetRemittance += breakdown.netToLandlord;
         summary.transactionCount++;
