@@ -92,6 +92,8 @@ export type Task = {
   createdAt: string;
 };
 
+export type PaymentStatus = 'Paid' | 'Pending' | 'Failed';
+
 export type Payment = {
   id: string;
   tenantId: string;
@@ -101,7 +103,7 @@ export type Payment = {
   rentForMonth?: string;
   createdAt: Date;
   reference?: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: PaymentStatus;
   type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Other';
 };
 

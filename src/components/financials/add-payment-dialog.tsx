@@ -177,7 +177,7 @@ export function AddPaymentDialog({
           date: format(entry.date, 'yyyy-MM-dd'),
           notes: entry.notes,
           rentForMonth: entry.rentForMonth,
-          status: 'completed',
+          status: 'Paid',
           type: paymentType,
         }, taskId)
       );
@@ -269,14 +269,14 @@ export function AddPaymentDialog({
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
                         
-                        {(tenantForDisplay.residentType === 'Tenant' && (tenantForDisplay.lease.rent || 0) > 0) && (
+                        {(tenantForDisplay.residentType === 'Tenant') && (
                             <>
                                 <div className="text-muted-foreground">Monthly Rent:</div>
                                 <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
                             </>
                         )}
 
-                        {(tenantForDisplay.residentType !== 'Tenant' && (tenantForDisplay.lease.serviceCharge || 0) > 0) && (
+                        {(tenantForDisplay.residentType !== 'Tenant') && (
                             <>
                                 <div className="text-muted-foreground">Monthly Service Charge:</div>
                                 <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>

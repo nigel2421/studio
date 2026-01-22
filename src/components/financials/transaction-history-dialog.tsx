@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Loader2, FileText, PlusCircle } from 'lucide-react';
 import { Tenant, Payment, Property } from '@/lib/types';
 import { getTenantPayments } from '@/lib/data';
-import { downloadCSV } from '@/lib/utils';
+import { generateTenantStatementPDF } from '@/lib/pdf-generator';
 import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format } from 'date-fns';
@@ -43,19 +43,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     }, [tenant, open, onPaymentAdded]);
 
 
-    const handleDownloadCSV = () => {
+    const handleDownloadPDF = () => {
         if (!tenant) return;
-
-        const data = payments.map(p => ({
-            Date: new Date(p.date).toLocaleDateString(),
-            Amount: p.amount,
-            Type: p.type || 'Rent',
-            RentForMonth: p.rentForMonth ? format(new Date(p.rentForMonth), 'MMM yyyy') : '',
-            Status: p.status || 'completed',
-            Notes: p.notes || ''
-        }));
-
-        downloadCSV(data, `${tenant.name}_statement.csv`);
+        generateTenantStatementPDF(tenant, payments);
     };
 
     if (!tenant) return null;
@@ -82,9 +72,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             Record Payment
                         </Button>
                     </AddPaymentDialog>
-                    <Button variant="outline" size="sm" onClick={handleDownloadCSV} disabled={payments.length === 0}>
+                    <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={payments.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
-                        Export Statement
+                        Export PDF
                     </Button>
                 </div>
 
@@ -116,8 +106,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                             </TableCell>
                                             <TableCell className="font-medium">Ksh {payment.amount.toLocaleString()}</TableCell>
                                             <TableCell>
-                                                <Badge variant={payment.status === 'failed' ? 'destructive' : 'secondary'}>
-                                                    {payment.status || 'completed'}
+                                                <Badge variant={payment.status === 'Failed' ? 'destructive' : payment.status === 'Paid' ? 'default' : 'secondary'}>
+                                                    {payment.status || 'Paid'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">{payment.notes}</TableCell>

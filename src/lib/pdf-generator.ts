@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property, PropertyOwner } from '@/lib/types';
+import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { format } from 'date-fns';
 
 // Helper to add company header
@@ -269,4 +269,58 @@ export const generateLandlordStatementPDF = (
     });
 
     doc.save(`landlord_statement_${landlord.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    addHeader(doc, 'Tenant Statement');
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(tenant.name, 196, 48, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Unit: ${tenant.unitName}`, 196, 54, { align: 'right' });
+    doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+
+    autoTable(doc, {
+        startY: 70,
+        head: [['Date', 'Type', 'For Month', 'Notes', 'Amount']],
+        body: payments.map(p => [
+            new Date(p.date).toLocaleDateString(),
+            p.type || 'Rent',
+            p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+            p.notes || '',
+            formatCurrency(p.amount)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] },
+        columnStyles: {
+            4: { halign: 'right' }
+        }
+    });
+    
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+    autoTable(doc, {
+        startY: finalY,
+        body: [
+            [{ content: 'Total Paid:', styles: { halign: 'right', fontStyle: 'bold' } }, { content: formatCurrency(totalPaid), styles: { halign: 'right', fontStyle: 'bold' } }],
+            [{ content: 'Outstanding Balance:', styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } }, { content: formatCurrency(tenant.dueBalance), styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } }],
+            [{ content: 'Account Credit:', styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } }, { content: formatCurrency(tenant.accountBalance), styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } }]
+        ],
+        theme: 'plain',
+        tableWidth: 'wrap',
+        margin: { left: 100 },
+    });
+
+    doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
