@@ -214,6 +214,8 @@ export default function ServiceChargesPage() {
     return filteredAccounts.slice(start, start + pageSize);
   }, [filteredAccounts, currentPage, pageSize]);
 
+  const totalPages = Math.ceil(filteredAccounts.length / pageSize);
+
   return (
     <div className="space-y-6">
        <div className="flex items-center justify-between">
