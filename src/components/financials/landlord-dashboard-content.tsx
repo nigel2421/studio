@@ -79,7 +79,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">Ksh {financialSummary.totalServiceCharges.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Deducted for maintenance</p>
+                        <p className="text-xs text-muted-foreground">Potential monthly service charges</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -94,7 +94,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 </Card>
                 <Card className="bg-primary/5 border-primary/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-primary">Net Remittance</CardTitle>
+                        <CardTitle className="text-sm font-medium text-primary">Net Rent Payout</CardTitle>
                         <Wallet className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>

@@ -46,40 +46,21 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalNetRemittance: 0,
-        transactionCount: 0
+        transactionCount: payments.filter(p => p.status === 'completed' && p.type === 'Rent').length
     };
 
-    // Calculate "Total Revenue" as the sum of monthly rents for all of the landlord's tenants.
-    // This represents the potential monthly income, not just collected amounts.
-    const totalPotentialRent = tenants.reduce((sum, tenant) => {
-        return sum + (tenant.lease?.rent || 0);
-    }, 0);
-
-    summary.totalRevenue = totalPotentialRent;
-
-    // Management fee is 5% of the total *potential* rent (total revenue)
-    const managementFeeRate = 0.05;
-    summary.totalManagementFees = totalPotentialRent * managementFeeRate;
-
-
-    // Service charges and Net Remittance are still based on actual payments.
-    payments.forEach(payment => {
-        if (payment.status !== 'completed' || payment.type !== 'Rent') return;
-
-        const tenant = tenants.find(t => t.id === payment.tenantId);
-        
-        let serviceCharge = 0;
-        if (tenant && tenant.lease) {
-             serviceCharge = tenant.lease.serviceCharge || 0;
-        }
-
-
-        const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
-        
-        summary.totalServiceCharges += breakdown.serviceChargeDeduction;
-        summary.totalNetRemittance += breakdown.netToLandlord;
-        summary.transactionCount++;
+    // Calculate potential monthly rent and service charges from all of the landlord's tenants.
+    tenants.forEach(tenant => {
+        summary.totalRevenue += tenant.lease?.rent || 0;
+        summary.totalServiceCharges += tenant.lease?.serviceCharge || 0;
     });
+
+    // Management fee is 5% of the total potential rent (total revenue).
+    const managementFeeRate = 0.05;
+    summary.totalManagementFees = summary.totalRevenue * managementFeeRate;
+
+    // Net Rent Payout is Total Revenue - Total Service Charges - Management Fees.
+    summary.totalNetRemittance = summary.totalRevenue - summary.totalServiceCharges - summary.totalManagementFees;
 
     return summary;
 }
