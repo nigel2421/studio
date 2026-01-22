@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement } from '@/lib/types';
+import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property } from '@/lib/types';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -125,4 +125,104 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
     });
 
     doc.text('This statement is for your records.', 14, (doc as any).lastAutoTable.finalY + 20);
+};
+
+
+export const generateLandlordStatementPDF = (
+    landlord: Landlord,
+    summary: FinancialSummary,
+    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; net: number }[],
+    units: { property: string; unitName: string; unitType: string; status: string }[]
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Eracov Properties', 14, 20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Landlord Statement', 14, 26);
+
+    // Landlord Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(landlord.name, 196, 20, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date Issued: ${dateStr}`, 196, 26, { align: 'right' });
+
+    doc.setDrawColor(200);
+    doc.line(14, 35, 196, 35);
+
+    // Summary Section
+    let yPos = 45;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Summary', 14, yPos);
+    yPos += 8;
+
+    const summaryData = [
+        ['Total Revenue (Gross)', formatCurrency(summary.totalRevenue)],
+        ['Service Charges', `-${formatCurrency(summary.totalServiceCharges)}`],
+        ['Management Fees (5%)', `-${formatCurrency(summary.totalManagementFees)}`],
+        ['Net Rent Payout', formatCurrency(summary.totalNetRemittance)],
+    ];
+    autoTable(doc, {
+        startY: yPos,
+        body: summaryData,
+        theme: 'plain',
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // Transaction History
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Transaction History', 14, yPos);
+    yPos += 8;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Unit', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
+        body: transactions.map(t => [
+            t.date,
+            t.unit,
+            formatCurrency(t.gross),
+            `-${formatCurrency(t.serviceCharge)}`,
+            `-${formatCurrency(t.mgmtFee)}`,
+            formatCurrency(t.net),
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [41, 102, 182] },
+        columnStyles: {
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+        },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    
+    // Units Overview
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Unit Portfolio', 14, yPos);
+    yPos += 8;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Property', 'Unit Name', 'Unit Type', 'Status']],
+        body: units.map(u => [u.property, u.unitName, u.unitType, u.status]),
+        theme: 'grid',
+        headStyles: { fillColor: [41, 102, 182] },
+    });
+
+    doc.save(`landlord_statement_${landlord.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
