@@ -43,7 +43,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId
 }: AddPaymentDialogProps) {
@@ -276,6 +276,7 @@ export function AddPaymentDialog({
                     <SelectContent>
                         <SelectItem value="Rent">Rent Payment</SelectItem>
                         <SelectItem value="Deposit">Security/Water Deposit</SelectItem>
+                        <SelectItem value="ServiceCharge">Service Charge</SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                 </Select>

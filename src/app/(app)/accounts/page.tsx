@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Percent, Users, Eye, AlertCircle, PlusCircle } from 'lucide-react';
+import { DollarSign, Percent, Users, Eye, AlertCircle, PlusCircle, ClipboardList, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +24,7 @@ import { downloadCSV } from '@/lib/utils';
 import { TransactionHistoryDialog } from '@/components/financials/transaction-history-dialog';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Search } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -134,6 +135,26 @@ export default function AccountsPage() {
           </Card>
         ))}
       </div>
+
+       <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <div className="flex items-center gap-2">
+                    <ClipboardList className="h-6 w-6 text-blue-700"/>
+                    <CardTitle className="text-blue-900">Client Service Charges</CardTitle>
+                </div>
+              <CardDescription className="text-blue-800/80 mt-2">
+                Track and manage service charge payments for self-managed client properties.
+              </CardDescription>
+            </div>
+            <Button asChild variant="outline" className="bg-white">
+              <Link href="/accounts/service-charges">
+                View Accounts <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+        </Card>
+
 
       <Card>
         <CardHeader>

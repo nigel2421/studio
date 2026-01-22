@@ -101,7 +101,7 @@ export type Payment = {
   createdAt: Date;
   reference?: string;
   status: 'completed' | 'pending' | 'failed';
-  type: 'Rent' | 'Deposit' | 'Other';
+  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Other';
 };
 
 export type Tenant = {

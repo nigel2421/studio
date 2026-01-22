@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -32,6 +33,7 @@ import {
   CheckSquare,
   ChevronDown,
   UserCog,
+  ClipboardList,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -156,6 +158,16 @@ export function AppSidebar() {
                         <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
                           <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
                             <span>Overview</span>
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
+                    )}
+                    {(isAdmin || isAgent) && (
+                       <SidebarMenuItem>
+                        <Link href="/accounts/service-charges" onClick={() => handleLinkClick('Service Charges')}>
+                          <SidebarMenuButton isActive={isActive('/accounts/service-charges')} size="sm">
+                            <ClipboardList className="h-3 w-3 mr-2"/>
+                            <span>Service Charges</span>
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
