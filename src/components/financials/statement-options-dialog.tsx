@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -66,7 +67,6 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
                                         selected={startDate}
                                         onSelect={setStartDate}
                                         disabled={{ after: new Date() }}
-                                        initialFocus
                                     />
                                 </PopoverContent>
                             </Popover>
