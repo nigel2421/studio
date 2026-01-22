@@ -57,26 +57,14 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     return sum + breakdown.managementFee;
   }, 0);
 
-  const totalHandedOver = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.handoverStatus === 'Handed Over').length || 0), 0);
-  const rentingMngdByEracovForSM = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.managementStatus === 'Renting Mngd by Eracov for SM').length || 0), 0);
-  const rentingMngdByEracovForClient = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.managementStatus === 'Renting Mngd by Eracov for Client').length || 0), 0);
-  const reservedForAirbnb = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.managementStatus === 'Reserved for Airbnb').length || 0), 0);
-  const clientSelfFullyManaged = properties.reduce((sum, p) => sum + (p.units?.filter(u => u.managementStatus === 'Client Self Fully Managed').length || 0), 0);
-
-
   const stats = [
     { title: "Total Tenants", value: totalTenants, icon: Users, color: "text-blue-500" },
     { title: "Properties Managed", value: totalProperties, icon: Building, color: "text-green-500" },
     { title: "Occupied Units", value: occupiedUnits, icon: Building2, color: "text-purple-500" },
     { title: "Vacant Units", value: vacantUnits, icon: Home, color: "text-gray-500" },
     { title: "Agency Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
-    { title: "Handed Over Units", value: totalHandedOver, icon: Briefcase, color: "text-sky-500" },
     { title: "Pending Maintenance", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
     { title: "Overdue Rents", value: overdueRents, icon: AlertCircle, color: "text-red-500" },
-    { title: "Mngd for SM", value: rentingMngdByEracovForSM, icon: Building2, color: "text-teal-500" },
-    { title: "Mngd for Client", value: rentingMngdByEracovForClient, icon: UserCog, color: "text-orange-500" },
-    { title: "Reserved for Airbnb", value: reservedForAirbnb, icon: BedDouble, color: "text-rose-500" },
-    { title: "Client Self-Managed", value: clientSelfFullyManaged, icon: UserCog, color: "text-indigo-500" },
   ];
 
   return (

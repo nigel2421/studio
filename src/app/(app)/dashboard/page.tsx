@@ -11,6 +11,7 @@ import { ArrowRight, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MaintenanceRequest, Tenant, Property, Payment } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
+import { StatusAnalytics } from "@/components/status-analytics";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -52,6 +53,8 @@ export default function DashboardPage() {
         maintenanceRequests={maintenanceRequests} 
         payments={payments} 
       />
+
+      <StatusAnalytics properties={properties} />
 
       {properties.map(property => (
         <UnitAnalytics key={property.id} property={property} tenants={tenants} />
