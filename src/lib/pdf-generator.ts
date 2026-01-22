@@ -291,7 +291,7 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) 
 
     autoTable(doc, {
         startY: 70,
-        head: [['Date', 'Type', 'For Month', 'Notes', 'Amount']],
+        head: [['Date', 'Type', 'For Month', 'Notes', 'Amount Paid']],
         body: payments.map(p => [
             new Date(p.date).toLocaleDateString(),
             p.type || 'Rent',
@@ -306,21 +306,14 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) 
         }
     });
     
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
-    autoTable(doc, {
-        startY: finalY,
-        body: [
-            [{ content: 'Total Paid:', styles: { halign: 'right', fontStyle: 'bold' } }, { content: formatCurrency(totalPaid), styles: { halign: 'right', fontStyle: 'bold' } }],
-            [{ content: 'Outstanding Balance:', styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } }, { content: formatCurrency(tenant.dueBalance), styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } }],
-            [{ content: 'Account Credit:', styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } }, { content: formatCurrency(tenant.accountBalance), styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } }]
-        ],
-        theme: 'plain',
-        tableWidth: 'wrap',
-        margin: { left: 100 },
-    });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Paid:', 140, finalY, { align: 'right' });
+    doc.text(formatCurrency(totalPaid), 196, finalY, { align: 'right' });
 
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
