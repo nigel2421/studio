@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
