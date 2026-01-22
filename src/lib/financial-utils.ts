@@ -5,30 +5,32 @@ import { Payment, Property, Tenant, Unit } from "./types";
  * Calculates the breakdown of a rent payment, including management fees and service charges.
  * 
  * Logic:
- * 1. Gross Amount = Total Payment
- * 2. Service Charge = Deducted from Gross first (retained for maintenance/sinking fund)
- * 3. Management Fee = 5% of the Rent portion (Gross - Service Charge)
- * 4. Net to Landlord = Rent - Management Fee
+ * 1. Gross Amount = The unit's standard rent amount.
+ * 2. Management Fee = 5% of the Gross Rent Amount.
+ * 3. Service Charge = The unit's standard service charge.
+ * 4. Net to Landlord = Gross - Service Charge - Management Fee.
  * 
- * @param payment The payment transaction
- * @param serviceCharge The service charge amount for the unit (monthly)
+ * @param rentAmount The standard monthly rent for the unit.
+ * @param serviceCharge The service charge amount for the unit.
  */
-export function calculateTransactionBreakdown(amount: number, serviceCharge: number = 0) {
-    // The portion of the payment that is rent is what's left after the service charge is covered.
-    let rentPortion = Math.max(0, amount - serviceCharge);
+export function calculateTransactionBreakdown(rentAmount: number, serviceCharge: number = 0) {
+    const grossAmount = rentAmount;
 
-    // Management fee is 5% of the Rent collected
+    // Management fee is 5% of the Gross Rent Amount.
     const managementFeeRate = 0.05;
-    const managementFee = rentPortion * managementFeeRate;
+    const managementFee = grossAmount * managementFeeRate;
+    
+    // The service charge is deducted from the gross.
+    const serviceChargeDeduction = serviceCharge;
 
-    const netToLandlord = rentPortion - managementFee;
+    // Net to landlord is what's left after service charge and management fee are deducted.
+    const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
 
     return {
-        gross: amount,
-        serviceChargeDeduction: Math.min(amount, serviceCharge), // Can't deduct more than paid
-        rentCollected: rentPortion,
+        gross: grossAmount,
+        serviceChargeDeduction: serviceChargeDeduction,
         managementFee: managementFee,
-        netToLandlord: netToLandlord
+        netToLandlord: netToLandlord,
     };
 }
 
