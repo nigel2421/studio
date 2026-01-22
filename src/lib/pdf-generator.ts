@@ -1,7 +1,7 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property } from '@/lib/types';
+import { format } from 'date-fns';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -132,7 +132,9 @@ export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
     transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; net: number }[],
-    units: { property: string; unitName: string; unitType: string; status: string }[]
+    units: { property: string; unitName: string; unitType: string; status: string }[],
+    startDate?: Date,
+    endDate?: Date
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
@@ -156,6 +158,11 @@ export const generateLandlordStatementPDF = (
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Date Issued: ${dateStr}`, 196, 26, { align: 'right' });
+    
+    if (startDate && endDate) {
+        const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
+        doc.text(`Period: ${periodStr}`, 196, 31, { align: 'right' });
+    }
 
     doc.setDrawColor(200);
     doc.line(14, 35, 196, 35);

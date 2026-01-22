@@ -14,6 +14,8 @@ import Link from 'next/link';
 import { generateLandlordStatementPDF } from '@/lib/pdf-generator';
 import { aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { useLoading } from '@/hooks/useLoading';
+import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
+import { isWithinInterval } from 'date-fns';
 
 export default function LandlordsPage() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
@@ -25,6 +27,9 @@ export default function LandlordsPage() {
   const [selectedLandlord, setSelectedLandlord] = useState<Landlord | null>(null);
   const { toast } = useToast();
   const { startLoading, stopLoading, isLoading } = useLoading();
+  
+  const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
+  const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -96,7 +101,7 @@ export default function LandlordsPage() {
     }
   };
 
-  const handleGenerateStatement = async (landlord: Landlord) => {
+  const handleGenerateStatement = async (landlord: Landlord, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
       const landlordProperties: { property: Property; units: Unit[] }[] = [];
@@ -114,7 +119,12 @@ export default function LandlordsPage() {
 
       const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
       const relevantTenantIds = relevantTenants.map(t => t.id);
-      const relevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId) && p.type === 'Rent');
+      
+      const relevantPayments = payments.filter(p => 
+          relevantTenantIds.includes(p.tenantId) && 
+          p.type === 'Rent' &&
+          isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
+      );
 
       const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
       
@@ -147,8 +157,9 @@ export default function LandlordsPage() {
         unitType: u.unitType,
         status: u.status
       })));
-
-      generateLandlordStatementPDF(landlord, summary, transactionsForPDF, unitsForPDF);
+      
+      generateLandlordStatementPDF(landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
+      setIsStatementDialogOpen(false); 
 
     } catch (error) {
       console.error("Error generating statement:", error);
@@ -247,7 +258,7 @@ export default function LandlordsPage() {
                   )}
                 </CardContent>
                 <CardContent>
-                    <Button className="w-full" variant="outline" onClick={() => handleGenerateStatement(landlord)}>
+                    <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
                         <FileDown className="mr-2 h-4 w-4" />
                         Generate Statement
                     </Button>
@@ -267,6 +278,14 @@ export default function LandlordsPage() {
           onSave={handleSaveLandlord}
         />
       )}
+      
+      <StatementOptionsDialog
+        isOpen={isStatementDialogOpen}
+        onClose={() => setIsStatementDialogOpen(false)}
+        landlord={landlordForStatement}
+        onGenerate={handleGenerateStatement}
+        isGenerating={isLoading}
+      />
     </div>
   );
 }
