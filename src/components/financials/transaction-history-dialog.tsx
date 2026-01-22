@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,6 +10,7 @@ import { getTenantPayments } from '@/lib/data';
 import { downloadCSV } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
+import { format } from 'date-fns';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
@@ -50,6 +50,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
             Date: new Date(p.date).toLocaleDateString(),
             Amount: p.amount,
             Type: p.type || 'Rent',
+            RentForMonth: p.rentForMonth ? format(new Date(p.rentForMonth), 'MMM yyyy') : '',
             Status: p.status || 'completed',
             Notes: p.notes || ''
         }));
@@ -98,6 +99,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                 <TableRow>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Type</TableHead>
+                                    <TableHead>Rent For</TableHead>
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Notes</TableHead>
@@ -109,6 +111,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                         <TableRow key={payment.id}>
                                             <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
                                             <TableCell>{payment.type || 'Rent'}</TableCell>
+                                            <TableCell>
+                                                {payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A'}
+                                            </TableCell>
                                             <TableCell className="font-medium">Ksh {payment.amount.toLocaleString()}</TableCell>
                                             <TableCell>
                                                 <Badge variant={payment.status === 'failed' ? 'destructive' : 'secondary'}>
@@ -120,7 +125,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                             No transaction history found.
                                         </TableCell>
                                     </TableRow>

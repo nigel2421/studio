@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
@@ -22,6 +22,7 @@ interface PaymentEntry {
   amount: string;
   date: Date;
   notes: string;
+  rentForMonth: string;
 }
 
 interface AddPaymentDialogProps {
@@ -50,11 +51,21 @@ export function AddPaymentDialog({
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '' }]);
+  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
   const [paymentType, setPaymentType] = useState<Payment['type']>('Rent');
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
+
+  const monthOptions = Array.from({ length: 18 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i + 2);
+    return {
+        value: format(d, 'yyyy-MM'),
+        label: format(d, 'MMMM yyyy'),
+    };
+  });
 
   const {
     selectedProperty,
@@ -84,7 +95,7 @@ export function AddPaymentDialog({
   }, [tenant, selectedUnit, selectedProperty, tenants]);
 
   const resetForm = () => {
-    setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '' }]);
+    setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
     setPaymentType('Rent');
     if (!tenant) { // Don't reset if a tenant is pre-selected
         setSelectedProperty('');
@@ -116,7 +127,7 @@ export function AddPaymentDialog({
   };
 
   const addEntry = () => {
-    setPaymentEntries(entries => [...entries, { id: Date.now(), amount: '', date: new Date(), notes: '' }]);
+    setPaymentEntries(entries => [...entries, { id: Date.now(), amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
   };
 
   const removeEntry = (id: number) => {
@@ -165,9 +176,10 @@ export function AddPaymentDialog({
           amount: Number(entry.amount),
           date: format(entry.date, 'yyyy-MM-dd'),
           notes: entry.notes,
+          rentForMonth: entry.rentForMonth,
           status: 'completed',
           type: paymentType,
-        }, taskId) // Pass taskId here
+        }, taskId)
       );
 
       await Promise.all(paymentPromises);
@@ -199,7 +211,7 @@ export function AddPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger}
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Payment Record</DialogTitle>
           {tenant && <DialogDescription>For {tenant.name} - Unit {tenant.unitName}</DialogDescription>}
@@ -257,11 +269,18 @@ export function AddPaymentDialog({
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
                         
-                        {(tenantForDisplay.lease.rent || 0) > 0 && (
-                          <>
-                            <div className="text-muted-foreground">Monthly Rent:</div>
-                            <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
-                          </>
+                        {(tenantForDisplay.residentType === 'Tenant' && (tenantForDisplay.lease.rent || 0) > 0) && (
+                            <>
+                                <div className="text-muted-foreground">Monthly Rent:</div>
+                                <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
+                            </>
+                        )}
+
+                        {(tenantForDisplay.residentType !== 'Tenant' && (tenantForDisplay.lease.serviceCharge || 0) > 0) && (
+                            <>
+                                <div className="text-muted-foreground">Monthly Service Charge:</div>
+                                <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
+                            </>
                         )}
                         
                         {(tenantForDisplay.securityDeposit || 0) > 0 && (
@@ -302,10 +321,28 @@ export function AddPaymentDialog({
               <Label>Payment Records</Label>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry, index) => (
-                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end p-3 border rounded-lg">
+                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg">
                     <div className="space-y-1">
                       <Label htmlFor={`amount-${entry.id}`} className="text-xs">Amount (Ksh)</Label>
                       <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">Rent For Month</Label>
+                      <Select
+                          value={entry.rentForMonth}
+                          onValueChange={(value) => handleEntryChange(entry.id, 'rentForMonth', value)}
+                      >
+                          <SelectTrigger id={`rent-for-${entry.id}`} className="h-10">
+                              <SelectValue placeholder="Select month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {monthOptions.map(option => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                  </SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>

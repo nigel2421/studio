@@ -98,6 +98,7 @@ export type Payment = {
   amount: number;
   date: string;
   notes?: string;
+  rentForMonth?: string;
   createdAt: Date;
   reference?: string;
   status: 'completed' | 'pending' | 'failed';
