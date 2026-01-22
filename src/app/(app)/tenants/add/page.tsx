@@ -72,6 +72,19 @@ export default function AddTenantPage() {
     setUnitName('');
   }, [selectedProperty, properties]);
 
+  useEffect(() => {
+    if (unitName) {
+        const unit = availableUnits.find(u => u.name === unitName);
+        if (unit && unit.rentAmount) {
+            setRent(unit.rentAmount);
+        } else {
+            setRent(0);
+        }
+    } else {
+        setRent(0);
+    }
+  }, [unitName, availableUnits]);
+
   const { startLoading, stopLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {

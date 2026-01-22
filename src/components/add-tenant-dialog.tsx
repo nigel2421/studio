@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -81,6 +82,19 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
     }
     setUnitName('');
   }, [selectedProperty, properties]);
+  
+  useEffect(() => {
+    if (unitName) {
+        const unit = availableUnits.find(u => u.name === unitName);
+        if (unit && unit.rentAmount) {
+            setRent(unit.rentAmount);
+        } else {
+            setRent(0);
+        }
+    } else {
+        setRent(0);
+    }
+  }, [unitName, availableUnits]);
 
   const resetForm = () => {
     setName('');
@@ -114,6 +128,7 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         securityDeposit: bookedWithDeposit ? securityDeposit : 0,
         waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
         residentType: 'Tenant',
+        leaseStartDate: new Date().toISOString().split('T')[0],
       });
       toast({
         title: "Tenant Added",

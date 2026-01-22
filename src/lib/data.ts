@@ -148,9 +148,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
             serviceCharge = unit.serviceCharge || 0;
     }
 
-    const rentFromUnit = unit.rentAmount || 0;
-    const finalRent = rent > 0 ? rent : rentFromUnit;
-    const initialDue = finalRent + securityDeposit + (waterDeposit || 0);
+    const initialDue = rent + securityDeposit + (waterDeposit || 0);
 
     const newTenantData = {
         name,
@@ -165,7 +163,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
         lease: {
             startDate: leaseStartDate,
             endDate: new Date(new Date(leaseStartDate).setFullYear(new Date(leaseStartDate).getFullYear() + 1)).toISOString().split('T')[0],
-            rent: finalRent,
+            rent: rent,
             serviceCharge: serviceCharge,
             paymentStatus: 'Pending' as const,
             lastBilledPeriod: format(new Date(leaseStartDate), 'yyyy-MM'),
@@ -180,7 +178,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     // Create onboarding task
     await addTask({
         title: `Onboard: ${name}`,
-        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${finalRent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
+        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${rent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
         status: 'Pending',
         priority: 'High',
         category: 'Financial',
@@ -1164,6 +1162,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 

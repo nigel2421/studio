@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -79,11 +80,11 @@ export default function LoginPage() {
             <span className="text-xl font-bold tracking-tight">Eracov Properties</span>
           </div>
           <h1 className="text-5xl font-extrabold leading-tight tracking-tight mb-4">
-            Manage your properties <br />
-            <span className="text-blue-400">Built for modern Properties</span>
+            Property Management, <br />
+            <span className="text-blue-400">Simplified & Centralized.</span>
           </h1>
           <p className="text-lg text-slate-300 max-w-md">
-            The complete solution for landlords, tenants, and homeowners. Streamline your workflow today.
+            The complete solution for property managers, landlords, and residents. Access your portfolio and manage operations seamlessly.
           </p>
         </div>
 
