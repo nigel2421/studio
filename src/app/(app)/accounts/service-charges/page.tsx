@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -17,6 +16,8 @@ import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 interface ServiceChargeAccount {
   propertyId: string;
@@ -88,10 +89,11 @@ export default function ServiceChargesPage() {
           const relevantPayment = paymentsData.find(p => 
             p.tenantId === tenant.id &&
             p.type === 'ServiceCharge' &&
+            p.status === 'Paid' &&
             isSameMonth(new Date(p.date), currentMonthStart)
           );
           
-          if (relevantPayment) {
+          if (relevantPayment && relevantPayment.amount >= (unit.serviceCharge || 0)) {
             paymentStatus = 'Paid';
             paymentAmount = relevantPayment.amount;
           }
@@ -184,6 +186,18 @@ export default function ServiceChargesPage() {
     }
   };
 
+  const handleStatusChange = (account: ServiceChargeAccount, newStatus: 'Paid' | 'Pending') => {
+    if (newStatus === 'Paid' && account.paymentStatus !== 'Paid') {
+      handleConfirmPayment(account);
+    } else if (newStatus === 'Pending' && account.paymentStatus === 'Paid') {
+      toast({
+        variant: 'destructive',
+        title: 'Action Not Supported',
+        description: 'To mark a payment as pending, the corresponding payment record must be removed. This action is not yet supported directly.',
+      });
+    }
+  };
+
 
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
@@ -199,16 +213,6 @@ export default function ServiceChargesPage() {
     const start = (currentPage - 1) * pageSize;
     return filteredAccounts.slice(start, start + pageSize);
   }, [filteredAccounts, currentPage, pageSize]);
-  
-  const totalPages = Math.ceil(filteredAccounts.length / pageSize);
-
-  const getStatusVariant = (status: ServiceChargeAccount['paymentStatus']) => {
-    switch (status) {
-      case 'Paid': return 'default';
-      case 'Pending': return 'destructive';
-      case 'Vacant': return 'secondary';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -260,9 +264,25 @@ export default function ServiceChargesPage() {
                                 <TableCell>{acc.ownerName}</TableCell>
                                 <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
                                 <TableCell>
-                                    <Badge variant={getStatusVariant(acc.paymentStatus)}>
-                                        {acc.paymentStatus}
-                                    </Badge>
+                                    {acc.paymentStatus === 'Vacant' ? (
+                                        <Badge variant="secondary">Vacant</Badge>
+                                    ) : (
+                                        <Select
+                                            value={acc.paymentStatus}
+                                            onValueChange={(newStatus) => handleStatusChange(acc, newStatus as 'Paid' | 'Pending')}
+                                        >
+                                            <SelectTrigger className={cn(
+                                                "w-[110px] focus:ring-0 focus:ring-offset-0",
+                                                acc.paymentStatus === 'Paid' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
+                                            )}>
+                                                <SelectValue placeholder="Set Status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Paid">Paid</SelectItem>
+                                                <SelectItem value="Pending">Pending</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
                                 <TableCell className="text-right">
