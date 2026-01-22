@@ -65,6 +65,7 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
                                         mode="single"
                                         selected={startDate}
                                         onSelect={setStartDate}
+                                        disabled={{ after: new Date() }}
                                         initialFocus
                                     />
                                 </PopoverContent>
@@ -91,6 +92,7 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
                                         mode="single"
                                         selected={endDate}
                                         onSelect={setEndDate}
+                                        disabled={{ after: new Date(), before: startDate }}
                                         initialFocus
                                     />
                                 </PopoverContent>
