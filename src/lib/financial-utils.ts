@@ -14,6 +14,7 @@ import { Payment, Tenant } from "./types";
  * @param serviceCharge The service charge amount for the unit (monthly)
  */
 export function calculateTransactionBreakdown(amount: number, serviceCharge: number = 0) {
+    // The portion of the payment that is rent is what's left after the service charge is covered.
     let rentPortion = Math.max(0, amount - serviceCharge);
 
     // Management fee is 5% of the Rent collected
@@ -48,6 +49,16 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): Fin
         transactionCount: 0
     };
 
+    // Calculate "Total Revenue" as the sum of monthly rents for all of the landlord's tenants.
+    // This represents the potential monthly income, not just collected amounts.
+    const totalPotentialRent = tenants.reduce((sum, tenant) => {
+        return sum + (tenant.lease?.rent || 0);
+    }, 0);
+
+    summary.totalRevenue = totalPotentialRent;
+
+
+    // The rest of the calculations remain based on actual payments made.
     payments.forEach(payment => {
         // Explicitly only count 'Rent' type payments towards landlord revenue.
         // Deposits and other types are excluded.
@@ -57,8 +68,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): Fin
         const serviceCharge = tenant?.lease?.serviceCharge || 0;
 
         const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
-
-        summary.totalRevenue += breakdown.rentCollected;
+        
         summary.totalManagementFees += breakdown.managementFee;
         summary.totalServiceCharges += breakdown.serviceChargeDeduction;
         summary.totalNetRemittance += breakdown.netToLandlord;
