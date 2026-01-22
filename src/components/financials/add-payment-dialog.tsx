@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -42,7 +43,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -187,7 +188,7 @@ export function AddPaymentDialog({
   const trigger = children ? (
     <DialogTrigger asChild>{children}</DialogTrigger>
   ) : (
-    !controlledOpen ? 
+    controlledOpen === undefined ? 
     <DialogTrigger asChild>
       <Button>
         <PlusCircle className="mr-2 h-4 w-4" />
