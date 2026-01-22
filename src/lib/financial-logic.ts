@@ -77,14 +77,13 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     }
 
     // --- DATA CORRECTION ---
-    // This is a data-fix for tenants who might have been created with a zero balance.
-    const hasMadeNoPayments = !tenant.lease.lastPaymentDate;
-    const hasZeroBalance = (tenant.dueBalance || 0) === 0 && (tenant.accountBalance || 0) === 0;
+    // This is a data-fix for tenants who might have an incorrect initial balance.
+    const hasMadeNoPayments = !tenant.lease.lastPaymentDate && (tenant.accountBalance || 0) === 0;
     const initialCharges = (tenant.lease.rent || 0) + (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
 
-    if (hasMadeNoPayments && hasZeroBalance && initialCharges > 0) {
-        const correctInitialDue = (tenant.lease.rent || 0) + (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
-        return { dueBalance: correctInitialDue, 'lease.paymentStatus': 'Pending' };
+    // If the tenant hasn't made any payments and their balance doesn't match the expected initial charges, correct it.
+    if (hasMadeNoPayments && (tenant.dueBalance || 0) !== initialCharges && initialCharges > 0) {
+        return { dueBalance: initialCharges, 'lease.paymentStatus': 'Pending' };
     }
     // --- END DATA CORRECTION ---
 
