@@ -4,19 +4,19 @@ import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, is
 
 /**
  * Calculates the total amount due for a tenant in the current billing cycle.
- * First month: Rent + Deposit (assumed same as rent) + Service Charge.
- * Other months: Rent + Service Charge.
+ * First month: Rent + Deposit.
+ * Other months: Rent.
+ * Service charge is assumed to be included in the rent.
  */
 export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): number {
     if (!tenant.lease) {
         return 0;
     }
     const rent = tenant.lease.rent || 0;
-    const serviceCharge = tenant.lease.serviceCharge || 0;
     
-    // For monthly reconciliation, only charge rent + service charge. 
+    // For monthly reconciliation, only charge rent. 
     // Deposit is handled at tenant creation.
-    return rent + serviceCharge;
+    return rent;
 }
 
 /**
@@ -68,7 +68,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number): { [key: s
 
 /**
  * Monthly reconciliation logic (should run on the 1st or when dashboard loads)
- * This adds the monthly rent/service charge to the dueBalance.
+ * This adds the monthly rent to the dueBalance.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): { [key: string]: any } {
     if (!tenant.lease) {
@@ -83,7 +83,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     const initialCharges = (tenant.lease.rent || 0) + (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
 
     if (hasMadeNoPayments && hasZeroBalance && initialCharges > 0) {
-        const correctInitialDue = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0) + (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
+        const correctInitialDue = (tenant.lease.rent || 0) + (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
         return { dueBalance: correctInitialDue, 'lease.paymentStatus': 'Pending' };
     }
     // --- END DATA CORRECTION ---
@@ -99,7 +99,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         return {}; // No changes needed
     }
 
-    const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
+    const monthlyCharge = (tenant.lease.rent || 0);
     let newDueBalance = (tenant.dueBalance || 0) + monthlyCharge;
     let newAccountBalance = tenant.accountBalance || 0;
 
