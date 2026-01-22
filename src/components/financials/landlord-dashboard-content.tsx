@@ -42,17 +42,17 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
         const data = payments.map(p => {
             const t = tenants.find(t => t.id === p.tenantId);
             const unit = t ? unitMap.get(`${t.propertyId}-${t.unitName}`) : undefined;
+            const rentAmount = unit?.rentAmount || t?.lease?.rent || 0;
             const serviceCharge = unit?.serviceCharge || t?.lease?.serviceCharge || 0;
-            const breakdown = calculateTransactionBreakdown(p.amount, serviceCharge);
+            const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
 
             return {
                 Date: new Date(p.date).toLocaleDateString(),
                 Unit: t?.unitName || 'Unknown',
-                Type: p.type || 'Rent',
                 "Gross Amount": breakdown.gross,
                 "Service Charge Deduction": breakdown.serviceChargeDeduction,
                 "Management Fee (5%)": breakdown.managementFee,
-                "Net Remittance": breakdown.netToLandlord,
+                "Net Payout": breakdown.netToLandlord,
                 Notes: p.notes || ''
             };
         });
@@ -126,7 +126,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Unit</TableHead>
-                                <TableHead>Type</TableHead>
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">S. Charge</TableHead>
                                 <TableHead className="text-right">Mgmt Fee</TableHead>
@@ -137,8 +136,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             {payments.slice(0, 10).map((payment) => {
                                 const tenant = tenants.find(t => t.id === payment.tenantId);
                                 const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
+                                const rentAmount = unit?.rentAmount || tenant?.lease?.rent || 0;
                                 const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-                                const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
+                                const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
                                 const unitType = getUnitTypeForTenant(tenant);
 
                                 return (
@@ -148,7 +148,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                             <div className="font-medium">{tenant?.unitName}</div>
                                             <div className="text-xs text-muted-foreground">{unitType}</div>
                                         </TableCell>
-                                        <TableCell><Badge variant="outline">{payment.type || 'Rent'}</Badge></TableCell>
                                         <TableCell className="text-right">Ksh {breakdown.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {breakdown.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {breakdown.managementFee.toLocaleString()}</TableCell>
