@@ -99,7 +99,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         return {}; // No changes needed
     }
 
-    const monthlyCharge = (tenant.lease.rent || 0);
+    const monthlyCharge = tenant.lease.rent || 0;
     let newDueBalance = (tenant.dueBalance || 0) + monthlyCharge;
     let newAccountBalance = tenant.accountBalance || 0;
 

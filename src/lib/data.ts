@@ -133,7 +133,8 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
         throw new Error("Cannot add tenant: selected unit not found in property.");
     }
     
-    // Service charge is included in rent.
+    // Explicitly define what goes into the initial due amount.
+    // Rent + Security Deposit + Water Deposit. Service charge is part of rent and not added again.
     const initialDue = rent + securityDeposit + (waterDeposit || 0);
 
     const newTenantData = {
@@ -150,6 +151,7 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
             startDate: leaseStartDate,
             endDate: new Date(new Date(leaseStartDate).setFullYear(new Date(leaseStartDate).getFullYear() + 1)).toISOString().split('T')[0],
             rent: rent,
+            serviceCharge: unit.serviceCharge || 0, // Store for reference, but DO NOT add to dueBalance
             paymentStatus: 'Pending' as const,
             lastBilledPeriod: format(new Date(leaseStartDate), 'yyyy-MM'),
         },
@@ -1146,6 +1148,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 
