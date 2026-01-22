@@ -19,7 +19,7 @@ export function calculateTransactionBreakdown(amount: number, serviceCharge: num
     // Rent = Amount - Service Charge
 
     // Safety check: specific payments might not have service charge included if they are partial
-    // For now, we assume standard full payments or we rely on the defined service charge amount
+    // For now, we rely on the defined service charge amount
 
     // If the payment is explicitly marked as "Deposit" or "Other", different rules might apply
     // maximizing robustness here for "Rent"
@@ -69,7 +69,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[]): Fin
         if (payment.type === 'Rent') {
             const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
 
-            summary.totalRevenue += breakdown.gross;
+            summary.totalRevenue += breakdown.rentCollected; // Landlord revenue is based on rent portion only
             summary.totalManagementFees += breakdown.managementFee;
             summary.totalServiceCharges += breakdown.serviceChargeDeduction;
             summary.totalNetRemittance += breakdown.netToLandlord;

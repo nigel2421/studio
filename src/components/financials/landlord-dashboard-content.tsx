@@ -69,7 +69,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">Ksh {financialSummary.totalRevenue.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Total collected rent & charges</p>
+                        <p className="text-xs text-muted-foreground">Total collected rent (excluding charges)</p>
                     </CardContent>
                 </Card>
                 <Card>
