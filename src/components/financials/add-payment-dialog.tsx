@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -35,6 +33,7 @@ interface AddPaymentDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   taskId?: string;
+  defaultPaymentType?: Payment['type'];
 }
 
 export function AddPaymentDialog({ 
@@ -43,9 +42,10 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
-  taskId
+  taskId,
+  defaultPaymentType,
 }: AddPaymentDialogProps) {
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -96,11 +96,16 @@ export function AddPaymentDialog({
   useEffect(() => {
     if (!open) {
       resetForm();
-    } else if (tenant) {
-      setSelectedProperty(tenant.propertyId);
-      setSelectedUnit(tenant.unitName);
+    } else {
+      if (tenant) {
+        setSelectedProperty(tenant.propertyId);
+        setSelectedUnit(tenant.unitName);
+      }
+      if (defaultPaymentType) {
+        setPaymentType(defaultPaymentType);
+      }
     }
-  }, [tenant, open]);
+  }, [tenant, open, defaultPaymentType]);
 
   const { startLoading, stopLoading } = useLoading();
 

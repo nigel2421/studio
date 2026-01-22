@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -8,12 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, FileSignature } from 'lucide-react';
+import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle } from 'lucide-react';
 import { isSameMonth, startOfMonth } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
+import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 
 interface ServiceChargeAccount {
   propertyId: string;
@@ -41,81 +43,105 @@ export default function ServiceChargesPage() {
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
   const { startLoading, stopLoading } = useLoading();
+  const { toast } = useToast();
+
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
+
+  const fetchData = async () => {
+    // No setLoading here, to avoid flicker on re-fetch
+    try {
+      const [propertiesData, ownersData, tenantsData, paymentsData] = await Promise.all([
+        getProperties(),
+        getPropertyOwners(),
+        getTenants(),
+        getAllPayments(),
+      ]);
+      
+      setAllProperties(propertiesData);
+      setAllOwners(ownersData);
+      setAllTenants(tenantsData);
+      setAllPayments(paymentsData);
+
+      const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
+      propertiesData.forEach(p => {
+        (p.units || []).forEach(u => {
+          if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
+            selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
+          }
+        });
+      });
+
+      const currentMonthStart = startOfMonth(new Date());
+
+      const serviceChargeAccounts = selfManagedUnits.map(unit => {
+        const owner = ownersData.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+        const tenant = tenantsData.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+        
+        let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
+        let paymentAmount: number | undefined;
+        
+        if (!tenant) {
+          paymentStatus = 'Vacant';
+        } else {
+          const relevantPayment = paymentsData.find(p => 
+            p.tenantId === tenant.id &&
+            p.type === 'ServiceCharge' &&
+            isSameMonth(new Date(p.date), currentMonthStart)
+          );
+          
+          if (relevantPayment) {
+            paymentStatus = 'Paid';
+            paymentAmount = relevantPayment.amount;
+          }
+        }
+
+        return {
+          propertyId: unit.propertyId,
+          propertyName: unit.propertyName,
+          unitName: unit.name,
+          unitServiceCharge: unit.serviceCharge || 0,
+          ownerId: owner?.id,
+          ownerName: owner?.name || 'Unassigned',
+          tenantId: tenant?.id,
+          tenantName: tenant?.name,
+          paymentStatus,
+          paymentAmount,
+        };
+      });
+      
+      setAccounts(serviceChargeAccounts);
+
+    } catch (error) {
+      console.error("Failed to fetch service charge data:", error);
+    } finally {
+      if (loading) setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const [propertiesData, ownersData, tenantsData, paymentsData] = await Promise.all([
-          getProperties(),
-          getPropertyOwners(),
-          getTenants(),
-          getAllPayments(),
-        ]);
-        
-        setAllProperties(propertiesData);
-        setAllOwners(ownersData);
-        setAllTenants(tenantsData);
-        setAllPayments(paymentsData);
-
-        const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
-        propertiesData.forEach(p => {
-          p.units.forEach(u => {
-            if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
-              selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
-            }
-          });
-        });
-
-        const currentMonthStart = startOfMonth(new Date());
-
-        const serviceChargeAccounts = selfManagedUnits.map(unit => {
-          const owner = ownersData.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
-          const tenant = tenantsData.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-          
-          let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
-          let paymentAmount: number | undefined;
-          
-          if (!tenant) {
-            paymentStatus = 'Vacant';
-          } else {
-            const relevantPayment = paymentsData.find(p => 
-              p.tenantId === tenant.id &&
-              p.type === 'ServiceCharge' &&
-              isSameMonth(new Date(p.date), currentMonthStart)
-            );
-            
-            if (relevantPayment) {
-              paymentStatus = 'Paid';
-              paymentAmount = relevantPayment.amount;
-            }
-          }
-
-          return {
-            propertyId: unit.propertyId,
-            propertyName: unit.propertyName,
-            unitName: unit.name,
-            unitServiceCharge: unit.serviceCharge || 0,
-            ownerId: owner?.id,
-            ownerName: owner?.name || 'Unassigned',
-            tenantId: tenant?.id,
-            tenantName: tenant?.name,
-            paymentStatus,
-            paymentAmount,
-          };
-        });
-        
-        setAccounts(serviceChargeAccounts);
-
-      } catch (error) {
-        console.error("Failed to fetch service charge data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
+    setLoading(true);
     fetchData();
   }, []);
+
+  const handleConfirmPayment = (account: ServiceChargeAccount) => {
+    if (!account.tenantId) {
+        toast({ variant: 'destructive', title: 'Cannot Record Payment', description: 'This unit is vacant and does not have an active resident to bill.' });
+        return;
+    }
+    const tenant = allTenants.find(t => t.id === account.tenantId);
+    if (!tenant) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not find resident details for this unit.' });
+        return;
+    }
+    setSelectedTenantForPayment(tenant);
+    setIsPaymentDialogOpen(true);
+  };
+  
+  const handlePaymentAdded = () => {
+    setIsPaymentDialogOpen(false);
+    fetchData();
+  };
 
   const handleGenerateStatement = (ownerId: string) => {
     startLoading('Generating Statement...');
@@ -220,7 +246,7 @@ export default function ServiceChargesPage() {
                             <TableHead>Service Charge</TableHead>
                             <TableHead>Payment Status</TableHead>
                             <TableHead>Paid Amount</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -238,11 +264,31 @@ export default function ServiceChargesPage() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
-                                <TableCell>
-                                    <Button variant="ghost" size="sm" disabled={!acc.ownerId} onClick={() => handleGenerateStatement(acc.ownerId!)}>
-                                        <FileSignature className="mr-2 h-4 w-4" />
-                                        Statement
-                                    </Button>
+                                <TableCell className="text-right">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                <span className="sr-only">Open menu</span>
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => handleConfirmPayment(acc)}
+                                                disabled={acc.paymentStatus === 'Vacant' || !acc.tenantId}
+                                            >
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                Confirm Payment
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleGenerateStatement(acc.ownerId!)}
+                                                disabled={!acc.ownerId}
+                                            >
+                                                <FileSignature className="mr-2 h-4 w-4" />
+                                                Generate Statement
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -263,6 +309,15 @@ export default function ServiceChargesPage() {
           </div>
         )}
       </Card>
+      <AddPaymentDialog
+        properties={allProperties}
+        tenants={allTenants}
+        onPaymentAdded={handlePaymentAdded}
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        tenant={selectedTenantForPayment}
+        defaultPaymentType="ServiceCharge"
+      />
     </div>
   );
 }
