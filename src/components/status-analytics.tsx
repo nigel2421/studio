@@ -38,11 +38,11 @@ const normalizeManagementStatus = (status?: string): ManagementStatus | undefine
 export function StatusAnalytics({ property }: StatusAnalyticsProps) {
     const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
 
-    const analytics = useMemo(() => {
+    const { analytics, handoverTotals, managementTotals, grandTotals } = useMemo(() => {
         const data: Record<string, AnalyticsData> = {};
         
         if (!Array.isArray(property.units)) {
-            return {};
+            return { analytics: {}, handoverTotals: null, managementTotals: null, grandTotals: null };
         }
 
         const filteredUnits = property.units.filter(unit =>
@@ -62,8 +62,10 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
             // Check handoverStatus and ensure it exists in our data object before incrementing
             if (unit.handoverStatus && data[unit.handoverStatus] && unit.unitType) {
                 const status = unit.handoverStatus;
-                (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
-                data[status].Total++;
+                if(data[status] && typeof (data[status] as any)[unit.unitType] !== 'undefined') {
+                    (data[status] as any)[unit.unitType] += 1;
+                    data[status].Total++;
+                }
             }
             
             // Normalize the management status to handle old data
@@ -72,18 +74,65 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
             // Check managementStatus and ensure it exists in our data object before incrementing
             if (normalizedStatus && data[normalizedStatus] && unit.unitType) {
                 const status = normalizedStatus;
-                (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
-                data[status].Total++;
+                 if(data[status] && typeof (data[status] as any)[unit.unitType] !== 'undefined') {
+                    (data[status] as any)[unit.unitType] += 1;
+                    data[status].Total++;
+                }
             }
         }
-        return data;
+        
+        const createTotalsRow = (statuses: readonly string[]): AnalyticsData => {
+            const totals: AnalyticsData = { Total: 0 };
+            unitTypes.forEach(ut => (totals as any)[ut] = 0);
+
+            statuses.forEach(status => {
+                if (data[status]) {
+                    unitTypes.forEach(ut => {
+                        (totals as any)[ut] += (data[status] as any)[ut] || 0;
+                    });
+                    totals.Total += data[status].Total || 0;
+                }
+            });
+            return totals;
+        };
+        
+        const handoverTotals = createTotalsRow(handoverStatuses);
+        const managementTotals = createTotalsRow(managementStatuses);
+        
+        const grandTotals: AnalyticsData = { Total: 0 };
+        unitTypes.forEach(ut => (grandTotals as any)[ut] = 0);
+        filteredUnits.forEach(unit => {
+            if (unit.unitType && (grandTotals as any)[unit.unitType] !== undefined) {
+                (grandTotals as any)[unit.unitType]++;
+            }
+        });
+        grandTotals.Total = filteredUnits.length;
+
+        return { analytics: data, handoverTotals, managementTotals, grandTotals };
     }, [property, unitTypeFilter]);
     
     if (!property || !property.units) {
         return null;
     }
 
-    const renderTableSection = (title: string, statuses: readonly string[]) => (
+    const renderTotalsRow = (title: string, totals: AnalyticsData | null, isGrandTotal = false) => {
+        if (!totals) return null;
+        return (
+             <TableRow className="bg-muted hover:bg-muted font-bold">
+                <TableCell className={isGrandTotal ? "" : "pl-8"}>{title}</TableCell>
+                {unitTypes.map(ut => (
+                    <TableCell key={ut} className="text-right">
+                        {(totals as any)[ut] || 0}
+                    </TableCell>
+                ))}
+                <TableCell className="text-right">
+                    {totals.Total || 0}
+                </TableCell>
+            </TableRow>
+        )
+    }
+
+    const renderTableSection = (title: string, statuses: readonly string[], totals: AnalyticsData | null) => (
         <>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableCell colSpan={unitTypes.length + 2} className="font-bold">{title}</TableCell>
@@ -101,6 +150,7 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                     </TableCell>
                 </TableRow>
             ))}
+            {renderTotalsRow(`Total ${title}`, totals)}
         </>
     );
 
@@ -129,8 +179,9 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {renderTableSection('Handover Status', handoverStatuses)}
-                        {renderTableSection('Management Status', managementStatuses)}
+                        {renderTableSection('Handover Status', handoverStatuses, handoverTotals)}
+                        {renderTableSection('Management Status', managementStatuses, managementTotals)}
+                        {renderTotalsRow('Grand Total', grandTotals, true)}
                     </TableBody>
                 </Table>
             </div>
