@@ -15,10 +15,10 @@ import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 
-const paymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Other'];
+const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Other'];
 
 interface PaymentEntry {
   id: number;
@@ -55,30 +55,11 @@ export function AddPaymentDialog({
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const initialEntry: PaymentEntry = {
-      id: 1,
-      amount: '',
-      type: defaultPaymentType || 'Rent',
-      date: new Date(),
-      notes: '',
-      rentForMonth: format(new Date(), 'yyyy-MM'),
-  };
-  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([initialEntry]);
+  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([]);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
-
-  const monthOptions = Array.from({ length: 18 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i + 2);
-    return {
-        value: format(d, 'yyyy-MM'),
-        label: format(d, 'MMMM yyyy'),
-    };
-  });
-
+  
   const {
     selectedProperty,
     setSelectedProperty,
@@ -89,6 +70,63 @@ export function AddPaymentDialog({
     floors,
     unitsOnFloor,
   } = useUnitFilter(properties);
+  
+  const tenantForDisplay = useMemo(() => {
+    if (tenant) return tenant;
+    if (selectedUnit) {
+      return tenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
+    }
+    return null;
+  }, [tenant, selectedUnit, selectedProperty, tenants]);
+  
+  const availablePaymentTypes = useMemo(() => {
+    if (tenantForDisplay?.residentType === 'Homeowner') {
+      return allPaymentTypes.filter(t => t !== 'Rent' && t !== 'Deposit');
+    }
+    // Default to tenant types - they don't pay "ServiceCharge" directly, it's part of rent.
+    return allPaymentTypes.filter(t => t !== 'ServiceCharge');
+  }, [tenantForDisplay]);
+  
+  const defaultEntryType = useMemo(() => {
+    return tenantForDisplay?.residentType === 'Homeowner' ? 'ServiceCharge' : 'Rent';
+  }, [tenantForDisplay]);
+
+  useEffect(() => {
+    if (open) {
+      const initialEntry: PaymentEntry = {
+        id: Date.now(),
+        amount: '',
+        type: defaultPaymentType || defaultEntryType,
+        date: new Date(),
+        notes: '',
+        rentForMonth: format(new Date(), 'yyyy-MM'),
+      };
+      setPaymentEntries([initialEntry]);
+
+      if (tenant) {
+        setSelectedProperty(tenant.propertyId);
+        // We don't set unit/floor here because it will be derived from tenant
+      }
+    } else {
+      // Reset form on close
+      setPaymentEntries([]);
+      if (!tenant) {
+        setSelectedProperty('');
+        setSelectedFloor('');
+        setSelectedUnit('');
+      }
+    }
+  }, [open, tenant, defaultPaymentType, defaultEntryType]);
+
+  const monthOptions = Array.from({ length: 18 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i + 2);
+    return {
+      value: format(d, 'yyyy-MM'),
+      label: format(d, 'MMMM yyyy'),
+    };
+  });
 
   const occupiedUnitsOnFloor = useMemo(() => {
     if (!selectedFloor) return [];
@@ -97,36 +135,6 @@ export function AddPaymentDialog({
     );
     return unitsOnFloor.filter(unit => tenantUnitsForProperty.has(unit.name));
   }, [selectedProperty, selectedFloor, unitsOnFloor, tenants]);
-  
-  const tenantForDisplay = useMemo(() => {
-    if (tenant) return tenant; // From props
-    if (selectedUnit) {
-        return tenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
-    }
-    return null;
-  }, [tenant, selectedUnit, selectedProperty, tenants]);
-
-  const resetForm = () => {
-    setPaymentEntries([initialEntry]);
-    if (!tenant) { // Don't reset if a tenant is pre-selected
-        setSelectedProperty('');
-        setSelectedFloor('');
-        setSelectedUnit('');
-    }
-  };
-
-  useEffect(() => {
-    if (!open) {
-      resetForm();
-    } else {
-      if (tenant) {
-        setSelectedProperty(tenant.propertyId);
-        setSelectedUnit(tenant.unitName);
-      }
-    }
-  }, [tenant, open]);
-
-  const { startLoading, stopLoading } = useLoading();
 
   const handleEntryChange = (id: number, field: keyof Omit<PaymentEntry, 'id'>, value: any) => {
     setPaymentEntries(entries =>
@@ -134,49 +142,40 @@ export function AddPaymentDialog({
     );
   };
   
-  const handleTypeToggle = (type: Payment['type'], checked: boolean) => {
-    setPaymentEntries(currentEntries => {
-        const entryExists = currentEntries.some(entry => entry.type === type);
-        if (checked && !entryExists) {
-            return [...currentEntries, { ...initialEntry, id: Date.now(), type: type, amount: '' }];
-        } else if (!checked && entryExists) {
-            return currentEntries.filter(entry => entry.type !== type);
-        }
-        return currentEntries;
-    });
+  const addEntry = (type: Payment['type']) => {
+    const newEntry: PaymentEntry = {
+        id: Date.now(),
+        amount: '',
+        type: type,
+        date: new Date(),
+        notes: '',
+        rentForMonth: format(new Date(), 'yyyy-MM'),
+    };
+    setPaymentEntries(prev => [...prev, newEntry]);
   };
+  
+  const removeEntry = (id: number) => {
+      setPaymentEntries(prev => prev.filter(entry => entry.id !== id));
+  };
+
+
+  const { startLoading, stopLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let tenantId = tenant?.id;
-    let finalSelectedProperty = selectedProperty;
-    let finalSelectedUnit = selectedUnit;
+    let finalTenantId = tenantForDisplay?.id;
 
-    if (tenant) {
-      finalSelectedProperty = tenant.propertyId;
-      finalSelectedUnit = tenant.unitName;
-    }
-
-    if (!finalSelectedProperty || !finalSelectedUnit) {
-      toast({ variant: 'destructive', title: 'Missing Fields', description: 'Please select a property and unit.' });
+    if (!finalTenantId) {
+      toast({ variant: 'destructive', title: 'Missing Tenant', description: 'Please select a valid unit with an assigned tenant.' });
       return;
-    }
-
-    if (!tenantId) {
-      const foundTenant = tenants.find(t => t.propertyId === finalSelectedProperty && t.unitName === finalSelectedUnit);
-      if (!foundTenant) {
-        toast({ variant: 'destructive', title: 'Tenant Not Found', description: 'No active tenant found for the selected unit.' });
-        return;
-      }
-      tenantId = foundTenant.id;
     }
 
     const validEntries = paymentEntries.filter(e => e.amount && Number(e.amount) > 0);
 
     if (validEntries.length === 0) {
-        toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter at least one payment amount.' });
-        return;
+      toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter an amount for at least one payment record.' });
+      return;
     }
 
     setIsLoading(true);
@@ -190,7 +189,7 @@ export function AddPaymentDialog({
         type: e.type,
       }));
 
-      await batchProcessPayments(tenantId, paymentsToBatch, taskId);
+      await batchProcessPayments(finalTenantId, paymentsToBatch, taskId);
 
       toast({ title: 'Payments Added', description: `${validEntries.length} payment(s) have been successfully recorded.` });
       onPaymentAdded();
@@ -222,91 +221,57 @@ export function AddPaymentDialog({
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Payment Record</DialogTitle>
-          {tenant && <DialogDescription>For {tenant.name} - Unit {tenant.unitName}</DialogDescription>}
+          {tenantForDisplay && <DialogDescription>For {tenantForDisplay.name} - Unit {tenantForDisplay.unitName}</DialogDescription>}
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="development">Development</Label>
-                <Select onValueChange={setSelectedProperty} value={selectedProperty} disabled={!!tenant}>
-                  <SelectTrigger id="development">
-                    <SelectValue placeholder="Select a development" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {properties.map(prop => (
-                      <SelectItem key={prop.id} value={prop.id}>{prop.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {!tenant && (
-                <div className="grid grid-cols-2 gap-4">
+            {!tenant && (
+              <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="development">Development</Label>
+                    <Select onValueChange={setSelectedProperty} value={selectedProperty}>
+                      <SelectTrigger id="development"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>{properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="floor">Floor</Label>
                     <Select onValueChange={setSelectedFloor} value={selectedFloor} disabled={!selectedProperty}>
-                      <SelectTrigger id="floor">
-                        <SelectValue placeholder="Select floor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {floors.map(floor => (
-                          <SelectItem key={floor} value={floor}>{floor}</SelectItem>
-                        ))}
-                      </SelectContent>
+                      <SelectTrigger id="floor"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>{floors.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unit">Unit</Label>
                     <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedFloor}>
-                      <SelectTrigger id="unit">
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {occupiedUnitsOnFloor.map(unit => (
-                          <SelectItem key={unit.name} value={unit.name}>{unit.name}</SelectItem>
-                        ))}
-                      </SelectContent>
+                      <SelectTrigger id="unit"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>{occupiedUnitsOnFloor.map(u => <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {tenantForDisplay && (
                 <div className="p-4 my-2 border rounded-lg bg-blue-50 border-blue-200">
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
-                        
-                        {(tenantForDisplay.residentType === 'Tenant') && (
-                            <>
-                                <div className="text-muted-foreground">Monthly Rent:</div>
-                                <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.rent || 0).toLocaleString()}</div>
-                            </>
-                        )}
-
-                        {(tenantForDisplay.residentType !== 'Tenant') && (
-                            <>
-                                <div className="text-muted-foreground">Monthly Service Charge:</div>
-                                <div className="font-medium text-right">Ksh {(tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
-                            </>
-                        )}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 mt-2 text-sm">
+                        <div className="text-muted-foreground">Monthly Charge:</div>
+                        <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.lease.rent || tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
                         
                         {(tenantForDisplay.securityDeposit || 0) > 0 && (
                            <>
                             <div className="text-muted-foreground">Security Deposit:</div>
-                            <div className="font-medium text-right">Ksh {(tenantForDisplay.securityDeposit || 0).toLocaleString()}</div>
+                            <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.securityDeposit).toLocaleString()}</div>
                            </>
                         )}
-
                         {(tenantForDisplay.waterDeposit || 0) > 0 && (
                            <>
                             <div className="text-muted-foreground">Water Deposit:</div>
-                            <div className="font-medium text-right">Ksh {(tenantForDisplay.waterDeposit || 0).toLocaleString()}</div>
+                            <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.waterDeposit).toLocaleString()}</div>
                            </>
                         )}
-
                         <div className="text-muted-foreground font-bold text-red-600">Total Outstanding:</div>
-                        <div className="font-bold text-red-600 text-right">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
+                        <div className="font-bold text-red-600 text-right md:text-left">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
                     </div>
                 </div>
             )}
@@ -314,31 +279,31 @@ export function AddPaymentDialog({
             <div className="space-y-2 pt-4">
               <div className="flex items-center justify-between">
                 <Label>Payment Records</Label>
-                <DropdownMenu>
+                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button type="button" variant="outline" size="sm">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add/Remove Fields
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Record
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                         <DropdownMenuLabel>Payment Types</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {paymentTypes.map(type => (
-                             <DropdownMenuCheckboxItem
-                                key={type}
-                                checked={paymentEntries.some(e => e.type === type)}
-                                onCheckedChange={(checked) => handleTypeToggle(type, !!checked)}
-                                disabled={type === 'Rent'} // Rent is mandatory
-                            >
+                        {availablePaymentTypes.map(type => (
+                             <DropdownMenuItem key={type} onSelect={() => addEntry(type)}>
                                 {type}
-                            </DropdownMenuCheckboxItem>
+                            </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
               </div>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                {paymentEntries.map((entry, index) => (
-                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg">
+                {paymentEntries.map((entry) => (
+                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg relative">
+                     {paymentEntries.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeEntry(entry.id)} className="absolute -top-1 -right-1 h-6 w-6 z-10">
+                            <X className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                     )}
                      <div className="space-y-1">
                       <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
                       <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
@@ -379,7 +344,7 @@ export function AddPaymentDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || paymentEntries.length === 0}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Payments
             </Button>
