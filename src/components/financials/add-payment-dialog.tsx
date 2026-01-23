@@ -355,7 +355,12 @@ export function AddPaymentDialog({
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={entry.date} onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)} />
+                          <Calendar
+                            mode="single"
+                            selected={entry.date}
+                            onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)}
+                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          />
                         </PopoverContent>
                       </Popover>
                     </div>
