@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, getTenants, getAllPayments } from '@/lib/data';
+import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,7 +33,6 @@ interface ServiceChargeAccount {
   tenantName?: string;
   paymentStatus: 'Paid' | 'Pending' | 'Vacant';
   paymentAmount?: number;
-  paymentDate?: string;
 }
 
 interface VacantArrearsAccount {
@@ -119,7 +118,9 @@ export default function ServiceChargesPage() {
             let paymentAmount: number | undefined;
             
             if (!tenant) {
-                paymentStatus = 'Vacant';
+                // If there's no tenant, but it's a self-managed unit, it's not 'Vacant' for service charge purposes.
+                // We assume it's 'Pending' until a payment is made against the (to-be-created) homeowner tenant.
+                paymentStatus = 'Pending';
             } else {
                 const relevantPayment = allPayments.find(p => 
                     p.tenantId === tenant.id &&
@@ -196,18 +197,43 @@ export default function ServiceChargesPage() {
     }
   }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
 
-  const handleConfirmPayment = (account: ServiceChargeAccount) => {
-    if (!account.tenantId) {
-        toast({ variant: 'destructive', title: 'Cannot Record Payment', description: 'This unit is vacant and does not have an active resident to bill.' });
-        return;
+  const handleConfirmPayment = async (account: ServiceChargeAccount) => {
+    if (account.paymentStatus === 'Paid') return;
+
+    startLoading('Preparing payment record...');
+    try {
+        let tenantForPayment: Tenant | null = null;
+        
+        if (account.tenantId) {
+            tenantForPayment = allTenants.find(t => t.id === account.tenantId) || null;
+        } else {
+            // No tenant, so it must be a client-managed unit. Let's find/create a homeowner tenant.
+            const property = allProperties.find(p => p.id === account.propertyId);
+            const unit = property?.units.find(u => u.name === account.unitName);
+            const owner = allOwners.find(o => o.id === account.ownerId);
+
+            if (unit?.managementStatus === 'Client Self Fully Managed' && owner && property) {
+                tenantForPayment = await findOrCreateHomeownerTenant(owner, unit, property.id);
+                // Refetch tenants so the new one is in our state for the dialog
+                const tenantsData = await getTenants();
+                setAllTenants(tenantsData);
+            }
+        }
+
+        if (!tenantForPayment) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find or create a billable resident for this unit. Ensure an owner is assigned.' });
+            return;
+        }
+        
+        setSelectedTenantForPayment(tenantForPayment);
+        setIsPaymentDialogOpen(true);
+
+    } catch (error) {
+        console.error("Error preparing payment:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+    } finally {
+        stopLoading();
     }
-    const tenant = allTenants.find(t => t.id === account.tenantId);
-    if (!tenant) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not find resident details for this unit.' });
-        return;
-    }
-    setSelectedTenantForPayment(tenant);
-    setIsPaymentDialogOpen(true);
   };
   
   const handlePaymentAdded = () => {

@@ -59,6 +59,7 @@ export type Unit = {
   serviceCharge?: number;
   handoverStatus?: HandoverStatus;
   handoverDate?: string;
+  propertyId?: string;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
@@ -120,7 +121,7 @@ export type Tenant = {
   status: 'active' | 'archived';
   securityDeposit: number;
   waterDeposit: number;
-  residentType: 'Tenant';
+  residentType: 'Tenant' | 'Homeowner';
   lease: {
     startDate: string;
     endDate: string;
@@ -133,6 +134,7 @@ export type Tenant = {
   accountBalance: number; // For overpayments
   dueBalance: number;      // For carry-over debts
   waterReadings?: WaterMeterReading[];
+  userId?: string;
 };
 
 export type ArchivedTenant = Tenant & {

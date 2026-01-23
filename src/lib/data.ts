@@ -990,6 +990,54 @@ export async function addLandlordsFromCSV(data: { name: string; email: string; p
     return { added, skipped };
 }
 
+export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Unit, propertyId: string): Promise<Tenant> {
+    const tenantsRef = collection(db, 'tenants');
+    const q = query(tenantsRef, where("email", "==", owner.email), where("residentType", "==", "Homeowner"), limit(1));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Tenant;
+    }
+
+    // If not found, create one
+    const serviceCharge = unit.serviceCharge || 0;
+    const newTenantData = {
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone,
+        idNumber: 'N/A',
+        propertyId: propertyId,
+        unitName: unit.name,
+        agent: 'Susan' as const,
+        status: 'active' as const,
+        residentType: 'Homeowner' as const,
+        lease: {
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
+            rent: 0,
+            serviceCharge: serviceCharge,
+            paymentStatus: 'Pending' as const,
+        },
+        securityDeposit: 0,
+        waterDeposit: 0,
+        dueBalance: serviceCharge, // Initial due balance is the service charge
+        accountBalance: 0,
+        userId: owner.userId,
+    };
+    
+    const tenantDocRef = await addDoc(tenantsRef, newTenantData);
+    await logActivity(`Auto-created homeowner resident account for ${owner.name}`);
+    
+    // Also update the User profile if it exists
+    if (owner.userId) {
+        const userRef = doc(db, 'users', owner.userId);
+        await updateDoc(userRef, { tenantId: tenantDocRef.id });
+    }
+    
+    return { id: tenantDocRef.id, ...newTenantData } as Tenant;
+}
+
+
 // Property Owner (Client) Functions
 export async function getPropertyOwners(): Promise<PropertyOwner[]> {
     return getCollection<PropertyOwner>('propertyOwners');
@@ -1153,6 +1201,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 
