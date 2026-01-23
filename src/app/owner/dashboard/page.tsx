@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import type { Property, Unit, Tenant, Payment, WaterMeterReading } from '@/lib/t
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Home, Users, Wallet, DollarSign, Calendar, Droplets, LogOut, Building } from 'lucide-react';
+import { Home, Users, Wallet, DollarSign, Calendar, Droplets, LogOut, Building, AlertCircle, PlusCircle } from 'lucide-react';
 import { getTenants, getTenantPayments, getAllPayments } from '@/lib/data';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,10 @@ function ResidentOwnerDashboard() {
     
     useEffect(() => {
         if (userProfile?.tenantId) {
-            getTenantPayments(userProfile.tenantId).then(setPayments);
+            getTenantPayments(userProfile.tenantId).then(allPayments => {
+                const serviceChargePayments = allPayments.filter(p => p.type === 'ServiceCharge' || p.type === 'Rent'); // Homeowner rent is service charge
+                setPayments(serviceChargePayments);
+            });
         }
     }, [userProfile]);
 
@@ -75,7 +77,7 @@ function ResidentOwnerDashboard() {
             {tenantDetails && (
                 <div>
                     <h2 className="text-2xl font-semibold mb-4">Financial Overview</h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Monthly Service Charge</CardTitle>
@@ -111,11 +113,22 @@ function ResidentOwnerDashboard() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Next Due Date</CardTitle>
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <CardTitle className="text-sm font-medium">Due Balance</CardTitle>
+                                <AlertCircle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{nextDueDate}</div>
+                                <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails.dueBalance || 0).toLocaleString()}</div>
+                                <p className="text-xs text-muted-foreground">Total outstanding amount</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Excess Credit</CardTitle>
+                                <PlusCircle className="h-4 w-4 text-green-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails.accountBalance || 0).toLocaleString()}</div>
+                                <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                             </CardContent>
                         </Card>
                     </div>
@@ -124,8 +137,8 @@ function ResidentOwnerDashboard() {
              <div className="grid gap-8 md:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Recent Payments</CardTitle>
-                        <CardDescription>Your last 5 successful transactions.</CardDescription>
+                        <CardTitle>Payment History</CardTitle>
+                        <CardDescription>Your last 5 service charge transactions.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
