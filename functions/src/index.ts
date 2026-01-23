@@ -86,7 +86,7 @@ export const sendPaymentReceipt = onCall({
     } catch (error) {
         logger.error("Error sending email:", error);
         // Throw a specific error for the client
-        throw new HttpsError("internal", "Failed to send email. Please check server logs for details.");
+        throw new HttpsError("internal", "Failed to send email. This is likely due to missing or incorrect SMTP credentials in your Firebase project's environment configuration. Please ensure EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASS secrets are set correctly.");
     }
 });
 
@@ -134,6 +134,6 @@ export const sendCustomEmail = onCall({
         return { success: true, message: `Email sent successfully to ${recipients.length} recipients.` };
     } catch (error) {
         logger.error("Error sending bulk email:", error);
-        throw new HttpsError("internal", "Failed to send one or more emails. Please check server logs.");
+        throw new HttpsError("internal", "Failed to send email. This is likely due to missing or incorrect SMTP credentials in your Firebase project's environment configuration. Please ensure EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASS secrets are set correctly.");
     }
 });
