@@ -114,7 +114,7 @@ export default function AccountsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Accounts Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Rent Accounts</h2>
           <p className="text-muted-foreground">A financial overview of your properties.</p>
         </div>
         <AddPaymentDialog properties={properties} tenants={tenants} onPaymentAdded={fetchAllData} />
@@ -135,26 +135,6 @@ export default function AccountsPage() {
           </Card>
         ))}
       </div>
-
-       <Card className="bg-blue-50 border-blue-200">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <div className="flex items-center gap-2">
-                    <ClipboardList className="h-6 w-6 text-blue-700"/>
-                    <CardTitle className="text-blue-900">Client Service Charges</CardTitle>
-                </div>
-              <CardDescription className="text-blue-800/80 mt-2">
-                Track and manage service charge payments for self-managed client properties.
-              </CardDescription>
-            </div>
-            <Button asChild variant="outline" className="bg-white">
-              <Link href="/accounts/service-charges">
-                View Accounts <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-        </Card>
-
 
       <Card>
         <CardHeader>

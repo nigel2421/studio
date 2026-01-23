@@ -48,6 +48,8 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/accounts', icon: Banknote, label: 'Rent Accounts' },
+  { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
   { href: '/documents', icon: FileText, label: 'My Documents' },
@@ -69,22 +71,10 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { user, userProfile } = useAuth();
   const { startLoading } = useLoading();
-  const [isAccountingOpen, setIsAccountingOpen] = useState(pathname.startsWith('/accounts') || pathname.startsWith('/tasks'));
-  const [tasks, setTasks] = useState<Task[]>([]);
 
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
   const isAgent = userProfile?.role === 'agent';
   const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
-
-  useEffect(() => {
-    if (isAdmin || isAgent) {
-      const unsub = listenToTasks(setTasks);
-      return () => unsub();
-    }
-  }, [isAdmin, isAgent]);
-
-  const hasPendingTasks = tasks.some(task => task.status === 'Pending');
-
 
   const isActive = (href: string) => pathname === href;
 
@@ -124,7 +114,7 @@ export function AppSidebar() {
       <SidebarContent className="flex-1">
         <SidebarMenu>
           {navItems.map((item) => {
-            if (isAgent && item.href === '/documents') return null;
+            if (isAgent && (item.href === '/documents' || item.href === '/accounts')) return null;
             if (isInvestmentConsultant && item.href === '/documents') return null;
             return (
               <SidebarMenuItem key={item.href}>
@@ -140,54 +130,6 @@ export function AppSidebar() {
               </SidebarMenuItem>
             );
           })}
-
-          {(isAdmin || isAgent) && (
-            <SidebarMenuItem>
-              <Collapsible open={isAccountingOpen} onOpenChange={setIsAccountingOpen} className="w-full">
-                <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={pathname.startsWith('/accounts') || pathname.startsWith('/tasks')} className="w-full">
-                      <Banknote />
-                      <span>Accounts</span>
-                      <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200" />
-                    </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <ul className="pl-8 py-1 space-y-1">
-                    {isAdmin && (
-                      <SidebarMenuItem>
-                        <Link href="/accounts" onClick={() => handleLinkClick('Accounts')}>
-                          <SidebarMenuButton isActive={isActive('/accounts')} size="sm">
-                            <span>Overview</span>
-                          </SidebarMenuButton>
-                        </Link>
-                      </SidebarMenuItem>
-                    )}
-                    {(isAdmin || isAgent) && (
-                       <SidebarMenuItem>
-                        <Link href="/accounts/service-charges" onClick={() => handleLinkClick('Service Charges')}>
-                          <SidebarMenuButton isActive={isActive('/accounts/service-charges')} size="sm">
-                            <ClipboardList className="h-3 w-3 mr-2"/>
-                            <span>Service Charges</span>
-                          </SidebarMenuButton>
-                        </Link>
-                      </SidebarMenuItem>
-                    )}
-                    <SidebarMenuItem>
-                      <Link href="/tasks" onClick={() => handleLinkClick('Tasks')}>
-                          <SidebarMenuButton isActive={isActive('/tasks')} size="sm">
-                              <span>Tasks</span>
-                              <div className={cn(
-                                  "ml-auto h-2 w-2 rounded-full",
-                                  hasPendingTasks ? "bg-red-500" : "bg-green-500"
-                              )} />
-                          </SidebarMenuButton>
-                      </Link>
-                    </SidebarMenuItem>
-                  </ul>
-                </CollapsibleContent>
-              </Collapsible>
-            </SidebarMenuItem>
-          )}
 
 
           <Separator className="my-2" />
