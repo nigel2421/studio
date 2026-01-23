@@ -117,6 +117,7 @@ export default function LandlordDashboardPage() {
             return {
               date: new Date(payment.date).toLocaleDateString(),
               unit: tenant?.unitName || 'N/A',
+              rentForMonth: payment.rentForMonth,
               gross: breakdown.gross,
               serviceCharge: breakdown.serviceChargeDeduction,
               mgmtFee: breakdown.managementFee,

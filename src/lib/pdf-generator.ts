@@ -169,7 +169,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; net: number }[],
+    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; net: number, rentForMonth?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -238,25 +238,42 @@ export const generateLandlordStatementPDF = (
     doc.setFont('helvetica', 'bold');
     doc.text('Transaction History', 14, yPos);
     yPos += 8;
+    
+    const totals = transactions.reduce((acc, t) => {
+        acc.gross += t.gross;
+        acc.serviceCharge += t.serviceCharge;
+        acc.mgmtFee += t.mgmtFee;
+        acc.net += t.net;
+        return acc;
+    }, { gross: 0, serviceCharge: 0, mgmtFee: 0, net: 0 });
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
         body: transactions.map(t => [
             t.date,
             t.unit,
+            t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
             formatCurrency(t.gross),
             `-${formatCurrency(t.serviceCharge)}`,
             `-${formatCurrency(t.mgmtFee)}`,
             formatCurrency(t.net),
         ]),
+        foot: [[
+            { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: formatCurrency(totals.gross), styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(totals.serviceCharge)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(totals.mgmtFee)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: formatCurrency(totals.net), styles: { fontStyle: 'bold', halign: 'right' } }
+        ]],
+        footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
         theme: 'striped',
         headStyles: { fillColor: [41, 102, 182] },
         columnStyles: {
-            2: { halign: 'right' },
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' },
+            6: { halign: 'right' },
         },
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
