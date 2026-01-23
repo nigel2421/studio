@@ -355,7 +355,7 @@ export function AddPaymentDialog({
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={entry.date} onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)} initialFocus />
+                          <Calendar mode="single" selected={entry.date} onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)} />
                         </PopoverContent>
                       </Popover>
                     </div>
