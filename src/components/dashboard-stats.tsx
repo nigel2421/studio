@@ -52,9 +52,16 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
 
   const totalMgmtFees = payments.reduce((sum, p) => {
     if (p.type === 'Deposit') return sum;
-    const t = tenants.find(tenant => tenant.id === p.tenantId);
-    const serviceCharge = t?.lease?.serviceCharge || 0;
-    const breakdown = calculateTransactionBreakdown(p.amount, serviceCharge);
+    const tenant = tenants.find(t => t.id === p.tenantId);
+    if (!tenant) return sum;
+
+    const property = properties.find(prop => prop.id === tenant.propertyId);
+    const unit = property?.units.find(u => u.name === tenant.unitName);
+    
+    const unitRent = unit?.rentAmount || tenant.lease.rent || 0;
+    const serviceCharge = unit?.serviceCharge || tenant.lease.serviceCharge || 0;
+
+    const breakdown = calculateTransactionBreakdown(p.amount, unitRent, serviceCharge);
     return sum + breakdown.managementFee;
   }, 0);
 

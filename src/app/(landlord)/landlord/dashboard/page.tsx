@@ -111,8 +111,9 @@ export default function LandlordDashboardPage() {
           const transactionsForPDF = relevantPayments.map(payment => {
             const tenant = relevantTenants.find(t => t.id === payment.tenantId);
             const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
+            const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
             const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-            const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
+            const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, serviceCharge);
             return {
               date: new Date(payment.date).toLocaleDateString(),
               unit: tenant?.unitName || 'N/A',
