@@ -251,7 +251,7 @@ export default function ServiceChargesPage() {
         const tenantsForPayment = (await Promise.all(tenantPromises)).filter(Boolean) as Tenant[];
         
         if (tenantsForPayment.length !== accountsForPayment.length) {
-            throw new Error("Could not find or create resident accounts for all selected units.");
+            throw new Error(`Could not find or create resident accounts for all selected units. Expected ${accountsForPayment.length}, found ${tenantsForPayment.length}.`);
         }
 
         // Step 2: Create payment promises.
@@ -509,4 +509,5 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
 

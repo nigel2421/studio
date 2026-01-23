@@ -992,7 +992,13 @@ export async function addLandlordsFromCSV(data: { name: string; email: string; p
 
 export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Unit, propertyId: string): Promise<Tenant> {
     const tenantsRef = collection(db, 'tenants');
-    const q = query(tenantsRef, where("email", "==", owner.email), where("residentType", "==", "Homeowner"), limit(1));
+    const q = query(
+        tenantsRef,
+        where("propertyId", "==", propertyId),
+        where("unitName", "==", unit.name),
+        where("residentType", "==", "Homeowner"),
+        limit(1)
+    );
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
@@ -1026,12 +1032,16 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
     };
     
     const tenantDocRef = await addDoc(tenantsRef, newTenantData);
-    await logActivity(`Auto-created homeowner resident account for ${owner.name}`);
+    await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
     
-    // Also update the User profile if it exists
+    // Also update the User profile if it exists and doesn't have a tenantId yet.
+    // We don't want to overwrite a primary tenantId if they are also a tenant elsewhere.
     if (owner.userId) {
         const userRef = doc(db, 'users', owner.userId);
-        await updateDoc(userRef, { tenantId: tenantDocRef.id });
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && !userSnap.data().tenantId) {
+            await updateDoc(userRef, { tenantId: tenantDocRef.id });
+        }
     }
     
     return { id: tenantDocRef.id, ...newTenantData } as Tenant;
@@ -1201,6 +1211,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 
