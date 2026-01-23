@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Users, Building2, Wrench, AlertCircle, Building, Briefcase, BedDouble, UserCog, Home } from "lucide-react";
+import { Users, Building2, Wrench, AlertCircle, Building, Briefcase, BedDouble, UserCog, Home, Percent } from "lucide-react";
 import type { Tenant, Property, MaintenanceRequest, Payment } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 
@@ -49,6 +49,7 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
   })();
 
   const vacantUnits = totalUnits - occupiedUnits;
+  const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const totalMgmtFees = payments.reduce((sum, p) => {
     if (p.type === 'Deposit') return sum;
@@ -70,6 +71,7 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     { title: "Properties Managed", value: totalProperties, icon: Building, color: "text-green-500" },
     { title: "Occupied Units", value: occupiedUnits, icon: Building2, color: "text-purple-500" },
     { title: "Vacant Units", value: vacantUnits, icon: Home, color: "text-gray-500" },
+    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
     { title: "Eracovs Management Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
     { title: "Pending Maintenance", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
     { title: "Overdue Rents", value: overdueRents, icon: AlertCircle, color: "text-red-500" },
