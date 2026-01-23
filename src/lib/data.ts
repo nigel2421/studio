@@ -47,9 +47,17 @@ export async function getUsers(): Promise<UserProfile[]> {
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, { role });
-    await logActivity(`Updated role for user ${userId} to ${role}`);
+    try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, { role });
+        await logActivity(`Updated role for user ${userId} to ${role}`);
+    } catch (error: any) {
+        console.error(`Error updating role for user ${userId}:`, error);
+        if (error.code === 'permission-denied') {
+            throw new Error("You do not have permission to update user roles.");
+        }
+        throw new Error("A database error occurred while updating the user role.");
+    }
 }
 
 export async function getLogs(): Promise<Log[]> {
@@ -383,19 +391,32 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'id' | 'date' | 'status' | 'createdAt'>) {
-    await addDoc(collection(db, 'maintenanceRequests'), {
-        ...request,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp(),
-        status: 'New',
-    });
-    await logActivity(`Submitted maintenance request`);
+    try {
+        await addDoc(collection(db, 'maintenanceRequests'), {
+            ...request,
+            date: new Date().toISOString().split('T')[0],
+            createdAt: serverTimestamp(),
+            status: 'New',
+        });
+        await logActivity(`Submitted maintenance request`);
+    } catch (error: any) {
+        console.error("Error adding maintenance request:", error);
+        throw new Error("Failed to submit maintenance request. Please try again later.");
+    }
 }
 
 export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceRequest['status']) {
-    const requestRef = doc(db, 'maintenanceRequests', requestId);
-    await updateDoc(requestRef, { status });
-    await logActivity(`Updated maintenance request ${requestId} to ${status}`);
+    try {
+        const requestRef = doc(db, 'maintenanceRequests', requestId);
+        await updateDoc(requestRef, { status });
+        await logActivity(`Updated maintenance request ${requestId} to ${status}`);
+    } catch (error: any) {
+        console.error(`Error updating maintenance request ${requestId}:`, error);
+        if (error.code === 'permission-denied') {
+            throw new Error("You do not have permission to update maintenance requests.");
+        }
+        throw new Error("A database error occurred while updating the request status.");
+    }
 }
 
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
@@ -1221,11 +1242,16 @@ export async function getAllPayments(): Promise<Payment[]> {
 }
 
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
-    await addDoc(collection(db, 'tasks'), {
-        ...task,
-        createdAt: serverTimestamp(),
-    });
-    await logActivity(`Created task: ${task.title}`);
+    try {
+        await addDoc(collection(db, 'tasks'), {
+            ...task,
+            createdAt: serverTimestamp(),
+        });
+        await logActivity(`Created task: ${task.title}`);
+    } catch (error: any) {
+        console.error("Error adding task:", error);
+        throw new Error("Failed to create task.");
+    }
 }
 
 export async function getTasks(): Promise<Task[]> {

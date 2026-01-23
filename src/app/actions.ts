@@ -21,7 +21,7 @@ export async function performSendCustomEmail(recipients: string[], subject: stri
     });
 
     return { success: true, data: result.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending custom email:", error);
     // Also log a failed communication attempt
      await logCommunication({
@@ -34,7 +34,8 @@ export async function performSendCustomEmail(recipients: string[], subject: stri
         status: 'failed',
         timestamp: new Date().toISOString(),
     });
-    return { success: false, error: 'Failed to send email. please try again.' };
+    const message = error.message || 'Failed to send email. Please check the system logs.';
+    return { success: false, error: message };
   }
 }
 
@@ -42,9 +43,10 @@ export async function performCheckLeaseReminders() {
   try {
     const result = await checkAndSendLeaseReminders();
     return { success: true, data: result.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error checking lease reminders:", error);
-    return { success: false, error: 'Failed to run automation. Please try again.' };
+    const message = error.message || 'Failed to run automation. Please try again.';
+    return { success: false, error: message };
   }
 }
 
@@ -52,9 +54,10 @@ export async function getMaintenanceResponseDraft(input: MaintenanceRequestInput
   try {
     const result = await generateMaintenanceResponseDraft(input);
     return { success: true, data: result };
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    return { success: false, error: 'Failed to generate draft. Please try again.' };
+    const message = error.message || 'Failed to generate AI draft. Please try again.';
+    return { success: false, error: message };
   }
 }
 
@@ -86,8 +89,9 @@ export async function performSendArrearsReminder(tenantId: string, senderId: str
     });
 
     return { success: true, message: `Reminder sent to ${tenant.name}` };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending arrears reminder:", error);
-    return { success: false, error: 'Failed to send reminder.' };
+    const message = error.message || 'Failed to send reminder.';
+    return { success: false, error: message };
   }
 }

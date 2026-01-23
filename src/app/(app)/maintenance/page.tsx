@@ -78,11 +78,11 @@ export default function MaintenancePage() {
             description: `Request status changed to "${status}".`
         });
         fetchData(); // Refresh data
-    } catch(e) {
+    } catch(e: any) {
         toast({
             variant: "destructive",
             title: "Error",
-            description: "Failed to update status."
+            description: e.message || "Failed to update status."
         })
     }
   }

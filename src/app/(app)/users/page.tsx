@@ -66,11 +66,11 @@ export default function UsersPage() {
       });
       // Refresh user list
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to update user role.',
+        description: error.message || 'Failed to update user role.',
       });
     }
   };
