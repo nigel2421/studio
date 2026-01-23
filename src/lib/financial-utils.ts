@@ -44,12 +44,13 @@ export interface FinancialSummary {
 }
 
 export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
-    let summary: FinancialSummary = {
+    const summary: FinancialSummary = {
         totalRevenue: 0,
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalNetRemittance: 0,
-        transactionCount: payments.filter(p => p.status === 'Paid' && p.type === 'Rent').length
+        transactionCount: 0,
+        vacantUnitServiceChargeDeduction: 0,
     };
 
     const unitMap = new Map<string, Unit>();
@@ -59,20 +60,25 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         });
     });
 
-    // Calculate potential monthly rent and service charges from all of the landlord's tenants.
-    tenants.forEach(tenant => {
-        summary.totalRevenue += tenant.lease?.rent || 0;
+    const rentPayments = payments.filter(p => p.status === 'Paid' && p.type === 'Rent');
+    summary.transactionCount = rentPayments.length;
+
+    rentPayments.forEach(payment => {
+        const tenant = tenants.find(t => t.id === payment.tenantId);
+        const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
         
-        // Get the most up-to-date service charge from the unit definition
-        const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-        summary.totalServiceCharges += unit?.serviceCharge || tenant.lease?.serviceCharge || 0;
+        // Use the actual rent amount defined for the unit for calculations, as per the business logic.
+        const rentAmount = unit?.rentAmount || tenant?.lease?.rent || 0;
+        const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
+
+        const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
+
+        summary.totalRevenue += breakdown.gross;
+        summary.totalManagementFees += breakdown.managementFee;
+        summary.totalServiceCharges += breakdown.serviceChargeDeduction;
     });
 
-    // Management fee is 5% of the total potential rent (total revenue).
-    const managementFeeRate = 0.05;
-    summary.totalManagementFees = summary.totalRevenue * managementFeeRate;
-
-    // Calculate service charge for vacant units
+    // Calculate service charge for vacant units.
     let vacantUnitDeduction = 0;
     properties.forEach(p => {
       p.units.forEach(u => {
@@ -83,7 +89,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
     });
     summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
 
-    // Net Rent Payout is Total Revenue - Total Service Charges - Management Fees - Vacant Service Charges.
+    // Final Net Rent Payout calculation.
     summary.totalNetRemittance = summary.totalRevenue - summary.totalServiceCharges - summary.totalManagementFees - vacantUnitDeduction;
 
     return summary;
