@@ -57,7 +57,7 @@ export default function DashboardPage() {
         payments={payments} 
       />
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <FinancialOverviewChart payments={payments} tenants={tenants} />
         <OccupancyOverviewChart properties={properties} tenants={tenants} />
       </div>
@@ -97,7 +97,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>

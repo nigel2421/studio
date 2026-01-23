@@ -54,8 +54,8 @@ export function OccupancyOverviewChart({ properties, tenants }: OccupancyOvervie
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius={120}
-              innerRadius={80}
+              outerRadius={110}
+              innerRadius={75}
               fill="#8884d8"
               dataKey="value"
               label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
@@ -64,7 +64,7 @@ export function OccupancyOverviewChart({ properties, tenants }: OccupancyOvervie
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 return (
-                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="bold">
                     {`${value}`}
                   </text>
                 );
@@ -75,7 +75,7 @@ export function OccupancyOverviewChart({ properties, tenants }: OccupancyOvervie
               ))}
             </Pie>
             <Tooltip formatter={(value: number, name: string) => [`${value} units`, name]} />
-            <Legend />
+            <Legend wrapperStyle={{ fontSize: '12px' }} />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

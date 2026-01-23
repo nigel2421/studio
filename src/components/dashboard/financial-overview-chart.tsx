@@ -14,17 +14,15 @@ interface FinancialOverviewChartProps {
 export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewChartProps) {
   const chartData = useMemo(() => {
     const now = new Date();
-
-    // Total outstanding balance from all tenants
-    const totalOutstanding = tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
     
-    // Total collected within the current calendar month, regardless of type
     const collectedThisMonth = payments
       .filter(p => 
         p.status === 'Paid' && 
         isSameMonth(new Date(p.date), now)
       )
       .reduce((sum, p) => sum + p.amount, 0);
+
+    const totalOutstanding = tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
       
     return [
       {
@@ -52,13 +50,13 @@ export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewC
             <XAxis
               dataKey="name"
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `Ksh ${value / 1000}k`}

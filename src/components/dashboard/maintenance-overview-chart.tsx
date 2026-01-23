@@ -41,13 +41,13 @@ export function MaintenanceOverviewChart({ maintenanceRequests }: MaintenanceOve
             <XAxis
               dataKey="status"
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
               stroke="#888888"
-              fontSize={12}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
               allowDecimals={false}
