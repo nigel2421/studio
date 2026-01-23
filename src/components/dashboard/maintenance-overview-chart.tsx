@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
@@ -36,7 +37,7 @@ export function MaintenanceOverviewChart({ maintenanceRequests }: MaintenanceOve
         <CardDescription>A summary of requests by status.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <XAxis
               dataKey="status"

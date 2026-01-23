@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -45,7 +46,7 @@ export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewC
         <CardDescription>A real-time overview of payments collected against all outstanding balances.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <XAxis
               dataKey="name"

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -47,15 +48,15 @@ export function OccupancyOverviewChart({ properties, tenants }: OccupancyOvervie
         <CardDescription>A breakdown of occupied vs. vacant units.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
               data={chartData}
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius={110}
-              innerRadius={75}
+              outerRadius={100}
+              innerRadius={65}
               fill="#8884d8"
               dataKey="value"
               label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
@@ -64,7 +65,7 @@ export function OccupancyOverviewChart({ properties, tenants }: OccupancyOvervie
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 return (
-                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="bold">
+                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold">
                     {`${value}`}
                   </text>
                 );
