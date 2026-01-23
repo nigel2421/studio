@@ -11,6 +11,8 @@ import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-di
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
+import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
+import { isWithinInterval, differenceInMonths, addMonths, startOfMonth, format } from 'date-fns';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -22,7 +24,10 @@ export default function ClientsPage() {
   const [selectedOwner, setSelectedOwner] = useState<PropertyOwner | null>(null);
   const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
   const { toast } = useToast();
-  const { startLoading, stopLoading } = useLoading();
+  const { startLoading, stopLoading, isLoading } = useLoading();
+
+  const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
+  const [ownerForStatement, setOwnerForStatement] = useState<PropertyOwner | null>(null);
 
   const fetchData = async () => {
     const [props, owners, tenants, payments] = await Promise.all([
@@ -70,10 +75,9 @@ export default function ClientsPage() {
     }
   }
 
-  const handleGenerateStatement = (ownerId: string) => {
+  const handleGenerateStatement = (owner: PropertyOwner, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
-        const owner = propertyOwners.find(o => o.id === ownerId);
         if (!owner) {
             throw new Error("Owner not found");
         }
@@ -88,8 +92,26 @@ export default function ClientsPage() {
         const relevantTenantIds = relevantTenants.map(t => t.id);
 
         const serviceChargePayments = allPayments.filter(p =>
-            relevantTenantIds.includes(p.tenantId) && p.type === 'ServiceCharge'
+            relevantTenantIds.includes(p.tenantId) && 
+            p.type === 'ServiceCharge' &&
+            isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
         );
+        
+        const totalPaid = serviceChargePayments.reduce((sum, p) => sum + p.amount, 0);
+
+        const ownerUnits = allProperties.flatMap(p => 
+            p.units.filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
+        );
+
+        const months = differenceInMonths(endDate, startDate);
+        let totalDue = 0;
+        for (let i = 0; i <= months; i++) {
+            ownerUnits.forEach(unit => {
+                totalDue += unit.serviceCharge || 0;
+            });
+        }
+        
+        const balance = totalDue - totalPaid;
 
         const paymentsForPDF = serviceChargePayments.map(p => {
             const tenant = allTenants.find(t => t.id === p.tenantId);
@@ -98,11 +120,19 @@ export default function ClientsPage() {
                 date: p.date,
                 property: property?.name || 'N/A',
                 unit: tenant?.unitName || 'N/A',
-                amount: p.amount
+                amount: p.amount,
+                forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
             };
         });
+        
+        const summary = {
+            totalDue,
+            totalPaid,
+            balance
+        };
 
-        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF);
+        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF, summary, startDate, endDate);
+        setIsStatementDialogOpen(false);
     } catch (error: any) {
         console.error("Error generating statement:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to generate statement.' });
@@ -170,7 +200,10 @@ export default function ClientsPage() {
                                       size="icon"
                                       variant="ghost"
                                       className="h-8 w-8 hover:bg-green-500 hover:text-white transition-colors"
-                                      onClick={() => handleGenerateStatement(owner.id)}
+                                      onClick={() => {
+                                        setOwnerForStatement(owner);
+                                        setIsStatementDialogOpen(true);
+                                      }}
                                   >
                                       <FileSignature className="h-4 w-4" />
                                   </Button>
@@ -251,6 +284,16 @@ export default function ClientsPage() {
           owner={selectedOwner}
           property={selectedProperty}
           onSave={handleSaveOwner}
+        />
+      )}
+
+      {ownerForStatement && (
+        <StatementOptionsDialog
+            isOpen={isStatementDialogOpen}
+            onClose={() => setIsStatementDialogOpen(false)}
+            landlord={ownerForStatement}
+            onGenerate={handleGenerateStatement as any}
+            isGenerating={isLoading}
         />
       )}
     </div>

@@ -130,7 +130,10 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
 
 export const generateOwnerServiceChargeStatementPDF = (
     owner: PropertyOwner,
-    payments: { date: string; property: string; unit: string; amount: number }[]
+    payments: { date: string; property: string; unit: string; amount: number; forMonth: string }[],
+    summary: { totalDue: number; totalPaid: number; balance: number },
+    startDate: Date,
+    endDate: Date,
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -145,22 +148,71 @@ export const generateOwnerServiceChargeStatementPDF = (
     doc.setFont('helvetica', 'normal');
     doc.text(owner.email, 196, 54, { align: 'right' });
     doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+    const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
+    doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
+
+    let yPos = 75;
+
+    // Summary Section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary for Period', 14, yPos);
+    yPos += 8;
 
     autoTable(doc, {
-        startY: 70,
-        head: [['Date', 'Property', 'Unit', 'Amount Paid']],
+        startY: yPos,
+        body: [
+            ['Total Service Charge Due', formatCurrency(summary.totalDue)],
+            ['Total Amount Paid', formatCurrency(summary.totalPaid)],
+            ['Balance', formatCurrency(summary.balance)],
+        ],
+        theme: 'plain',
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+        didDrawCell: (data) => {
+            if (data.row.index === 2) { // Balance row
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(summary.balance <= 0 ? '#16a34a' : '#dc2626'); // green for credit/zero, red for debit
+            }
+        },
+        willDrawCell: (data) => {
+            doc.setFont('helvetica', data.row.index === 2 ? 'bold' : 'normal');
+            doc.setTextColor(0,0,0);
+        }
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+
+    // Payments Table
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Payment History', 14, yPos);
+    yPos += 8;
+    
+    const totalPaidFromPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Property', 'Unit', 'For Month', 'Amount Paid']],
         body: payments.map(p => [
             new Date(p.date).toLocaleDateString(),
             p.property,
             p.unit,
+            p.forMonth,
             formatCurrency(p.amount)
         ]),
+        foot: [[
+             { content: 'Total Paid This Period', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } },
+             { content: formatCurrency(totalPaidFromPayments), styles: { fontStyle: 'bold', halign: 'right' } }
+        ]],
         theme: 'striped',
         headStyles: { fillColor: [217, 119, 6] }, // Amber
+        footStyles: { fillColor: [254, 252, 232] },
         columnStyles: {
-            3: { halign: 'right' }
+            4: { halign: 'right' }
         }
     });
+
 
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
