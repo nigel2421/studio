@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant } from '@/lib/data';
+import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant, addPayment } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,6 +19,7 @@ import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmOwnerPaymentDialog } from '@/components/financials/confirm-owner-payment-dialog';
 
 
 interface ServiceChargeAccount {
@@ -64,12 +64,13 @@ export default function ServiceChargesPage() {
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
 
-  const { startLoading, stopLoading } = useLoading();
+  const { startLoading, stopLoading, isLoading: isSaving } = useLoading();
   const { toast } = useToast();
 
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
-  
+  const [isOwnerPaymentDialogOpen, setIsOwnerPaymentDialogOpen] = useState(false);
+  const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | null>(null);
+  const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
+
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
 
   const fetchData = async () => {
@@ -117,12 +118,8 @@ export default function ServiceChargesPage() {
             let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
             let paymentAmount: number | undefined;
             
-            if (!tenant) {
-                // If there's no tenant, but it's a self-managed unit, it's not 'Vacant' for service charge purposes.
-                // We assume it's 'Pending' until a payment is made against the (to-be-created) homeowner tenant.
-                paymentStatus = 'Pending';
-            } else {
-                const relevantPayment = allPayments.find(p => 
+            if (tenant) {
+                 const relevantPayment = allPayments.find(p => 
                     p.tenantId === tenant.id &&
                     p.type === 'ServiceCharge' &&
                     p.status === 'Paid' &&
@@ -133,6 +130,7 @@ export default function ServiceChargesPage() {
                     paymentAmount = relevantPayment.amount;
                 }
             }
+
 
             return {
                 propertyId: unit.propertyId,
@@ -197,50 +195,104 @@ export default function ServiceChargesPage() {
     }
   }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
 
-  const handleConfirmPayment = async (account: ServiceChargeAccount) => {
-    if (account.paymentStatus === 'Paid') return;
+  const handleOpenOwnerPaymentDialog = async (account: ServiceChargeAccount) => {
+    if (!account.ownerId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'This unit is not assigned to an owner.' });
+        return;
+    }
 
-    startLoading('Preparing payment record...');
+    startLoading('Preparing consolidated payment...');
     try {
-        let tenantForPayment: Tenant | null = null;
-        
-        if (account.tenantId) {
-            tenantForPayment = allTenants.find(t => t.id === account.tenantId) || null;
-        } else {
-            // No tenant, so it must be a client-managed unit. Let's find/create a homeowner tenant.
-            const property = allProperties.find(p => p.id === account.propertyId);
-            const unit = property?.units.find(u => u.name === account.unitName);
-            const owner = allOwners.find(o => o.id === account.ownerId);
+        const owner = allOwners.find(o => o.id === account.ownerId);
+        if (!owner) throw new Error("Owner not found");
 
-            if (unit?.managementStatus === 'Client Self Fully Managed' && owner && property) {
-                tenantForPayment = await findOrCreateHomeownerTenant(owner, unit, property.id);
-                // Refetch tenants so the new one is in our state for the dialog
-                const tenantsData = await getTenants();
-                setAllTenants(tenantsData);
-            }
-        }
-
-        if (!tenantForPayment) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not find or create a billable resident for this unit. Ensure an owner is assigned.' });
+        const ownerAccounts = occupiedAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
+        if (ownerAccounts.length === 0) {
+            toast({ title: "No Pending Charges", description: "This owner has no pending service charges for the selected month." });
             return;
         }
-        
-        setSelectedTenantForPayment(tenantForPayment);
-        setIsPaymentDialogOpen(true);
+
+        setOwnerForPayment(owner);
+        setAccountsForPayment(ownerAccounts);
+        setIsOwnerPaymentDialogOpen(true);
 
     } catch (error) {
-        console.error("Error preparing payment:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+        console.error("Error preparing consolidated payment:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not prepare consolidated payment.' });
     } finally {
         stopLoading();
     }
   };
-  
-  const handlePaymentAdded = () => {
-    setIsPaymentDialogOpen(false);
-    fetchData(); // Refetch all data
-  };
-  
+
+  const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string }) => {
+    if (!ownerForPayment || accountsForPayment.length === 0) return;
+
+    startLoading(`Recording payment for ${ownerForPayment.name}...`);
+    try {
+        let remainingAmount = paymentData.amount;
+        let paymentsRecorded = 0;
+
+        // Ensure all homeowner tenants exist before processing payments
+        const tenantsToUpdate: Tenant[] = [];
+        for (const acc of accountsForPayment) {
+            let tenant = allTenants.find(t => t.propertyId === acc.propertyId && t.unitName === acc.unitName);
+            if (!tenant) {
+                const property = allProperties.find(p => p.id === acc.propertyId);
+                const unit = property?.units.find(u => u.name === acc.unitName);
+                if (property && unit && ownerForPayment) {
+                    tenant = await findOrCreateHomeownerTenant(ownerForPayment, unit, property.id);
+                }
+            }
+            if (tenant) {
+                tenantsToUpdate.push(tenant);
+            }
+        }
+        
+        // Refetch tenants state to include any newly created ones
+        if (tenantsToUpdate.length > accountsForPayment.length) {
+          const freshTenants = await getTenants();
+          setAllTenants(freshTenants);
+        }
+
+        const paymentPromises = [];
+
+        for (const account of accountsForPayment) {
+            if (remainingAmount <= 0) break;
+
+            const tenant = tenantsToUpdate.find(t => t.propertyId === account.propertyId && t.unitName === account.unitName);
+            if (tenant) {
+                const amountToApply = Math.min(remainingAmount, account.unitServiceCharge);
+                
+                paymentPromises.push(addPayment({
+                    tenantId: tenant.id,
+                    amount: amountToApply,
+                    date: format(paymentData.date, 'yyyy-MM-dd'),
+                    notes: `Part of consolidated payment. ${paymentData.notes}`,
+                    rentForMonth: format(selectedMonth, 'yyyy-MM'),
+                    status: 'Paid',
+                    type: 'ServiceCharge',
+                }));
+
+                remainingAmount -= amountToApply;
+                paymentsRecorded++;
+            }
+        }
+
+        await Promise.all(paymentPromises);
+
+        toast({ title: "Payment Recorded", description: `${paymentsRecorded} service charge payment(s) for ${ownerForPayment.name} have been recorded.` });
+        
+        setIsOwnerPaymentDialogOpen(false);
+        fetchData();
+
+    } catch (error) {
+        console.error("Error recording consolidated payment:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while recording the payment.' });
+    } finally {
+        stopLoading();
+    }
+  }
+
   const handleGenerateInvoice = (arrears: VacantArrearsAccount) => {
     generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail);
     toast({ title: 'Invoice Generated', description: `Invoice for ${arrears.unitName} has been downloaded.` });
@@ -301,22 +353,23 @@ export default function ServiceChargesPage() {
             </div>
         </div>
         <TabsContent value="occupied">
-           <OccupiedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleConfirmPayment} />
+           <OccupiedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} />
         </TabsContent>
         <TabsContent value="arrears">
            <VacantArrearsTab arrears={filteredArrears} onGenerateInvoice={handleGenerateInvoice} />
         </TabsContent>
       </Tabs>
       
-      <AddPaymentDialog
-        properties={allProperties}
-        tenants={allTenants}
-        onPaymentAdded={handlePaymentAdded}
-        open={isPaymentDialogOpen}
-        onOpenChange={setIsPaymentDialogOpen}
-        tenant={selectedTenantForPayment}
-        defaultPaymentType="ServiceCharge"
-      />
+      {ownerForPayment && (
+        <ConfirmOwnerPaymentDialog
+          isOpen={isOwnerPaymentDialogOpen}
+          onClose={() => setIsOwnerPaymentDialogOpen(false)}
+          ownerName={ownerForPayment.name}
+          accounts={accountsForPayment}
+          onConfirm={handleConfirmOwnerPayment}
+          isSaving={isSaving}
+        />
+      )}
     </div>
   );
 }
@@ -326,7 +379,7 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
         <Card>
             <CardHeader>
                 <CardTitle>Occupied Unit Service Charges</CardTitle>
-                <CardDescription>Payments for units that are currently tenant-occupied.</CardDescription>
+                <CardDescription>Payments for units that are currently client-occupied.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -350,8 +403,7 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
                                 <TableCell>{acc.ownerName}</TableCell>
                                 <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
                                 <TableCell>
-                                    {acc.paymentStatus === 'Vacant' ? <Badge variant="secondary">Vacant</Badge> : 
-                                    acc.paymentStatus === 'Paid' ? <Badge variant="default">Paid</Badge> : 
+                                    {acc.paymentStatus === 'Paid' ? <Badge variant="default">Paid</Badge> : 
                                     <Badge variant="destructive">Pending</Badge>}
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
