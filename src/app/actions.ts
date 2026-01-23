@@ -65,8 +65,8 @@ export async function performSendArrearsReminder(tenantId: string, senderId: str
       return { success: false, error: 'Tenant not found.' };
     }
 
-    const subject = 'Friendly Reminder: Your Rent is Overdue';
-    const body = `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent payment is overdue. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease make a payment at your earliest convenience.\n\nThank you,\nEracov Properties`;
+    const subject = 'Friendly Reminder: Outstanding Account Balance';
+    const body = `Dear ${tenant.name},\n\nThis is a friendly reminder regarding your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease make a payment at your earliest convenience to clear your balance.\n\nThank you,\nEracov Properties`;
     
     // Call the cloud function to send email
     await sendCustomEmail({ recipients: [tenant.email], subject, body });

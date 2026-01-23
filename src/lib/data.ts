@@ -10,7 +10,7 @@ import {
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot } from 'firebase/firestore';
 import { auth } from './firebase';
-import { reconcileMonthlyBilling, processPayment, calculateTargetDue } from './financial-logic';
+import { reconcileMonthlyBilling, processPayment, calculateTargetDue, getRecommendedPaymentStatus } from './financial-logic';
 import { format } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
@@ -392,6 +392,19 @@ export async function addWaterMeterReading(data: {
     };
 
     await addDoc(collection(db, 'waterReadings'), readingData);
+
+    // Update tenant's due balance
+    const tenantRef = doc(db, 'tenants', tenantId);
+    const tenantSnap = await getDoc(tenantRef);
+    if (tenantSnap.exists()) {
+        const tenantData = tenantSnap.data() as Tenant;
+        const newDueBalance = (tenantData.dueBalance || 0) + amount;
+        await updateDoc(tenantRef, { 
+            dueBalance: newDueBalance,
+            'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenantData, dueBalance: newDueBalance })
+        });
+    }
+
     await logActivity(`Added water reading for unit ${data.unitName}`);
 }
 

@@ -116,7 +116,7 @@ export default function AccountsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Rent Accounts</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Financial Accounts</h2>
           <p className="text-muted-foreground">A financial overview of your properties.</p>
         </div>
         <AddPaymentDialog properties={properties} tenants={tenants} onPaymentAdded={fetchAllData} />

@@ -49,8 +49,8 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/accounts', icon: Banknote, label: 'Rent Accounts' },
-  { href: '/accounts/arrears', icon: AlertCircle, label: 'Rent Arrears' },
+  { href: '/accounts', icon: Banknote, label: 'Accounts' },
+  { href: '/accounts/arrears', icon: AlertCircle, label: 'Arrears' },
   { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },

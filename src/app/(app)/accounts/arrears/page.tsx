@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -123,8 +124,8 @@ export default function ArrearsPage() {
     <div className="space-y-6">
         <div className="flex items-center justify-between">
             <div>
-                <h2 className="text-3xl font-bold tracking-tight">Rent Arrears</h2>
-                <p className="text-muted-foreground">Tenants with outstanding rent balances.</p>
+                <h2 className="text-3xl font-bold tracking-tight">Rent & Service Charge Arrears</h2>
+                <p className="text-muted-foreground">A list of all residents with outstanding balances (rent, service charges, etc.).</p>
             </div>
             <Card className="p-4">
                 <div className="text-sm font-medium text-muted-foreground">Total Arrears</div>
@@ -136,8 +137,8 @@ export default function ArrearsPage() {
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle>Tenants in Arrears ({filteredData.length})</CardTitle>
-                        <CardDescription>A list of all tenants with overdue rent.</CardDescription>
+                        <CardTitle>Residents in Arrears ({filteredData.length})</CardTitle>
+                        <CardDescription>A list of all residents with overdue balances.</CardDescription>
                     </div>
                      <div className="flex items-center gap-2">
                         <div className="relative w-full sm:w-[300px]">
@@ -163,7 +164,7 @@ export default function ArrearsPage() {
                             <TableHead>Tenant</TableHead>
                             <TableHead>Property / Unit</TableHead>
                             <TableHead>Last Payment</TableHead>
-                            <TableHead className="text-right">Amount in Arrears</TableHead>
+                            <TableHead className="text-right">Total Arrears</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
