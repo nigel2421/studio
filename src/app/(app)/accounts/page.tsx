@@ -75,7 +75,7 @@ export default function AccountsPage() {
   };
 
   const rentCollected = payments
-    .filter(p => p.type === 'Rent' && p.status === 'completed')
+    .filter(p => p.type === 'Rent' && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0);
 
   const rentDue = tenants
