@@ -230,9 +230,6 @@ export default function AddTenantPage() {
                             mode="single"
                             selected={leaseStartDate}
                             onSelect={setLeaseStartDate}
-                            disabled={(date) =>
-                                date > new Date() || date < new Date("1900-01-01")
-                            }
                         />
                         </PopoverContent>
                     </Popover>

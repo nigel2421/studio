@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -154,6 +155,7 @@ export function UnitBulkUpdateDialog({ onUploadComplete }: Props) {
                     <li>UnitType (e.g., Studio, One Bedroom)</li>
                     <li>ManagementStatus</li>
                     <li>HandoverStatus (Pending or Handed Over)</li>
+                    <li>HandoverDate (YYYY-MM-DD format)</li>
                     <li>RentAmount (number only, e.g., 25000)</li>
                     <li>ServiceCharge (number only, e.g., 3000)</li>
                 </ul>

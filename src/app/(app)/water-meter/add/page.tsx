@@ -162,9 +162,6 @@ export default function AddWaterMeterReadingPage() {
                         mode="single"
                         selected={readingDate}
                         onSelect={setReadingDate}
-                        disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
-                        }
                     />
                     </PopoverContent>
                 </Popover>

@@ -19,7 +19,11 @@ import {
 import {
     Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, Landlord
 } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 const unitSchema = z.object({
     name: z.string(),
@@ -29,6 +33,7 @@ const unitSchema = z.object({
     landlordId: z.string().optional(),
     managementStatus: z.enum(managementStatuses as any).optional(),
     handoverStatus: z.enum(handoverStatuses as any).optional(),
+    handoverDate: z.date().optional(),
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
 });
@@ -56,6 +61,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
             landlordId: '',
             managementStatus: undefined,
             handoverStatus: undefined,
+            handoverDate: undefined,
             rentAmount: 0,
             serviceCharge: 0,
         },
@@ -68,6 +74,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                 landlordId: unit.landlordId || 'none',
                 rentAmount: unit.rentAmount || 0,
                 serviceCharge: unit.serviceCharge || 0,
+                handoverDate: unit.handoverDate ? new Date(unit.handoverDate) : undefined,
             });
         }
     }, [unit, form]);
@@ -75,7 +82,16 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
     const handleSubmit = async (data: UnitFormValues) => {
         setIsSaving(true);
         try {
-            await onSave(data as Unit);
+            const dataToSave: Partial<UnitFormValues> & { handoverDate?: string } = {
+                ...data,
+                handoverDate: data.handoverDate ? format(data.handoverDate, 'yyyy-MM-dd') : undefined,
+            };
+
+            if (data.handoverStatus !== 'Handed Over') {
+                dataToSave.handoverDate = undefined;
+            }
+
+            await onSave(dataToSave as Unit);
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving unit:", error);
@@ -240,6 +256,46 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                                     </FormItem>
                                 )}
                             />
+                             {form.watch('handoverStatus') === 'Handed Over' && (
+                                <FormField
+                                    control={form.control}
+                                    name="handoverDate"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col pt-2">
+                                            <FormLabel>Handover Date</FormLabel>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full pl-3 text-left font-normal",
+                                                                !field.value && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {field.value ? (
+                                                                format(field.value, "PPP")
+                                                            ) : (
+                                                                <span>Pick a date</span>
+                                                            )}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </FormControl>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={field.value}
+                                                        onSelect={field.onChange}
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                             <FormField
                                 control={form.control}
                                 name="rentAmount"

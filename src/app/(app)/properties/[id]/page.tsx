@@ -146,10 +146,6 @@ export default function PropertyManagementPage() {
             if (u.name === unitData.name) {
                 const updatedUnit: { [key: string]: any } = { ...u, ...unitData };
     
-                if (updatedUnit.handoverStatus === 'Handed Over' && u.handoverStatus !== 'Handed Over' && !u.handoverDate) {
-                    updatedUnit.handoverDate = new Date().toISOString().split('T')[0];
-                }
-
                 if (updatedUnit.landlordId === 'none' || updatedUnit.landlordId === '') {
                     delete updatedUnit.landlordId;
                 }

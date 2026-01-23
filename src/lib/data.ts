@@ -1,5 +1,4 @@
 
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -503,10 +502,9 @@ export async function runMonthlyReconciliation(): Promise<void> {
 export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Promise<{ updatedCount: number; errors: string[] }> {
     const errors: string[] = [];
 
-    // 1. Fetch all properties and create a map of all units.
     const propertiesSnapshot = await getDocs(collection(db, 'properties'));
-    const properties: Record<string, Property> = {}; // propertyId -> Property
-    const unitMap: Record<string, { unit: Unit, propertyId: string }> = {}; // unitName -> {unit, propertyId}
+    const properties: Record<string, Property> = {};
+    const unitMap: Record<string, { unit: Unit, propertyId: string }> = {};
     const duplicateUnitNames = new Set<string>();
 
     propertiesSnapshot.forEach(doc => {
@@ -515,7 +513,6 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         if (prop.units) {
             for (const unit of prop.units) {
                 if (unitMap[unit.name]) {
-                    // This unit name is already present, so it's a duplicate.
                     duplicateUnitNames.add(unit.name);
                 } else {
                     unitMap[unit.name] = { unit, propertyId: prop.id };
@@ -524,13 +521,12 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
     });
 
-    // Invalidate all duplicate unit names found.
     for (const unitName of duplicateUnitNames) {
         delete unitMap[unitName];
     }
     
     let totalUnitsUpdated = 0;
-    const propertyUpdates: Record<string, Unit[]> = {}; // propertyId -> updated units array
+    const propertyUpdates: Record<string, Unit[]> = {};
 
     for (const [index, row] of data.entries()) {
         const {
@@ -540,6 +536,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
             UnitType,
             ManagementStatus,
             HandoverStatus,
+            HandoverDate,
             RentAmount,
             ServiceCharge,
         } = row;
@@ -550,20 +547,18 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
 
         if (duplicateUnitNames.has(UnitName)) {
-            errors.push(`Row ${index + 2}: Unit name "${UnitName}" is not unique across properties and cannot be updated automatically. Please update it manually.`);
+            errors.push(`Row ${index + 2}: Unit name "${UnitName}" is not unique and cannot be updated automatically.`);
             continue;
         }
 
         const unitInfo = unitMap[UnitName];
-
         if (!unitInfo) {
-            errors.push(`Row ${index + 2}: Unit "${UnitName}" not found or is not unique.`);
+            errors.push(`Row ${index + 2}: Unit "${UnitName}" not found.`);
             continue;
         }
 
         const { propertyId } = unitInfo;
         
-        // Lazily copy the original units for a property only when we need to modify it.
         if (!propertyUpdates[propertyId]) {
             propertyUpdates[propertyId] = JSON.parse(JSON.stringify(properties[propertyId].units));
         }
@@ -571,19 +566,14 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         const unitsForProperty = propertyUpdates[propertyId];
         const unitIndex = unitsForProperty.findIndex((u:any) => u.name === UnitName);
         
-        // This should always be found because of the map, but for safety:
-        if (unitIndex === -1) {
-            errors.push(`Row ${index + 2}: Internal error. Could not find unit "${UnitName}" in property ID "${propertyId}".`);
-            continue;
-        }
+        if (unitIndex === -1) continue;
 
         const unitToUpdate = unitsForProperty[unitIndex];
         let unitWasUpdated = false;
 
-        // Apply updates from CSV row...
         if (Status !== undefined && unitToUpdate.status !== Status) {
             if (!unitStatuses.includes(Status as any)) {
-                errors.push(`Row ${index + 2}: Invalid Status "${Status}". Valid: ${unitStatuses.join(', ')}`);
+                errors.push(`Row ${index + 2}: Invalid Status "${Status}".`);
             } else {
                 unitToUpdate.status = Status as UnitStatus;
                 unitWasUpdated = true;
@@ -591,7 +581,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
         if (Ownership !== undefined && unitToUpdate.ownership !== Ownership) {
             if (!ownershipTypes.includes(Ownership as any)) {
-                errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}". Valid: ${ownershipTypes.join(', ')}`);
+                errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`);
             } else {
                 unitToUpdate.ownership = Ownership as OwnershipType;
                 unitWasUpdated = true;
@@ -599,7 +589,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
         if (UnitType !== undefined && unitToUpdate.unitType !== UnitType) {
             if (!unitTypes.includes(UnitType as any)) {
-                errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}". Valid: ${unitTypes.join(', ')}`);
+                errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`);
             } else {
                 unitToUpdate.unitType = UnitType as UnitType;
                 unitWasUpdated = true;
@@ -607,7 +597,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
         if (ManagementStatus !== undefined && unitToUpdate.managementStatus !== ManagementStatus) {
             if (!managementStatuses.includes(ManagementStatus as any)) {
-                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}". Valid: ${managementStatuses.join(', ')}`);
+                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}".`);
             } else {
                 unitToUpdate.managementStatus = ManagementStatus as ManagementStatus;
                 unitWasUpdated = true;
@@ -615,19 +605,27 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
         if (HandoverStatus !== undefined && unitToUpdate.handoverStatus !== HandoverStatus) {
             if (!handoverStatuses.includes(HandoverStatus as any)) {
-                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}". Valid: ${handoverStatuses.join(', ')}`);
+                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}".`);
             } else {
                 unitToUpdate.handoverStatus = HandoverStatus as HandoverStatus;
                 unitWasUpdated = true;
-                if (HandoverStatus === 'Handed Over' && !unitToUpdate.handoverDate) {
+                if (HandoverStatus === 'Handed Over' && !HandoverDate && !unitToUpdate.handoverDate) {
                     unitToUpdate.handoverDate = new Date().toISOString().split('T')[0];
                 }
+            }
+        }
+        if (HandoverDate !== undefined && unitToUpdate.handoverDate !== HandoverDate) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(HandoverDate)) {
+                errors.push(`Row ${index + 2}: Invalid HandoverDate format "${HandoverDate}". Use YYYY-MM-DD.`);
+            } else {
+                unitToUpdate.handoverDate = HandoverDate;
+                unitWasUpdated = true;
             }
         }
         if (RentAmount !== undefined && String(unitToUpdate.rentAmount || '') !== RentAmount) {
             const rent = Number(RentAmount);
             if (isNaN(rent) || rent < 0) {
-                errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}". Must be a non-negative number.`);
+                errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}".`);
             } else {
                 unitToUpdate.rentAmount = rent;
                 unitWasUpdated = true;
@@ -636,7 +634,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         if (ServiceCharge !== undefined && String(unitToUpdate.serviceCharge || '') !== ServiceCharge) {
             const charge = Number(ServiceCharge);
             if (isNaN(charge) || charge < 0) {
-                errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}". Must be a non-negative number.`);
+                errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}".`);
             } else {
                 unitToUpdate.serviceCharge = charge;
                 unitWasUpdated = true;
@@ -644,23 +642,9 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         }
         
         if (unitWasUpdated) {
-            // Because we only copy when a property has an update, and only update if a field changes,
-            // we can just increment a counter for each row that triggers an update.
             totalUnitsUpdated++;
         }
     }
-
-    // A unit might be processed multiple times if it appears in multiple rows. 
-    // To get a count of unique units updated, we can do this:
-    const uniqueUpdatedUnitsCount = Object.values(propertyUpdates).reduce((acc, units) => {
-        const originalUnits = properties[units[0].propertyId!].units;
-        const updated = units.filter((u: Unit) => {
-            const original = originalUnits.find(ou => ou.name === u.name);
-            return JSON.stringify(u) !== JSON.stringify(original);
-        });
-        return acc + updated.length;
-    }, 0);
-
 
     if (errors.length > 0) {
         return { updatedCount: 0, errors };
@@ -673,10 +657,10 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
             batch.update(propertyRef, { units: propertyUpdates[propId] });
         }
         await batch.commit();
-        await logActivity(`Bulk updated units via CSV.`);
+        await logActivity(`Bulk updated ${totalUnitsUpdated} units via CSV.`);
     }
 
-    return { updatedCount: Object.keys(propertyUpdates).length, errors: [] };
+    return { updatedCount: totalUnitsUpdated, errors: [] };
 }
 
 
@@ -1206,25 +1190,3 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     });
     return unsubscribe;
 }
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
