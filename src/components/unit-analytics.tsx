@@ -126,10 +126,10 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   }
 
   return (
-    <div className="pt-4">
-        <div className="flex justify-end mb-4">
+    <div className="pt-4 space-y-4">
+        <div className="flex justify-end">
             <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by Unit Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -138,7 +138,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
                 </SelectContent>
             </Select>
         </div>
-        <div className="border rounded-md">
+        <div className="border rounded-md overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
