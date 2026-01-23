@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -39,8 +38,11 @@ export default function AddTenantPage() {
   const [rent, setRent] = useState(0);
   const [leaseStartDate, setLeaseStartDate] = useState<Date | undefined>(new Date());
   const [securityDeposit, setSecurityDeposit] = useState(0);
-  const [bookedWithDeposit, setBookedWithDeposit] = useState(false);
-  const [collectWaterDeposit, setCollectWaterDeposit] = useState(false);
+
+  const [paidRent, setPaidRent] = useState(false);
+  const [paidSecurityDeposit, setPaidSecurityDeposit] = useState(false);
+  const [paidWaterDeposit, setPaidWaterDeposit] = useState(false);
+
 
   useEffect(() => {
     async function fetchProperties() {
@@ -77,11 +79,14 @@ export default function AddTenantPage() {
         const unit = availableUnits.find(u => u.name === unitName);
         if (unit && unit.rentAmount) {
             setRent(unit.rentAmount);
+            setSecurityDeposit(unit.rentAmount); // Default security deposit to one month's rent
         } else {
             setRent(0);
+            setSecurityDeposit(0);
         }
     } else {
         setRent(0);
+        setSecurityDeposit(0);
     }
   }, [unitName, availableUnits]);
 
@@ -104,9 +109,12 @@ export default function AddTenantPage() {
         agent,
         rent,
         leaseStartDate: leaseStartDate ? format(leaseStartDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-        securityDeposit: bookedWithDeposit ? securityDeposit : 0,
-        waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
+        securityDeposit,
+        waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
+        paidRent,
+        paidSecurityDeposit,
+        paidWaterDeposit,
       });
 
       toast({
@@ -114,7 +122,7 @@ export default function AddTenantPage() {
         description: `${name} has been added and their login credentials have been created.`,
       });
       router.push('/tenants');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding tenant:', error);
       toast({
         variant: "destructive",
@@ -135,7 +143,7 @@ export default function AddTenantPage() {
         <CardDescription>Onboard a new tenant and create their system account.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Full Name</Label>
@@ -203,47 +211,54 @@ export default function AddTenantPage() {
               <Input id="rent" type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} required />
             </div>
           </div>
-          <div>
-            <Label htmlFor="leaseStartDate">Lease Start Date</Label>
-            <Popover>
-                <PopoverTrigger asChild>
-                <Button
-                    variant={"outline"}
-                    className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !leaseStartDate && "text-muted-foreground"
-                    )}
-                >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {leaseStartDate ? format(leaseStartDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                <Calendar
-                    mode="single"
-                    selected={leaseStartDate}
-                    onSelect={setLeaseStartDate}
-                    initialFocus
-                />
-                </PopoverContent>
-            </Popover>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center space-x-2 pt-6">
-              <Checkbox id="bookedWithDeposit" checked={bookedWithDeposit} onCheckedChange={(checked) => setBookedWithDeposit(Boolean(checked))} />
-              <Label htmlFor="bookedWithDeposit">Booked with security deposit</Label>
+           <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="securityDeposit">Security Deposit Amount (Ksh)</Label>
+                    <Input id="securityDeposit" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value) || 0)} />
+                </div>
+                <div>
+                    <Label htmlFor="leaseStartDate">Lease Start Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !leaseStartDate && "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {leaseStartDate ? format(leaseStartDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={leaseStartDate}
+                            onSelect={setLeaseStartDate}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
+                </div>
             </div>
-            {bookedWithDeposit && (
-              <div>
-                <Label htmlFor="securityDeposit">Security Deposit Amount (Ksh)</Label>
-                <Input id="securityDeposit" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value))} required={bookedWithDeposit} />
-              </div>
-            )}
-          </div>
-           <div className="flex items-center space-x-2">
-              <Checkbox id="collectWaterDeposit" checked={collectWaterDeposit} onCheckedChange={(checked) => setCollectWaterDeposit(Boolean(checked))} />
-              <Label htmlFor="collectWaterDeposit">Collect Water Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+          
+           <div className="space-y-3 rounded-md border p-4">
+                <Label className="font-semibold">Mark Initial Payments as Paid</Label>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidRent" checked={paidRent} onCheckedChange={(c) => setPaidRent(Boolean(c))} />
+                    <Label htmlFor="paidRent" className="font-normal">Mark first month's rent as paid (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidSecurityDeposit" checked={paidSecurityDeposit} onCheckedChange={(c) => setPaidSecurityDeposit(Boolean(c))} />
+                    <Label htmlFor="paidSecurityDeposit" className="font-normal">Mark security deposit as paid (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidWaterDeposit" checked={paidWaterDeposit} onCheckedChange={(c) => setPaidWaterDeposit(Boolean(c))} />
+                    <Label htmlFor="paidWaterDeposit" className="font-normal">Mark water deposit as paid (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+                </div>
             </div>
+
           <Button type="submit" className="w-full" disabled={!selectedProperty || !unitName || !agent || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Tenant

@@ -120,9 +120,9 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant', leaseStartDate: string }): Promise<void> {
+export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant', leaseStartDate: string, paidRent: boolean, paidSecurityDeposit: boolean, paidWaterDeposit: boolean }): Promise<void> {
 
-    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate } = data;
+    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate, paidRent, paidSecurityDeposit, paidWaterDeposit } = data;
 
     const property = await getProperty(propertyId);
     if (!property) {
@@ -133,9 +133,10 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
         throw new Error("Cannot add tenant: selected unit not found in property.");
     }
     
-    // Explicitly define what goes into the initial due amount.
-    // Rent + Security Deposit + Water Deposit. Service charge is part of rent and not added again.
-    const initialDue = rent + securityDeposit + (waterDeposit || 0);
+    let initialDue = 0;
+    if (!paidRent) initialDue += rent;
+    if (!paidSecurityDeposit) initialDue += securityDeposit;
+    if (!paidWaterDeposit) initialDue += (waterDeposit || 0);
 
     const newTenantData = {
         name,
@@ -151,8 +152,8 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
             startDate: leaseStartDate,
             endDate: new Date(new Date(leaseStartDate).setFullYear(new Date(leaseStartDate).getFullYear() + 1)).toISOString().split('T')[0],
             rent: rent,
-            serviceCharge: unit.serviceCharge || 0, // Store for reference, but DO NOT add to dueBalance
-            paymentStatus: 'Pending' as const,
+            serviceCharge: unit.serviceCharge || 0,
+            paymentStatus: initialDue > 0 ? 'Pending' as const : 'Paid' as const,
             lastBilledPeriod: format(new Date(leaseStartDate), 'yyyy-MM'),
         },
         securityDeposit: securityDeposit || 0,
@@ -162,11 +163,23 @@ export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & 
     };
     const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData);
 
+    const totalInitialCharges = rent + (securityDeposit || 0) + (waterDeposit || 0);
+    const amountConsideredPaid = totalInitialCharges - initialDue;
+
+    let taskDescription = `Complete onboarding for ${name} in ${unitName}.`;
+    if (initialDue > 0) {
+        taskDescription += ` An initial balance of Ksh ${initialDue.toLocaleString()} is pending.`;
+    } else {
+        taskDescription += ` All initial charges were marked as paid.`;
+    }
+     taskDescription += ` (Total Charges: Ksh ${totalInitialCharges.toLocaleString()}, Paid: Ksh ${amountConsideredPaid.toLocaleString()})`;
+
+
     // Create onboarding task
     await addTask({
         title: `Onboard: ${name}`,
-        description: `Complete onboarding for ${name} in ${unitName}. Initial billing of Ksh ${initialDue} (Rent: ${rent}, Sec. Deposit: ${securityDeposit}, Water Deposit: ${waterDeposit || 0}) is pending.`,
-        status: 'Pending',
+        description: taskDescription,
+        status: initialDue > 0 ? 'Pending' : 'Completed',
         priority: 'High',
         category: 'Financial',
         tenantId: tenantDocRef.id,
@@ -1148,6 +1161,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 

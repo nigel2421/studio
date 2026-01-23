@@ -48,8 +48,10 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
   const [agent, setAgent] = useState<Agent>();
   const [rent, setRent] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
-  const [bookedWithDeposit, setBookedWithDeposit] = useState(false);
-  const [collectWaterDeposit, setCollectWaterDeposit] = useState(false);
+
+  const [paidRent, setPaidRent] = useState(false);
+  const [paidSecurityDeposit, setPaidSecurityDeposit] = useState(false);
+  const [paidWaterDeposit, setPaidWaterDeposit] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -88,11 +90,14 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         const unit = availableUnits.find(u => u.name === unitName);
         if (unit && unit.rentAmount) {
             setRent(unit.rentAmount);
+            setSecurityDeposit(unit.rentAmount);
         } else {
             setRent(0);
+            setSecurityDeposit(0);
         }
     } else {
         setRent(0);
+        setSecurityDeposit(0);
     }
   }, [unitName, availableUnits]);
 
@@ -106,8 +111,9 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
     setAgent(undefined);
     setRent(0);
     setSecurityDeposit(0);
-    setBookedWithDeposit(false);
-    setCollectWaterDeposit(false);
+    setPaidRent(false);
+    setPaidSecurityDeposit(false);
+    setPaidWaterDeposit(false);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,10 +131,13 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         unitName,
         agent,
         rent,
-        securityDeposit: bookedWithDeposit ? securityDeposit : 0,
-        waterDeposit: collectWaterDeposit ? WATER_DEPOSIT_AMOUNT : 0,
+        securityDeposit,
+        waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
         leaseStartDate: new Date().toISOString().split('T')[0],
+        paidRent,
+        paidSecurityDeposit,
+        paidWaterDeposit,
       });
       toast({
         title: "Tenant Added",
@@ -233,22 +242,29 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
                 <Input id="rent-dialog" type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 items-center">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="bookedWithDeposit-dialog" checked={bookedWithDeposit} onCheckedChange={(checked) => setBookedWithDeposit(Boolean(checked))} />
-                <Label htmlFor="bookedWithDeposit-dialog">Booked with security deposit</Label>
-              </div>
-              {bookedWithDeposit && (
+             <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="securityDeposit-dialog">Deposit Amount (Ksh)</Label>
-                  <Input id="securityDeposit-dialog" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value))} required={bookedWithDeposit} />
+                    <Label htmlFor="securityDeposit-dialog">Security Deposit Amount (Ksh)</Label>
+                    <Input id="securityDeposit-dialog" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value) || 0)} />
                 </div>
-              )}
             </div>
-             <div className="flex items-center space-x-2">
-              <Checkbox id="collectWaterDeposit-dialog" checked={collectWaterDeposit} onCheckedChange={(checked) => setCollectWaterDeposit(Boolean(checked))} />
-              <Label htmlFor="collectWaterDeposit-dialog">Collect Water Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+            
+            <div className="space-y-3 rounded-md border p-4">
+                <Label className="font-semibold">Mark Initial Payments as Paid</Label>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidRent-dialog" checked={paidRent} onCheckedChange={(c) => setPaidRent(Boolean(c))} />
+                    <Label htmlFor="paidRent-dialog" className="font-normal">Mark first month's rent as paid (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidSecurityDeposit-dialog" checked={paidSecurityDeposit} onCheckedChange={(c) => setPaidSecurityDeposit(Boolean(c))} />
+                    <Label htmlFor="paidSecurityDeposit-dialog" className="font-normal">Mark security deposit as paid (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="paidWaterDeposit-dialog" checked={paidWaterDeposit} onCheckedChange={(c) => setPaidWaterDeposit(Boolean(c))} />
+                    <Label htmlFor="paidWaterDeposit-dialog" className="font-normal">Mark water deposit as paid (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+                </div>
             </div>
+
           </div>
           <DialogFooter>
             <Button type="submit" disabled={!selectedProperty || !unitName || !agent || isLoading}>
