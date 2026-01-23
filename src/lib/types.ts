@@ -43,8 +43,8 @@ export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'S
 export type UnitStatus = 'vacant' | 'rented' | 'airbnb' | 'client occupied';
 export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'airbnb', 'client occupied'];
 
-export type HandoverStatus = 'Pending' | 'Handed Over';
-export const handoverStatuses: HandoverStatus[] = ['Pending', 'Handed Over'];
+export type HandoverStatus = 'Pending Hand Over' | 'Handed Over';
+export const handoverStatuses: HandoverStatus[] = ['Pending Hand Over', 'Handed Over'];
 
 export type Unit = {
   name: string;
