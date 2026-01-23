@@ -104,7 +104,29 @@ export async function getProperties(): Promise<Property[]> {
 }
 
 export async function getTenants(): Promise<Tenant[]> {
-    return getCollection<Tenant>('tenants');
+    const tenants = await getCollection<Tenant>('tenants');
+    
+    // Fetch all water readings in a single query
+    const readingsQuery = query(collection(db, 'waterReadings'), orderBy('createdAt', 'desc'));
+    const readingsSnapshot = await getDocs(readingsQuery);
+    const allReadings = readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+
+    // Group readings by tenantId for efficient lookup
+    const readingsByTenant = new Map<string, WaterMeterReading[]>();
+    for (const reading of allReadings) {
+        if (!readingsByTenant.has(reading.tenantId)) {
+            readingsByTenant.set(reading.tenantId, []);
+        }
+        // Since we ordered by desc, the first one for each tenant will be the latest
+        readingsByTenant.get(reading.tenantId)!.push(reading);
+    }
+    
+    // Attach readings to each tenant
+    for (const tenant of tenants) {
+        tenant.waterReadings = readingsByTenant.get(tenant.id) || [];
+    }
+
+    return tenants;
 }
 
 export async function getArchivedTenants(): Promise<ArchivedTenant[]> {

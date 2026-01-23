@@ -91,12 +91,33 @@ export function AddPaymentDialog({
     return tenantForDisplay?.residentType === 'Homeowner' ? 'ServiceCharge' : 'Rent';
   }, [tenantForDisplay]);
 
+  const getDefaultAmount = (type: Payment['type'], tenantInfo: Tenant | null): string => {
+    if (!tenantInfo) return '';
+    const latestWaterBillAmount = tenantInfo.waterReadings?.[0]?.amount;
+
+    switch (type) {
+      case 'Rent':
+        return (tenantInfo.lease.rent || '').toString();
+      case 'ServiceCharge':
+        return (tenantInfo.lease.serviceCharge || '').toString();
+      case 'Water':
+        return (latestWaterBillAmount || '').toString();
+      case 'Deposit':
+        return (tenantInfo.securityDeposit || '').toString();
+      default:
+        return '';
+    }
+  };
+
   useEffect(() => {
     if (open) {
+      const type = defaultPaymentType || defaultEntryType;
+      // When opening, if we have a tenant context, pre-fill amount, otherwise start blank.
+      const amount = tenantForDisplay ? getDefaultAmount(type, tenantForDisplay) : '';
       const initialEntry: PaymentEntry = {
         id: Date.now(),
-        amount: '',
-        type: defaultPaymentType || defaultEntryType,
+        amount,
+        type,
         date: new Date(),
         notes: '',
         rentForMonth: format(new Date(), 'yyyy-MM'),
@@ -105,7 +126,6 @@ export function AddPaymentDialog({
 
       if (tenant) {
         setSelectedProperty(tenant.propertyId);
-        // We don't set unit/floor here because it will be derived from tenant
       }
     } else {
       // Reset form on close
@@ -116,7 +136,7 @@ export function AddPaymentDialog({
         setSelectedUnit('');
       }
     }
-  }, [open, tenant, defaultPaymentType, defaultEntryType]);
+  }, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType]);
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
     const d = new Date();
@@ -145,7 +165,7 @@ export function AddPaymentDialog({
   const addEntry = (type: Payment['type']) => {
     const newEntry: PaymentEntry = {
         id: Date.now(),
-        amount: '',
+        amount: getDefaultAmount(type, tenantForDisplay),
         type: type,
         date: new Date(),
         notes: '',
