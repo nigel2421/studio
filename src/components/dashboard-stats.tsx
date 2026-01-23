@@ -84,14 +84,14 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {stats.map((stat, index) => (
         <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">
               {stat.title}
             </CardTitle>
             <stat.icon className={`h-4 w-4 text-muted-foreground ${stat.color}`} />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stat.value}</div>
+          <CardContent className="p-4 pt-0">
+            <div className="text-xl font-bold">{stat.value}</div>
             <p className="text-xs text-muted-foreground">
               {/* Additional context if needed */}
             </p>

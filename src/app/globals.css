@@ -97,3 +97,9 @@ body {
       background-size: 1.5em 1.5em;
   }
 }
+
+@layer components {
+  .recharts-default-tooltip {
+    @apply rounded-lg border bg-background p-2 text-xs shadow-lg;
+  }
+}

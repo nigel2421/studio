@@ -47,8 +47,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Welcome, Property Manager</h2>
-        <p className="text-muted-foreground text-sm sm:text-base">Here's a summary of your properties today.</p>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Welcome, Property Manager</h2>
+        <p className="text-sm text-muted-foreground">Here's a summary of your properties today.</p>
       </div>
 
       <DashboardStats 
