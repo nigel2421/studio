@@ -38,7 +38,7 @@ export default function AccountsPage() {
 
   const fetchAllData = async () => {
     try {
-      await runMonthlyReconciliation();
+      // await runMonthlyReconciliation(); // This was causing status to reset after payment.
       const [tenantsData, propertiesData, paymentsData] = await Promise.all([
         getTenants(),
         getProperties(),
