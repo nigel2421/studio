@@ -619,6 +619,9 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
             } else {
                 unitToUpdate.handoverStatus = HandoverStatus as HandoverStatus;
                 unitWasUpdated = true;
+                if (HandoverStatus === 'Handed Over' && !unitToUpdate.handoverDate) {
+                    unitToUpdate.handoverDate = new Date().toISOString().split('T')[0];
+                }
             }
         }
         if (RentAmount !== undefined && String(unitToUpdate.rentAmount || '') !== RentAmount) {
@@ -1150,6 +1153,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
 
     
+
 
 
 

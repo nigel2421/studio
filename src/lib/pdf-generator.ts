@@ -355,3 +355,55 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) 
 
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
+export const generateVacantServiceChargeInvoicePDF = (
+    owner: PropertyOwner,
+    unit: Unit,
+    property: Property,
+    arrears: { month: string, amount: number }[]
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    addHeader(doc, 'Service Charge Invoice');
+    
+    // Owner Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(owner.name, 196, 48, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(owner.email, 196, 54, { align: 'right' });
+    doc.text(`Invoice Date: ${dateStr}`, 196, 60, { align: 'right' });
+    
+    // Property and Unit Details
+    let yPos = 70;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice For:', 14, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Property: ${property.name}`, 14, yPos + 6);
+    doc.text(`Unit: ${unit.name}`, 14, yPos + 11);
+    doc.text(`Handover Date: ${unit.handoverDate ? new Date(unit.handoverDate).toLocaleDateString() : 'N/A'}`, 14, yPos + 16);
+    yPos += 25;
+
+    const totalAmount = arrears.reduce((sum, item) => sum + item.amount, 0);
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Month', 'Description', 'Amount']],
+        body: arrears.map(item => [item.month, `Service Charge for Vacant Unit`, formatCurrency(item.amount)]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        foot: [['TOTAL DUE', '', formatCurrency(totalAmount)]],
+        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
+        columnStyles: {
+            2: { halign: 'right' }
+        }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.text('Please remit payment at your earliest convenience to avoid further penalties.', 14, yPos);
+
+    doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+};

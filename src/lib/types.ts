@@ -58,6 +58,7 @@ export type Unit = {
   rentAmount?: number;
   serviceCharge?: number;
   handoverStatus?: HandoverStatus;
+  handoverDate?: string;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';

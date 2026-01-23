@@ -144,14 +144,16 @@ export default function PropertyManagementPage() {
     
         const updatedUnits = units.map(u => {
             if (u.name === unitData.name) {
-                // Build a new object from scratch to avoid undefined values
                 const updatedUnit: { [key: string]: any } = { ...u, ...unitData };
     
+                if (updatedUnit.handoverStatus === 'Handed Over' && u.handoverStatus !== 'Handed Over' && !u.handoverDate) {
+                    updatedUnit.handoverDate = new Date().toISOString().split('T')[0];
+                }
+
                 if (updatedUnit.landlordId === 'none' || updatedUnit.landlordId === '') {
                     delete updatedUnit.landlordId;
                 }
     
-                // Ensure all undefined keys are removed
                 Object.keys(updatedUnit).forEach(key => {
                     if (updatedUnit[key] === undefined) {
                         delete updatedUnit[key];
@@ -163,16 +165,16 @@ export default function PropertyManagementPage() {
             return u;
         });
     
-        setUnits(updatedUnits); // Optimistic update
+        setUnits(updatedUnits);
     
         try {
             await updateProperty(property.id, { units: updatedUnits });
             toast({ title: "Unit Updated", description: `Unit ${unitData.name} has been updated successfully.` });
-            fetchData(); // Re-fetch to ensure consistency
+            fetchData(); 
         } catch (error) {
             console.error("Firestore update error:", error);
             toast({ variant: "destructive", title: "Error", description: "Failed to update unit details in the database." });
-            fetchData(); // Revert optimistic update by re-fetching
+            fetchData(); 
         }
     };
     
@@ -181,7 +183,12 @@ export default function PropertyManagementPage() {
 
         const updatedUnits = units.map(unit => {
             if (selectedUnitNames.includes(unit.name)) {
-                return { ...unit, ...updateData };
+                const originalStatus = unit.handoverStatus;
+                const newUnit = { ...unit, ...updateData };
+                if (newUnit.handoverStatus === 'Handed Over' && originalStatus !== 'Handed Over' && !newUnit.handoverDate) {
+                    newUnit.handoverDate = new Date().toISOString().split('T')[0];
+                }
+                return newUnit;
             }
             return unit;
         });

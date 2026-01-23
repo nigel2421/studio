@@ -1,23 +1,26 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { getProperties, getPropertyOwners, getTenants, getAllPayments } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle } from 'lucide-react';
-import { isSameMonth, startOfMonth } from 'date-fns';
+import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMonths } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
-import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
+import { generateOwnerServiceChargeStatementPDF, generateVacantServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 interface ServiceChargeAccount {
   propertyId: string;
@@ -33,8 +36,25 @@ interface ServiceChargeAccount {
   paymentDate?: string;
 }
 
+interface VacantArrearsAccount {
+    ownerId: string;
+    ownerName: string;
+    propertyId: string;
+    propertyName: string;
+    unitName: string;
+    unitHandoverDate: string;
+    monthsInArrears: number;
+    totalDue: number;
+    arrearsDetail: { month: string, amount: number }[];
+    unit: Unit;
+    owner: PropertyOwner;
+    property: Property;
+}
+
 export default function ServiceChargesPage() {
-  const [accounts, setAccounts] = useState<ServiceChargeAccount[]>([]);
+  const [occupiedAccounts, setOccupiedAccounts] = useState<ServiceChargeAccount[]>([]);
+  const [arrearsAccounts, setArrearsAccounts] = useState<VacantArrearsAccount[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,14 +64,16 @@ export default function ServiceChargesPage() {
   const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
+
   const { startLoading, stopLoading } = useLoading();
   const { toast } = useToast();
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
+  
+  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
 
   const fetchData = async () => {
-    // No setLoading here, to avoid flicker on re-fetch
     try {
       const [propertiesData, ownersData, tenantsData, paymentsData] = await Promise.all([
         getProperties(),
@@ -65,56 +87,6 @@ export default function ServiceChargesPage() {
       setAllTenants(tenantsData);
       setAllPayments(paymentsData);
 
-      const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
-      propertiesData.forEach(p => {
-        (p.units || []).forEach(u => {
-          if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
-            selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
-          }
-        });
-      });
-
-      const currentMonthStart = startOfMonth(new Date());
-
-      const serviceChargeAccounts = selfManagedUnits.map(unit => {
-        const owner = ownersData.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
-        const tenant = tenantsData.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-        
-        let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
-        let paymentAmount: number | undefined;
-        
-        if (!tenant) {
-          paymentStatus = 'Vacant';
-        } else {
-          const relevantPayment = paymentsData.find(p => 
-            p.tenantId === tenant.id &&
-            p.type === 'ServiceCharge' &&
-            p.status === 'Paid' &&
-            isSameMonth(new Date(p.date), currentMonthStart)
-          );
-          
-          if (relevantPayment && relevantPayment.amount >= (unit.serviceCharge || 0)) {
-            paymentStatus = 'Paid';
-            paymentAmount = relevantPayment.amount;
-          }
-        }
-
-        return {
-          propertyId: unit.propertyId,
-          propertyName: unit.propertyName,
-          unitName: unit.name,
-          unitServiceCharge: unit.serviceCharge || 0,
-          ownerId: owner?.id,
-          ownerName: owner?.name || 'Unassigned',
-          tenantId: tenant?.id,
-          tenantName: tenant?.name,
-          paymentStatus,
-          paymentAmount,
-        };
-      });
-      
-      setAccounts(serviceChargeAccounts);
-
     } catch (error) {
       console.error("Failed to fetch service charge data:", error);
     } finally {
@@ -126,6 +98,103 @@ export default function ServiceChargesPage() {
     setLoading(true);
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if(allProperties.length > 0) {
+        // Occupied Units Logic
+        const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
+        allProperties.forEach(p => {
+            (p.units || []).forEach(u => {
+                if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
+                    selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
+                }
+            });
+        });
+
+        const occupiedServiceChargeAccounts = selfManagedUnits.map(unit => {
+            const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+            const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+            
+            let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
+            let paymentAmount: number | undefined;
+            
+            if (!tenant) {
+                paymentStatus = 'Vacant';
+            } else {
+                const relevantPayment = allPayments.find(p => 
+                    p.tenantId === tenant.id &&
+                    p.type === 'ServiceCharge' &&
+                    p.status === 'Paid' &&
+                    isSameMonth(new Date(p.date), selectedMonth)
+                );
+                if (relevantPayment && relevantPayment.amount >= (unit.serviceCharge || 0)) {
+                    paymentStatus = 'Paid';
+                    paymentAmount = relevantPayment.amount;
+                }
+            }
+
+            return {
+                propertyId: unit.propertyId,
+                propertyName: unit.propertyName,
+                unitName: unit.name,
+                unitServiceCharge: unit.serviceCharge || 0,
+                ownerId: owner?.id,
+                ownerName: owner?.name || 'Unassigned',
+                tenantId: tenant?.id,
+                tenantName: tenant?.name,
+                paymentStatus,
+                paymentAmount,
+            };
+        });
+        setOccupiedAccounts(occupiedServiceChargeAccounts);
+
+        // Vacant Units in Arrears Logic
+        const vacantUnitsInArrears: VacantArrearsAccount[] = [];
+        const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
+            u.managementStatus === 'Client Self Fully Managed' &&
+            u.ownership === 'Landlord' &&
+            u.status === 'vacant' &&
+            u.handoverStatus === 'Handed Over' &&
+            u.handoverDate
+        );
+
+        unitsForArrears.forEach(unit => {
+            const monthsSinceHandover = differenceInMonths(selectedMonth, new Date(unit.handoverDate!));
+
+            if (monthsSinceHandover >= 3) {
+                const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
+                if (owner) {
+                    const arrearsDetail: { month: string, amount: number }[] = [];
+                    for (let i = 3; i <= monthsSinceHandover; i++) {
+                        const monthInArrears = addMonths(new Date(unit.handoverDate!), i);
+                        arrearsDetail.push({
+                            month: format(monthInArrears, 'MMMM yyyy'),
+                            amount: unit.serviceCharge || 0
+                        });
+                    }
+
+                    if(arrearsDetail.length > 0) {
+                        vacantUnitsInArrears.push({
+                            ownerId: owner.id,
+                            ownerName: owner.name,
+                            propertyId: unit.property.id,
+                            propertyName: unit.property.name,
+                            unitName: unit.name,
+                            unitHandoverDate: unit.handoverDate!,
+                            monthsInArrears: arrearsDetail.length,
+                            totalDue: arrearsDetail.reduce((sum, item) => sum + item.amount, 0),
+                            arrearsDetail,
+                            unit,
+                            owner,
+                            property: unit.property
+                        });
+                    }
+                }
+            }
+        });
+        setArrearsAccounts(vacantUnitsInArrears);
+    }
+  }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
 
   const handleConfirmPayment = (account: ServiceChargeAccount) => {
     if (!account.tenantId) {
@@ -143,78 +212,34 @@ export default function ServiceChargesPage() {
   
   const handlePaymentAdded = () => {
     setIsPaymentDialogOpen(false);
-    fetchData();
+    fetchData(); // Refetch all data
   };
-
-  const handleGenerateStatement = (ownerId: string) => {
-    startLoading('Generating Statement...');
-    try {
-        const owner = allOwners.find(o => o.id === ownerId);
-        if (!owner) {
-            throw new Error("Owner not found");
-        }
-
-        const ownerAssignedUnitIdentifiers = new Set(
-            owner.assignedUnits.flatMap(au => au.unitNames.map(un => `${au.propertyId}-${un}`))
-        );
-
-        const relevantTenants = allTenants.filter(t => 
-            ownerAssignedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`)
-        );
-        const relevantTenantIds = relevantTenants.map(t => t.id);
-
-        const serviceChargePayments = allPayments.filter(p =>
-            relevantTenantIds.includes(p.tenantId) && p.type === 'ServiceCharge'
-        );
-
-        const paymentsForPDF = serviceChargePayments.map(p => {
-            const tenant = allTenants.find(t => t.id === p.tenantId);
-            const property = allProperties.find(prop => prop.id === tenant?.propertyId);
-            return {
-                date: p.date,
-                property: property?.name || 'N/A',
-                unit: tenant?.unitName || 'N/A',
-                amount: p.amount
-            };
-        });
-
-        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF);
-    } catch (error: any) {
-        console.error("Error generating statement:", error);
-    } finally {
-        stopLoading();
-    }
-  };
-
-  const handleStatusChange = (account: ServiceChargeAccount, newStatus: 'Paid' | 'Pending') => {
-    if (newStatus === 'Paid' && account.paymentStatus !== 'Paid') {
-      handleConfirmPayment(account);
-    } else if (newStatus === 'Pending' && account.paymentStatus === 'Paid') {
-      toast({
-        variant: 'destructive',
-        title: 'Action Not Supported',
-        description: 'To mark a payment as pending, the corresponding payment record must be removed. This action is not yet supported directly.',
-      });
-    }
+  
+  const handleGenerateInvoice = (arrears: VacantArrearsAccount) => {
+    generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail);
+    toast({ title: 'Invoice Generated', description: `Invoice for ${arrears.unitName} has been downloaded.` });
   };
 
 
   const filteredAccounts = useMemo(() => {
-    if (!searchTerm) return accounts;
+    if (!searchTerm) return occupiedAccounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return accounts.filter(acc =>
+    return occupiedAccounts.filter(acc =>
         acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
         acc.unitName.toLowerCase().includes(lowercasedFilter) ||
         acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
-  }, [accounts, searchTerm]);
-
-  const paginatedAccounts = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredAccounts.slice(start, start + pageSize);
-  }, [filteredAccounts, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredAccounts.length / pageSize);
+  }, [occupiedAccounts, searchTerm]);
+  
+  const filteredArrears = useMemo(() => {
+    if (!searchTerm) return arrearsAccounts;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return arrearsAccounts.filter(acc =>
+        acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
+        acc.unitName.toLowerCase().includes(lowercasedFilter) ||
+        acc.ownerName?.toLowerCase().includes(lowercasedFilter)
+    );
+  }, [arrearsAccounts, searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -223,115 +248,40 @@ export default function ServiceChargesPage() {
           <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
           <p className="text-muted-foreground">Track service charge payments for self-managed client units.</p>
         </div>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium w-32 text-center">{format(selectedMonth, 'MMMM yyyy')}</span>
+            <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+                <ChevronRight className="h-4 w-4" />
+            </Button>
+        </div>
       </div>
-      <Card>
-        <CardHeader>
-             <div className="flex justify-between items-center">
-                 <CardTitle>Service Charge Accounts</CardTitle>
-                 <div className="relative w-full sm:w-[300px]">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by unit, owner..."
-                        className="pl-9"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
+      <Tabs defaultValue="occupied">
+        <div className="flex justify-between items-center">
+            <TabsList>
+                <TabsTrigger value="occupied">Occupied Units</TabsTrigger>
+                <TabsTrigger value="arrears">Vacant Units in Arrears</TabsTrigger>
+            </TabsList>
+            <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Search by unit, owner..."
+                    className="pl-9"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
             </div>
-        </CardHeader>
-        <CardContent className="p-0">
-            {loading ? (
-                 <div className="flex justify-center items-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                 </div>
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Property / Unit</TableHead>
-                            <TableHead>Owner</TableHead>
-                            <TableHead>Service Charge</TableHead>
-                            <TableHead>Payment Status</TableHead>
-                            <TableHead>Paid Amount</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {paginatedAccounts.map(acc => (
-                            <TableRow key={`${acc.propertyId}-${acc.unitName}`}>
-                                <TableCell>
-                                    <div className="font-medium">{acc.propertyName}</div>
-                                    <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
-                                </TableCell>
-                                <TableCell>{acc.ownerName}</TableCell>
-                                <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
-                                <TableCell>
-                                    {acc.paymentStatus === 'Vacant' ? (
-                                        <Badge variant="secondary">Vacant</Badge>
-                                    ) : (
-                                        <Select
-                                            value={acc.paymentStatus}
-                                            onValueChange={(newStatus) => handleStatusChange(acc, newStatus as 'Paid' | 'Pending')}
-                                        >
-                                            <SelectTrigger className={cn(
-                                                "w-[110px] focus:ring-0 focus:ring-offset-0",
-                                                acc.paymentStatus === 'Paid' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
-                                            )}>
-                                                <SelectValue placeholder="Set Status" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Paid">Paid</SelectItem>
-                                                <SelectItem value="Pending">Pending</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </TableCell>
-                                <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <span className="sr-only">Open menu</span>
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem
-                                                onClick={() => handleConfirmPayment(acc)}
-                                                disabled={acc.paymentStatus === 'Vacant' || !acc.tenantId}
-                                            >
-                                                <CheckCircle className="mr-2 h-4 w-4" />
-                                                Confirm Payment
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => handleGenerateStatement(acc.ownerId!)}
-                                                disabled={!acc.ownerId}
-                                            >
-                                                <FileSignature className="mr-2 h-4 w-4" />
-                                                Generate Statement
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
-        </CardContent>
-        {filteredAccounts.length > 0 && (
-          <div className="p-4 border-t">
-            <PaginationControls
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              totalItems={filteredAccounts.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-            />
-          </div>
-        )}
-      </Card>
+        </div>
+        <TabsContent value="occupied">
+           <OccupiedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleConfirmPayment} />
+        </TabsContent>
+        <TabsContent value="arrears">
+           <VacantArrearsTab arrears={filteredArrears} onGenerateInvoice={handleGenerateInvoice} />
+        </TabsContent>
+      </Tabs>
+      
       <AddPaymentDialog
         properties={allProperties}
         tenants={allTenants}
@@ -344,3 +294,119 @@ export default function ServiceChargesPage() {
     </div>
   );
 }
+
+const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void }) => {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Occupied Unit Service Charges</CardTitle>
+                <CardDescription>Payments for units that are currently tenant-occupied.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Property / Unit</TableHead>
+                            <TableHead>Owner</TableHead>
+                            <TableHead>Service Charge</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Paid Amount</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {accounts.map(acc => (
+                            <TableRow key={`${acc.propertyId}-${acc.unitName}`}>
+                                <TableCell>
+                                    <div className="font-medium">{acc.propertyName}</div>
+                                    <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
+                                </TableCell>
+                                <TableCell>{acc.ownerName}</TableCell>
+                                <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
+                                <TableCell>
+                                    {acc.paymentStatus === 'Vacant' ? <Badge variant="secondary">Vacant</Badge> : 
+                                    acc.paymentStatus === 'Paid' ? <Badge variant="default">Paid</Badge> : 
+                                    <Badge variant="destructive">Pending</Badge>}
+                                </TableCell>
+                                <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => onConfirmPayment(acc)}
+                                        disabled={acc.paymentStatus === 'Vacant' || !acc.tenantId}
+                                    >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Confirm Payment
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                         {accounts.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                    No occupied units match the criteria for this month.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+};
+
+const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrearsAccount[], onGenerateInvoice: (acc: VacantArrearsAccount) => void }) => {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Vacant Units in Arrears</CardTitle>
+                <CardDescription>Handed-over units vacant for over 3 months with outstanding service charges.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Owner</TableHead>
+                            <TableHead>Property / Unit</TableHead>
+                            <TableHead>Handover Date</TableHead>
+                            <TableHead>Months in Arrears</TableHead>
+                            <TableHead>Total Due</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {arrears.map(acc => (
+                            <TableRow key={`${acc.propertyId}-${acc.unitName}`}>
+                                <TableCell>
+                                    <div className="font-medium">{acc.ownerName}</div>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="font-medium">{acc.propertyName}</div>
+                                    <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
+                                </TableCell>
+                                <TableCell>{new Date(acc.unitHandoverDate).toLocaleDateString()}</TableCell>
+                                <TableCell>{acc.monthsInArrears}</TableCell>
+                                <TableCell>Ksh {acc.totalDue.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button size="sm" variant="destructive" onClick={() => onGenerateInvoice(acc)}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        Generate Invoice
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        {arrears.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                    No units in arrears for the selected period.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
