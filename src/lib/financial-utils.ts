@@ -67,11 +67,9 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         const tenant = tenants.find(t => t.id === payment.tenantId);
         const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
         
-        // Use the actual rent amount defined for the unit for calculations, as per the business logic.
-        const rentAmount = unit?.rentAmount || tenant?.lease?.rent || 0;
         const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
-        const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
+        const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
 
         summary.totalRevenue += breakdown.gross;
         summary.totalManagementFees += breakdown.managementFee;
