@@ -44,7 +44,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -341,7 +341,6 @@ export function AddPaymentDialog({
                             mode="single"
                             selected={entry.date}
                             onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)}
-                            disabled={undefined}
                           />
                         </PopoverContent>
                       </Popover>
