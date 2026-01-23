@@ -9,14 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format, addMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
-import { PlusCircle, Calendar as CalendarIcon, Loader2, X } from 'lucide-react';
+import { PlusCircle, Loader2, X } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface PaymentEntry {
   id: number;
@@ -44,7 +42,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -329,21 +327,7 @@ export function AddPaymentDialog({
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor={`date-${entry.id}`} className="text-xs">Date Paid</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-10", !entry.date && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {entry.date ? format(entry.date, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={entry.date}
-                            onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
                     </div>
                     <div className="space-y-1 md:col-span-2 grid grid-cols-[1fr_auto] gap-2 items-end">
                        <div className="space-y-1">

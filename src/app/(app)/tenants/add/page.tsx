@@ -12,13 +12,10 @@ import { getProperties, addTenant } from '@/lib/data';
 import { agents } from '@/lib/types';
 import type { Property, Unit, Agent } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2 } from 'lucide-react';
 import { useLoading } from '@/hooks/useLoading';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const WATER_DEPOSIT_AMOUNT = 5000;
 
@@ -212,27 +209,7 @@ export default function AddTenantPage() {
                 </div>
                 <div>
                     <Label htmlFor="leaseStartDate">Lease Start Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !leaseStartDate && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {leaseStartDate ? format(leaseStartDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={leaseStartDate}
-                            onSelect={setLeaseStartDate}
-                        />
-                        </PopoverContent>
-                    </Popover>
+                    <DatePicker value={leaseStartDate} onChange={setLeaseStartDate} />
                 </div>
             </div>
 

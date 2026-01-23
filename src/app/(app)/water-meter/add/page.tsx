@@ -11,13 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getProperties, addWaterMeterReading, getTenants } from '@/lib/data';
 import type { Property } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function AddWaterMeterReadingPage() {
   const router = useRouter();
@@ -144,27 +142,7 @@ export default function AddWaterMeterReadingPage() {
 
             <div className="space-y-2">
                 <Label htmlFor="reading-date">Reading Date</Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !readingDate && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {readingDate ? format(readingDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                    <Calendar
-                        mode="single"
-                        selected={readingDate}
-                        onSelect={setReadingDate}
-                    />
-                    </PopoverContent>
-                </Popover>
+                <DatePicker value={readingDate} onChange={setReadingDate} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
