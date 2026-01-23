@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
@@ -110,7 +111,7 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
         });
         grandTotals.Total = filteredUnits.length;
 
-        return { analytics, handoverTotals, managementTotals, grandTotals, allUnitsHandedOver };
+        return { analytics: data, handoverTotals, managementTotals, grandTotals, allUnitsHandedOver };
     }, [property, unitTypeFilter]);
     
     if (!property || !property.units) {
