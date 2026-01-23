@@ -25,8 +25,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "hidden",
-        caption_dropdowns: "flex justify-center gap-1",
+        caption_label: "text-sm font-medium",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -54,28 +53,31 @@ function Calendar({
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
+        caption_dropdowns: "flex items-center gap-1",
         ...classNames,
       }}
       components={{
-        Dropdown: ({ value, onChange, children }: DropdownProps) => {
+        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
+        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        Dropdown: ({ value, onChange, children, ...props }: DropdownProps) => {
           const options = React.Children.toArray(
             children
           ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
-          const selected = options.find((child) => String(child.props.value) === String(value))
+          const selected = options.find((child) => child.props.value === value)
           const handleChange = (value: string) => {
-            const changeEvent = {
-              target: { value },
+            const event = {
+              target: { value: value },
             } as React.ChangeEvent<HTMLSelectElement>
-            onChange?.(changeEvent)
+            onChange?.(event)
           }
           return (
             <Select
               value={value?.toString()}
               onValueChange={(value) => {
-                if (value) handleChange(value)
+                handleChange(value)
               }}
             >
-              <SelectTrigger className="pr-1.5 focus:ring-0">
+              <SelectTrigger className="h-7 w-fit min-w-[4.5rem] p-0 px-2 text-sm focus:ring-0 border-none bg-transparent font-medium">
                 <SelectValue>{selected?.props?.children}</SelectValue>
               </SelectTrigger>
               <SelectContent position="popper">
@@ -93,8 +95,6 @@ function Calendar({
             </Select>
           )
         },
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
     />
