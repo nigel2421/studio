@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -22,8 +23,8 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
   const totalProperties = properties.length;
   const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
   
-  const overdueRents = tenants
-    .filter(t => t.lease?.paymentStatus === 'Overdue' && t.dueBalance > 0)
+  const totalArrears = tenants
+    .filter(t => (t.dueBalance || 0) > 0)
     .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
 
   const totalUnits = properties.reduce((sum, p) => sum + (p.units?.length || 0), 0);
@@ -76,7 +77,7 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
     { title: "Eracovs Management Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
     { title: "Pending Maintenance", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
-    { title: "Overdue Rents", value: `Ksh ${overdueRents.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
+    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
   ];
 
   return (
