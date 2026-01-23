@@ -66,7 +66,7 @@ export function DatePicker({
     }
 
   return (
-    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen} modal={true}>
       <div className={cn('relative w-full', className)}>
         <Input
           type="text"
