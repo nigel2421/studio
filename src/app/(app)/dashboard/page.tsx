@@ -1,4 +1,3 @@
-
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -13,6 +12,9 @@ import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { FinancialOverviewChart } from "@/components/dashboard/financial-overview-chart";
+import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overview-chart";
+import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -55,6 +57,11 @@ export default function DashboardPage() {
         payments={payments} 
       />
 
+      <div className="grid gap-8 lg:grid-cols-2">
+        <FinancialOverviewChart payments={payments} tenants={tenants} />
+        <OccupancyOverviewChart properties={properties} tenants={tenants} />
+      </div>
+
       {properties.length > 0 && (
         <Card>
           <CardHeader>
@@ -64,7 +71,7 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue={properties[0].id} className="w-full">
+            <Tabs defaultValue={properties.length > 0 ? properties[0].id : ""} className="w-full">
               <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                 {properties.map(property => (
                   <TabsTrigger key={property.id} value={property.id}>{property.name}</TabsTrigger>
@@ -91,7 +98,7 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Maintenance Requests</CardTitle>
@@ -120,36 +127,9 @@ export default function DashboardPage() {
             </ul>
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Properties Overview</CardTitle>
-            <CardDescription>A summary of your managed properties.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-4">
-              {properties.map(prop => (
-                <li key={prop.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors gap-3">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-primary/10 p-2 rounded-full shrink-0">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <span className="font-medium">{prop.name}</span>
-                      <p className="text-sm text-muted-foreground break-all">{prop.address}</p>
-                    </div>
-                  </div>
-                  <div className="flex sm:block items-center justify-between sm:text-right w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0">
-                    <span className="text-sm text-muted-foreground sm:hidden">Units</span>
-                    <div>
-                      <span className="font-semibold">{Array.isArray(prop.units) ? prop.units.length : 0}</span>
-                      <p className="text-xs text-muted-foreground hidden sm:block">Units</p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-1">
+            <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
+        </div>
       </div>
     </div>
   );
