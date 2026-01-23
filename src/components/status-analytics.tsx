@@ -2,61 +2,57 @@
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface StatusAnalyticsProps {
-    properties: Property[];
+    property: Property;
 }
 
 type AnalyticsData = {
     [key in UnitType]?: number;
 } & { Total: number };
 
-export function StatusAnalytics({ properties }: StatusAnalyticsProps) {
+export function StatusAnalytics({ property }: StatusAnalyticsProps) {
+    const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
 
     const analytics = useMemo(() => {
         const data: Record<string, AnalyticsData> = {};
-
-        const allUnits: Unit[] = properties.flatMap(p => p.units || []);
-
-        const allStatusCategories = [...handoverStatuses, ...managementStatuses];
         
-        // Initialize data structure
+        if (!Array.isArray(property.units)) {
+            return {};
+        }
+
+        const filteredUnits = property.units.filter(unit =>
+            unitTypeFilter === 'all' || unit.unitType === unitTypeFilter
+        );
+
+        const allStatusCategories = [...new Set([...handoverStatuses, ...managementStatuses])];
+        
         allStatusCategories.forEach(status => {
             data[status] = { Total: 0 };
             unitTypes.forEach(ut => {
-                data[status][ut] = 0;
+                (data[status] as any)[ut] = 0;
             });
         });
 
-        // Populate data
-        for (const unit of allUnits) {
+        for (const unit of filteredUnits) {
             if (unit.handoverStatus) {
                 const status = unit.handoverStatus;
-                if (!data[status]) { // handle case where a status might not be in the constant array
-                     data[status] = { Total: 0 };
-                     unitTypes.forEach(ut => { (data[status] as any)[ut] = 0; });
-                }
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
             }
             if (unit.managementStatus) {
                 const status = unit.managementStatus;
-                if (!data[status]) {
-                     data[status] = { Total: 0 };
-                     unitTypes.forEach(ut => { (data[status] as any)[ut] = 0; });
-                }
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
             }
         }
-
         return data;
-    }, [properties]);
+    }, [property, unitTypeFilter]);
     
-    if (!properties || properties.length === 0) {
+    if (!property || !property.units) {
         return null;
     }
 
@@ -82,20 +78,27 @@ export function StatusAnalytics({ properties }: StatusAnalyticsProps) {
     );
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Unit Status Analytics</CardTitle>
-                <CardDescription>Breakdown of units by status and type.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
+        <div className="pt-4 space-y-4">
+            <div className="flex justify-end">
+                <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by Unit Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Unit Types</SelectItem>
+                        {unitTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="border rounded-md overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Status</TableHead>
+                            <TableHead className="min-w-[200px]">Status</TableHead>
                             {unitTypes.map(ut => (
-                                <TableHead key={ut} className="text-right">{ut}</TableHead>
+                                <TableHead key={ut} className="text-right min-w-[100px]">{ut}</TableHead>
                             ))}
-                            <TableHead className="text-right font-bold">Total</TableHead>
+                            <TableHead className="text-right font-bold min-w-[100px]">Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -103,7 +106,7 @@ export function StatusAnalytics({ properties }: StatusAnalyticsProps) {
                         {renderTableSection('Management Status', managementStatuses)}
                     </TableBody>
                 </Table>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -13,6 +12,7 @@ import { MaintenanceRequest, Tenant, Property, Payment } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -55,26 +55,34 @@ export default function DashboardPage() {
         payments={payments} 
       />
 
-      <StatusAnalytics properties={properties} />
-
       {properties.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Per-Property Unit Analytics</CardTitle>
+            <CardTitle>Property Analytics</CardTitle>
             <CardDescription>
-              A detailed floor-by-floor breakdown of units for each property.
+              Detailed analytics for each property in your portfolio.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={properties[0].id} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                 {properties.map(property => (
                   <TabsTrigger key={property.id} value={property.id}>{property.name}</TabsTrigger>
                 ))}
               </TabsList>
               {properties.map(property => (
-                <TabsContent key={property.id} value={property.id}>
-                  <UnitAnalytics property={property} tenants={tenants} />
+                <TabsContent key={property.id} value={property.id} className="space-y-6">
+                    <div>
+                        <h3 className="text-lg font-semibold mt-4">Unit Status Analytics</h3>
+                        <p className="text-sm text-muted-foreground">Breakdown of units by handover and management status.</p>
+                        <StatusAnalytics property={property} />
+                    </div>
+                    <Separator />
+                    <div>
+                        <h3 className="text-lg font-semibold">Occupancy Analytics</h3>
+                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units.</p>
+                        <UnitAnalytics property={property} tenants={tenants} />
+                    </div>
                 </TabsContent>
               ))}
             </Tabs>
