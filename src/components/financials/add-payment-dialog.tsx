@@ -15,6 +15,8 @@ import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+
 
 const paymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Other'];
 
@@ -45,7 +47,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -131,13 +133,17 @@ export function AddPaymentDialog({
       entries.map(entry => (entry.id === id ? { ...entry, [field]: value } : entry))
     );
   };
-
-  const addEntry = () => {
-    setPaymentEntries(entries => [...entries, { ...initialEntry, id: Date.now() }]);
-  };
-
-  const removeEntry = (id: number) => {
-    setPaymentEntries(entries => entries.filter(entry => entry.id !== id));
+  
+  const handleTypeToggle = (type: Payment['type'], checked: boolean) => {
+    setPaymentEntries(currentEntries => {
+        const entryExists = currentEntries.some(entry => entry.type === type);
+        if (checked && !entryExists) {
+            return [...currentEntries, { ...initialEntry, id: Date.now(), type: type, amount: '' }];
+        } else if (!checked && entryExists) {
+            return currentEntries.filter(entry => entry.type !== type);
+        }
+        return currentEntries;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -306,26 +312,40 @@ export function AddPaymentDialog({
             )}
             
             <div className="space-y-2 pt-4">
-              <Label>Payment Records</Label>
+              <div className="flex items-center justify-between">
+                <Label>Payment Records</Label>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="outline" size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add/Remove Fields
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuLabel>Payment Types</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {paymentTypes.map(type => (
+                             <DropdownMenuCheckboxItem
+                                key={type}
+                                checked={paymentEntries.some(e => e.type === type)}
+                                onCheckedChange={(checked) => handleTypeToggle(type, !!checked)}
+                                disabled={type === 'Rent'} // Rent is mandatory
+                            >
+                                {type}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry, index) => (
-                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end p-3 border rounded-lg">
+                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg">
+                     <div className="space-y-1">
+                      <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
+                      <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
+                    </div>
                     <div className="space-y-1">
                       <Label htmlFor={`amount-${entry.id}`} className="text-xs">Amount (Ksh)</Label>
                       <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
-                       <Select value={entry.type} onValueChange={(v) => handleEntryChange(entry.id, 'type', v as Payment['type'])}>
-                          <SelectTrigger id={`type-${entry.id}`} className="h-10">
-                              <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {paymentTypes.map(option => (
-                                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">For Month</Label>
@@ -349,23 +369,13 @@ export function AddPaymentDialog({
                       <Label htmlFor={`date-${entry.id}`} className="text-xs">Date Paid</Label>
                       <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
                     </div>
-                    <div className="space-y-1 md:col-span-2 grid grid-cols-[1fr_auto] gap-2 items-end">
-                       <div className="space-y-1">
-                         <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes</Label>
-                         <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} />
-                       </div>
-                        {paymentEntries.length > 1 && (
-                            <Button type="button" variant="destructive" size="icon" className="h-10 w-10" onClick={() => removeEntry(entry.id)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
+                    <div className="space-y-1">
+                        <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes</Label>
+                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} />
                     </div>
                   </div>
                 ))}
               </div>
-               <Button type="button" variant="outline" size="sm" onClick={addEntry}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Record
-              </Button>
             </div>
           </div>
           <DialogFooter>
