@@ -61,7 +61,7 @@ export default function AirbnbPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Airbnb Monitoring</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Airbnb</h2>
           <p className="text-muted-foreground">
             A list of all units currently designated as Airbnb rentals.
           </p>
