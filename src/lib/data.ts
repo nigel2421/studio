@@ -77,7 +77,29 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
 export async function getProperties(): Promise<Property[]> {
     const propertiesCol = collection(db, 'properties');
     const propertiesSnapshot = await getDocs(propertiesCol);
-    return propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
+    const properties = propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
+    
+    const desiredOrder = [
+        'Midtown Apartments',
+        'Grand Midtown Apartments',
+        'Grand Midtown Annex Apartments',
+    ];
+
+    return properties.sort((a, b) => {
+        const indexA = desiredOrder.indexOf(a.name);
+        const indexB = desiredOrder.indexOf(b.name);
+
+        if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+        }
+        if (indexA !== -1) {
+            return -1;
+        }
+        if (indexB !== -1) {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
 }
 
 export async function getTenants(): Promise<Tenant[]> {
@@ -1179,7 +1201,29 @@ export function listenToProperties(callback: (properties: Property[]) => void): 
     const q = query(collection(db, 'properties'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-        callback(properties);
+        const desiredOrder = [
+            'Midtown Apartments',
+            'Grand Midtown Apartments',
+            'Grand Midtown Annex Apartments',
+        ];
+
+        const sortedProperties = properties.sort((a, b) => {
+            const indexA = desiredOrder.indexOf(a.name);
+            const indexB = desiredOrder.indexOf(b.name);
+
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+            if (indexA !== -1) {
+                return -1;
+            }
+            if (indexB !== -1) {
+                return 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+        callback(sortedProperties);
     }, (error) => {
         console.error("Error listening to properties:", error);
     });

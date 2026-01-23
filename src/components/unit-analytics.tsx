@@ -1,15 +1,9 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import type { Property, Tenant, UnitType } from '@/lib/types';
 import { unitTypes } from '@/lib/types';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -114,36 +108,26 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/2" />
-          <Skeleton className="h-4 w-3/4 mt-2" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 p-6 pt-0">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4 pt-4">
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-[180px]" />
+        </div>
+        <Skeleton className="h-48 w-full" />
+      </div>
     );
   }
 
   if (!analytics || Object.keys(analytics).length === 0) {
-    return null;
+    return (
+        <div className="text-center py-10 border rounded-lg mt-4">
+            <p className="text-sm text-muted-foreground">No units found for the selected filter in this property.</p>
+        </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-            <div>
-                <CardTitle>{property.name} - Unit Analytics</CardTitle>
-                <CardDescription>
-                  A detailed breakdown of units for this property by floor.
-                </CardDescription>
-            </div>
+    <div className="pt-4">
+        <div className="flex justify-end mb-4">
             <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Filter by Unit Type" />
@@ -154,31 +138,30 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
                 </SelectContent>
             </Select>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Floor</TableHead>
-              <TableHead className="text-center">Rented (SM)</TableHead>
-              <TableHead className="text-center">Rented (Landlord)</TableHead>
-              <TableHead className="text-center">Vacant</TableHead>
-              <TableHead className="text-center">Total Units</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {Object.entries(analytics).map(([floor, data]) => (
-              <TableRow key={floor}>
-                <TableCell className="font-medium">Floor {floor}</TableCell>
-                <TableCell className="text-center">{data.rentedSM}</TableCell>
-                <TableCell className="text-center">{data.rentedLandlord}</TableCell>
-                <TableCell className="text-center">{data.vacant}</TableCell>
-                <TableCell className="text-center">{data.totalUnits}</TableCell>
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Floor</TableHead>
+                <TableHead className="text-center">Rented (SM)</TableHead>
+                <TableHead className="text-center">Rented (Landlord)</TableHead>
+                <TableHead className="text-center">Vacant</TableHead>
+                <TableHead className="text-center">Total Units</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(analytics).map(([floor, data]) => (
+                <TableRow key={floor}>
+                  <TableCell className="font-medium">Floor {floor}</TableCell>
+                  <TableCell className="text-center">{data.rentedSM}</TableCell>
+                  <TableCell className="text-center">{data.rentedLandlord}</TableCell>
+                  <TableCell className="text-center">{data.vacant}</TableCell>
+                  <TableCell className="text-center">{data.totalUnits}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+    </div>
   );
 }

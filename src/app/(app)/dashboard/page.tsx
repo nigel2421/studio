@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { MaintenanceRequest, Tenant, Property, Payment } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -56,9 +57,30 @@ export default function DashboardPage() {
 
       <StatusAnalytics properties={properties} />
 
-      {properties.map(property => (
-        <UnitAnalytics key={property.id} property={property} tenants={tenants} />
-      ))}
+      {properties.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Per-Property Unit Analytics</CardTitle>
+            <CardDescription>
+              A detailed floor-by-floor breakdown of units for each property.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue={properties[0].id} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                {properties.map(property => (
+                  <TabsTrigger key={property.id} value={property.id}>{property.name}</TabsTrigger>
+                ))}
+              </TabsList>
+              {properties.map(property => (
+                <TabsContent key={property.id} value={property.id}>
+                  <UnitAnalytics property={property} tenants={tenants} />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         <Card className="lg:col-span-1">
