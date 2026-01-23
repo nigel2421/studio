@@ -1,12 +1,31 @@
-
 {
   "indexes": [
     {
-      "collectionGroup": "waterReadings",
+      "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "tenantId",
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "propertyId",
           "order": "ASCENDING"
         },
         {
@@ -34,11 +53,97 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "tenantId",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tenants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "propertyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "unitName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "residentType",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "email",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "waterReadings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "waterReadings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "propertyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "waterReadings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ]
