@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -46,10 +47,6 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
   const [agent, setAgent] = useState<Agent>();
   const [rent, setRent] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
-
-  const [paidRent, setPaidRent] = useState(false);
-  const [paidSecurityDeposit, setPaidSecurityDeposit] = useState(false);
-  const [paidWaterDeposit, setPaidWaterDeposit] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -109,9 +106,6 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
     setAgent(undefined);
     setRent(0);
     setSecurityDeposit(0);
-    setPaidRent(false);
-    setPaidSecurityDeposit(false);
-    setPaidWaterDeposit(false);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,9 +127,6 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
         leaseStartDate: new Date().toISOString().split('T')[0],
-        paidRent,
-        paidSecurityDeposit,
-        paidWaterDeposit,
       });
       toast({
         title: "Tenant Added",
@@ -247,22 +238,6 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
                 </div>
             </div>
             
-            <div className="space-y-3 rounded-md border p-4">
-                <Label className="font-semibold">Initial Payments</Label>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidRent-dialog" checked={paidRent} onCheckedChange={(c) => setPaidRent(Boolean(c))} />
-                    <Label htmlFor="paidRent-dialog" className="font-normal">Paid First Month's Rent (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidSecurityDeposit-dialog" checked={paidSecurityDeposit} onCheckedChange={(c) => setPaidSecurityDeposit(Boolean(c))} />
-                    <Label htmlFor="paidSecurityDeposit-dialog" className="font-normal">Paid Security Deposit (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidWaterDeposit-dialog" checked={paidWaterDeposit} onCheckedChange={(c) => setPaidWaterDeposit(Boolean(c))} />
-                    <Label htmlFor="paidWaterDeposit-dialog" className="font-normal">Paid Water Meter Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
-                </div>
-            </div>
-
           </div>
           <DialogFooter>
             <Button type="submit" disabled={!selectedProperty || !unitName || !agent || isLoading}>

@@ -40,10 +40,6 @@ export default function AddTenantPage() {
   const [leaseStartDate, setLeaseStartDate] = useState<Date | undefined>(new Date());
   const [securityDeposit, setSecurityDeposit] = useState(0);
 
-  const [paidRent, setPaidRent] = useState(false);
-  const [paidSecurityDeposit, setPaidSecurityDeposit] = useState(false);
-  const [paidWaterDeposit, setPaidWaterDeposit] = useState(false);
-
 
   useEffect(() => {
     async function fetchProperties() {
@@ -113,9 +109,6 @@ export default function AddTenantPage() {
         securityDeposit,
         waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
-        paidRent,
-        paidSecurityDeposit,
-        paidWaterDeposit,
       });
 
       toast({
@@ -243,22 +236,6 @@ export default function AddTenantPage() {
                         />
                         </PopoverContent>
                     </Popover>
-                </div>
-            </div>
-          
-           <div className="space-y-3 rounded-md border p-4">
-                <Label className="font-semibold">Initial Payments</Label>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidRent" checked={paidRent} onCheckedChange={(c) => setPaidRent(Boolean(c))} />
-                    <Label htmlFor="paidRent" className="font-normal">Paid First Month's Rent (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidSecurityDeposit" checked={paidSecurityDeposit} onCheckedChange={(c) => setPaidSecurityDeposit(Boolean(c))} />
-                    <Label htmlFor="paidSecurityDeposit" className="font-normal">Paid Security Deposit (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="paidWaterDeposit" checked={paidWaterDeposit} onCheckedChange={(c) => setPaidWaterDeposit(Boolean(c))} />
-                    <Label htmlFor="paidWaterDeposit" className="font-normal">Paid Water Meter Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
                 </div>
             </div>
 
