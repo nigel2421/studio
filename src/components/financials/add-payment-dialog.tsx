@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { addPayment } from '@/lib/data';
+import { batchProcessPayments } from '@/lib/data';
 import type { Tenant, Property, Payment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -16,9 +16,12 @@ import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 
+const paymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Other'];
+
 interface PaymentEntry {
   id: number;
   amount: string;
+  type: Payment['type'];
   date: Date;
   notes: string;
   rentForMonth: string;
@@ -42,7 +45,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -50,7 +53,16 @@ export function AddPaymentDialog({
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
+  
+  const initialEntry: PaymentEntry = {
+      id: 1,
+      amount: '',
+      type: defaultPaymentType || 'Rent',
+      date: new Date(),
+      notes: '',
+      rentForMonth: format(new Date(), 'yyyy-MM'),
+  };
+  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([initialEntry]);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
@@ -93,7 +105,7 @@ export function AddPaymentDialog({
   }, [tenant, selectedUnit, selectedProperty, tenants]);
 
   const resetForm = () => {
-    setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
+    setPaymentEntries([initialEntry]);
     if (!tenant) { // Don't reset if a tenant is pre-selected
         setSelectedProperty('');
         setSelectedFloor('');
@@ -121,7 +133,7 @@ export function AddPaymentDialog({
   };
 
   const addEntry = () => {
-    setPaymentEntries(entries => [...entries, { id: Date.now(), amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
+    setPaymentEntries(entries => [...entries, { ...initialEntry, id: Date.now() }]);
   };
 
   const removeEntry = (id: number) => {
@@ -164,20 +176,15 @@ export function AddPaymentDialog({
     setIsLoading(true);
     startLoading(`Recording ${validEntries.length} payment(s)...`);
     try {
-      const typeToSubmit = defaultPaymentType || 'Rent';
-      const paymentPromises = validEntries.map(entry =>
-        addPayment({
-          tenantId: tenantId!,
-          amount: Number(entry.amount),
-          date: format(entry.date, 'yyyy-MM-dd'),
-          notes: entry.notes,
-          rentForMonth: entry.rentForMonth,
-          status: 'Paid',
-          type: typeToSubmit,
-        }, taskId)
-      );
+      const paymentsToBatch = validEntries.map(e => ({
+        amount: Number(e.amount),
+        date: format(e.date, 'yyyy-MM-dd'),
+        notes: e.notes,
+        rentForMonth: e.rentForMonth,
+        type: e.type,
+      }));
 
-      await Promise.all(paymentPromises);
+      await batchProcessPayments(tenantId, paymentsToBatch, taskId);
 
       toast({ title: 'Payments Added', description: `${validEntries.length} payment(s) have been successfully recorded.` });
       onPaymentAdded();
@@ -302,13 +309,26 @@ export function AddPaymentDialog({
               <Label>Payment Records</Label>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry, index) => (
-                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg">
+                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end p-3 border rounded-lg">
                     <div className="space-y-1">
                       <Label htmlFor={`amount-${entry.id}`} className="text-xs">Amount (Ksh)</Label>
                       <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">Rent For Month</Label>
+                      <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
+                       <Select value={entry.type} onValueChange={(v) => handleEntryChange(entry.id, 'type', v as Payment['type'])}>
+                          <SelectTrigger id={`type-${entry.id}`} className="h-10">
+                              <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {paymentTypes.map(option => (
+                                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">For Month</Label>
                       <Select
                           value={entry.rentForMonth}
                           onValueChange={(value) => handleEntryChange(entry.id, 'rentForMonth', value)}

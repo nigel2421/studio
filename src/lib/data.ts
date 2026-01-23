@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -8,7 +9,7 @@ import {
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, calculateTargetDue, getRecommendedPaymentStatus } from './financial-logic';
 import { format } from "date-fns";
@@ -477,75 +478,98 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
 }
 
-export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
-    const tenantRef = doc(db, 'tenants', paymentData.tenantId);
-    const tenantSnap = await getDoc(tenantRef);
-    if (!tenantSnap.exists()) {
-        throw new Error("Tenant not found");
-    }
-    const originalTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
+export async function batchProcessPayments(
+    tenantId: string,
+    paymentEntries: { amount: number, date: string, notes?: string, rentForMonth?: string, type: Payment['type'] }[],
+    taskId?: string
+) {
+    const tenantRef = doc(db, 'tenants', tenantId);
 
-    // 1. Record the payment in Firestore
-    await addDoc(collection(db, 'payments'), {
-        ...paymentData,
-        createdAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+        const tenantSnap = await transaction.get(tenantRef);
+        if (!tenantSnap.exists()) {
+            throw new Error("Tenant not found");
+        }
+        let tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
+
+        let allPaymentUpdates: any = {};
+
+        // Process all payments sequentially and accumulate state changes in memory
+        for (const entry of paymentEntries) {
+            const paymentDocRef = doc(collection(db, 'payments'));
+            transaction.set(paymentDocRef, { 
+                ...entry, 
+                tenantId: tenantId, 
+                status: 'Paid', 
+                createdAt: serverTimestamp() 
+            });
+            
+            const updates = processPayment(tenantData, entry.amount);
+            
+            // Apply updates to in-memory tenantData for the next iteration
+            tenantData = {
+                ...tenantData,
+                dueBalance: updates.dueBalance,
+                accountBalance: updates.accountBalance,
+                lease: {
+                    ...tenantData.lease,
+                    paymentStatus: updates['lease.paymentStatus'],
+                    lastPaymentDate: updates['lease.lastPaymentDate'],
+                }
+            };
+            allPaymentUpdates = { ...allPaymentUpdates, ...updates };
+        }
+
+        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, new Date());
+        const finalUpdates = { ...allPaymentUpdates, ...reconciliationUpdates };
+
+        transaction.update(tenantRef, finalUpdates);
     });
 
-    // 2. Process payment to get initial updates
-    const paymentUpdates = processPayment(originalTenant, paymentData.amount);
+    // --- Post-transaction side effects ---
 
-    // 3. Create a transient in-memory state of the tenant AFTER payment
-    const tenantAfterPayment: Tenant = {
-        ...originalTenant,
-        dueBalance: paymentUpdates.dueBalance,
-        accountBalance: paymentUpdates.accountBalance,
-        lease: {
-            ...originalTenant.lease,
-            paymentStatus: paymentUpdates['lease.paymentStatus'],
-            lastPaymentDate: paymentUpdates['lease.lastPaymentDate'],
-        }
-    };
-    
-    // 4. Run monthly billing reconciliation on this new transient state
-    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterPayment, new Date());
-    
-    // 5. Merge all updates for the final write.
-    const finalUpdates = {
-        ...paymentUpdates,
-        ...reconciliationUpdates
-    };
-
-    // 6. Update tenant in Firestore with the final, fully-reconciled state
-    await updateDoc(tenantRef, finalUpdates);
-
-    // 7. If a taskId is provided, update the task status
     if (taskId) {
         try {
             const taskRef = doc(db, 'tasks', taskId);
             await updateDoc(taskRef, { status: 'Completed' });
-            await logActivity(`Completed task ${taskId} via payment for ${originalTenant.name}.`);
+            await logActivity(`Completed task ${taskId} via payment.`);
         } catch (error) {
             console.error("Failed to update task status:", error);
-            // We don't throw here because the payment itself was successful.
         }
     }
 
-    // 8. Send receipt email
-    const property = await getProperty(originalTenant.propertyId);
-    try {
-        await sendPaymentReceipt({
-            tenantEmail: originalTenant.email,
-            tenantName: originalTenant.name,
-            amount: paymentData.amount,
-            date: paymentData.date,
-            propertyName: property?.name || 'N/A',
-            unitName: originalTenant.unitName,
-            notes: paymentData.notes,
-        });
-        await logActivity(`Sent payment receipt to ${originalTenant.name} (${originalTenant.email})`);
-    } catch (error) {
-        console.error("Failed to send receipt email:", error);
+    const tenant = await getTenant(tenantId);
+    if (tenant) {
+        const property = await getProperty(tenant.propertyId);
+        for (const entry of paymentEntries) {
+             try {
+                await sendPaymentReceipt({
+                    tenantEmail: tenant.email,
+                    tenantName: tenant.name,
+                    amount: entry.amount,
+                    date: entry.date,
+                    propertyName: property?.name || 'N/A',
+                    unitName: tenant.unitName,
+                    notes: entry.notes,
+                });
+                await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
+            } catch (error) {
+                console.error("Failed to send receipt email:", error);
+            }
+        }
     }
+}
+
+export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
+    const { tenantId, amount, date, notes, rentForMonth, type } = paymentData;
+    const entries = [{
+        amount,
+        date,
+        notes,
+        rentForMonth,
+        type,
+    }];
+    await batchProcessPayments(tenantId, entries, taskId);
 }
 
 export async function runMonthlyReconciliation(): Promise<void> {
