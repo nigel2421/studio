@@ -106,7 +106,7 @@ export default function ServiceChargesPage() {
         const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
         allProperties.forEach(p => {
             (p.units || []).forEach(u => {
-                if (u.managementStatus === 'Client Managed' && u.ownership === 'Landlord') {
+                if (u.managementStatus === 'Client Managed' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over') {
                     selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
                 }
             });
@@ -130,8 +130,6 @@ export default function ServiceChargesPage() {
                     paymentStatus = 'Paid';
                     paymentAmount = relevantPayment.amount;
                 }
-            } else if (unit.status !== 'client occupied') {
-                paymentStatus = 'Vacant';
             }
 
 
@@ -509,5 +507,3 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
-
-
