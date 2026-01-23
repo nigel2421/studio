@@ -92,7 +92,6 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
                                         selected={endDate}
                                         onSelect={setEndDate}
                                         disabled={startDate ? { before: startDate } : undefined}
-                                        initialFocus
                                     />
                                 </PopoverContent>
                             </Popover>

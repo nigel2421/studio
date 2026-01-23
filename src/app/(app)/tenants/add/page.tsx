@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -236,7 +237,6 @@ export default function AddTenantPage() {
                             mode="single"
                             selected={leaseStartDate}
                             onSelect={setLeaseStartDate}
-                            initialFocus
                         />
                         </PopoverContent>
                     </Popover>

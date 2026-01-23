@@ -162,7 +162,6 @@ export default function AddWaterMeterReadingPage() {
                         mode="single"
                         selected={readingDate}
                         onSelect={setReadingDate}
-                        initialFocus
                     />
                     </PopoverContent>
                 </Popover>
