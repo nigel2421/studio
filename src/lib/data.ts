@@ -377,33 +377,50 @@ export async function addWaterMeterReading(data: {
         throw new Error("Tenant not found for the selected unit.");
     }
     const tenantDoc = tenantsSnapshot.docs[0];
-    const tenantId = tenantDoc.id;
+    const originalTenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
 
     const consumption = data.currentReading - data.priorReading;
     const amount = consumption * WATER_RATE;
 
-    const readingData = {
+    // 1. Record the water reading
+    await addDoc(collection(db, 'waterReadings'), {
         ...data,
-        tenantId,
+        tenantId: originalTenant.id,
         consumption,
         rate: WATER_RATE,
         amount,
         createdAt: serverTimestamp(),
+    });
+
+    // 2. Prepare initial update from the water bill
+    const newDueBalance = (originalTenant.dueBalance || 0) + amount;
+    const initialUpdates = {
+        dueBalance: newDueBalance,
+        'lease.paymentStatus': getRecommendedPaymentStatus({ ...originalTenant, dueBalance: newDueBalance })
     };
 
-    await addDoc(collection(db, 'waterReadings'), readingData);
+    // 3. Create a transient in-memory state after applying the bill
+    const tenantAfterBill: Tenant = {
+        ...originalTenant,
+        dueBalance: initialUpdates.dueBalance,
+        lease: {
+            ...originalTenant.lease,
+            paymentStatus: initialUpdates['lease.paymentStatus'],
+        }
+    };
+    
+    // 4. Run reconciliation on this new transient state
+    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, new Date());
 
-    // Update tenant's due balance
-    const tenantRef = doc(db, 'tenants', tenantId);
-    const tenantSnap = await getDoc(tenantRef);
-    if (tenantSnap.exists()) {
-        const tenantData = tenantSnap.data() as Tenant;
-        const newDueBalance = (tenantData.dueBalance || 0) + amount;
-        await updateDoc(tenantRef, { 
-            dueBalance: newDueBalance,
-            'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenantData, dueBalance: newDueBalance })
-        });
-    }
+    // 5. Merge all updates for the final write
+    const finalUpdates = {
+        ...initialUpdates,
+        ...reconciliationUpdates
+    };
+
+    // 6. Update tenant in Firestore
+    const tenantRef = doc(db, 'tenants', originalTenant.id);
+    await updateDoc(tenantRef, finalUpdates);
 
     await logActivity(`Added water reading for unit ${data.unitName}`);
 }
@@ -441,52 +458,69 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
 export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
     const tenantRef = doc(db, 'tenants', paymentData.tenantId);
     const tenantSnap = await getDoc(tenantRef);
-
     if (!tenantSnap.exists()) {
         throw new Error("Tenant not found");
     }
-
-    const tenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
+    const originalTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
     // 1. Record the payment in Firestore
-    const paymentsRef = collection(db, 'payments');
-    await addDoc(paymentsRef, {
+    await addDoc(collection(db, 'payments'), {
         ...paymentData,
         createdAt: serverTimestamp(),
     });
 
-    // 2. Process balances using logic
-    const updates = processPayment(tenant, paymentData.amount);
+    // 2. Process payment to get initial updates
+    const paymentUpdates = processPayment(originalTenant, paymentData.amount);
 
-    // 3. Update tenant in Firestore
-    await updateDoc(tenantRef, updates);
+    // 3. Create a transient in-memory state of the tenant AFTER payment
+    const tenantAfterPayment: Tenant = {
+        ...originalTenant,
+        dueBalance: paymentUpdates.dueBalance,
+        accountBalance: paymentUpdates.accountBalance,
+        lease: {
+            ...originalTenant.lease,
+            paymentStatus: paymentUpdates['lease.paymentStatus'],
+            lastPaymentDate: paymentUpdates['lease.lastPaymentDate'],
+        }
+    };
     
-    // 4. If a taskId is provided, update the task status
+    // 4. Run monthly billing reconciliation on this new transient state
+    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterPayment, new Date());
+    
+    // 5. Merge all updates for the final write.
+    const finalUpdates = {
+        ...paymentUpdates,
+        ...reconciliationUpdates
+    };
+
+    // 6. Update tenant in Firestore with the final, fully-reconciled state
+    await updateDoc(tenantRef, finalUpdates);
+
+    // 7. If a taskId is provided, update the task status
     if (taskId) {
         try {
             const taskRef = doc(db, 'tasks', taskId);
             await updateDoc(taskRef, { status: 'Completed' });
-            await logActivity(`Completed task ${taskId} via payment for ${tenant.name}.`);
+            await logActivity(`Completed task ${taskId} via payment for ${originalTenant.name}.`);
         } catch (error) {
             console.error("Failed to update task status:", error);
             // We don't throw here because the payment itself was successful.
         }
     }
 
-
-    // 5. Send receipt email
-    const property = await getProperty(tenant.propertyId);
+    // 8. Send receipt email
+    const property = await getProperty(originalTenant.propertyId);
     try {
         await sendPaymentReceipt({
-            tenantEmail: tenant.email,
-            tenantName: tenant.name,
+            tenantEmail: originalTenant.email,
+            tenantName: originalTenant.name,
             amount: paymentData.amount,
             date: paymentData.date,
             propertyName: property?.name || 'N/A',
-            unitName: tenant.unitName,
+            unitName: originalTenant.unitName,
             notes: paymentData.notes,
         });
-        await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
+        await logActivity(`Sent payment receipt to ${originalTenant.name} (${originalTenant.email})`);
     } catch (error) {
         console.error("Failed to send receipt email:", error);
     }
