@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -18,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type FloorAnalyticsData = {
   rentedSM: number;
   rentedLandlord: number;
+  clientOccupied: number;
   vacant: number;
   totalUnits: number;
 };
@@ -63,6 +63,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
             floors.set(floorNumber, {
               rentedSM: 0,
               rentedLandlord: 0,
+              clientOccupied: 0,
               vacant: 0,
               totalUnits: 0,
             });
@@ -83,13 +84,17 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
         const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
 
         if (tenant) {
-          if (unit.ownership === 'SM') {
-            floorData.rentedSM++;
-          } else if (unit.ownership === 'Landlord') {
-            floorData.rentedLandlord++;
+          if (tenant.residentType === 'Homeowner') {
+            floorData.clientOccupied++;
+          } else { // residentType is 'Tenant'
+            if (unit.ownership === 'SM') {
+              floorData.rentedSM++;
+            } else if (unit.ownership === 'Landlord') {
+              floorData.rentedLandlord++;
+            }
           }
         } else if (unit.status === 'vacant') {
-          floorData.vacant++;
+            floorData.vacant++;
         }
       });
       
@@ -145,6 +150,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
                 <TableHead>Floor</TableHead>
                 <TableHead className="text-center">Rented (SM)</TableHead>
                 <TableHead className="text-center">Rented (Landlord)</TableHead>
+                <TableHead className="text-center">Client Occupied</TableHead>
                 <TableHead className="text-center">Vacant</TableHead>
                 <TableHead className="text-center">Total Units</TableHead>
               </TableRow>
@@ -155,6 +161,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
                   <TableCell className="font-medium">Floor {floor}</TableCell>
                   <TableCell className="text-center">{data.rentedSM}</TableCell>
                   <TableCell className="text-center">{data.rentedLandlord}</TableCell>
+                  <TableCell className="text-center">{data.clientOccupied}</TableCell>
                   <TableCell className="text-center">{data.vacant}</TableCell>
                   <TableCell className="text-center">{data.totalUnits}</TableCell>
                 </TableRow>
