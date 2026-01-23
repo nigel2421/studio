@@ -1,9 +1,11 @@
+
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Payment, Tenant } from '@/lib/types';
 import { useMemo } from 'react';
+import { isSameMonth } from 'date-fns';
 
 interface FinancialOverviewChartProps {
   payments: Payment[];
@@ -12,19 +14,27 @@ interface FinancialOverviewChartProps {
 
 export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewChartProps) {
   const chartData = useMemo(() => {
-    const rentCollected = payments
-      .filter(p => p.type === 'Rent' && p.status === 'Paid')
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    const rentDue = tenants
+    const now = new Date();
+    
+    // Calculate total expected rent from all active tenants
+    const expectedMonthlyRevenue = tenants
       .filter(t => t.residentType === 'Tenant')
-      .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+      .reduce((sum, t) => sum + (t.lease?.rent || 0), 0);
+
+    // Calculate rent collected within the current month
+    const collectedThisMonth = payments
+      .filter(p => 
+        p.type === 'Rent' && 
+        p.status === 'Paid' && 
+        isSameMonth(new Date(p.date), now)
+      )
+      .reduce((sum, p) => sum + p.amount, 0);
       
     return [
       {
-        name: 'Financials',
-        "Rent Collected": rentCollected,
-        "Outstanding Rent": rentDue,
+        name: 'Current Month Revenue',
+        "Collected": collectedThisMonth,
+        "Expected": expectedMonthlyRevenue,
       },
     ];
   }, [payments, tenants]);
@@ -32,8 +42,8 @@ export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewC
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Financial Overview</CardTitle>
-        <CardDescription>A summary of rent collected vs. outstanding rent.</CardDescription>
+        <CardTitle>Monthly Revenue Target</CardTitle>
+        <CardDescription>A real-time overview of rent collected against the expected monthly total.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
@@ -57,8 +67,8 @@ export function FinancialOverviewChart({ payments, tenants }: FinancialOverviewC
                 cursor={{fill: 'hsl(var(--muted))'}}
              />
             <Legend />
-            <Bar dataKey="Rent Collected" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Outstanding Rent" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Collected" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Expected" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
