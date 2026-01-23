@@ -38,12 +38,14 @@ const normalizeManagementStatus = (status?: string): ManagementStatus | undefine
 export function StatusAnalytics({ property }: StatusAnalyticsProps) {
     const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
 
-    const { analytics, handoverTotals, managementTotals, grandTotals } = useMemo(() => {
+    const { analytics, handoverTotals, managementTotals, grandTotals, allUnitsHandedOver } = useMemo(() => {
         const data: Record<string, AnalyticsData> = {};
         
         if (!Array.isArray(property.units)) {
-            return { analytics: {}, handoverTotals: null, managementTotals: null, grandTotals: null };
+            return { analytics: {}, handoverTotals: null, managementTotals: null, grandTotals: null, allUnitsHandedOver: false };
         }
+        
+        const allUnitsHandedOver = property.units.every(unit => unit.handoverStatus === 'Handed Over');
 
         const filteredUnits = property.units.filter(unit =>
             unitTypeFilter === 'all' || unit.unitType === unitTypeFilter
@@ -108,7 +110,7 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
         });
         grandTotals.Total = filteredUnits.length;
 
-        return { analytics: data, handoverTotals, managementTotals, grandTotals };
+        return { analytics, handoverTotals, managementTotals, grandTotals, allUnitsHandedOver };
     }, [property, unitTypeFilter]);
     
     if (!property || !property.units) {
@@ -179,7 +181,7 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {renderTableSection('Handover Status', handoverStatuses, handoverTotals)}
+                        {!allUnitsHandedOver && renderTableSection('Handover Status', handoverStatuses, handoverTotals)}
                         {renderTableSection('Management Status', managementStatuses, managementTotals)}
                         {renderTotalsRow('Grand Total', grandTotals, true)}
                     </TableBody>
