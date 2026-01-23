@@ -334,7 +334,7 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
                                         size="sm"
                                         variant="outline"
                                         onClick={() => onConfirmPayment(acc)}
-                                        disabled={acc.paymentStatus === 'Vacant' || !acc.tenantId}
+                                        disabled={acc.paymentStatus === 'Paid'}
                                     >
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Confirm Payment
