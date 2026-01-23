@@ -25,7 +25,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "hidden", // Hide the default text label which interferes
+        caption_label: "hidden",
         caption_dropdowns: "flex justify-center gap-1",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
@@ -61,7 +61,7 @@ function Calendar({
           const options = React.Children.toArray(
             children
           ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
-          const selected = options.find((child) => child.props.value == value)
+          const selected = options.find((child) => String(child.props.value) === String(value))
           const handleChange = (value: string) => {
             const changeEvent = {
               target: { value },
@@ -75,7 +75,7 @@ function Calendar({
                 if (value) handleChange(value)
               }}
             >
-              <SelectTrigger className="pr-1.5 focus:ring-0 w-[120px]">
+              <SelectTrigger className="pr-1.5 focus:ring-0">
                 <SelectValue>{selected?.props?.children}</SelectValue>
               </SelectTrigger>
               <SelectContent position="popper">
