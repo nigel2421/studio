@@ -75,7 +75,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
     const clientUnits = property.units.filter(u =>
         u.status === 'client occupied' &&
         u.ownership === 'Landlord' &&
-        u.managementStatus === 'Client Self Fully Managed' &&
+        u.managementStatus === 'Client Managed' &&
         u.handoverStatus === 'Handed Over'
     );
 
