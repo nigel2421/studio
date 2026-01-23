@@ -25,8 +25,8 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "hidden",
-        caption_dropdowns: "flex justify-center gap-2",
+        caption_label: "hidden", // Hide the default text label which interferes
+        caption_dropdowns: "flex justify-center gap-1",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -34,7 +34,7 @@ function Calendar({
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse",
+        table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
           "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
@@ -61,7 +61,7 @@ function Calendar({
           const options = React.Children.toArray(
             children
           ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
-          const selected = options.find((child) => child.props.value === value)
+          const selected = options.find((child) => child.props.value == value)
           const handleChange = (value: string) => {
             const changeEvent = {
               target: { value },
@@ -72,15 +72,15 @@ function Calendar({
             <Select
               value={value?.toString()}
               onValueChange={(value) => {
-                handleChange(value)
+                if (value) handleChange(value)
               }}
             >
-              <SelectTrigger className="h-7 pr-1.5 focus:ring-0">
+              <SelectTrigger className="pr-1.5 focus:ring-0 w-[120px]">
                 <SelectValue>{selected?.props?.children}</SelectValue>
               </SelectTrigger>
               <SelectContent position="popper">
                 <ScrollArea className="h-80">
-                  {options.map((option, id) => (
+                  {options.map((option, id: number) => (
                     <SelectItem
                       key={`${option.props.value}-${id}`}
                       value={option.props.value?.toString() ?? ""}
