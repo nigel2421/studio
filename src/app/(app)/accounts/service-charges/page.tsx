@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -129,6 +130,8 @@ export default function ServiceChargesPage() {
                     paymentStatus = 'Paid';
                     paymentAmount = relevantPayment.amount;
                 }
+            } else if (unit.status !== 'client occupied') {
+                paymentStatus = 'Vacant';
             }
 
 
@@ -230,36 +233,35 @@ export default function ServiceChargesPage() {
     startLoading(`Recording payment for ${ownerForPayment.name}...`);
     try {
         let remainingAmount = paymentData.amount;
-        let paymentsRecorded = 0;
 
-        // Ensure all homeowner tenants exist before processing payments
-        const tenantsToUpdate: Tenant[] = [];
-        for (const acc of accountsForPayment) {
+        // Step 1: Ensure all tenants exist and get their data.
+        const tenantPromises = accountsForPayment.map(async (acc) => {
             let tenant = allTenants.find(t => t.propertyId === acc.propertyId && t.unitName === acc.unitName);
-            if (!tenant) {
-                const property = allProperties.find(p => p.id === acc.propertyId);
-                const unit = property?.units.find(u => u.name === acc.unitName);
-                if (property && unit && ownerForPayment) {
-                    tenant = await findOrCreateHomeownerTenant(ownerForPayment, unit, property.id);
-                }
+            if (tenant) return tenant;
+
+            // If not found locally, try to find/create it in the database.
+            const property = allProperties.find(p => p.id === acc.propertyId);
+            const unit = property?.units.find(u => u.name === acc.unitName);
+            if (property && unit && ownerForPayment) {
+                return await findOrCreateHomeownerTenant(ownerForPayment, unit, property.id);
             }
-            if (tenant) {
-                tenantsToUpdate.push(tenant);
-            }
-        }
+            return null;
+        });
         
-        // Refetch tenants state to include any newly created ones
-        if (tenantsToUpdate.length > accountsForPayment.length) {
-          const freshTenants = await getTenants();
-          setAllTenants(freshTenants);
+        const tenantsForPayment = (await Promise.all(tenantPromises)).filter(Boolean) as Tenant[];
+        
+        if (tenantsForPayment.length !== accountsForPayment.length) {
+            throw new Error("Could not find or create resident accounts for all selected units.");
         }
 
+        // Step 2: Create payment promises.
         const paymentPromises = [];
+        let paymentsRecorded = 0;
 
         for (const account of accountsForPayment) {
             if (remainingAmount <= 0) break;
 
-            const tenant = tenantsToUpdate.find(t => t.propertyId === account.propertyId && t.unitName === account.unitName);
+            const tenant = tenantsForPayment.find(t => t.propertyId === account.propertyId && t.unitName === account.unitName);
             if (tenant) {
                 const amountToApply = Math.min(remainingAmount, account.unitServiceCharge);
                 
@@ -277,17 +279,18 @@ export default function ServiceChargesPage() {
                 paymentsRecorded++;
             }
         }
-
+        
+        // Step 3: Execute all payments.
         await Promise.all(paymentPromises);
 
         toast({ title: "Payment Recorded", description: `${paymentsRecorded} service charge payment(s) for ${ownerForPayment.name} have been recorded.` });
         
         setIsOwnerPaymentDialogOpen(false);
-        fetchData();
+        fetchData(); // Refreshes all data.
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error recording consolidated payment:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while recording the payment.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An error occurred while recording the payment.' });
     } finally {
         stopLoading();
     }
@@ -375,6 +378,20 @@ export default function ServiceChargesPage() {
 }
 
 const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void }) => {
+    const { toast } = useToast();
+
+    const handleConfirmClick = (acc: ServiceChargeAccount) => {
+        if (acc.paymentStatus === 'Vacant') {
+            toast({
+                variant: "destructive",
+                title: "Cannot Record Payment",
+                description: "This unit is vacant. Service charges for vacant units are handled under the 'Vacant Units in Arrears' tab or billed directly to the landlord.",
+            });
+            return;
+        }
+        onConfirmPayment(acc);
+    };
+    
     return (
         <Card>
             <CardHeader>
@@ -403,15 +420,20 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
                                 <TableCell>{acc.ownerName}</TableCell>
                                 <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
                                 <TableCell>
-                                    {acc.paymentStatus === 'Paid' ? <Badge variant="default">Paid</Badge> : 
-                                    <Badge variant="destructive">Pending</Badge>}
+                                     <Badge variant={
+                                        acc.paymentStatus === 'Paid' ? 'default' :
+                                        acc.paymentStatus === 'Pending' ? 'destructive' :
+                                        'secondary'
+                                    }>
+                                        {acc.paymentStatus}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
                                 <TableCell className="text-right">
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => onConfirmPayment(acc)}
+                                        onClick={() => handleConfirmClick(acc)}
                                         disabled={acc.paymentStatus === 'Paid'}
                                     >
                                         <CheckCircle className="mr-2 h-4 w-4" />
