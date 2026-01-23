@@ -23,7 +23,7 @@ export default function AddWaterMeterReadingPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [priorReading, setPriorReading] = useState('');
   const [currentReading, setCurrentReading] = useState('');
-  const [readingDate, setReadingDate] = useState<Date | undefined>(new Date());
+  const [readingDate, setReadingDate] = useState<Date | undefined>();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -58,6 +58,15 @@ export default function AddWaterMeterReadingPage() {
       });
       return;
     }
+    if (!readingDate) {
+      toast({
+        variant: "destructive",
+        title: "Missing Date",
+        description: "Please select a reading date.",
+      });
+      return;
+    }
+
 
     setIsLoading(true);
     startLoading('Recording Water Reading...');
@@ -68,7 +77,7 @@ export default function AddWaterMeterReadingPage() {
         unitName: selectedUnit,
         priorReading: Number(priorReading),
         currentReading: Number(currentReading),
-        date: readingDate ? format(readingDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
+        date: format(readingDate, 'yyyy-MM-dd'),
       });
       toast({
         title: "Reading Added",

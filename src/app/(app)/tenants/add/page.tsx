@@ -34,7 +34,7 @@ export default function AddTenantPage() {
   const [unitName, setUnitName] = useState('');
   const [agent, setAgent] = useState<Agent>();
   const [rent, setRent] = useState(0);
-  const [leaseStartDate, setLeaseStartDate] = useState<Date | undefined>(new Date());
+  const [leaseStartDate, setLeaseStartDate] = useState<Date | undefined>();
   const [securityDeposit, setSecurityDeposit] = useState(0);
 
 
@@ -89,6 +89,14 @@ export default function AddTenantPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProperty || !unitName || !agent) return;
+    if (!leaseStartDate) {
+      toast({
+        variant: "destructive",
+        title: "Missing Date",
+        description: "Please select a lease start date.",
+      });
+      return;
+    }
 
     setIsLoading(true);
     startLoading(`Adding Tenant...`);
@@ -102,7 +110,7 @@ export default function AddTenantPage() {
         unitName,
         agent,
         rent,
-        leaseStartDate: leaseStartDate ? format(leaseStartDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+        leaseStartDate: format(leaseStartDate, 'yyyy-MM-dd'),
         securityDeposit,
         waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
