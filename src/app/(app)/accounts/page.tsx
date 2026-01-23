@@ -56,6 +56,8 @@ export default function AccountsPage() {
     fetchAllData();
   }, []);
 
+  const rentTenants = useMemo(() => tenants.filter(t => t.residentType === 'Tenant'), [tenants]);
+
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
     return property ? property.name : 'N/A';
@@ -78,7 +80,7 @@ export default function AccountsPage() {
     .filter(p => p.type === 'Rent' && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const rentDue = tenants
+  const rentDue = rentTenants
     .filter(t => t.lease?.paymentStatus === 'Pending' || t.lease?.paymentStatus === 'Overdue')
     .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
 
@@ -93,7 +95,7 @@ export default function AccountsPage() {
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
   ];
 
-  const filteredTenants = tenants.filter(t =>
+  const filteredTenants = rentTenants.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -209,7 +211,7 @@ export default function AccountsPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={tenants.length}
+            totalItems={rentTenants.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
           />
