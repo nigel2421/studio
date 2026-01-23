@@ -69,7 +69,6 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
     const rentPayments = payments.filter(p => p.status === 'Paid' && p.type === 'Rent');
     summary.transactionCount = rentPayments.length;
 
-    // First, calculate totalRevenue and totalServiceCharges from the transactions.
     rentPayments.forEach(payment => {
         const tenant = tenants.find(t => t.id === payment.tenantId);
         const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
@@ -77,26 +76,25 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
         const unitServiceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
-        summary.totalRevenue += unitRent;
-        summary.totalServiceCharges += unitServiceCharge;
+        const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, unitServiceCharge);
+
+        summary.totalRevenue += breakdown.gross;
+        summary.totalServiceCharges += breakdown.serviceChargeDeduction;
+        summary.totalManagementFees += breakdown.managementFee;
+        summary.totalNetRemittance += breakdown.netToLandlord;
     });
 
-    // Now, calculate the other summary values based on the totals.
-    summary.totalManagementFees = summary.totalRevenue * 0.05;
-
-    // Calculate service charge for vacant units.
+    // Calculate service charge for vacant units that have been handed over
     let vacantUnitDeduction = 0;
     properties.forEach(p => {
       p.units.forEach(u => {
-        if (u.status === 'vacant') {
+        if (u.status === 'vacant' && u.handoverStatus === 'Handed Over') {
           vacantUnitDeduction += u.serviceCharge || 0;
         }
       });
     });
     summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
-
-    // Final Net Rent Payout calculation.
-    summary.totalNetRemittance = summary.totalRevenue - summary.totalServiceCharges - summary.totalManagementFees - vacantUnitDeduction;
+    summary.totalNetRemittance -= vacantUnitDeduction; // Deduct from the final payout
 
     return summary;
 }
