@@ -38,12 +38,14 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
         });
 
         for (const unit of filteredUnits) {
-            if (unit.handoverStatus) {
+            // Check handoverStatus and ensure it exists in our data object before incrementing
+            if (unit.handoverStatus && data[unit.handoverStatus] && unit.unitType) {
                 const status = unit.handoverStatus;
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
             }
-            if (unit.managementStatus) {
+            // Check managementStatus and ensure it exists in our data object before incrementing
+            if (unit.managementStatus && data[unit.managementStatus] && unit.unitType) {
                 const status = unit.managementStatus;
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
