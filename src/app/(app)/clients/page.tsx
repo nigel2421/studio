@@ -49,7 +49,7 @@ export default function ClientsPage() {
   const isClientManagedUnit = (u: Unit) =>
     u.status === 'client occupied' &&
     u.ownership === 'Landlord' &&
-    u.managementStatus === 'Client Self Fully Managed' &&
+    u.managementStatus === 'Client Managed' &&
     u.handoverStatus === 'Handed Over';
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {

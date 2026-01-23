@@ -9,7 +9,7 @@ let updatedCount = 0;
 data.properties.forEach(property => {
     property.units.forEach(unit => {
         if (unit.ownership === 'SM') {
-            unit.managementStatus = 'Renting Mngd by Eracov for SM';
+            unit.managementStatus = 'Rented for Soil Merchants';
             updatedCount++;
         }
     });

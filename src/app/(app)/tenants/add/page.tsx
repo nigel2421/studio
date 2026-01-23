@@ -57,7 +57,7 @@ export default function AddTenantPage() {
           const isSMManaged = u.ownership === 'SM';
           const isClientManaged = u.ownership === 'Landlord' &&
             u.handoverStatus === 'Handed Over' &&
-            u.managementStatus === 'Renting Mngd by Eracov for Client';
+            u.managementStatus === 'Rented for Clients';
           return isSMManaged || isClientManaged;
         });
         setAvailableUnits(units);

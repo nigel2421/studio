@@ -106,7 +106,7 @@ export default function ServiceChargesPage() {
         const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
         allProperties.forEach(p => {
             (p.units || []).forEach(u => {
-                if (u.managementStatus === 'Client Self Fully Managed' && u.ownership === 'Landlord') {
+                if (u.managementStatus === 'Client Managed' && u.ownership === 'Landlord') {
                     selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
                 }
             });
@@ -153,7 +153,7 @@ export default function ServiceChargesPage() {
         // Vacant Units in Arrears Logic
         const vacantUnitsInArrears: VacantArrearsAccount[] = [];
         const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
-            u.managementStatus === 'Client Self Fully Managed' &&
+            u.managementStatus === 'Client Managed' &&
             u.ownership === 'Landlord' &&
             u.status === 'vacant' &&
             u.handoverStatus === 'Handed Over' &&

@@ -17,7 +17,7 @@ export default function AddPropertyPage() {
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [address, setAddress] = useState('');
-  const [units, setUnits] = useState<Omit<Unit, 'status'>[]>([{ name: '', unitType: 'Studio', ownership: 'SM', managementStatus: 'Renting Mngd by Eracov for SM' }]);
+  const [units, setUnits] = useState<Omit<Unit, 'status'>[]>([{ name: '', unitType: 'Studio', ownership: 'SM', managementStatus: 'Rented for Soil Merchants' }]);
 
   const handleUnitChange = (index: number, field: keyof Omit<Unit, 'status'>, value: string) => {
     const newUnits = [...units];
@@ -26,7 +26,7 @@ export default function AddPropertyPage() {
   };
 
   const addUnit = () => {
-    setUnits([...units, { name: '', unitType: 'Studio', ownership: 'SM', managementStatus: 'Renting Mngd by Eracov for SM' }]);
+    setUnits([...units, { name: '', unitType: 'Studio', ownership: 'SM', managementStatus: 'Rented for Soil Merchants' }]);
   };
 
   const removeUnit = (index: number) => {
