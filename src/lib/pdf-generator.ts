@@ -213,11 +213,17 @@ export const generateLandlordStatementPDF = (
     yPos += 8;
 
     const summaryData = [
-        ['Total Revenue (Gross)', formatCurrency(summary.totalRevenue)],
-        ['Service Charges', `-${formatCurrency(summary.totalServiceCharges)}`],
+        ['Total Revenue (from Occupied Units)', formatCurrency(summary.totalRevenue)],
+        ['Service Charges (from Occupied Units)', `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees (5%)', `-${formatCurrency(summary.totalManagementFees)}`],
-        ['Net Rent Payout', formatCurrency(summary.totalNetRemittance)],
     ];
+
+    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
+      summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`])
+    }
+
+    summaryData.push(['Net Rent Payout', formatCurrency(summary.totalNetRemittance)]);
+
     autoTable(doc, {
         startY: yPos,
         body: summaryData,
@@ -268,6 +274,20 @@ export const generateLandlordStatementPDF = (
         theme: 'grid',
         headStyles: { fillColor: [41, 102, 182] },
     });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100);
+        doc.text(
+            `Note: A deduction of ${formatCurrency(summary.vacantUnitServiceChargeDeduction)} has been made for service charges on your vacant units.`,
+            14,
+            yPos
+        );
+        yPos += 10;
+    }
+
 
     doc.save(`landlord_statement_${landlord.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };

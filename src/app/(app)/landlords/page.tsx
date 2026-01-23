@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -16,6 +17,15 @@ import { aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financ
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
+
+const SOIL_MERCHANTS_LANDLORD: Landlord = {
+  id: 'soil_merchants_internal',
+  name: 'Soil Merchants',
+  email: 'internal@eracov.com',
+  phone: 'N/A',
+  bankAccount: 'Internal Account',
+};
+
 
 export default function LandlordsPage() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
@@ -39,7 +49,7 @@ export default function LandlordsPage() {
       getTenants(),
       getAllPayments()
     ]).then(([landlordData, propertyData, tenantData, paymentData]) => {
-      setLandlords(landlordData);
+      setLandlords([SOIL_MERCHANTS_LANDLORD, ...landlordData]);
       setProperties(propertyData);
       setTenants(tenantData);
       setPayments(paymentData);
@@ -62,15 +72,19 @@ export default function LandlordsPage() {
     properties.forEach(p => {
       if (p.units) {
         p.units.forEach(u => {
-          if (u.ownership === 'Landlord') {
-            if (u.landlordId) {
-              if (!map.has(u.landlordId)) {
-                map.set(u.landlordId, []);
-              }
-              map.get(u.landlordId)!.push({ ...u, propertyName: p.name, propertyId: p.id });
-            } else {
-              unassigned.push({ ...u, propertyName: p.name, propertyId: p.id });
+          if (u.ownership === 'Landlord' && u.landlordId) {
+            if (!map.has(u.landlordId)) {
+              map.set(u.landlordId, []);
             }
+            map.get(u.landlordId)!.push({ ...u, propertyName: p.name, propertyId: p.id });
+          } else if (u.ownership === 'SM') {
+            if (!map.has(SOIL_MERCHANTS_LANDLORD.id)) {
+              map.set(SOIL_MERCHANTS_LANDLORD.id, []);
+            }
+            map.get(SOIL_MERCHANTS_LANDLORD.id)!.push({ ...u, propertyName: p.name, propertyId: p.id });
+          }
+           else if (u.ownership === 'Landlord' && !u.landlordId) {
+            unassigned.push({ ...u, propertyName: p.name, propertyId: p.id });
           }
         });
       }
@@ -79,6 +93,14 @@ export default function LandlordsPage() {
   }, [properties]);
 
   const handleOpenDialog = (landlord: Landlord | null) => {
+    if (landlord?.id === SOIL_MERCHANTS_LANDLORD.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Edit',
+        description: 'Soil Merchants is an internal profile and cannot be edited.'
+      });
+      return;
+    }
     setSelectedLandlord(landlord);
     setIsManageDialogOpen(true);
   };
@@ -105,12 +127,21 @@ export default function LandlordsPage() {
     startLoading('Generating Statement...');
     try {
       const landlordProperties: { property: Property; units: Unit[] }[] = [];
-      properties.forEach(p => {
-        const units = p.units.filter(u => u.landlordId === landlord.id);
-        if (units.length > 0) {
-          landlordProperties.push({ property: p, units });
-        }
-      });
+      if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
+        properties.forEach(p => {
+          const units = p.units.filter(u => u.ownership === 'SM');
+          if (units.length > 0) {
+            landlordProperties.push({ property: p, units });
+          }
+        });
+      } else {
+        properties.forEach(p => {
+          const units = p.units.filter(u => u.landlordId === landlord.id);
+          if (units.length > 0) {
+            landlordProperties.push({ property: p, units });
+          }
+        });
+      }
 
       const ownedUnitIdentifiers = new Set<string>();
       landlordProperties.forEach(p => {

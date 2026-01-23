@@ -40,6 +40,7 @@ export interface FinancialSummary {
     totalServiceCharges: number;
     totalNetRemittance: number;
     transactionCount: number;
+    vacantUnitServiceChargeDeduction?: number;
 }
 
 export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
@@ -48,7 +49,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalNetRemittance: 0,
-        transactionCount: payments.filter(p => p.status === 'completed' && p.type === 'Rent').length
+        transactionCount: payments.filter(p => p.status === 'Paid' && p.type === 'Rent').length
     };
 
     const unitMap = new Map<string, Unit>();
@@ -71,8 +72,19 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
     const managementFeeRate = 0.05;
     summary.totalManagementFees = summary.totalRevenue * managementFeeRate;
 
-    // Net Rent Payout is Total Revenue - Total Service Charges - Management Fees.
-    summary.totalNetRemittance = summary.totalRevenue - summary.totalServiceCharges - summary.totalManagementFees;
+    // Calculate service charge for vacant units
+    let vacantUnitDeduction = 0;
+    properties.forEach(p => {
+      p.units.forEach(u => {
+        if (u.status === 'vacant') {
+          vacantUnitDeduction += u.serviceCharge || 0;
+        }
+      });
+    });
+    summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
+
+    // Net Rent Payout is Total Revenue - Total Service Charges - Management Fees - Vacant Service Charges.
+    summary.totalNetRemittance = summary.totalRevenue - summary.totalServiceCharges - summary.totalManagementFees - vacantUnitDeduction;
 
     return summary;
 }
