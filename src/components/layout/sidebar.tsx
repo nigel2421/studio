@@ -34,6 +34,7 @@ import {
   ChevronDown,
   UserCog,
   ClipboardList,
+  AlertCircle,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +50,7 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/accounts', icon: Banknote, label: 'Rent Accounts' },
+  { href: '/accounts/arrears', icon: AlertCircle, label: 'Rent Arrears' },
   { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },

@@ -100,7 +100,7 @@ export function DatePicker({
           initialFocus
           fromYear={new Date().getFullYear() - 40}
           toYear={new Date().getFullYear() + 10}
-          captionLayout="dropdown-buttons"
+          captionLayout="dropdown"
         />
       </PopoverContent>
     </Popover>
