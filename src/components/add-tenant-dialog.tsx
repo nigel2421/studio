@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -250,18 +248,18 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
             </div>
             
             <div className="space-y-3 rounded-md border p-4">
-                <Label className="font-semibold">Mark Initial Payments as Paid</Label>
+                <Label className="font-semibold">Initial Payments</Label>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="paidRent-dialog" checked={paidRent} onCheckedChange={(c) => setPaidRent(Boolean(c))} />
-                    <Label htmlFor="paidRent-dialog" className="font-normal">Mark first month's rent as paid (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
+                    <Label htmlFor="paidRent-dialog" className="font-normal">Paid First Month's Rent (Ksh {rent > 0 ? rent.toLocaleString() : '...'})</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="paidSecurityDeposit-dialog" checked={paidSecurityDeposit} onCheckedChange={(c) => setPaidSecurityDeposit(Boolean(c))} />
-                    <Label htmlFor="paidSecurityDeposit-dialog" className="font-normal">Mark security deposit as paid (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
+                    <Label htmlFor="paidSecurityDeposit-dialog" className="font-normal">Paid Security Deposit (Ksh {securityDeposit > 0 ? securityDeposit.toLocaleString() : '...'})</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="paidWaterDeposit-dialog" checked={paidWaterDeposit} onCheckedChange={(c) => setPaidWaterDeposit(Boolean(c))} />
-                    <Label htmlFor="paidWaterDeposit-dialog" className="font-normal">Mark water deposit as paid (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
+                    <Label htmlFor="paidWaterDeposit-dialog" className="font-normal">Paid Water Meter Deposit (Ksh {WATER_DEPOSIT_AMOUNT.toLocaleString()})</Label>
                 </div>
             </div>
 
