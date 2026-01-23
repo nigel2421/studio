@@ -42,9 +42,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
         const data = payments.map(p => {
             const t = tenants.find(t => t.id === p.tenantId);
             const unit = t ? unitMap.get(`${t.propertyId}-${t.unitName}`) : undefined;
-            const rentAmount = unit?.rentAmount || t?.lease?.rent || 0;
+            const unitRent = unit?.rentAmount || t?.lease?.rent || 0;
             const serviceCharge = unit?.serviceCharge || t?.lease?.serviceCharge || 0;
-            const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
+            const breakdown = calculateTransactionBreakdown(p.amount, unitRent, serviceCharge);
 
             return {
                 Date: new Date(p.date).toLocaleDateString(),
@@ -136,9 +136,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             {payments.slice(0, 10).map((payment) => {
                                 const tenant = tenants.find(t => t.id === payment.tenantId);
                                 const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-                                const rentAmount = unit?.rentAmount || tenant?.lease?.rent || 0;
+                                const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
                                 const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-                                const breakdown = calculateTransactionBreakdown(rentAmount, serviceCharge);
+                                const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, serviceCharge);
                                 const unitType = getUnitTypeForTenant(tenant);
 
                                 return (

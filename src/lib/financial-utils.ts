@@ -5,25 +5,31 @@ import { Payment, Property, Tenant, Unit } from "./types";
  * Calculates the breakdown of a rent payment, including management fees and service charges.
  * 
  * Logic:
- * 1. Gross Amount = The unit's standard rent amount.
- * 2. Management Fee = 5% of the Gross Rent Amount.
+ * 1. Gross Amount = The actual amount paid in the transaction.
+ * 2. Management Fee = 5% of the unit's standard rent amount.
  * 3. Service Charge = The unit's standard service charge.
- * 4. Net to Landlord = Gross - Service Charge - Management Fee.
+ * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
  * 
- * @param rentAmount The standard monthly rent for the unit.
+ * @param paymentAmount The actual amount paid in the transaction.
+ * @param unitRent The standard monthly rent for the unit.
  * @param serviceCharge The service charge amount for the unit.
  */
-export function calculateTransactionBreakdown(rentAmount: number, serviceCharge: number = 0) {
-    const grossAmount = rentAmount;
+export function calculateTransactionBreakdown(
+    paymentAmount: number,
+    unitRent: number,
+    serviceCharge: number = 0
+) {
+    // Gross Amount for the transaction is what was actually paid.
+    const grossAmount = paymentAmount;
 
-    // Management fee is 5% of the Gross Rent Amount.
+    // Management fee is 5% of the standard rent for the unit, not the amount paid.
     const managementFeeRate = 0.05;
-    const managementFee = grossAmount * managementFeeRate;
+    const managementFee = unitRent * managementFeeRate;
     
-    // The service charge is deducted from the gross.
+    // The service charge is deducted.
     const serviceChargeDeduction = serviceCharge;
 
-    // Net to landlord is what's left after service charge and management fee are deducted.
+    // Net to landlord is what's left after deductions from the actual payment.
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
 
     return {
@@ -67,9 +73,10 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         const tenant = tenants.find(t => t.id === payment.tenantId);
         const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
         
-        const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
+        const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+        const unitServiceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
-        const breakdown = calculateTransactionBreakdown(payment.amount, serviceCharge);
+        const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, unitServiceCharge);
 
         summary.totalRevenue += breakdown.gross;
         summary.totalManagementFees += breakdown.managementFee;
