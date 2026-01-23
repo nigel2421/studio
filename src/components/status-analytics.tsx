@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
@@ -13,6 +12,28 @@ interface StatusAnalyticsProps {
 type AnalyticsData = {
     [key in UnitType]?: number;
 } & { Total: number };
+
+// Helper function to map old statuses to new ones
+const normalizeManagementStatus = (status?: string): ManagementStatus | undefined => {
+    if (!status) return undefined;
+    switch (status) {
+        case 'Renting Mngd by Eracov for SM':
+            return 'Rented for Soil Merchants';
+        case 'Renting Mngd by Eracov for Client':
+            return 'Rented for Clients';
+        case 'Client Self Fully Managed':
+            return 'Client Managed';
+        case 'Reserved for Airbnb': // This was removed but might still be in the DB
+            return 'Airbnb';
+        default:
+            // Check if it's one of the valid new statuses
+            if ((managementStatuses as readonly string[]).includes(status)) {
+                return status as ManagementStatus;
+            }
+            return undefined; // Ignore unknown statuses
+    }
+};
+
 
 export function StatusAnalytics({ property }: StatusAnalyticsProps) {
     const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
@@ -44,9 +65,13 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
             }
+            
+            // Normalize the management status to handle old data
+            const normalizedStatus = normalizeManagementStatus(unit.managementStatus);
+
             // Check managementStatus and ensure it exists in our data object before incrementing
-            if (unit.managementStatus && data[unit.managementStatus] && unit.unitType) {
-                const status = unit.managementStatus;
+            if (normalizedStatus && data[normalizedStatus] && unit.unitType) {
+                const status = normalizedStatus;
                 (data[status] as any)[unit.unitType] = ((data[status] as any)[unit.unitType] || 0) + 1;
                 data[status].Total++;
             }
