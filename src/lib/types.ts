@@ -29,12 +29,14 @@ export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
 export type ManagementStatus =
   | 'Rented for Soil Merchants'
   | 'Rented for Clients'
-  | 'Client Managed';
+  | 'Client Managed'
+  | 'Airbnb';
 
 export const managementStatuses: ManagementStatus[] = [
   'Rented for Soil Merchants',
   'Rented for Clients',
   'Client Managed',
+  'Airbnb',
 ];
 
 export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';

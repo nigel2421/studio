@@ -27,7 +27,7 @@ export default function AirbnbPage() {
       const units: AirbnbUnit[] = [];
       properties.forEach(prop => {
         prop.units.forEach(unit => {
-          if (unit.status === 'airbnb') {
+          if (unit.managementStatus === 'Airbnb') {
             units.push({
               ...unit,
               propertyName: prop.name,
@@ -126,7 +126,7 @@ export default function AirbnbPage() {
             </div>
             <h3 className="text-xl font-semibold">No Airbnb Units Found</h3>
             <p className="text-muted-foreground mt-2 max-w-md">
-              To list a unit here, go to the "Properties" page, select a property to edit, and change a unit's status to "airbnb".
+              To list a unit here, go to the "Properties" page, select a property to edit, and change a unit's management status to "Airbnb".
             </p>
         </div>
       )}
