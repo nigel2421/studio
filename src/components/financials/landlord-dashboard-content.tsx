@@ -66,7 +66,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 <p className="text-muted-foreground">Financial overview of your properties and remittances.</p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium">Total Revenue (Gross)</CardTitle>
@@ -79,12 +79,22 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium">Service Charges</CardTitle>
+                        <CardTitle className="text-sm font-medium">Service Charges (Occupied)</CardTitle>
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">Ksh {financialSummary.totalServiceCharges.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Total service charges from payments</p>
+                        <p className="text-xs text-muted-foreground">Deducted from occupied units</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-sm font-medium">Service Charges (Vacant)</CardTitle>
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Ksh {(financialSummary.vacantUnitServiceChargeDeduction || 0).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">Deducted for vacant units</p>
                     </CardContent>
                 </Card>
                 <Card>
