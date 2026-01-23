@@ -53,7 +53,6 @@ export function AddPaymentDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
-  const [paymentType, setPaymentType] = useState<Payment['type']>('Rent');
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
@@ -97,7 +96,6 @@ export function AddPaymentDialog({
 
   const resetForm = () => {
     setPaymentEntries([{ id: 1, amount: '', date: new Date(), notes: '', rentForMonth: format(new Date(), 'yyyy-MM') }]);
-    setPaymentType('Rent');
     if (!tenant) { // Don't reset if a tenant is pre-selected
         setSelectedProperty('');
         setSelectedFloor('');
@@ -113,11 +111,8 @@ export function AddPaymentDialog({
         setSelectedProperty(tenant.propertyId);
         setSelectedUnit(tenant.unitName);
       }
-      if (defaultPaymentType) {
-        setPaymentType(defaultPaymentType);
-      }
     }
-  }, [tenant, open, defaultPaymentType]);
+  }, [tenant, open]);
 
   const { startLoading, stopLoading } = useLoading();
 
@@ -171,6 +166,7 @@ export function AddPaymentDialog({
     setIsLoading(true);
     startLoading(`Recording ${validEntries.length} payment(s)...`);
     try {
+      const typeToSubmit = defaultPaymentType || 'Rent';
       const paymentPromises = validEntries.map(entry =>
         addPayment({
           tenantId: tenantId!,
@@ -179,7 +175,7 @@ export function AddPaymentDialog({
           notes: entry.notes,
           rentForMonth: entry.rentForMonth,
           status: 'Paid',
-          type: paymentType,
+          type: typeToSubmit,
         }, taskId)
       );
 
@@ -303,21 +299,7 @@ export function AddPaymentDialog({
                     </div>
                 </div>
             )}
-             <div className="space-y-2 pt-2">
-                <Label htmlFor="payment-type">Payment Type</Label>
-                <Select value={paymentType} onValueChange={(v) => setPaymentType(v as Payment['type'])}>
-                    <SelectTrigger id="payment-type">
-                        <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Rent">Rent Payment</SelectItem>
-                        <SelectItem value="Deposit">Security/Water Deposit</SelectItem>
-                        <SelectItem value="ServiceCharge">Service Charge</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
+            
             <div className="space-y-2 pt-4">
               <Label>Payment Records</Label>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
@@ -346,7 +328,7 @@ export function AddPaymentDialog({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
+                      <Label htmlFor={`date-${entry.id}`} className="text-xs">Date Paid</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-10", !entry.date && "text-muted-foreground")}>
@@ -359,6 +341,7 @@ export function AddPaymentDialog({
                             mode="single"
                             selected={entry.date}
                             onSelect={(d) => d && handleEntryChange(entry.id, 'date', d)}
+                            disabled={undefined}
                           />
                         </PopoverContent>
                       </Popover>
