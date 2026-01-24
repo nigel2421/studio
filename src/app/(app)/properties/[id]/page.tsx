@@ -9,7 +9,7 @@ import { getProperty, updateProperty, getLandlords } from '@/lib/data';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors } from '@/lib/types';
+import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors, unitOrientations } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,7 @@ export default function PropertyManagementPage() {
         status: 'all',
         ownership: 'all',
         unitType: 'all',
+        unitOrientation: 'all',
     });
 
     const form = useForm<EditPropertyFormValues>({
@@ -112,7 +113,8 @@ export default function PropertyManagementPage() {
             const statusMatch = filters.status === 'all' || u.status === filters.status;
             const ownershipMatch = filters.ownership === 'all' || u.ownership === filters.ownership;
             const typeMatch = filters.unitType === 'all' || u.unitType === filters.unitType;
-            return searchMatch && statusMatch && ownershipMatch && typeMatch;
+            const orientationMatch = filters.unitOrientation === 'all' || u.unitOrientation === filters.unitOrientation;
+            return searchMatch && statusMatch && ownershipMatch && typeMatch && orientationMatch;
         });
     }, [units, searchTerm, filters]);
 
@@ -223,7 +225,7 @@ export default function PropertyManagementPage() {
         return <div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }
     
-    const isFiltered = filters.status !== 'all' || filters.ownership !== 'all' || filters.unitType !== 'all';
+    const isFiltered = filters.status !== 'all' || filters.ownership !== 'all' || filters.unitType !== 'all' || filters.unitOrientation !== 'all';
 
     return (
         <Form {...form}>
@@ -339,7 +341,14 @@ export default function PropertyManagementPage() {
                                             {ownershipTypes.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
-                                    {isFiltered && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setFilters({status: 'all', ownership: 'all', unitType: 'all'})}><X className="mr-1 h-3 w-3" />Clear</Button>}
+                                    <Select value={filters.unitOrientation} onValueChange={(v) => handleFilterChange('unitOrientation', v)}>
+                                        <SelectTrigger className="w-auto h-8 text-xs gap-1"><SelectValue placeholder="Orientation" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Orientations</SelectItem>
+                                            {unitOrientations.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    {isFiltered && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setFilters({status: 'all', ownership: 'all', unitType: 'all', unitOrientation: 'all'})}><X className="mr-1 h-3 w-3" />Clear</Button>}
                                 </div>
                             </CardHeader>
                         </Card>
@@ -424,3 +433,5 @@ export default function PropertyManagementPage() {
         </Form>
     );
 }
+
+    
