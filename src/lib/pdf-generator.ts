@@ -462,7 +462,9 @@ export const generateVacantServiceChargeInvoicePDF = (
 export const generateDashboardReportPDF = (
     stats: { title: string; value: string | number }[],
     financialData: { name: string; amount: number }[],
-    rentBreakdownData: { unitType: string, smRent?: number, landlordRent?: number }[]
+    rentBreakdownData: { unitType: string, smRent?: number, landlordRent?: number }[],
+    maintenanceBreakdown: { status: string; count: number }[],
+    orientationBreakdown: { name: string; value: number }[]
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
@@ -547,7 +549,55 @@ export const generateDashboardReportPDF = (
         ]],
         footStyles: { halign: 'right', fontStyle: 'bold' }
     });
+    yPos = (doc as any).lastAutoTable.finalY;
+
+    if (yPos > 240) { // Check if there's enough space for next tables
+        doc.addPage();
+        yPos = 20;
+    } else {
+        yPos += 15;
+    }
+
+    // Maintenance Breakdown
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Maintenance Request Status', 14, yPos);
+    yPos += 10;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Status', 'Count']],
+        body: maintenanceBreakdown.map(d => [d.status, d.count]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        foot: [[
+            { content: 'Total Requests', styles: { fontStyle: 'bold' } },
+            { content: `${maintenanceBreakdown.reduce((sum, d) => sum + d.count, 0)}`, styles: { fontStyle: 'bold' } }
+        ]],
+        footStyles: { halign: 'right' },
+        columnStyles: { 1: { halign: 'right' } },
+    });
     yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // Orientation Breakdown
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Unit Orientation Breakdown', 14, yPos);
+    yPos += 10;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Orientation', 'Unit Count']],
+        body: orientationBreakdown.map(d => [d.name, d.value]),
+        theme: 'striped',
+        headStyles: { fillColor: [22, 163, 74] }, // Green
+        foot: [[
+            { content: 'Total Units with Orientation', styles: { fontStyle: 'bold' } },
+            { content: `${orientationBreakdown.reduce((sum, d) => sum + d.value, 0)}`, styles: { fontStyle: 'bold' } }
+        ]],
+        footStyles: { halign: 'right' },
+        columnStyles: { 1: { halign: 'right' } },
+    });
 
     doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
 };

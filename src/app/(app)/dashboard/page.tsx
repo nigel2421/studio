@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2, FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MaintenanceRequest, Tenant, Property, Payment, Unit, UnitType, unitTypes } from "@/lib/types";
+import { MaintenanceRequest, Tenant, Property, Payment, Unit, UnitType, unitTypes, UnitOrientation, unitOrientations } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -136,7 +136,29 @@ export default function DashboardPage() {
         })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
     })();
     
-    generateDashboardReportPDF(statsForPDF, financialDataForPDF, rentBreakdownForPDF);
+    // 4. Maintenance breakdown
+    const maintenanceBreakdownForPDF = (['New', 'In Progress', 'Completed'] as const).map(status => ({
+        status,
+        count: maintenanceRequests.filter(r => r.status === status).length
+    }));
+
+    // 5. Orientation breakdown
+    const orientationCounts: { [key in UnitOrientation]?: number } = {};
+    properties.forEach(property => {
+      if (Array.isArray(property.units)) {
+        property.units.forEach(unit => {
+          if (unit.unitOrientation) {
+            orientationCounts[unit.unitOrientation] = (orientationCounts[unit.unitOrientation] || 0) + 1;
+          }
+        });
+      }
+    });
+    const orientationBreakdownForPDF = unitOrientations.map(orientation => ({
+      name: orientation.toLowerCase().replace(/_/g, ' '),
+      value: orientationCounts[orientation] || 0,
+    })).filter(d => d.value > 0);
+    
+    generateDashboardReportPDF(statsForPDF, financialDataForPDF, rentBreakdownForPDF, maintenanceBreakdownForPDF, orientationBreakdownForPDF);
   }
 
   const recentRequests = maintenanceRequests
@@ -227,23 +249,28 @@ export default function DashboardPage() {
               </TabsList>
               {properties.map(property => (
                 <TabsContent key={property.id} value={property.id} className="space-y-6">
-                    <div>
+                  <Tabs defaultValue="status-analytics" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
+                        <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
+                        <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="status-analytics">
                         <h3 className="text-lg font-semibold mt-4">Unit Status Analytics</h3>
                         <p className="text-sm text-muted-foreground">Breakdown of units by handover and management status.</p>
                         <StatusAnalytics property={property} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h3 className="text-lg font-semibold">Occupancy Analytics</h3>
+                    </TabsContent>
+                    <TabsContent value="occupancy-analytics">
+                        <h3 className="text-lg font-semibold mt-4">Occupancy Analytics</h3>
                         <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units.</p>
                         <UnitAnalytics property={property} tenants={tenants} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h3 className="text-lg font-semibold">Orientation Analytics</h3>
+                    </TabsContent>
+                    <TabsContent value="orientation-analytics">
+                        <h3 className="text-lg font-semibold mt-4">Orientation Analytics</h3>
                         <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units by orientation.</p>
                         <OrientationAnalytics property={property} tenants={tenants} />
-                    </div>
+                    </TabsContent>
+                  </Tabs>
                 </TabsContent>
               ))}
             </Tabs>
