@@ -131,8 +131,8 @@ export default function DashboardPage() {
                     <Separator />
                     <div>
                         <h3 className="text-lg font-semibold">Orientation Analytics</h3>
-                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of units by orientation and average rent.</p>
-                        <OrientationAnalytics property={property} />
+                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units by orientation.</p>
+                        <OrientationAnalytics property={property} tenants={tenants} />
                     </div>
                 </TabsContent>
               ))}
