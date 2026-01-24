@@ -174,11 +174,11 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="min-w-[200px]">Status</TableHead>
+                            <TableHead className="min-w-[200px] font-bold text-primary">Status</TableHead>
                             {unitTypes.map(ut => (
-                                <TableHead key={ut} className="text-right min-w-[100px]">{ut}</TableHead>
+                                <TableHead key={ut} className="text-right min-w-[100px] font-bold text-primary">{ut}</TableHead>
                             ))}
-                            <TableHead className="text-right font-bold min-w-[100px]">Total</TableHead>
+                            <TableHead className="text-right font-bold min-w-[100px] text-primary">Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
