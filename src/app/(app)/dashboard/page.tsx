@@ -18,6 +18,7 @@ import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overvie
 import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
 import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
+import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -68,6 +69,10 @@ export default function DashboardPage() {
        <div className="grid gap-8 md:grid-cols-2">
         <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
         <OrientationOverviewChart properties={properties} />
+      </div>
+      
+      <div className="grid gap-8">
+        <RentBreakdownChart payments={payments} tenants={tenants} properties={properties} />
       </div>
 
       <Card>
