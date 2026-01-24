@@ -6,7 +6,7 @@ import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
-    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses
+    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -670,6 +670,7 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
             Status,
             Ownership,
             UnitType,
+            UnitOrientation,
             ManagementStatus,
             HandoverStatus,
             HandoverDate,
@@ -728,6 +729,14 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
                 errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`);
             } else {
                 unitToUpdate.unitType = UnitType as UnitType;
+                unitWasUpdated = true;
+            }
+        }
+        if (UnitOrientation !== undefined && unitToUpdate.unitOrientation !== UnitOrientation) {
+            if (!unitOrientations.includes(UnitOrientation as any)) {
+                errors.push(`Row ${index + 2}: Invalid UnitOrientation "${UnitOrientation}".`);
+            } else {
+                unitToUpdate.unitOrientation = UnitOrientation as UnitOrientation;
                 unitWasUpdated = true;
             }
         }

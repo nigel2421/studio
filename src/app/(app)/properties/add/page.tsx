@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { addProperty } from '@/lib/data';
-import { Unit, UnitType, unitTypes, OwnershipType, ownershipTypes, ManagementStatus, managementStatuses } from '@/lib/types';
+import { Unit, UnitType, unitTypes, OwnershipType, ownershipTypes, ManagementStatus, managementStatuses, UnitOrientation, unitOrientations } from '@/lib/types';
 import { X, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -70,7 +70,7 @@ export default function AddPropertyPage() {
           <div className="space-y-4">
             <Label>Units</Label>
             {units.map((unit, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-4 border rounded-lg">
+              <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-4 border rounded-lg">
                 <div className="md:col-span-1">
                   <Label htmlFor={`unit-name-${index}`}>Unit Name</Label>
                   <Input
@@ -102,6 +102,19 @@ export default function AddPropertyPage() {
                         <SelectContent>
                             {ownershipTypes.map(type => (
                                 <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                 </div>
+                 <div className="md:col-span-1">
+                    <Label htmlFor={`unit-orientation-${index}`}>Orientation</Label>
+                    <Select onValueChange={(value) => handleUnitChange(index, 'unitOrientation', value as UnitOrientation)}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select orientation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {unitOrientations.map(orientation => (
+                                <SelectItem key={orientation} value={orientation}>{orientation}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

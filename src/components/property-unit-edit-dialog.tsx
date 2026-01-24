@@ -17,7 +17,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import {
-    Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, Landlord
+    Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, Landlord, UnitOrientation, unitOrientations
 } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -34,6 +34,7 @@ const unitSchema = z.object({
     handoverDate: z.date().optional(),
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
+    unitOrientation: z.enum(unitOrientations as [string, ...string[]]).optional(),
 });
 
 type UnitFormValues = z.infer<typeof unitSchema>;
@@ -62,6 +63,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
             handoverDate: undefined,
             rentAmount: 0,
             serviceCharge: 0,
+            unitOrientation: undefined,
         },
     });
 
@@ -206,6 +208,30 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                                     )}
                                 />
                             )}
+                             <FormField
+                                control={form.control}
+                                name="unitOrientation"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Unit Orientation</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select orientation" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {unitOrientations.map((orientation) => (
+                                                    <SelectItem key={orientation} value={orientation}>
+                                                        {orientation}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                             <FormField
                                 control={form.control}
                                 name="managementStatus"

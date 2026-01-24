@@ -9,7 +9,7 @@ import { getProperty, updateProperty, getLandlords } from '@/lib/data';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord } from '@/lib/types';
+import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { BulkUnitUpdateDialog } from '@/components/bulk-unit-update-dialog';
 import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -362,6 +363,7 @@ export default function PropertyManagementPage() {
                                             <TableHead>Type</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Ownership</TableHead>
+                                            <TableHead>Orientation</TableHead>
                                             <TableHead>Management Status</TableHead>
                                             <TableHead>Rent (Ksh)</TableHead>
                                             {!isReadOnly && <TableHead className="text-right">Actions</TableHead>}
@@ -383,6 +385,18 @@ export default function PropertyManagementPage() {
                                                 <TableCell>{unit.unitType}</TableCell>
                                                 <TableCell><Badge variant={unit.status === 'vacant' ? 'secondary' : 'default'} className="capitalize">{unit.status}</Badge></TableCell>
                                                 <TableCell><span className="text-sm">{unit.ownership}</span></TableCell>
+                                                <TableCell>
+                                                    {unit.unitOrientation ? (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn("capitalize border-transparent", unit.unitOrientation && unitOrientationColors[unit.unitOrientation])}
+                                                        >
+                                                            {unit.unitOrientation.toLowerCase().replace(/_/g, ' ')}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">N/A</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell><span className="text-xs">{unit.managementStatus || 'N/A'}</span></TableCell>
                                                 <TableCell>{unit.rentAmount?.toLocaleString()}</TableCell>
                                                 {!isReadOnly && (
@@ -393,7 +407,7 @@ export default function PropertyManagementPage() {
                                             </TableRow>
                                         ))}
                                         {paginatedUnits.length === 0 && (
-                                            <TableRow><TableCell colSpan={isReadOnly ? 6 : 7} className="h-24 text-center">No units found.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isReadOnly ? 8 : 9} className="h-24 text-center">No units found.</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>

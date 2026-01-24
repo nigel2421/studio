@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses } from '@/lib/types';
+import { Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, unitOrientations } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,7 +21,7 @@ interface BulkUnitUpdateDialogProps {
 }
 
 const updatableFields: (keyof Omit<Unit, 'name' | 'landlordId'>)[] = [
-    'status', 'ownership', 'unitType', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
+    'status', 'ownership', 'unitType', 'unitOrientation', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
 ];
 
 export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
@@ -31,6 +32,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
             status: '',
             ownership: '',
             unitType: '',
+            unitOrientation: '',
             managementStatus: '',
             handoverStatus: '',
             rentAmount: '',
@@ -134,6 +136,19 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                         )}
                     />
                 );
+            case 'unitOrientation':
+                 return (
+                     <Controller
+                        name="unitOrientation"
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.unitOrientation}>
+                                <SelectTrigger><SelectValue placeholder="Select Orientation" /></SelectTrigger>
+                                <SelectContent>{unitOrientations.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
             case 'managementStatus':
                  return (
                      <Controller
@@ -182,13 +197,13 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                         <div key={field} className="grid grid-cols-[auto,1fr] items-center gap-4">
                              <Checkbox
                                 id={`cb-${field}`}
-                                onCheckedChange={(checked) => handleToggleField(field, !!checked)}
+                                onCheckedChange={(checked) => handleToggleField(field as keyof Unit, !!checked)}
                             />
                             <div className="grid w-full items-center gap-1.5">
                                 <Label htmlFor={field} className="capitalize text-sm font-medium">
                                     {field.replace(/([A-Z])/g, ' $1')}
                                 </Label>
-                                {renderFieldInput(field)}
+                                {renderFieldInput(field as keyof Unit)}
                             </div>
                         </div>
                     ))}

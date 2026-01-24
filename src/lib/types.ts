@@ -48,6 +48,17 @@ export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'airbnb', 'client
 export type HandoverStatus = 'Pending Hand Over' | 'Handed Over';
 export const handoverStatuses: HandoverStatus[] = ['Pending Hand Over', 'Handed Over'];
 
+export type UnitOrientation = 'MURANG\'A.RD' | 'FOREST.RD' | 'GMA-ANNEX' | 'MUTHAIGA' | 'MID-BLOCK UNIT';
+export const unitOrientations: UnitOrientation[] = ['MURANG\'A.RD', 'FOREST.RD', 'GMA-ANNEX', 'MUTHAIGA', 'MID-BLOCK UNIT'];
+
+export const unitOrientationColors: Record<UnitOrientation, string> = {
+    'MURANG\'A.RD': 'bg-green-100 text-green-800',
+    'FOREST.RD': 'bg-blue-100 text-blue-800',
+    'GMA-ANNEX': 'bg-yellow-100 text-yellow-800',
+    'MUTHAIGA': 'bg-purple-100 text-purple-800',
+    'MID-BLOCK UNIT': 'bg-gray-100 text-gray-800',
+};
+
 export type Unit = {
   name: string;
   status: UnitStatus;
@@ -60,6 +71,7 @@ export type Unit = {
   handoverStatus?: HandoverStatus;
   handoverDate?: string;
   propertyId?: string;
+  unitOrientation?: UnitOrientation;
 };
 
 export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
