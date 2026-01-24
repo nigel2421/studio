@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -28,7 +29,6 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UnitAnalytics } from '@/components/unit-analytics';
 import { StatusAnalytics } from '@/components/status-analytics';
-import { OrientationAnalytics } from '@/components/orientation-analytics';
 import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
@@ -308,19 +308,15 @@ export default function PropertyManagementPage() {
                         </CardHeader>
                         <CardContent>
                             <Tabs defaultValue="occupancy" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
+                                <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
                                     <TabsTrigger value="status">Unit Status</TabsTrigger>
-                                    <TabsTrigger value="orientation">Orientation</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="occupancy">
                                     <UnitAnalytics property={property} tenants={tenants} />
                                 </TabsContent>
                                 <TabsContent value="status">
                                     <StatusAnalytics property={property} />
-                                </TabsContent>
-                                <TabsContent value="orientation">
-                                    <OrientationAnalytics property={property} />
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
@@ -467,5 +463,3 @@ export default function PropertyManagementPage() {
         </Form>
     );
 }
-
-    

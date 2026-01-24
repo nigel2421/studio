@@ -17,6 +17,7 @@ import { FinancialOverviewChart } from "@/components/dashboard/financial-overvie
 import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overview-chart";
 import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
 import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
+import { OrientationAnalytics } from "@/components/orientation-analytics";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -126,6 +127,12 @@ export default function DashboardPage() {
                         <h3 className="text-lg font-semibold">Occupancy Analytics</h3>
                         <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units.</p>
                         <UnitAnalytics property={property} tenants={tenants} />
+                    </div>
+                    <Separator />
+                    <div>
+                        <h3 className="text-lg font-semibold">Orientation Analytics</h3>
+                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of units by orientation and average rent.</p>
+                        <OrientationAnalytics property={property} />
                     </div>
                 </TabsContent>
               ))}
