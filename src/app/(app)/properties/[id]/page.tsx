@@ -5,11 +5,11 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { getProperty, updateProperty, getLandlords } from '@/lib/data';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { getProperty, updateProperty, getLandlords, getTenants } from '@/lib/data';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors, unitOrientations } from '@/lib/types';
+import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors, unitOrientations, Tenant } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,11 @@ import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UnitAnalytics } from '@/components/unit-analytics';
+import { StatusAnalytics } from '@/components/status-analytics';
+import { OrientationAnalytics } from '@/components/orientation-analytics';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -39,6 +44,7 @@ export default function PropertyManagementPage() {
     const { id } = useParams();
     const router = useRouter();
     const [property, setProperty] = useState<Property | null>(null);
+    const [tenants, setTenants] = useState<Tenant[]>([]);
     const [landlords, setLandlords] = useState<Landlord[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
@@ -70,13 +76,15 @@ export default function PropertyManagementPage() {
         if (id) {
             Promise.all([
                 getProperty(id as string),
-                getLandlords().catch(() => [])
-            ]).then(([propertyData, landlordData]) => {
+                getLandlords().catch(() => []),
+                getTenants().catch(() => [])
+            ]).then(([propertyData, landlordData, tenantData]) => {
                 if (propertyData) {
                     setProperty(propertyData);
                     setUnits(propertyData.units || []);
                 }
                 setLandlords(landlordData);
+                setTenants(tenantData);
             }).catch(error => {
                 console.error("Error fetching property data:", error);
             });
@@ -294,6 +302,33 @@ export default function PropertyManagementPage() {
                 </header>
 
                 <div className="p-4 sm:p-6 lg:p-8 space-y-8">
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Property Analytics</CardTitle>
+                            <CardDescription>Detailed analytics for {property.name}.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Tabs defaultValue="occupancy" className="w-full">
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
+                                    <TabsTrigger value="status">Unit Status</TabsTrigger>
+                                    <TabsTrigger value="orientation">Orientation</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="occupancy">
+                                    <UnitAnalytics property={property} tenants={tenants} />
+                                </TabsContent>
+                                <TabsContent value="status">
+                                    <StatusAnalytics property={property} />
+                                </TabsContent>
+                                <TabsContent value="orientation">
+                                    <OrientationAnalytics property={property} />
+                                </TabsContent>
+                            </Tabs>
+                        </CardContent>
+                    </Card>
+
+                    <Separator />
+
                     <div className="space-y-4">
                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>

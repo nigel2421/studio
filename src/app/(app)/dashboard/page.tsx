@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { FinancialOverviewChart } from "@/components/dashboard/financial-overview-chart";
 import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overview-chart";
 import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
+import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -63,6 +64,41 @@ export default function DashboardPage() {
         <OccupancyOverviewChart properties={properties} tenants={tenants} />
       </div>
 
+       <div className="grid gap-8 md:grid-cols-2">
+        <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
+        <OrientationOverviewChart properties={properties} />
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Recent Maintenance Requests</CardTitle>
+            <CardDescription>Top pending requests from tenants.</CardDescription>
+          </div>
+          <Link href="/maintenance">
+            <Button variant="outline" size="sm">
+              View All <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-4">
+            {recentRequests.map(req => (
+              <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-muted/30 rounded-lg transition-colors">
+                <div className="flex flex-col min-w-0 flex-1 mr-4">
+                  <span className="font-medium truncate">{getTenantName(req.tenantId)} - <span className="text-muted-foreground">{getPropertyName(req.propertyId)}</span></span>
+                  <span className="text-sm text-muted-foreground truncate">{req.details}</span>
+                </div>
+                <span className="text-xs sm:text-sm font-medium whitespace-nowrap bg-muted px-2 py-1 rounded-full">{new Date(req.date).toLocaleDateString()}</span>
+              </li>
+            ))}
+            {recentRequests.length === 0 && (
+              <p className="text-sm text-muted-foreground">No pending maintenance requests.</p>
+            )}
+          </ul>
+        </CardContent>
+      </Card>
+
       {properties.length > 0 && (
         <Card>
           <CardHeader>
@@ -98,40 +134,6 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Maintenance Requests</CardTitle>
-              <CardDescription>Top pending requests from tenants.</CardDescription>
-            </div>
-            <Link href="/maintenance">
-              <Button variant="outline" size="sm">
-                View All <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-4">
-              {recentRequests.map(req => (
-                <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-muted/30 rounded-lg transition-colors">
-                  <div className="flex flex-col min-w-0 flex-1 mr-4">
-                    <span className="font-medium truncate">{getTenantName(req.tenantId)} - <span className="text-muted-foreground">{getPropertyName(req.propertyId)}</span></span>
-                    <span className="text-sm text-muted-foreground truncate">{req.details}</span>
-                  </div>
-                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap bg-muted px-2 py-1 rounded-full">{new Date(req.date).toLocaleDateString()}</span>
-                </li>
-              ))}
-              {recentRequests.length === 0 && (
-                <p className="text-sm text-muted-foreground">No pending maintenance requests.</p>
-              )}
-            </ul>
-          </CardContent>
-        </Card>
-        <div className="lg:col-span-1">
-            <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
-        </div>
-      </div>
     </div>
   );
 }

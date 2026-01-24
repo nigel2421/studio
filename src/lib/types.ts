@@ -59,6 +59,14 @@ export const unitOrientationColors: Record<UnitOrientation, string> = {
     'MID-BLOCK UNIT': 'bg-gray-100 text-gray-800',
 };
 
+export const unitOrientationHexColors: Record<UnitOrientation, string> = {
+    'MURANG\'A.RD': '#4ade80',
+    'FOREST.RD': '#60a5fa',
+    'GMA-ANNEX': '#facc15',
+    'MUTHAIGA': '#c084fc',
+    'MID-BLOCK UNIT': '#9ca3af',
+};
+
 export type Unit = {
   name: string;
   status: UnitStatus;
