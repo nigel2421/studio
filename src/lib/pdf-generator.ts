@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -458,4 +457,97 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.text('Please remit payment at your earliest convenience to avoid further penalties.', 14, yPos);
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const generateDashboardReportPDF = (
+    stats: { title: string; value: string | number }[],
+    financialData: { name: string; amount: number }[],
+    rentBreakdownData: { unitType: string, smRent?: number, landlordRent?: number }[]
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    addHeader(doc, 'Dashboard Summary Report');
+    doc.setFontSize(10);
+    doc.text(`Date Issued: ${dateStr}`, 196, 31, { align: 'right' });
+    
+    let yPos = 50;
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Key Performance Indicators', 14, yPos);
+    yPos += 10;
+    
+    const statRows: (string | number)[][] = [];
+    for (let i = 0; i < stats.length; i += 2) {
+        const row = [
+            stats[i].title, 
+            String(stats[i].value), 
+            stats[i+1] ? stats[i+1].title : '',
+            stats[i+1] ? String(stats[i+1].value) : ''
+        ];
+        statRows.push(row);
+    }
+
+    autoTable(doc, {
+        startY: yPos,
+        body: statRows,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
+        columnStyles: { 
+            0: { fontStyle: 'normal' },
+            1: { fontStyle: 'bold', fontSize: 12 },
+            2: { fontStyle: 'normal' },
+            3: { fontStyle: 'bold', fontSize: 12 }
+        },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // Financial Overview
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Overview', 14, yPos);
+    yPos += 10;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Metric', 'Amount']],
+        body: financialData.map(d => [d.name, `Ksh ${d.amount.toLocaleString()}`]),
+        theme: 'striped',
+        headStyles: { fillColor: [41, 102, 182] },
+        foot: [[
+            { content: 'Total', styles: { fontStyle: 'bold' } },
+            { content: `Ksh ${financialData.reduce((sum, d) => sum + d.amount, 0).toLocaleString()}`, styles: { fontStyle: 'bold' } }
+        ]],
+        footStyles: { halign: 'right' }
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // Rent Revenue Breakdown
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Rent Revenue by Ownership', 14, yPos);
+    yPos += 10;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Unit Type', 'SM Unit Rent', 'Landlord Unit Rent']],
+        body: rentBreakdownData.map(d => [d.unitType, formatCurrency(d.smRent || 0), formatCurrency(d.landlordRent || 0)]),
+        theme: 'striped',
+        headStyles: { fillColor: [41, 102, 182] },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }},
+        foot: [[
+            { content: 'Totals', styles: { fontStyle: 'bold', halign: 'right' } },
+            formatCurrency(rentBreakdownData.reduce((sum, d) => sum + (d.smRent || 0), 0)),
+            formatCurrency(rentBreakdownData.reduce((sum, d) => sum + (d.landlordRent || 0), 0))
+        ]],
+        footStyles: { halign: 'right', fontStyle: 'bold' }
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
 };
