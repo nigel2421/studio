@@ -301,29 +301,6 @@ export default function PropertyManagementPage() {
                 </header>
 
                 <div className="p-4 sm:p-6 lg:p-8 space-y-8">
-                     <Card>
-                        <CardHeader>
-                            <CardTitle>Property Analytics</CardTitle>
-                            <CardDescription>Detailed analytics for {property.name}.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Tabs defaultValue="occupancy" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
-                                    <TabsTrigger value="status">Unit Status</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="occupancy">
-                                    <UnitAnalytics property={property} tenants={tenants} />
-                                </TabsContent>
-                                <TabsContent value="status">
-                                    <StatusAnalytics property={property} />
-                                </TabsContent>
-                            </Tabs>
-                        </CardContent>
-                    </Card>
-
-                    <Separator />
-
                     <div className="space-y-4">
                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
