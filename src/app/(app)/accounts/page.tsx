@@ -25,6 +25,7 @@ import { TransactionHistoryDialog } from '@/components/financials/transaction-hi
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -90,7 +91,7 @@ export default function AccountsPage() {
 
   const stats = [
     { title: "Rent Collected", value: `Ksh ${rentCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Rent Due", value: `Ksh ${rentDue.toLocaleString()}`, icon: AlertCircle, color: "text-amber-500" },
+    { title: "Total Arrears", value: `Ksh ${rentDue.toLocaleString()}`, icon: AlertCircle, color: "text-amber-500" },
     { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-blue-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
   ];
@@ -122,17 +123,17 @@ export default function AccountsPage() {
         <AddPaymentDialog properties={properties} tenants={tenants} onPaymentAdded={fetchAllData} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map((stat, index) => (
           <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">
                 {stat.title}
               </CardTitle>
               <stat.icon className={`h-4 w-4 text-muted-foreground ${stat.color}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+            <CardContent className="p-4 pt-0">
+              <div className="text-xl font-bold">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
@@ -165,6 +166,7 @@ export default function AccountsPage() {
                 <TableHead>Tenant</TableHead>
                 <TableHead>Property</TableHead>
                 <TableHead>Rent Amount</TableHead>
+                <TableHead>Billed For</TableHead>
                 <TableHead>Excess (Cr)</TableHead>
                 <TableHead className="text-right">Payment Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -186,6 +188,11 @@ export default function AccountsPage() {
                       ? `Ksh ${tenant.lease.rent.toLocaleString()}`
                       : 'N/A'
                     }
+                  </TableCell>
+                  <TableCell>
+                    {tenant.lease?.lastBilledPeriod 
+                      ? format(new Date(tenant.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
+                      : 'N/A'}
                   </TableCell>
                   <TableCell className="text-green-600 font-semibold">
                     Ksh {(tenant.accountBalance || 0).toLocaleString()}
