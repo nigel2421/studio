@@ -1,3 +1,4 @@
+
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -18,7 +19,6 @@ import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-ove
 import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart";
-import { generateDashboardReportPDF } from "@/lib/pdf-generator";
 import { isSameMonth } from "date-fns";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 
@@ -42,7 +42,8 @@ export default function DashboardPage() {
     };
   }, []);
   
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    const { generateDashboardReportPDF } = await import('@/lib/pdf-generator');
     // 1. Prepare stats data
     const totalTenants = tenants.length;
     const totalProperties = properties.length;
@@ -281,3 +282,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

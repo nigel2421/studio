@@ -13,7 +13,6 @@ import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMo
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
-import { generateOwnerServiceChargeStatementPDF, generateVacantServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
@@ -294,7 +293,8 @@ export default function ServiceChargesPage() {
     }
   }
 
-  const handleGenerateInvoice = (arrears: VacantArrearsAccount) => {
+  const handleGenerateInvoice = async (arrears: VacantArrearsAccount) => {
+    const { generateVacantServiceChargeInvoicePDF } = await import('@/lib/pdf-generator');
     generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail);
     toast({ title: 'Invoice Generated', description: `Invoice for ${arrears.unitName} has been downloaded.` });
   };
@@ -507,3 +507,5 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
+    

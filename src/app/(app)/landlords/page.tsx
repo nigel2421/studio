@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { generateLandlordStatementPDF } from '@/lib/pdf-generator';
 import { aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
@@ -126,6 +125,7 @@ export default function LandlordsPage() {
   const handleGenerateStatement = async (landlord: Landlord, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
+      const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
       const landlordProperties: { property: Property; units: Unit[] }[] = [];
       if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
         properties.forEach(p => {
@@ -321,3 +321,5 @@ export default function LandlordsPage() {
     </div>
   );
 }
+
+    

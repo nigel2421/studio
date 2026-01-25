@@ -10,7 +10,6 @@ import { Edit, UserCog, PlusCircle, FileSignature } from 'lucide-react';
 import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
-import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval, differenceInMonths, addMonths, startOfMonth, format } from 'date-fns';
 
@@ -75,9 +74,10 @@ export default function ClientsPage() {
     }
   }
 
-  const handleGenerateStatement = (owner: PropertyOwner, startDate: Date, endDate: Date) => {
+  const handleGenerateStatement = async (owner: PropertyOwner, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
+        const { generateOwnerServiceChargeStatementPDF } = await import('@/lib/pdf-generator');
         if (!owner) {
             throw new Error("Owner not found");
         }
@@ -308,3 +308,5 @@ function EmptyState({ message }: { message: string }) {
     </div>
   );
 }
+
+    

@@ -9,7 +9,6 @@ import { DocumentList } from '@/components/financials/document-list';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { FileText, Download } from 'lucide-react';
-import { generateDocumentPDF } from '@/lib/pdf-generator';
 
 export default function DocumentsPage() {
     const { user, userProfile, isLoading: authLoading } = useAuth();
@@ -38,8 +37,9 @@ export default function DocumentsPage() {
         }
     }, [user, userProfile, authLoading]);
 
-    const handleDownload = (doc: FinancialDocument) => {
+    const handleDownload = async (doc: FinancialDocument) => {
         try {
+            const { generateDocumentPDF } = await import('@/lib/pdf-generator');
             generateDocumentPDF(doc);
             toast({
                 title: 'Download Complete',
@@ -80,3 +80,5 @@ export default function DocumentsPage() {
         </div>
     );
 }
+
+    

@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Loader2, FileText, PlusCircle } from 'lucide-react';
 import { Tenant, Payment, Property } from '@/lib/types';
 import { getTenantPayments } from '@/lib/data';
-import { generateTenantStatementPDF } from '@/lib/pdf-generator';
 import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format } from 'date-fns';
@@ -44,8 +43,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     }, [tenant, open, onPaymentAdded]);
 
 
-    const handleDownloadPDF = () => {
+    const handleDownloadPDF = async () => {
         if (!tenant) return;
+        const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
         generateTenantStatementPDF(tenant, payments);
     };
 
@@ -129,3 +129,5 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </Dialog>
     );
 }
+
+    
