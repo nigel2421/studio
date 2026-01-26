@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
-import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMonths } from 'date-fns';
+import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMonths, isAfter } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
@@ -44,7 +44,7 @@ interface VacantArrearsAccount {
     unitHandoverDate: string;
     monthsInArrears: number;
     totalDue: number;
-    arrearsDetail: { month: string, amount: number }[];
+    arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[];
     unit: Unit;
     owner: PropertyOwner;
     property: Property;
@@ -121,7 +121,7 @@ export default function ServiceChargesPage() {
             if (tenant) {
                  const relevantPayment = allPayments.find(p => 
                     p.tenantId === tenant.id &&
-                    p.type === 'ServiceCharge' &&
+                    (p.type === 'ServiceCharge' || p.type === 'Rent') &&
                     p.status === 'Paid' &&
                     isSameMonth(new Date(p.date), selectedMonth)
                 );
@@ -151,31 +151,57 @@ export default function ServiceChargesPage() {
         const vacantUnitsInArrears: VacantArrearsAccount[] = [];
         const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
             u.ownership === 'Landlord' &&
-            u.handoverStatus === 'Handed Over'
+            u.handoverStatus === 'Handed Over' &&
+            u.status === 'vacant'
         );
 
         unitsForArrears.forEach(unit => {
             const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
             if (!owner) return;
-
-            const handoverDate = new Date(unit.handoverDate!);
-            // Start billing from the month AFTER handover, as per user request.
-            const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
             
-            const monthsToBill = differenceInMonths(selectedMonth, firstBillableMonth);
+            const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
+            
+            const homeownerPayments = homeownerTenant ? allPayments.filter(p => p.tenantId === homeownerTenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent')) : [];
 
-            if (monthsToBill < 0) return; // Not yet in arrears based on the selected month
+            const paymentsByMonth = new Map<string, number>();
+            homeownerPayments.forEach(p => {
+                if (p.rentForMonth) {
+                    paymentsByMonth.set(p.rentForMonth, (paymentsByMonth.get(p.rentForMonth) || 0) + p.amount);
+                }
+            });
+            
+            const handoverDate = new Date(unit.handoverDate!);
+            const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+            const today = new Date();
+            const lastBillableMonth = startOfMonth(today);
 
-            const arrearsDetail: { month: string, amount: number }[] = [];
+            if (isAfter(firstBillableMonth, lastBillableMonth)) return;
+
+            const monthsToBill = differenceInMonths(lastBillableMonth, firstBillableMonth);
+            
+            const arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[] = [];
+            let totalDue = 0;
+
             for (let i = 0; i <= monthsToBill; i++) {
-                const monthInArrears = addMonths(firstBillableMonth, i);
-                arrearsDetail.push({
-                    month: format(monthInArrears, 'MMMM yyyy'),
-                    amount: unit.serviceCharge || 0
-                });
-            }
+                const monthDate = addMonths(firstBillableMonth, i);
+                const monthString = format(monthDate, 'yyyy-MM');
+                const monthLabel = format(monthDate, 'MMMM yyyy');
+                const chargeAmount = unit.serviceCharge || 0;
+                
+                if (chargeAmount <= 0) continue;
 
-            if(arrearsDetail.length > 0) {
+                const paidAmount = paymentsByMonth.get(monthString) || 0;
+                
+                if (paidAmount >= chargeAmount) {
+                    arrearsDetail.push({ month: monthLabel, amount: chargeAmount, status: 'Paid' });
+                } else {
+                    const outstandingForMonth = chargeAmount - paidAmount;
+                    arrearsDetail.push({ month: monthLabel, amount: chargeAmount, status: 'Pending' });
+                    totalDue += outstandingForMonth;
+                }
+            }
+            
+            if (totalDue > 0) {
                 vacantUnitsInArrears.push({
                     ownerId: owner.id,
                     ownerName: owner.name,
@@ -183,8 +209,8 @@ export default function ServiceChargesPage() {
                     propertyName: unit.property.name,
                     unitName: unit.name,
                     unitHandoverDate: unit.handoverDate!,
-                    monthsInArrears: arrearsDetail.length,
-                    totalDue: arrearsDetail.reduce((sum, item) => sum + item.amount, 0),
+                    monthsInArrears: arrearsDetail.filter(d => d.status === 'Pending').length,
+                    totalDue,
                     arrearsDetail,
                     unit,
                     owner,

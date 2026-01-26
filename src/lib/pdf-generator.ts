@@ -412,7 +412,7 @@ export const generateVacantServiceChargeInvoicePDF = (
     owner: PropertyOwner,
     unit: Unit,
     property: Property,
-    arrears: { month: string, amount: number }[]
+    arrears: { month: string; amount: number; status: 'Paid' | 'Pending' }[]
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -439,22 +439,41 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.text(`Handover Date: ${unit.handoverDate ? new Date(unit.handoverDate).toLocaleDateString() : 'N/A'}`, 14, yPos + 16);
     yPos += 25;
 
-    const totalAmount = arrears.reduce((sum, item) => sum + item.amount, 0);
+    const totalDue = arrears.filter(item => item.status === 'Pending').reduce((sum, item) => sum + item.amount, 0);
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Month', 'Description', 'Amount']],
-        body: arrears.map(item => [item.month, `Service Charge for Vacant Unit`, formatCurrency(item.amount)]),
+        head: [['Month', 'Description', 'Status', 'Amount']],
+        body: arrears.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
-        foot: [['TOTAL DUE', '', formatCurrency(totalAmount)]],
+        headStyles: { fillColor: [217, 119, 6] },
+        foot: [[{ content: 'TOTAL DUE', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(totalDue)]],
         footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-            2: { halign: 'right' }
-        }
+            3: { halign: 'right' }
+        },
+        didDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 2) {
+                const status = data.cell.raw as string;
+                doc.setFont(doc.getFont().fontName, 'bold');
+                if (status === 'Paid') {
+                    doc.setTextColor(15, 118, 110); // tailwind teal-700
+                } else if (status === 'Pending') {
+                    doc.setTextColor(199, 24, 24); // tailwind red-600
+                }
+            }
+        },
+        willDrawCell: (data) => {
+            if (!(data.section === 'body' && data.column.index === 2)) {
+                doc.setFont(doc.getFont().fontName, 'normal');
+                doc.setTextColor(40, 40, 40);
+            }
+        },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.setTextColor(40);
+    doc.setFont('helvetica', 'normal');
     doc.text('Please remit payment at your earliest convenience to avoid further penalties.', 14, yPos);
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
