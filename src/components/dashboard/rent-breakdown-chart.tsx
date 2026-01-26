@@ -51,7 +51,7 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
     return unitTypes.map(type => ({
       unitType: type,
       ...breakdown[type]
-    })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
+    })).filter(d => d.unitType === 'Studio' || (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
 
   }, [payments, tenants, properties]);
 
