@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -29,6 +30,7 @@ import { UnitAnalytics } from '@/components/unit-analytics';
 import { StatusAnalytics } from '@/components/status-analytics';
 import { Separator } from '@/components/ui/separator';
 import { OrientationAnalytics } from '@/components/orientation-analytics';
+import { UnitCsvUploader } from '@/components/unit-csv-uploader';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -318,7 +320,7 @@ export default function PropertyManagementPage() {
                                    Bulk Edit ({selectedUnitNames.length})
                                  </Button>
                                )}
-                               {!isReadOnly && <BulkUnitUpdateDialog onUploadComplete={fetchData} />}
+                               {!isReadOnly && <UnitCsvUploader onUploadComplete={fetchData} />}
                                 <div className="relative w-full md:w-48">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search units..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
