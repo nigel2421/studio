@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, FinancialSummary, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
+import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
+import { FinancialSummary } from '@/lib/financial-utils';
 import { format } from 'date-fns';
 
 // Helper to add company header

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -22,7 +21,7 @@ const formSchema = z.object({
     idNumber: z.string().min(1, 'ID number is required'),
     propertyId: z.string().min(1, 'Property is required'),
     unitName: z.string().min(1, 'Unit is required'),
-    agent: z.enum(agents as [string, ...string[]]),
+    agent: z.enum([...agents]),
 });
 
 type FormValues = z.infer<typeof formSchema>;

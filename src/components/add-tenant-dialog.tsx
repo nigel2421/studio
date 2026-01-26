@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -127,8 +126,6 @@ export function AddTenantDialog({ onTenantAdded }: AddTenantDialogProps) {
         waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
         leaseStartDate: new Date().toISOString().split('T')[0],
-        dueBalance: 0,
-        accountBalance: 0
       });
       toast({
         title: "Tenant Added",

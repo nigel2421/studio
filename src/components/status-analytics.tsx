@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
@@ -145,11 +144,11 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                     <TableCell className="pl-8">{status}</TableCell>
                     {unitTypes.map(ut => (
                         <TableCell key={ut} className="text-right">
-                            {analytics[status]?.[ut] || 0}
+                            {(analytics as any)[status]?.[ut] || 0}
                         </TableCell>
                     ))}
                     <TableCell className="text-right font-bold">
-                        {analytics[status]?.Total || 0}
+                        {(analytics as any)[status]?.Total || 0}
                     </TableCell>
                 </TableRow>
             ))}

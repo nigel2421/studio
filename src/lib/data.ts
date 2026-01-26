@@ -3,7 +3,7 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
-    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
+    UserRole, UnitStatus, OwnershipType, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
@@ -678,12 +678,12 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
     for (const [index, row] of data.entries()) {
         const {
             UnitName,
-            Status,
-            Ownership,
-            UnitType,
-            UnitOrientation,
-            ManagementStatus,
-            HandoverStatus,
+            Status: statusValue,
+            Ownership: ownershipValue,
+            UnitType: unitTypeValue,
+            UnitOrientation: unitOrientationValue,
+            ManagementStatus: managementStatusValue,
+            HandoverStatus: handoverStatusValue,
             HandoverDate,
             RentAmount,
             ServiceCharge,
@@ -719,53 +719,53 @@ export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Pr
         const unitToUpdate = unitsForProperty[unitIndex];
         let unitWasUpdated = false;
 
-        if (Status !== undefined && unitToUpdate.status !== Status) {
-            if (!unitStatuses.includes(Status as any)) {
-                errors.push(`Row ${index + 2}: Invalid Status "${Status}".`);
+        if (statusValue !== undefined && unitToUpdate.status !== statusValue) {
+            if (!unitStatuses.includes(statusValue as any)) {
+                errors.push(`Row ${index + 2}: Invalid Status "${statusValue}".`);
             } else {
-                unitToUpdate.status = Status as UnitStatus;
+                unitToUpdate.status = statusValue as UnitStatus;
                 unitWasUpdated = true;
             }
         }
-        if (Ownership !== undefined && unitToUpdate.ownership !== Ownership) {
-            if (!ownershipTypes.includes(Ownership as any)) {
-                errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`);
+        if (ownershipValue !== undefined && unitToUpdate.ownership !== ownershipValue) {
+            if (!ownershipTypes.includes(ownershipValue as any)) {
+                errors.push(`Row ${index + 2}: Invalid Ownership "${ownershipValue}".`);
             } else {
-                unitToUpdate.ownership = Ownership as OwnershipType;
+                unitToUpdate.ownership = ownershipValue as OwnershipType;
                 unitWasUpdated = true;
             }
         }
-        if (UnitType !== undefined && unitToUpdate.unitType !== UnitType) {
-            if (!unitTypes.includes(UnitType as any)) {
-                errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`);
+        if (unitTypeValue !== undefined && unitToUpdate.unitType !== unitTypeValue) {
+            if (!unitTypes.includes(unitTypeValue as any)) {
+                errors.push(`Row ${index + 2}: Invalid UnitType "${unitTypeValue}".`);
             } else {
-                unitToUpdate.unitType = UnitType as UnitType;
+                unitToUpdate.unitType = unitTypeValue as UnitType;
                 unitWasUpdated = true;
             }
         }
-        if (UnitOrientation !== undefined && unitToUpdate.unitOrientation !== UnitOrientation) {
-            if (!unitOrientations.includes(UnitOrientation as any)) {
-                errors.push(`Row ${index + 2}: Invalid UnitOrientation "${UnitOrientation}".`);
+        if (unitOrientationValue !== undefined && unitToUpdate.unitOrientation !== unitOrientationValue) {
+            if (!unitOrientations.includes(unitOrientationValue as any)) {
+                errors.push(`Row ${index + 2}: Invalid UnitOrientation "${unitOrientationValue}".`);
             } else {
-                unitToUpdate.unitOrientation = UnitOrientation as UnitOrientation;
+                unitToUpdate.unitOrientation = unitOrientationValue as UnitOrientation;
                 unitWasUpdated = true;
             }
         }
-        if (ManagementStatus !== undefined && unitToUpdate.managementStatus !== ManagementStatus) {
-            if (!managementStatuses.includes(ManagementStatus as any)) {
-                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}".`);
+        if (managementStatusValue !== undefined && unitToUpdate.managementStatus !== managementStatusValue) {
+            if (!managementStatuses.includes(managementStatusValue as any)) {
+                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${managementStatusValue}".`);
             } else {
-                unitToUpdate.managementStatus = ManagementStatus as ManagementStatus;
+                unitToUpdate.managementStatus = managementStatusValue as ManagementStatus;
                 unitWasUpdated = true;
             }
         }
-        if (HandoverStatus !== undefined && unitToUpdate.handoverStatus !== HandoverStatus) {
-            if (!handoverStatuses.includes(HandoverStatus as any)) {
-                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}".`);
+        if (handoverStatusValue !== undefined && unitToUpdate.handoverStatus !== handoverStatusValue) {
+            if (!handoverStatuses.includes(handoverStatusValue as any)) {
+                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${handoverStatusValue}".`);
             } else {
-                unitToUpdate.handoverStatus = HandoverStatus as HandoverStatus;
+                unitToUpdate.handoverStatus = handoverStatusValue as HandoverStatus;
                 unitWasUpdated = true;
-                if (HandoverStatus === 'Handed Over' && !HandoverDate && !unitToUpdate.handoverDate) {
+                if (handoverStatusValue === 'Handed Over' && !HandoverDate && !unitToUpdate.handoverDate) {
                     unitToUpdate.handoverDate = new Date().toISOString().split('T')[0];
                 }
             }
