@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AccountInfo {
     unitName: string;
@@ -20,9 +21,19 @@ interface ConfirmOwnerPaymentDialogProps {
     onClose: () => void;
     ownerName: string;
     accounts: AccountInfo[];
-    onConfirm: (paymentData: { amount: number; date: Date; notes: string }) => void;
+    onConfirm: (paymentData: { amount: number; date: Date; notes: string; forMonth: string }) => void;
     isSaving: boolean;
 }
+
+const monthOptions = Array.from({ length: 18 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i + 2);
+    return {
+      value: format(d, 'yyyy-MM'),
+      label: format(d, 'MMMM yyyy'),
+    };
+});
 
 export function ConfirmOwnerPaymentDialog({
     isOpen,
@@ -36,6 +47,7 @@ export function ConfirmOwnerPaymentDialog({
     const [amount, setAmount] = useState<string>('');
     const [date, setDate] = useState<Date>(new Date());
     const [notes, setNotes] = useState('');
+    const [forMonth, setForMonth] = useState<string>('');
 
     useEffect(() => {
         if (isOpen) {
@@ -43,12 +55,13 @@ export function ConfirmOwnerPaymentDialog({
             const unitNames = accounts.map(a => a.unitName).join(', ');
             setNotes(`Consolidated service charge for units: ${unitNames}`);
             setDate(new Date());
+            setForMonth(format(new Date(), 'yyyy-MM'));
         }
     }, [isOpen, totalDue, accounts]);
 
     const handleSubmit = () => {
-        if (Number(amount) > 0) {
-            onConfirm({ amount: Number(amount), date, notes });
+        if (Number(amount) > 0 && forMonth) {
+            onConfirm({ amount: Number(amount), date, notes, forMonth });
         }
     };
 
@@ -84,6 +97,19 @@ export function ConfirmOwnerPaymentDialog({
                              <DatePicker value={date} onChange={(d) => {if(d) setDate(d)}} />
                         </div>
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="for-month">Payment for Month</Label>
+                        <Select value={forMonth} onValueChange={setForMonth}>
+                            <SelectTrigger id="for-month">
+                                <SelectValue placeholder="Select month..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {monthOptions.map(option => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                      <div className="space-y-2">
                         <Label htmlFor="notes">Notes</Label>
                         <Input
@@ -95,7 +121,7 @@ export function ConfirmOwnerPaymentDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSaving || !amount}>
+                    <Button onClick={handleSubmit} disabled={isSaving || !amount || !forMonth}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Record Payment
                     </Button>
@@ -104,3 +130,5 @@ export function ConfirmOwnerPaymentDialog({
         </Dialog>
     );
 }
+
+    

@@ -151,9 +151,7 @@ export default function ServiceChargesPage() {
         const vacantUnitsInArrears: VacantArrearsAccount[] = [];
         const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
             u.ownership === 'Landlord' &&
-            u.status === 'vacant' &&
-            u.handoverStatus === 'Handed Over' &&
-            u.handoverDate
+            u.handoverStatus === 'Handed Over'
         );
 
         unitsForArrears.forEach(unit => {
@@ -227,7 +225,7 @@ export default function ServiceChargesPage() {
     }
   };
 
-  const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string }) => {
+  const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string, forMonth: string }) => {
     if (!ownerForPayment || accountsForPayment.length === 0) return;
 
     startLoading(`Recording payment for ${ownerForPayment.name}...`);
@@ -270,7 +268,7 @@ export default function ServiceChargesPage() {
                     amount: amountToApply,
                     date: format(paymentData.date, 'yyyy-MM-dd'),
                     notes: `Part of consolidated payment. ${paymentData.notes}`,
-                    rentForMonth: format(selectedMonth, 'yyyy-MM'),
+                    rentForMonth: paymentData.forMonth,
                     status: 'Paid',
                     type: 'ServiceCharge',
                 }));
@@ -510,6 +508,8 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
+    
 
     
 
