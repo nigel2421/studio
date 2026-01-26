@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPayments } from '@/lib/data';
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
 import { Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financ
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -271,30 +272,24 @@ export default function LandlordsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <h4 className="text-sm font-semibold mb-3 border-t pt-3">Assigned Units ({assignedUnits.length})</h4>
                   {assignedUnits.length > 0 ? (
-                    <ul className="space-y-2 text-sm">
+                    <div className="flex flex-wrap gap-2 pt-4 border-t">
                       {assignedUnits.map((unit, index) => (
-                        <li key={index} className="flex justify-between items-center group">
-                          <span>
-                            <span className="font-medium">{unit.propertyName}:</span> Unit {unit.name}
-                          </span>
-                          <Link href={`/properties/${unit.propertyId}`}>
-                            <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </Link>
-                        </li>
+                        <Badge variant="secondary" key={index} className="font-normal">
+                          {unit.propertyName}: Unit {unit.name}
+                        </Badge>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No units assigned yet.</p>
+                    <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned yet.</p>
                   )}
                 </CardContent>
-                <CardContent>
+                <CardFooter>
                     <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
                         <FileDown className="mr-2 h-4 w-4" />
                         Generate Statement
                     </Button>
-                </CardContent>
+                </CardFooter>
               </Card>
             )
           })}
