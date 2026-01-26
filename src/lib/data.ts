@@ -3,8 +3,11 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
-    UserRole, UnitStatus, OwnershipType, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
-    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent
+    UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
+    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
+    OwnershipType,
+    ManagementStatus,
+    HandoverStatus
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -181,11 +184,11 @@ export async function addTenant(data: {
     rent: number;
     securityDeposit: number;
     waterDeposit?: number;
-    residentType: 'Tenant';
+    residentType: 'Tenant' | 'Homeowner';
     leaseStartDate: string;
 }): Promise<void> {
 
-    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate } = data;
+    const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate, residentType } = data;
 
     const property = await getProperty(propertyId);
     if (!property) {
@@ -207,7 +210,7 @@ export async function addTenant(data: {
         unitName,
         agent,
         status: 'active' as const,
-        residentType: 'Tenant' as const,
+        residentType: residentType,
         lease: {
             startDate: leaseStartDate,
             endDate: new Date(new Date(leaseStartDate).setFullYear(new Date(leaseStartDate).getFullYear() + 1)).toISOString().split('T')[0],

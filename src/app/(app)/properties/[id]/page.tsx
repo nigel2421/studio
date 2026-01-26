@@ -20,8 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Edit2, Loader2, Filter, X, Save, ArrowLeft } from 'lucide-react';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Checkbox } from '@/components/ui/checkbox';
-import { BulkUnitUpdateDialog } from '@/components/bulk-unit-update-dialog';
-import { UnitBulkUpdateDialog } from '@/components/unit-bulk-update-dialog';
+import { BulkUnitUpdateDialog } from '@/components/unit-bulk-update-dialog';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -319,7 +318,7 @@ export default function PropertyManagementPage() {
                                    Bulk Edit ({selectedUnitNames.length})
                                  </Button>
                                )}
-                               {!isReadOnly && <UnitBulkUpdateDialog onUploadComplete={fetchData} />}
+                               {!isReadOnly && <BulkUnitUpdateDialog onUploadComplete={fetchData} />}
                                 <div className="relative w-full md:w-48">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search units..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
