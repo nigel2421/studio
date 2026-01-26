@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -412,7 +413,8 @@ export const generateVacantServiceChargeInvoicePDF = (
     owner: PropertyOwner,
     unit: Unit,
     property: Property,
-    arrears: { month: string; amount: number; status: 'Paid' | 'Pending' }[]
+    arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[],
+    totalDue: number
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -439,12 +441,10 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.text(`Handover Date: ${unit.handoverDate ? new Date(unit.handoverDate).toLocaleDateString() : 'N/A'}`, 14, yPos + 16);
     yPos += 25;
 
-    const totalDue = arrears.filter(item => item.status === 'Pending').reduce((sum, item) => sum + item.amount, 0);
-
     autoTable(doc, {
         startY: yPos,
         head: [['Month', 'Description', 'Status', 'Amount']],
-        body: arrears.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
+        body: arrearsDetail.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
         theme: 'striped',
         headStyles: { fillColor: [217, 119, 6] }, // Amber
         foot: [[{ content: 'TOTAL DUE', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(totalDue)]],

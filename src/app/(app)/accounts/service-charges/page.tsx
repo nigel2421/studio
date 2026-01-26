@@ -160,16 +160,10 @@ export default function ServiceChargesPage() {
             if (!owner) return;
             
             const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
-            
             const homeownerPayments = homeownerTenant ? allPayments.filter(p => p.tenantId === homeownerTenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent')) : [];
-
-            const paymentsByMonth = new Map<string, number>();
-            homeownerPayments.forEach(p => {
-                if (p.rentForMonth) {
-                    paymentsByMonth.set(p.rentForMonth, (paymentsByMonth.get(p.rentForMonth) || 0) + p.amount);
-                }
-            });
             
+            let creditPool = homeownerPayments.reduce((sum, p) => sum + p.amount, 0);
+
             const handoverDate = new Date(unit.handoverDate!);
             const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
             const today = new Date();
@@ -177,38 +171,34 @@ export default function ServiceChargesPage() {
 
             if (isAfter(firstBillableMonth, lastBillableMonth)) return;
 
-            const monthsToBill = differenceInMonths(lastBillableMonth, firstBillableMonth);
+            const monthsToBillCount = differenceInMonths(lastBillableMonth, firstBillableMonth);
             
             const arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[] = [];
-            let totalDue = 0;
-            let creditCarriedForward = 0;
+            let totalBilledAmount = 0;
 
-            for (let i = 0; i <= monthsToBill; i++) {
-                const monthDate = addMonths(firstBillableMonth, i);
-                const monthString = format(monthDate, 'yyyy-MM');
-                const monthLabel = format(monthDate, 'MMMM yyyy');
+            for (let i = 0; i <= monthsToBillCount; i++) {
+                const currentMonthDate = addMonths(firstBillableMonth, i);
+                const monthLabel = format(currentMonthDate, 'MMMM yyyy');
                 const chargeForMonth = unit.serviceCharge || 0;
-                
+
                 if (chargeForMonth <= 0) continue;
 
-                const paidForMonth = paymentsByMonth.get(monthString) || 0;
-                const totalAvailableToPay = paidForMonth + creditCarriedForward;
-                
-                let status: 'Paid' | 'Pending';
+                totalBilledAmount += chargeForMonth;
 
-                if (totalAvailableToPay >= chargeForMonth) {
+                let status: 'Paid' | 'Pending';
+                if (creditPool >= chargeForMonth) {
                     status = 'Paid';
-                    creditCarriedForward = totalAvailableToPay - chargeForMonth;
+                    creditPool -= chargeForMonth;
                 } else {
                     status = 'Pending';
-                    const amountPending = chargeForMonth - totalAvailableToPay;
-                    totalDue += amountPending; // This will be the final running total of what's owed.
-                    creditCarriedForward = 0;
                 }
                 
                 arrearsDetail.push({ month: monthLabel, amount: chargeForMonth, status });
             }
-            
+
+            const totalPaid = homeownerPayments.reduce((sum, p) => sum + p.amount, 0);
+            const totalDue = Math.max(0, totalBilledAmount - totalPaid);
+
             if (totalDue > 0) {
                 vacantUnitsInArrears.push({
                     ownerId: owner.id,
@@ -330,7 +320,7 @@ export default function ServiceChargesPage() {
 
   const handleGenerateInvoice = async (arrears: VacantArrearsAccount) => {
     const { generateVacantServiceChargeInvoicePDF } = await import('@/lib/pdf-generator');
-    generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail);
+    generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail, arrears.totalDue);
     toast({ title: 'Invoice Generated', description: `Invoice for ${arrears.unitName} has been downloaded.` });
   };
 
