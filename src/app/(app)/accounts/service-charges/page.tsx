@@ -150,7 +150,6 @@ export default function ServiceChargesPage() {
         // Vacant Units in Arrears Logic
         const vacantUnitsInArrears: VacantArrearsAccount[] = [];
         const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
-            u.managementStatus === 'Client Managed' &&
             u.ownership === 'Landlord' &&
             u.status === 'vacant' &&
             u.handoverStatus === 'Handed Over' &&
@@ -511,6 +510,8 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
+    
 
     
 
