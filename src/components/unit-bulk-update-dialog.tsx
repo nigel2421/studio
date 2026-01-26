@@ -1,179 +1,218 @@
-
 'use client';
 
-import { useState, useRef } from 'react';
-import Papa from 'papaparse';
+import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, unitOrientations } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload } from 'lucide-react';
-import { bulkUpdateUnitsFromCSV } from '@/lib/data';
-import { useLoading } from '@/hooks/useLoading';
-import { ScrollArea } from './ui/scroll-area';
 
-interface Props {
-  onUploadComplete: () => void;
+interface BulkUnitUpdateDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSave: (data: Partial<Omit<Unit, 'name'>>) => Promise<void>;
+    unitCount: number;
 }
 
-export function UnitBulkUpdateDialog({ onUploadComplete }: Props) {
-  const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  const { startLoading, stopLoading } = useLoading();
+type UpdatableUnitField = keyof Pick<Unit, 'status' | 'ownership' | 'unitType' | 'unitOrientation' | 'managementStatus' | 'handoverStatus' | 'rentAmount' | 'serviceCharge'>;
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      setFile(event.target.files[0]);
-    }
-  };
 
-  const handleUpload = async () => {
-    if (!file) {
-      toast({ variant: 'destructive', title: 'No file selected' });
-      return;
-    }
+const updatableFields: UpdatableUnitField[] = [
+    'status', 'ownership', 'unitType', 'unitOrientation', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
+];
 
-    setIsLoading(true);
-    startLoading('Processing Units CSV...');
-
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const { data, meta } = results;
-
-        const requiredHeaders = ['UnitName'];
-        const actualHeaders = meta.fields || [];
-        const missingHeaders = requiredHeaders.filter(h => !actualHeaders.includes(h));
-
-        if (missingHeaders.length > 0) {
-           toast({
-            variant: 'destructive',
-            title: 'CSV Header Error',
-            description: `Missing required columns: ${missingHeaders.join(', ')}`,
-          });
-          setIsLoading(false);
-          stopLoading();
-          return;
+export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const { control, handleSubmit, register, reset, getValues, setValue } = useForm();
+    const [activeFields, setActiveFields] = useState<Partial<Record<UpdatableUnitField, boolean>>>({});
+    
+    useEffect(() => {
+        if (!open) {
+            reset();
+            setActiveFields({});
         }
+    }, [open, reset]);
 
-        try {
-          const { updatedCount, errors } = await bulkUpdateUnitsFromCSV(data);
-          
-          if (errors.length > 0) {
-            toast({
-              variant: 'destructive',
-              title: `Found ${errors.length} error(s) in CSV`,
-              description: (
-                <ScrollArea className="h-40">
-                  <pre className="text-xs whitespace-pre-wrap">
-                    {errors.join('\n')}
-                  </pre>
-                </ScrollArea>
-              ),
-              duration: 10000,
-            });
-          } else if (updatedCount > 0) {
-            toast({
-              title: 'Upload Successful',
-              description: `${updatedCount} units have been updated.`,
-            });
-            onUploadComplete();
-            setOpen(false);
-            setFile(null);
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
+    const handleToggleField = (field: UpdatableUnitField, checked: boolean) => {
+        setActiveFields(prev => ({ ...prev, [field]: checked }));
+        if (!checked) {
+            setValue(field, '');
+        }
+    };
+
+    const processSubmit = async (data: any) => {
+        const updateData: Partial<Omit<Unit, 'name'>> = {};
+        let hasActiveField = false;
+
+        for (const key in activeFields) {
+            const fieldKey = key as UpdatableUnitField;
+            if (activeFields[fieldKey]) {
+                hasActiveField = true;
+                let value = data[fieldKey];
+                
+                if (fieldKey === 'rentAmount' || fieldKey === 'serviceCharge') {
+                    value = value !== '' && !isNaN(value) ? Number(value) : undefined;
+                }
+                
+                if (value !== undefined && value !== '' && value !== null) {
+                    (updateData as any)[fieldKey] = value;
+                }
             }
-          } else {
-             toast({
-              title: 'No Changes',
-              description: `The CSV data matched the existing unit details. No updates were made.`,
-            });
-          }
-        } catch (error: any) {
-          toast({
-            variant: 'destructive',
-            title: 'Update Failed',
-            description: error.message || 'An error occurred while updating the units.',
-          });
-        } finally {
-          setIsLoading(false);
-          stopLoading();
         }
-      },
-      error: (error: Error) => {
-        toast({
-          variant: 'destructive',
-          title: 'Upload Error',
-          description: error.message,
-        });
-        setIsLoading(false);
-        stopLoading();
-      },
-    });
-  };
+        
+        if (!hasActiveField || Object.keys(updateData).length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'No Changes',
+                description: 'Please select and fill at least one field to update.',
+            });
+            return;
+        }
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Upload className="mr-2 h-4 w-4" />
-          Bulk Update Units
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Bulk Update Units via CSV</DialogTitle>
-          <DialogDescription>
-            Upload a CSV to update multiple unit details at once.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="text-left text-xs space-y-2 text-muted-foreground">
-            <div>
-                <h4 className="font-bold text-foreground">Required Columns:</h4>
-                <ul className="list-disc list-inside">
-                    <li>UnitName (must be unique across all properties)</li>
-                </ul>
-            </div>
-            <div>
-                <h4 className="font-bold text-foreground mt-2">Optional Columns:</h4>
-                <ul className="list-disc list-inside">
-                    <li>Status (e.g., vacant, rented, airbnb)</li>
-                    <li>Ownership (SM or Landlord)</li>
-                    <li>UnitType (e.g., Studio, One Bedroom)</li>
-                    <li>ManagementStatus</li>
-                    <li>HandoverStatus (Pending or Handed Over)</li>
-                    <li>HandoverDate (YYYY-MM-DD format)</li>
-                    <li>RentAmount (number only, e.g., 25000)</li>
-                    <li>ServiceCharge (number only, e.g., 3000)</li>
-                </ul>
-            </div>
-        </div>
-        <div className="grid gap-4 py-4">
-          <div className="grid w-full max-w-sm items-center gap-1.5">
-            <Label htmlFor="csv-file">CSV File</Label>
-            <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} ref={fileInputRef} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button onClick={handleUpload} disabled={isLoading || !file}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLoading ? 'Processing...' : 'Upload and Update'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+        setIsSaving(true);
+        try {
+            await onSave(updateData);
+            onOpenChange(false);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const renderFieldInput = (field: UpdatableUnitField) => {
+        const isDisabled = !activeFields[field];
+
+        switch (field) {
+            case 'status':
+                return (
+                    <Controller
+                        name="status"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+                                <SelectContent>{unitStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'ownership':
+                return (
+                     <Controller
+                        name="ownership"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Ownership" /></SelectTrigger>
+                                <SelectContent>{ownershipTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'unitType':
+                 return (
+                     <Controller
+                        name="unitType"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Unit Type" /></SelectTrigger>
+                                <SelectContent>{unitTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'unitOrientation':
+                 return (
+                     <Controller
+                        name="unitOrientation"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Orientation" /></SelectTrigger>
+                                <SelectContent>{unitOrientations.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'managementStatus':
+                 return (
+                     <Controller
+                        name="managementStatus"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Management Status" /></SelectTrigger>
+                                <SelectContent>{managementStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'handoverStatus':
+                 return (
+                     <Controller
+                        name="handoverStatus"
+                        control={control}
+                        defaultValue=""
+                        render={({ field: controllerField }) => (
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
+                                <SelectTrigger><SelectValue placeholder="Select Handover Status" /></SelectTrigger>
+                                <SelectContent>{handoverStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )}
+                    />
+                );
+            case 'rentAmount':
+            case 'serviceCharge':
+                return <Input type="number" {...register(field)} disabled={isDisabled} placeholder="Enter new value" />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Bulk Edit Units</DialogTitle>
+                    <DialogDescription>
+                        You are editing {unitCount} units. Select the fields you want to change and provide the new values.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(processSubmit)} className="space-y-4 py-4">
+                    {updatableFields.map(field => (
+                        <div key={field} className="grid grid-cols-[auto,1fr] items-center gap-4">
+                             <Checkbox
+                                id={`cb-${field}`}
+                                onCheckedChange={(checked) => handleToggleField(field, !!checked)}
+                            />
+                            <div className="grid w-full items-center gap-1.5">
+                                <Label htmlFor={field} className="capitalize text-sm font-medium">
+                                    {field.replace(/([A-Z])/g, ' $1')}
+                                </Label>
+                                {renderFieldInput(field)}
+                            </div>
+                        </div>
+                    ))}
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Apply Changes
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }

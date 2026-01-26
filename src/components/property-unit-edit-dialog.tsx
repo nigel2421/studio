@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -24,16 +23,16 @@ import { DatePicker } from '@/components/ui/date-picker';
 
 const unitSchema = z.object({
     name: z.string(),
-    status: z.enum(unitStatuses as any),
-    ownership: z.enum(ownershipTypes as any),
-    unitType: z.enum(unitTypes as any),
+    status: z.enum(unitStatuses),
+    ownership: z.enum(ownershipTypes),
+    unitType: z.enum(unitTypes),
     landlordId: z.string().optional(),
-    managementStatus: z.enum(managementStatuses as any).optional(),
-    handoverStatus: z.enum(handoverStatuses as any).optional(),
+    managementStatus: z.enum(managementStatuses).optional(),
+    handoverStatus: z.enum(handoverStatuses).optional(),
     handoverDate: z.date().optional(),
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
-    unitOrientation: z.enum(unitOrientations as [string, ...string[]]).optional(),
+    unitOrientation: z.enum(unitOrientations).optional(),
 });
 
 type UnitFormValues = z.infer<typeof unitSchema>;

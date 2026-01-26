@@ -1,12 +1,10 @@
-
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
-    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations
+    unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -172,7 +170,20 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return tenant;
 }
 
-export async function addTenant(data: Omit<Tenant, 'id' | 'status' | 'lease'> & { rent: number; securityDeposit: number; waterDeposit?: number; residentType: 'Tenant', leaseStartDate: string }): Promise<void> {
+export async function addTenant(data: {
+    name: string;
+    email: string;
+    phone: string;
+    idNumber: string;
+    propertyId: string;
+    unitName: string;
+    agent: Agent;
+    rent: number;
+    securityDeposit: number;
+    waterDeposit?: number;
+    residentType: 'Tenant';
+    leaseStartDate: string;
+}): Promise<void> {
 
     const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate } = data;
 
@@ -1041,8 +1052,8 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
                 await createUserProfile(userId, landlord.email, 'landlord', { name: landlord.name, landlordId: landlord.id });
                 await logActivity(`Created landlord user: ${landlord.email}`);
             } catch (error: any) {
-                console.error("Error creating landlord auth user:", error);
                 if (error.code !== 'auth/email-already-in-use') {
+                    console.error("Error creating landlord auth user:", error);
                     throw new Error("Failed to create landlord login credentials.");
                 }
             } finally {

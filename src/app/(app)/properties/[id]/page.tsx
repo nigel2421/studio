@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -9,7 +8,7 @@ import { getProperty, updateProperty, getLandlords, getTenants } from '@/lib/dat
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors, unitOrientations, Tenant } from '@/lib/types';
+import { Property, ownershipTypes, Unit, unitTypes, unitStatuses, Landlord, unitOrientationColors, unitOrientations, Tenant, UnitStatus, OwnershipType, UnitType, UnitOrientation } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UnitAnalytics } from '@/components/unit-analytics';
 import { StatusAnalytics } from '@/components/status-analytics';
 import { Separator } from '@/components/ui/separator';
+import { OrientationAnalytics } from '@/components/orientation-analytics';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -60,7 +60,12 @@ export default function PropertyManagementPage() {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [selectedUnitNames, setSelectedUnitNames] = useState<string[]>([]);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
-    const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<{
+        status: UnitStatus | 'all';
+        ownership: OwnershipType | 'all';
+        unitType: UnitType | 'all';
+        unitOrientation: UnitOrientation | 'all';
+    }>({
         status: 'all',
         ownership: 'all',
         unitType: 'all',
@@ -106,7 +111,7 @@ export default function PropertyManagementPage() {
     }, [property, form.reset]);
 
     const handleFilterChange = (filterName: keyof typeof filters, value: string) => {
-        setFilters(prev => ({ ...prev, [filterName]: value }));
+        setFilters(prev => ({ ...prev, [filterName]: value as any }));
         setCurrentPage(1); // Reset to first page on filter change
     };
     
