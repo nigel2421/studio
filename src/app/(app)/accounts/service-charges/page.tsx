@@ -181,24 +181,32 @@ export default function ServiceChargesPage() {
             
             const arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[] = [];
             let totalDue = 0;
+            let creditCarriedForward = 0;
 
             for (let i = 0; i <= monthsToBill; i++) {
                 const monthDate = addMonths(firstBillableMonth, i);
                 const monthString = format(monthDate, 'yyyy-MM');
                 const monthLabel = format(monthDate, 'MMMM yyyy');
-                const chargeAmount = unit.serviceCharge || 0;
+                const chargeForMonth = unit.serviceCharge || 0;
                 
-                if (chargeAmount <= 0) continue;
+                if (chargeForMonth <= 0) continue;
 
-                const paidAmount = paymentsByMonth.get(monthString) || 0;
+                const paidForMonth = paymentsByMonth.get(monthString) || 0;
+                const totalAvailableToPay = paidForMonth + creditCarriedForward;
                 
-                if (paidAmount >= chargeAmount) {
-                    arrearsDetail.push({ month: monthLabel, amount: chargeAmount, status: 'Paid' });
+                let status: 'Paid' | 'Pending';
+
+                if (totalAvailableToPay >= chargeForMonth) {
+                    status = 'Paid';
+                    creditCarriedForward = totalAvailableToPay - chargeForMonth;
                 } else {
-                    const outstandingForMonth = chargeAmount - paidAmount;
-                    arrearsDetail.push({ month: monthLabel, amount: chargeAmount, status: 'Pending' });
-                    totalDue += outstandingForMonth;
+                    status = 'Pending';
+                    const amountPending = chargeForMonth - totalAvailableToPay;
+                    totalDue += amountPending; // This will be the final running total of what's owed.
+                    creditCarriedForward = 0;
                 }
+                
+                arrearsDetail.push({ month: monthLabel, amount: chargeForMonth, status });
             }
             
             if (totalDue > 0) {

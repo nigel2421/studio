@@ -446,7 +446,7 @@ export const generateVacantServiceChargeInvoicePDF = (
         head: [['Month', 'Description', 'Status', 'Amount']],
         body: arrears.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] },
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
         foot: [[{ content: 'TOTAL DUE', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(totalDue)]],
         footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
