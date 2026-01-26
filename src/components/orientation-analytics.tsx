@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import type { Property, UnitOrientation, Tenant } from '@/lib/types';
-import { unitOrientations } from '@/lib/types';
+import { useMemo, useState } from 'react';
+import type { Property, UnitOrientation, Tenant, UnitType } from '@/lib/types';
+import { unitOrientations, unitTypes } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface OrientationAnalyticsProps {
     property: Property;
@@ -28,6 +29,7 @@ const parseFloorFromUnitName = (unitName: string): string | null => {
 };
 
 export function OrientationAnalytics({ property, tenants }: OrientationAnalyticsProps) {
+    const [unitTypeFilter, setUnitTypeFilter] = useState<UnitType | 'all'>('all');
 
     const { analyticsData, totals } = useMemo(() => {
         const data: Record<string, FloorOrientationData> = {};
@@ -37,6 +39,10 @@ export function OrientationAnalytics({ property, tenants }: OrientationAnalytics
         if (!Array.isArray(property.units)) {
             return { analyticsData: {}, totals: grandTotals };
         }
+        
+        const filteredUnits = property.units.filter(unit =>
+            unitTypeFilter === 'all' || unit.unitType === unitTypeFilter
+        );
 
         const occupiedUnitIdentifiers = new Set(
             tenants
@@ -45,7 +51,7 @@ export function OrientationAnalytics({ property, tenants }: OrientationAnalytics
         );
 
         const floorSet = new Set<string>();
-        property.units.forEach(unit => {
+        filteredUnits.forEach(unit => {
             if (unit.unitOrientation) { // Only consider units with an orientation
                 const floor = parseFloorFromUnitName(unit.name);
                 if(floor) floorSet.add(floor);
@@ -59,7 +65,7 @@ export function OrientationAnalytics({ property, tenants }: OrientationAnalytics
             unitOrientations.forEach(o => (data[floor] as any)[o] = { rented: 0, vacant: 0 });
         });
 
-        for (const unit of property.units) {
+        for (const unit of filteredUnits) {
             const floorNumber = parseFloorFromUnitName(unit.name);
             if (!floorNumber || !data[floorNumber] || !unit.unitOrientation) continue;
 
@@ -84,12 +90,25 @@ export function OrientationAnalytics({ property, tenants }: OrientationAnalytics
         }
 
         return { analyticsData: data, totals: grandTotals };
-    }, [property, tenants]);
+    }, [property, tenants, unitTypeFilter]);
 
     if (!property || !property.units || Object.keys(analyticsData).length === 0) {
         return (
-            <div className="text-center py-10 border rounded-lg mt-4">
-                <p className="text-sm text-muted-foreground">No units with orientation data found for this property.</p>
+             <div className="pt-4 space-y-4">
+                <div className="flex justify-end">
+                    <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by Unit Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Unit Types</SelectItem>
+                            {unitTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="text-center py-10 border rounded-lg mt-4">
+                    <p className="text-sm text-muted-foreground">No units with orientation data found for this property with the selected filter.</p>
+                </div>
             </div>
         );
     }
@@ -110,6 +129,17 @@ export function OrientationAnalytics({ property, tenants }: OrientationAnalytics
 
     return (
         <div className="pt-4 space-y-4">
+            <div className="flex justify-end">
+                <Select value={unitTypeFilter} onValueChange={(value) => setUnitTypeFilter(value as UnitType | 'all')}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by Unit Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Unit Types</SelectItem>
+                        {unitTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
             <div className="border rounded-md overflow-x-auto">
                 <Table>
                     <TableHeader>
