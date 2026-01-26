@@ -145,7 +145,7 @@ export function StatusAnalytics({ property }: StatusAnalyticsProps) {
                     <TableCell className="pl-8">{status}</TableCell>
                     {unitTypes.map(ut => (
                         <TableCell key={ut} className="text-right">
-                            {(analytics[status] as any)?.[ut] || 0}
+                            {analytics[status]?.[ut] || 0}
                         </TableCell>
                     ))}
                     <TableCell className="text-right font-bold">

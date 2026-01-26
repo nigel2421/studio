@@ -16,7 +16,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       return; 
     }
 
-    const onLoginPage = pathname === '/login';
+    const onLoginPage = (pathname || '') === '/login';
 
     // 1. Handle not logged in
     if (!isAuth && !onLoginPage) {
@@ -29,9 +29,9 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       const isAdminType = role && ['admin', 'agent', 'viewer', 'water-meter-reader', 'investment-consultant'].includes(role);
       
       // These are the *dashboards* for specific roles, not the admin management pages
-      const isLandlordDashboard = pathname.startsWith('/landlord/');
-      const isTenantDashboard = pathname.startsWith('/tenant/');
-      const isOwnerDashboard = pathname.startsWith('/owner/');
+      const isLandlordDashboard = (pathname || '').startsWith('/landlord/');
+      const isTenantDashboard = (pathname || '').startsWith('/tenant/');
+      const isOwnerDashboard = (pathname || '').startsWith('/owner/');
       const isRoleSpecificDashboard = isLandlordDashboard || isTenantDashboard || isOwnerDashboard;
 
       // 2. Handle logged in on login page
@@ -57,7 +57,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   }, [isLoading, isAuth, userProfile, pathname, router]);
 
   // Show a loader while authentication is in progress or if a redirect is imminent.
-  if (isLoading || (!isAuth && pathname !== '/login')) {
+  if (isLoading || (!isAuth && (pathname || '') !== '/login')) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader className="h-8 w-8 animate-spin" />

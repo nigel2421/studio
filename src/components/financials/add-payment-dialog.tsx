@@ -91,15 +91,15 @@ export function AddPaymentDialog({
     return tenantForDisplay?.residentType === 'Homeowner' ? 'ServiceCharge' : 'Rent';
   }, [tenantForDisplay]);
 
-  const getDefaultAmount = (type: Payment['type'], tenantInfo: Tenant | null): string => {
+  const getDefaultAmount = (type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
     if (!tenantInfo) return '';
     const latestWaterBillAmount = tenantInfo.waterReadings?.[0]?.amount;
 
     switch (type) {
       case 'Rent':
-        return (tenantInfo.lease.rent || '').toString();
+        return (tenantInfo.lease?.rent || '').toString();
       case 'ServiceCharge':
-        return (tenantInfo.lease.serviceCharge || '').toString();
+        return (tenantInfo.lease?.serviceCharge || '').toString();
       case 'Water':
         return (latestWaterBillAmount || '').toString();
       case 'Deposit':
@@ -112,7 +112,6 @@ export function AddPaymentDialog({
   useEffect(() => {
     if (open) {
       const type = defaultPaymentType || defaultEntryType;
-      // When opening, if we have a tenant context, pre-fill amount, otherwise start blank.
       const amount = tenantForDisplay ? getDefaultAmount(type, tenantForDisplay) : '';
       const initialEntry: PaymentEntry = {
         id: Date.now(),
@@ -128,7 +127,6 @@ export function AddPaymentDialog({
         setSelectedProperty(tenant.propertyId);
       }
     } else {
-      // Reset form on close
       setPaymentEntries([]);
       if (!tenant) {
         setSelectedProperty('');
@@ -276,7 +274,7 @@ export function AddPaymentDialog({
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 mt-2 text-sm">
                         <div className="text-muted-foreground">Monthly Charge:</div>
-                        <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.lease.rent || tenantForDisplay.lease.serviceCharge || 0).toLocaleString()}</div>
+                        <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
                         
                         {(tenantForDisplay.securityDeposit || 0) > 0 && (
                            <>

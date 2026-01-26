@@ -1,11 +1,12 @@
-
 import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling } from './financial-logic';
-import { Tenant } from './types';
+import { Tenant, Agent } from './types';
 import { format } from 'date-fns';
 
 describe('Financial Logic Functions', () => {
 
-    const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Tenant['lease']> } = {}): Tenant => {
+    const createMockAgent = (): Agent => 'Susan';
+
+    const createMockTenant = (overrides: Omit<Partial<Tenant>, 'lease'> & { lease?: Partial<Tenant['lease']> } = {}): Tenant => {
         const defaultTenant: Tenant = {
             id: 'tenant-1',
             name: 'John Doe',
@@ -14,7 +15,7 @@ describe('Financial Logic Functions', () => {
             idNumber: '12345',
             propertyId: 'prop-1',
             unitName: 'A1',
-            agent: 'Susan',
+            agent: createMockAgent(),
             status: 'active',
             securityDeposit: 20000,
             waterDeposit: 5000,
@@ -30,8 +31,10 @@ describe('Financial Logic Functions', () => {
             dueBalance: 20000,
         };
 
-        const mergedLease = { ...defaultTenant.lease, ...overrides.lease };
-        return { ...defaultTenant, ...overrides, lease: mergedLease };
+        const { lease: leaseOverrides, ...otherOverrides } = overrides;
+        const mergedLease = { ...defaultTenant.lease, ...leaseOverrides };
+
+        return { ...defaultTenant, ...otherOverrides, lease: mergedLease as Tenant['lease'] };
     };
 
     describe('calculateTargetDue', () => {

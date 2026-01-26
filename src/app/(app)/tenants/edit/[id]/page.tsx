@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Tenant, Property, agents } from '@/lib/types';
+import { Tenant, Property, agents, Agent } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,13 +22,14 @@ const formSchema = z.object({
     idNumber: z.string().min(1, 'ID number is required'),
     propertyId: z.string().min(1, 'Property is required'),
     unitName: z.string().min(1, 'Unit is required'),
-    agent: z.enum(agents),
+    agent: z.enum(agents as [string, ...string[]]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 export default function EditTenantPage() {
-    const { id } = useParams();
+    const params = useParams();
+    const id = params?.id;
     const router = useRouter();
     const { toast } = useToast();
     const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -44,7 +45,6 @@ export default function EditTenantPage() {
             idNumber: '',
             propertyId: '',
             unitName: '',
-            agent: 'Susan',
         },
     });
 
@@ -53,7 +53,10 @@ export default function EditTenantPage() {
             getTenant(id as string).then(tenantData => {
                 if (tenantData) {
                     setTenant(tenantData);
-                    form.reset(tenantData);
+                    form.reset({
+                        ...tenantData,
+                        agent: tenantData.agent,
+                    });
                 }
             });
         }
@@ -65,14 +68,12 @@ export default function EditTenantPage() {
         const selectedProperty = properties.find(p => p.id === selectedPropertyId);
         
         if (selectedProperty) {
-            // Vacant units from the newly selected property
             const vacantUnits = selectedProperty.units
                 .filter(u => u.status === 'vacant' && u.name)
                 .map(u => u.name);
             
             let availableUnits = [...vacantUnits];
             
-            // If the selected property is the tenant's original property, also include their current unit
             if (tenant && selectedPropertyId === tenant.propertyId && tenant.unitName && !availableUnits.includes(tenant.unitName)) {
                 availableUnits.push(tenant.unitName);
             }
@@ -86,7 +87,10 @@ export default function EditTenantPage() {
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         if (tenant) {
-            await updateTenant(tenant.id, data);
+            await updateTenant(tenant.id, {
+                ...data,
+                agent: data.agent as Agent,
+            });
             toast({
                 title: "Tenant Updated",
                 description: "The tenant's details have been successfully updated.",

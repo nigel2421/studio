@@ -20,26 +20,17 @@ interface BulkUnitUpdateDialogProps {
     unitCount: number;
 }
 
-const updatableFields: (keyof Omit<Unit, 'name' | 'landlordId'>)[] = [
+type UpdatableUnitField = 'status' | 'ownership' | 'unitType' | 'unitOrientation' | 'managementStatus' | 'handoverStatus' | 'rentAmount' | 'serviceCharge';
+
+const updatableFields: UpdatableUnitField[] = [
     'status', 'ownership', 'unitType', 'unitOrientation', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
 ];
 
 export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
-    const { control, handleSubmit, register, reset, getValues } = useForm({
-        defaultValues: {
-            status: '',
-            ownership: '',
-            unitType: '',
-            unitOrientation: '',
-            managementStatus: '',
-            handoverStatus: '',
-            rentAmount: '',
-            serviceCharge: ''
-        }
-    });
-    const [activeFields, setActiveFields] = useState<Partial<Record<keyof Unit, boolean>>>({});
+    const { control, handleSubmit, register, reset, getValues, setValue } = useForm();
+    const [activeFields, setActiveFields] = useState<Partial<Record<UpdatableUnitField, boolean>>>({});
     
     useEffect(() => {
         if (!open) {
@@ -48,26 +39,25 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
         }
     }, [open, reset]);
 
-    const handleToggleField = (field: keyof Unit, checked: boolean) => {
+    const handleToggleField = (field: UpdatableUnitField, checked: boolean) => {
         setActiveFields(prev => ({ ...prev, [field]: checked }));
         if (!checked) {
-            const newValues = { ...getValues(), [field]: '' };
-            reset(newValues);
+            setValue(field, '');
         }
     };
 
     const processSubmit = async (data: any) => {
-        const updateData: Partial<Unit> = {};
+        const updateData: Partial<Omit<Unit, 'name'>> = {};
         let hasActiveField = false;
 
         for (const key in activeFields) {
-            if (activeFields[key as keyof Unit]) {
+            const fieldKey = key as UpdatableUnitField;
+            if (activeFields[fieldKey]) {
                 hasActiveField = true;
-                const fieldKey = key as keyof Unit;
                 let value = data[fieldKey];
                 
                 if (fieldKey === 'rentAmount' || fieldKey === 'serviceCharge') {
-                    value = value !== '' ? Number(value) : undefined;
+                    value = value !== '' && !isNaN(value) ? Number(value) : undefined;
                 }
                 
                 if (value !== undefined && value !== '' && value !== null) {
@@ -86,15 +76,16 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
         }
 
         setIsSaving(true);
-        await onSave(updateData);
-        setIsSaving(false);
+        try {
+            await onSave(updateData);
+            onOpenChange(false);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const renderFieldInput = (field: keyof Unit) => {
-        const commonProps = {
-            disabled: !activeFields[field],
-            ...register(field)
-        };
+    const renderFieldInput = (field: UpdatableUnitField) => {
+        const isDisabled = !activeFields[field];
 
         switch (field) {
             case 'status':
@@ -102,8 +93,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                     <Controller
                         name="status"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.status}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
                                 <SelectContent>{unitStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -115,8 +107,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                      <Controller
                         name="ownership"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.ownership}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Ownership" /></SelectTrigger>
                                 <SelectContent>{ownershipTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -128,8 +121,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                      <Controller
                         name="unitType"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.unitType}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Unit Type" /></SelectTrigger>
                                 <SelectContent>{unitTypes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -141,8 +135,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                      <Controller
                         name="unitOrientation"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.unitOrientation}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Orientation" /></SelectTrigger>
                                 <SelectContent>{unitOrientations.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -154,8 +149,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                      <Controller
                         name="managementStatus"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.managementStatus}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Management Status" /></SelectTrigger>
                                 <SelectContent>{managementStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -167,8 +163,9 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                      <Controller
                         name="handoverStatus"
                         control={control}
+                        defaultValue=""
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={!activeFields.handoverStatus}>
+                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={isDisabled}>
                                 <SelectTrigger><SelectValue placeholder="Select Handover Status" /></SelectTrigger>
                                 <SelectContent>{handoverStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
@@ -177,7 +174,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                 );
             case 'rentAmount':
             case 'serviceCharge':
-                return <Input type="number" {...commonProps} placeholder="Enter new value" />;
+                return <Input type="number" {...register(field)} disabled={isDisabled} placeholder="Enter new value" />;
             default:
                 return null;
         }
@@ -197,13 +194,13 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                         <div key={field} className="grid grid-cols-[auto,1fr] items-center gap-4">
                              <Checkbox
                                 id={`cb-${field}`}
-                                onCheckedChange={(checked) => handleToggleField(field as keyof Unit, !!checked)}
+                                onCheckedChange={(checked) => handleToggleField(field, !!checked)}
                             />
                             <div className="grid w-full items-center gap-1.5">
                                 <Label htmlFor={field} className="capitalize text-sm font-medium">
                                     {field.replace(/([A-Z])/g, ' $1')}
                                 </Label>
-                                {renderFieldInput(field as keyof Unit)}
+                                {renderFieldInput(field)}
                             </div>
                         </div>
                     ))}

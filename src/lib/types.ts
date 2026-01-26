@@ -1,5 +1,4 @@
 
-
 export type Property = {
   id: string;
   name: string;
@@ -23,33 +22,28 @@ export type PropertyOwner = {
   userId?: string;
 };
 
-export type OwnershipType = 'SM' | 'Landlord';
-export const ownershipTypes: OwnershipType[] = ['SM', 'Landlord'];
+export const ownershipTypes = ['SM', 'Landlord'] as const;
+export type OwnershipType = (typeof ownershipTypes)[number];
 
-export type ManagementStatus =
-  | 'Rented for Soil Merchants'
-  | 'Rented for Clients'
-  | 'Client Managed'
-  | 'Airbnb';
-
-export const managementStatuses: ManagementStatus[] = [
+export const managementStatuses = [
   'Rented for Soil Merchants',
   'Rented for Clients',
   'Client Managed',
   'Airbnb',
-];
+] as const;
+export type ManagementStatus = (typeof managementStatuses)[number];
 
-export type UnitType = 'Studio' | 'One Bedroom' | 'Two Bedroom' | 'Shop' | 'Three Bedroom';
-export const unitTypes: UnitType[] = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'];
+export const unitTypes = ['Studio', 'One Bedroom', 'Two Bedroom', 'Shop', 'Three Bedroom'] as const;
+export type UnitType = (typeof unitTypes)[number];
 
-export type UnitStatus = 'vacant' | 'rented' | 'airbnb' | 'client occupied';
-export const unitStatuses: UnitStatus[] = ['vacant', 'rented', 'airbnb', 'client occupied'];
+export const unitStatuses = ['vacant', 'rented', 'airbnb', 'client occupied'] as const;
+export type UnitStatus = (typeof unitStatuses)[number];
 
-export type HandoverStatus = 'Pending Hand Over' | 'Handed Over';
-export const handoverStatuses: HandoverStatus[] = ['Pending Hand Over', 'Handed Over'];
+export const handoverStatuses = ['Pending Hand Over', 'Handed Over'] as const;
+export type HandoverStatus = (typeof handoverStatuses)[number];
 
-export type UnitOrientation = 'MURANG\'A.RD' | 'FOREST.RD' | 'GMA-ANNEX' | 'MUTHAIGA' | 'MID-BLOCK UNIT';
-export const unitOrientations: UnitOrientation[] = ['MURANG\'A.RD', 'FOREST.RD', 'GMA-ANNEX', 'MUTHAIGA', 'MID-BLOCK UNIT'];
+export const unitOrientations = ['MURANG\'A.RD', 'FOREST.RD', 'GMA-ANNEX', 'MUTHAIGA', 'MID-BLOCK UNIT'] as const;
+export type UnitOrientation = (typeof unitOrientations)[number];
 
 export const unitOrientationColors: Record<UnitOrientation, string> = {
     'MURANG\'A.RD': 'bg-green-100 text-green-800',
@@ -82,9 +76,8 @@ export type Unit = {
   unitOrientation?: UnitOrientation;
 };
 
-export type Agent = 'Susan' | 'Beatrice' | 'Nelly' | 'Dennis' | 'Peris' | 'Felista' | 'Martha' | 'Thomas' | 'Kiragu';
-
-export const agents: Agent[] = ['Susan', 'Beatrice', 'Nelly', 'Dennis', 'Peris', 'Felista', 'Martha', 'Thomas', 'Kiragu'];
+export const agents = ['Susan', 'Beatrice', 'Nelly', 'Dennis', 'Peris', 'Felista', 'Martha', 'Thomas', 'Kiragu'] as const;
+export type Agent = (typeof agents)[number];
 
 export type WaterMeterReading = {
   id: string;
@@ -204,7 +197,7 @@ export type Landlord = {
   name: string;
   email: string;
   phone: string;
-  bankAccount: string;
+  bankAccount?: string;
   userId?: string;
 };
 

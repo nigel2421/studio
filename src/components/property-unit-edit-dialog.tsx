@@ -20,7 +20,6 @@ import {
     Unit, unitStatuses, unitTypes, ownershipTypes, managementStatuses, handoverStatuses, Landlord, UnitOrientation, unitOrientations
 } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 
 const unitSchema = z.object({
@@ -82,10 +81,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
     const handleSubmit = async (data: UnitFormValues) => {
         setIsSaving(true);
         try {
-            const dataToSave: Partial<UnitFormValues> & { handoverDate?: string } = {
-                ...data,
-                handoverDate: data.handoverDate ? format(data.handoverDate, 'yyyy-MM-dd') : undefined,
-            };
+            const dataToSave: Partial<UnitFormValues> = { ...data };
 
             if (data.handoverStatus !== 'Handed Over') {
                 dataToSave.handoverDate = undefined;

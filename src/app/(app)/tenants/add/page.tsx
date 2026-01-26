@@ -114,6 +114,8 @@ export default function AddTenantPage() {
         securityDeposit,
         waterDeposit: WATER_DEPOSIT_AMOUNT,
         residentType: 'Tenant',
+        dueBalance: 0,
+        accountBalance: 0
       });
 
       toast({

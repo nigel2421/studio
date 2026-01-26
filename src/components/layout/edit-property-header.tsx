@@ -6,11 +6,10 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { EditPropertyFormValues } from '@/app/(app)/properties/edit/[id]/page';
 import { Save, Loader2 } from 'lucide-react';
 
 interface EditPropertyHeaderProps {
-  form: UseFormReturn<EditPropertyFormValues>;
+  form: any;
   isSaving: boolean;
 }
 

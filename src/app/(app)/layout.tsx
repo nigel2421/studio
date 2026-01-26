@@ -9,8 +9,8 @@ import { usePathname } from 'next/navigation';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isPropertyManagementPage = /^\/properties\/[^/]+$/.test(pathname) && !pathname.endsWith('/add');
-  const isEditPropertyPage = /^\/properties\/edit\/[^/]+$/.test(pathname);
+  const isPropertyManagementPage = /^\/properties\/[^/]+$/.test(pathname || '') && !(pathname || '').endsWith('/add');
+  const isEditPropertyPage = /^\/properties\/edit\/[^/]+$/.test(pathname || '');
 
   // Hide default header on the new property management page
   const showHeader = !isPropertyManagementPage && !isEditPropertyPage;

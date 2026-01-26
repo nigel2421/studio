@@ -40,7 +40,8 @@ const formSchema = z.object({
 export type EditPropertyFormValues = z.infer<typeof formSchema>;
 
 export default function PropertyManagementPage() {
-    const { id } = useParams();
+    const params = useParams();
+    const id = params?.id;
     const router = useRouter();
     const [property, setProperty] = useState<Property | null>(null);
     const [tenants, setTenants] = useState<Tenant[]>([]);
