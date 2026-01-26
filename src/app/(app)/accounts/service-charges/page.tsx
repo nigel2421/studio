@@ -158,37 +158,41 @@ export default function ServiceChargesPage() {
         );
 
         unitsForArrears.forEach(unit => {
-            const monthsSinceHandover = differenceInMonths(selectedMonth, new Date(unit.handoverDate!));
+            const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
+            if (!owner) return;
 
-            if (monthsSinceHandover >= 3) {
-                const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
-                if (owner) {
-                    const arrearsDetail: { month: string, amount: number }[] = [];
-                    for (let i = 3; i <= monthsSinceHandover; i++) {
-                        const monthInArrears = addMonths(new Date(unit.handoverDate!), i);
-                        arrearsDetail.push({
-                            month: format(monthInArrears, 'MMMM yyyy'),
-                            amount: unit.serviceCharge || 0
-                        });
-                    }
+            const handoverDate = new Date(unit.handoverDate!);
+            // Start billing from the month AFTER handover, as per user request.
+            const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+            
+            const monthsToBill = differenceInMonths(selectedMonth, firstBillableMonth);
 
-                    if(arrearsDetail.length > 0) {
-                        vacantUnitsInArrears.push({
-                            ownerId: owner.id,
-                            ownerName: owner.name,
-                            propertyId: unit.property.id,
-                            propertyName: unit.property.name,
-                            unitName: unit.name,
-                            unitHandoverDate: unit.handoverDate!,
-                            monthsInArrears: arrearsDetail.length,
-                            totalDue: arrearsDetail.reduce((sum, item) => sum + item.amount, 0),
-                            arrearsDetail,
-                            unit,
-                            owner,
-                            property: unit.property
-                        });
-                    }
-                }
+            if (monthsToBill < 0) return; // Not yet in arrears based on the selected month
+
+            const arrearsDetail: { month: string, amount: number }[] = [];
+            for (let i = 0; i <= monthsToBill; i++) {
+                const monthInArrears = addMonths(firstBillableMonth, i);
+                arrearsDetail.push({
+                    month: format(monthInArrears, 'MMMM yyyy'),
+                    amount: unit.serviceCharge || 0
+                });
+            }
+
+            if(arrearsDetail.length > 0) {
+                vacantUnitsInArrears.push({
+                    ownerId: owner.id,
+                    ownerName: owner.name,
+                    propertyId: unit.property.id,
+                    propertyName: unit.property.name,
+                    unitName: unit.name,
+                    unitHandoverDate: unit.handoverDate!,
+                    monthsInArrears: arrearsDetail.length,
+                    totalDue: arrearsDetail.reduce((sum, item) => sum + item.amount, 0),
+                    arrearsDetail,
+                    unit,
+                    owner,
+                    property: unit.property
+                });
             }
         });
         setArrearsAccounts(vacantUnitsInArrears);
@@ -459,7 +463,7 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         <Card>
             <CardHeader>
                 <CardTitle>Vacant Units in Arrears</CardTitle>
-                <CardDescription>Handed-over units vacant for over 3 months with outstanding service charges.</CardDescription>
+                <CardDescription>Handed-over units vacant with outstanding service charges.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -507,5 +511,7 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
+    
 
     
