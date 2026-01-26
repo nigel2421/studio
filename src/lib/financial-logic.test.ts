@@ -141,20 +141,6 @@ describe('Financial Logic Functions', () => {
             expect(updates.accountBalance).toBe(5000);
             expect(updates['lease.paymentStatus']).toBe('Paid');
         });
-
-        it('should correct the initial balance for a brand new tenant if it is wrong', () => {
-            const tenant = createMockTenant({
-                lease: { rent: 20000, lastPaymentDate: undefined },
-                securityDeposit: 20000,
-                waterDeposit: 5000,
-                dueBalance: 0, // This is incorrect for a new tenant
-                accountBalance: 0,
-            });
-            const updates = reconcileMonthlyBilling(tenant, new Date('2023-01-02'));
-            const expectedInitialBalance = 20000 + 20000 + 5000;
-            expect(updates.dueBalance).toBe(expectedInitialBalance);
-            expect(updates['lease.paymentStatus']).toBe('Pending');
-        });
     });
     
      describe('getRecommendedPaymentStatus', () => {
