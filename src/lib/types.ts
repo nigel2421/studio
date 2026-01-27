@@ -1,4 +1,5 @@
 
+
 export type Property = {
   id: string;
   name: string;
@@ -110,17 +111,42 @@ export type Task = {
 
 export type PaymentStatus = 'Paid' | 'Pending' | 'Failed';
 
+/**
+ * Represents a single financial transaction.
+ * This can be a payment from a tenant, or a debit/credit adjustment from management.
+ * Adjustments (like late fees) are a 'Payment' of type 'Adjustment'.
+ * A positive amount for an adjustment is a DEBIT (increases due balance).
+ * A negative amount for an adjustment is a CREDIT (decreases due balance).
+ */
 export type Payment = {
   id: string;
   tenantId: string;
   amount: number;
   date: string;
+  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Water' | 'Other' | 'Adjustment';
+  status: PaymentStatus;
   notes?: string;
   rentForMonth?: string;
+  // Optional fields for more detailed tracking
+  paymentMethod?: 'Cash' | 'M-Pesa' | 'Bank Transfer' | 'Card';
+  transactionId?: string; // e.g., M-Pesa transaction code
   createdAt: Date;
   reference?: string;
-  status: PaymentStatus;
-  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Water' | 'Other' | 'Adjustment';
+};
+
+/**
+ * Represents the lease terms associated with a tenant.
+ * It's embedded within the Tenant object for simplicity.
+ */
+export type Lease = {
+  startDate: string;
+  endDate: string;
+  rent: number;
+  serviceCharge?: number;
+  paymentStatus: 'Paid' | 'Pending' | 'Overdue';
+  lastPaymentDate?: string;
+  lastBilledPeriod?: string;
+  lastLateFeeAppliedPeriod?: string;
 };
 
 export type Tenant = {
@@ -136,16 +162,7 @@ export type Tenant = {
   securityDeposit: number;
   waterDeposit: number;
   residentType: 'Tenant' | 'Homeowner';
-  lease: {
-    startDate: string;
-    endDate: string;
-    rent: number;
-    serviceCharge?: number;
-    paymentStatus: 'Paid' | 'Pending' | 'Overdue';
-    lastPaymentDate?: string;
-    lastBilledPeriod?: string;
-    lastLateFeeAppliedPeriod?: string;
-  };
+  lease: Lease;
   accountBalance: number; // For overpayments
   dueBalance: number;      // For carry-over debts
   waterReadings?: WaterMeterReading[];
@@ -203,17 +220,22 @@ export type Landlord = {
   userId?: string;
 };
 
+/**
+ * Represents any communication sent out from the system.
+ * This covers automated reminders, manual announcements, and receipts.
+ */
 export type Communication = {
   id: string;
   type: 'announcement' | 'automation';
-  subType?: string;
+  subType?: string; // e.g., 'Payment Receipt', 'Arrears Reminder'
   subject: string;
   body: string;
   recipients: string[];
   recipientCount: number;
-  senderId: string;
+  senderId: string; // 'system' or a user ID
   timestamp: string;
   status: 'sent' | 'failed';
+  deliveryMethod?: 'email' | 'sms' | 'in-app'; // Defaults to email
   relatedTenantId?: string;
 };
 
