@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -21,10 +22,11 @@ import { useLoading } from '@/hooks/useLoading';
 import { downloadCSV } from '@/lib/utils';
 
 interface Props {
+  propertyId: string;
   onUploadComplete: () => void;
 }
 
-export function UnitCsvUploader({ onUploadComplete }: Props) {
+export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -81,7 +83,7 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
         }
 
         try {
-          const { updatedCount, errors: updateErrors } = await bulkUpdateUnitsFromCSV(data);
+          const { updatedCount, createdCount, errors: updateErrors } = await bulkUpdateUnitsFromCSV(propertyId, data);
           if (updateErrors.length > 0) {
             toast({
               variant: 'destructive',
@@ -100,7 +102,7 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
           } else {
             toast({
               title: 'Upload Successful',
-              description: `${updatedCount} units have been updated.`,
+              description: `${createdCount} units created and ${updatedCount} units updated.`,
             });
           }
           
@@ -143,9 +145,9 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Bulk Update Units via CSV</DialogTitle>
+          <DialogTitle>Bulk Process Units via CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV with a 'UnitName' column, plus any other columns you want to update (e.g., 'Status', 'RentAmount').
+            Upload a CSV to create new units or update existing ones. The 'UnitName' column is required.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -161,7 +163,7 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
         <DialogFooter>
           <Button onClick={handleUpload} disabled={isLoading || !file}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLoading ? 'Processing...' : 'Upload and Update'}
+            {isLoading ? 'Processing...' : 'Process CSV'}
           </Button>
         </DialogFooter>
       </DialogContent>

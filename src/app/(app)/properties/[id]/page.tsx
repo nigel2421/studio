@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -368,7 +369,7 @@ export default function PropertyManagementPage() {
                                    Bulk Edit ({selectedUnitNames.length})
                                  </Button>
                                )}
-                               {!isReadOnly && <UnitCsvUploader onUploadComplete={fetchData} />}
+                               {!isReadOnly && <UnitCsvUploader propertyId={property.id} onUploadComplete={fetchData} />}
                                 <div className="relative w-full md:w-48">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input placeholder="Search units..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />

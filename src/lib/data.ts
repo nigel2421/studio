@@ -680,177 +680,102 @@ export async function runMonthlyReconciliation(): Promise<void> {
     await logActivity(`Monthly reconciliation completed for ${tenantsSnap.size} tenants.`);
 }
 
-export async function bulkUpdateUnitsFromCSV(data: Record<string, string>[]): Promise<{ updatedCount: number; errors: string[] }> {
+export async function bulkUpdateUnitsFromCSV(
+  propertyId: string, 
+  data: Record<string, string>[]
+): Promise<{ updatedCount: number; createdCount: number; errors: string[] }> {
     const errors: string[] = [];
+    let updatedCount = 0;
+    let createdCount = 0;
 
-    const propertiesSnapshot = await getDocs(collection(db, 'properties'));
-    const properties: Record<string, Property> = {};
-    const unitMap: Record<string, { unit: Unit, propertyId: string }> = {};
-    const duplicateUnitNames = new Set<string>();
-
-    propertiesSnapshot.forEach(doc => {
-        const prop = { id: doc.id, ...doc.data() } as Property;
-        properties[prop.id] = prop;
-        if (prop.units) {
-            for (const unit of prop.units) {
-                if (unitMap[unit.name]) {
-                    duplicateUnitNames.add(unit.name);
-                } else {
-                    unitMap[unit.name] = { unit, propertyId: prop.id };
-                }
-            }
-        }
-    });
-
-    for (const unitName of duplicateUnitNames) {
-        delete unitMap[unitName];
+    const property = await getProperty(propertyId);
+    if (!property) {
+        return { updatedCount: 0, createdCount: 0, errors: [`Property with ID "${propertyId}" not found.`] };
     }
-    
-    let totalUnitsUpdated = 0;
-    const propertyUpdates: Record<string, Unit[]> = {};
+
+    const units = [...(property.units || [])];
 
     for (const [index, row] of data.entries()) {
-        const {
-            UnitName,
-            Status: statusValue,
-            Ownership: ownershipValue,
-            UnitType: unitTypeValue,
-            UnitOrientation: unitOrientationValue,
-            ManagementStatus: managementStatusValue,
-            HandoverStatus: handoverStatusValue,
-            HandoverDate,
-            RentAmount,
-            ServiceCharge,
-        } = row;
-
+        const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge } = row;
+        
         if (!UnitName) {
-            errors.push(`Row ${index + 2}: Missing required column 'UnitName'.`);
-            continue;
+            continue; // Skip rows without a UnitName
         }
 
-        if (duplicateUnitNames.has(UnitName)) {
-            errors.push(`Row ${index + 2}: Unit name "${UnitName}" is not unique and cannot be updated automatically.`);
-            continue;
-        }
+        const unitIndex = units.findIndex(u => u.name === UnitName);
 
-        const unitInfo = unitMap[UnitName];
-        if (!unitInfo) {
-            errors.push(`Row ${index + 2}: Unit "${UnitName}" not found.`);
-            continue;
-        }
-
-        const { propertyId } = unitInfo;
+        let unitData: Partial<Unit> = {};
         
-        if (!propertyUpdates[propertyId]) {
-            propertyUpdates[propertyId] = JSON.parse(JSON.stringify(properties[propertyId].units));
+        if (Status !== undefined && Status.trim() !== '') {
+             if (!unitStatuses.includes(Status as any)) { errors.push(`Row ${index + 2}: Invalid Status "${Status}".`); continue; }
+             unitData.status = Status as UnitStatus;
         }
-
-        const unitsForProperty = propertyUpdates[propertyId];
-        const unitIndex = unitsForProperty.findIndex((u:any) => u.name === UnitName);
-        
-        if (unitIndex === -1) continue;
-
-        const unitToUpdate = unitsForProperty[unitIndex];
-        let unitWasUpdated = false;
-
-        if (statusValue !== undefined && unitToUpdate.status !== statusValue) {
-            if (!unitStatuses.includes(statusValue as any)) {
-                errors.push(`Row ${index + 2}: Invalid Status "${statusValue}".`);
-            } else {
-                unitToUpdate.status = statusValue as UnitStatus;
-                unitWasUpdated = true;
+        if (Ownership !== undefined && Ownership.trim() !== '') {
+             if (!ownershipTypes.includes(Ownership as any)) { errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`); continue; }
+             unitData.ownership = Ownership as OwnershipType;
+        }
+        if (UnitType !== undefined && UnitType.trim() !== '') {
+             if (!unitTypes.includes(UnitType as any)) { errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`); continue; }
+             unitData.unitType = UnitType as UnitType;
+        }
+        if (UnitOrientation !== undefined && UnitOrientation.trim() !== '') {
+            if (!unitOrientations.includes(UnitOrientation as any)) { errors.push(`Row ${index + 2}: Invalid UnitOrientation "${UnitOrientation}".`); continue; }
+            unitData.unitOrientation = UnitOrientation as UnitOrientation;
+        }
+        if (ManagementStatus !== undefined && ManagementStatus.trim() !== '') {
+            if (!managementStatuses.includes(ManagementStatus as any)) { errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}".`); continue; }
+            unitData.managementStatus = ManagementStatus as ManagementStatus;
+        }
+        if (HandoverStatus !== undefined && HandoverStatus.trim() !== '') {
+            if (!handoverStatuses.includes(HandoverStatus as any)) { errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}".`); continue; }
+            unitData.handoverStatus = HandoverStatus as HandoverStatus;
+            if (HandoverStatus === 'Handed Over' && !HandoverDate && (unitIndex === -1 || !units[unitIndex].handoverDate)) {
+                 unitData.handoverDate = new Date().toISOString().split('T')[0];
             }
         }
-        if (ownershipValue !== undefined && unitToUpdate.ownership !== ownershipValue) {
-            if (!ownershipTypes.includes(ownershipValue as any)) {
-                errors.push(`Row ${index + 2}: Invalid Ownership "${ownershipValue}".`);
-            } else {
-                unitToUpdate.ownership = ownershipValue as OwnershipType;
-                unitWasUpdated = true;
-            }
+        if (HandoverDate !== undefined && HandoverDate.trim() !== '') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(HandoverDate)) { errors.push(`Row ${index + 2}: Invalid HandoverDate format "${HandoverDate}". Use YYYY-MM-DD.`); continue; }
+            unitData.handoverDate = HandoverDate;
         }
-        if (unitTypeValue !== undefined && unitToUpdate.unitType !== unitTypeValue) {
-            if (!unitTypes.includes(unitTypeValue as any)) {
-                errors.push(`Row ${index + 2}: Invalid UnitType "${unitTypeValue}".`);
-            } else {
-                unitToUpdate.unitType = unitTypeValue as UnitType;
-                unitWasUpdated = true;
-            }
-        }
-        if (unitOrientationValue !== undefined && unitToUpdate.unitOrientation !== unitOrientationValue) {
-            if (!unitOrientations.includes(unitOrientationValue as any)) {
-                errors.push(`Row ${index + 2}: Invalid UnitOrientation "${unitOrientationValue}".`);
-            } else {
-                unitToUpdate.unitOrientation = unitOrientationValue as UnitOrientation;
-                unitWasUpdated = true;
-            }
-        }
-        if (managementStatusValue !== undefined && unitToUpdate.managementStatus !== managementStatusValue) {
-            if (!managementStatuses.includes(managementStatusValue as any)) {
-                 errors.push(`Row ${index + 2}: Invalid ManagementStatus "${managementStatusValue}".`);
-            } else {
-                unitToUpdate.managementStatus = managementStatusValue as ManagementStatus;
-                unitWasUpdated = true;
-            }
-        }
-        if (handoverStatusValue !== undefined && unitToUpdate.handoverStatus !== handoverStatusValue) {
-            if (!handoverStatuses.includes(handoverStatusValue as any)) {
-                 errors.push(`Row ${index + 2}: Invalid HandoverStatus "${handoverStatusValue}".`);
-            } else {
-                unitToUpdate.handoverStatus = handoverStatusValue as HandoverStatus;
-                unitWasUpdated = true;
-                if (handoverStatusValue === 'Handed Over' && !HandoverDate && !unitToUpdate.handoverDate) {
-                    unitToUpdate.handoverDate = new Date().toISOString().split('T')[0];
-                }
-            }
-        }
-        if (HandoverDate !== undefined && unitToUpdate.handoverDate !== HandoverDate) {
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(HandoverDate)) {
-                errors.push(`Row ${index + 2}: Invalid HandoverDate format "${HandoverDate}". Use YYYY-MM-DD.`);
-            } else {
-                unitToUpdate.handoverDate = HandoverDate;
-                unitWasUpdated = true;
-            }
-        }
-        if (RentAmount !== undefined && String(unitToUpdate.rentAmount || '') !== RentAmount) {
+        if (RentAmount !== undefined && RentAmount.trim() !== '') {
             const rent = Number(RentAmount);
-            if (isNaN(rent) || rent < 0) {
-                errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}".`);
-            } else {
-                unitToUpdate.rentAmount = rent;
-                unitWasUpdated = true;
-            }
+            if (isNaN(rent) || rent < 0) { errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}".`); continue; }
+            unitData.rentAmount = rent;
         }
-        if (ServiceCharge !== undefined && String(unitToUpdate.serviceCharge || '') !== ServiceCharge) {
+        if (ServiceCharge !== undefined && ServiceCharge.trim() !== '') {
             const charge = Number(ServiceCharge);
-            if (isNaN(charge) || charge < 0) {
-                errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}".`);
-            } else {
-                unitToUpdate.serviceCharge = charge;
-                unitWasUpdated = true;
-            }
+            if (isNaN(charge) || charge < 0) { errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}".`); continue; }
+            unitData.serviceCharge = charge;
         }
-        
-        if (unitWasUpdated) {
-            totalUnitsUpdated++;
+
+        if (unitIndex !== -1) {
+            // Update existing unit
+            units[unitIndex] = { ...units[unitIndex], ...unitData };
+            updatedCount++;
+        } else {
+            // Create new unit
+            const newUnit: Unit = {
+                name: UnitName,
+                status: (unitData.status || 'vacant') as UnitStatus,
+                ownership: (unitData.ownership || 'SM') as OwnershipType,
+                unitType: (unitData.unitType || 'Studio') as UnitType,
+                ...unitData,
+            };
+            units.push(newUnit);
+            createdCount++;
         }
     }
-
+    
     if (errors.length > 0) {
-        return { updatedCount: 0, errors };
+        return { updatedCount: 0, createdCount: 0, errors };
     }
 
-    if (Object.keys(propertyUpdates).length > 0) {
-        const batch = writeBatch(db);
-        for (const propId in propertyUpdates) {
-            const propertyRef = doc(db, 'properties', propId);
-            batch.update(propertyRef, { units: propertyUpdates[propId] });
-        }
-        await batch.commit();
-        await logActivity(`Bulk updated ${totalUnitsUpdated} units via CSV.`);
+    if (updatedCount > 0 || createdCount > 0) {
+        await updateProperty(propertyId, { units });
+        await logActivity(`Bulk processed ${updatedCount} updates and ${createdCount} creations for property ${property.name} via CSV.`);
     }
 
-    return { updatedCount: totalUnitsUpdated, errors: [] };
+    return { updatedCount, createdCount, errors: [] };
 }
 
 
