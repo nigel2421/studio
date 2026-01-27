@@ -172,7 +172,7 @@ export const checkAndSendLeaseReminders = onCall({
     }
 
     const propertiesRef = db.collection('properties');
-    const propertiesSnap = await getDocs(propertiesRef);
+    const propertiesSnap = await propertiesRef.get();
     const propertiesMap = new Map(propertiesSnap.docs.map(doc => [doc.id, doc.data()]));
 
     const transporter = createTransporter();

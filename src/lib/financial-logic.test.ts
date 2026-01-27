@@ -56,7 +56,7 @@ describe('Financial Logic Functions', () => {
     describe('processPayment', () => {
         it('should correctly process a full payment that clears the due balance', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 0 });
-            const updates = processPayment(tenant, 20000);
+            const updates = processPayment(tenant, 20000, 'Rent');
             expect(updates.dueBalance).toBe(0);
             expect(updates.accountBalance).toBe(0);
             expect(updates['lease.paymentStatus']).toBe('Paid');
@@ -65,7 +65,7 @@ describe('Financial Logic Functions', () => {
 
         it('should handle overpayment correctly, adding the excess to accountBalance', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 0 });
-            const updates = processPayment(tenant, 25000);
+            const updates = processPayment(tenant, 25000, 'Rent');
             expect(updates.dueBalance).toBe(0);
             expect(updates.accountBalance).toBe(5000);
             expect(updates['lease.paymentStatus']).toBe('Paid');
@@ -73,7 +73,7 @@ describe('Financial Logic Functions', () => {
 
         it('should handle partial payment correctly, reducing the dueBalance', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 0 });
-            const updates = processPayment(tenant, 15000);
+            const updates = processPayment(tenant, 15000, 'Rent');
             expect(updates.dueBalance).toBe(5000);
             expect(updates.accountBalance).toBe(0);
             expect(updates['lease.paymentStatus']).toBe('Pending');
@@ -81,7 +81,7 @@ describe('Financial Logic Functions', () => {
 
         it('should use existing account balance to help cover a payment', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 5000 });
-            const updates = processPayment(tenant, 15000);
+            const updates = processPayment(tenant, 15000, 'Rent');
             expect(updates.dueBalance).toBe(0);
             expect(updates.accountBalance).toBe(0);
             expect(updates['lease.paymentStatus']).toBe('Paid');
@@ -89,7 +89,7 @@ describe('Financial Logic Functions', () => {
 
         it('should use existing account balance and a new overpayment', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 5000 });
-            const updates = processPayment(tenant, 20000);
+            const updates = processPayment(tenant, 20000, 'Rent');
             expect(updates.dueBalance).toBe(0);
             expect(updates.accountBalance).toBe(5000);
             expect(updates['lease.paymentStatus']).toBe('Paid');
@@ -172,36 +172,36 @@ describe('Financial Logic Functions', () => {
         const tenant = createMockTenant({ lease: { startDate: '2023-01-15' } });
 
         it('should throw an error for negative payment amounts', () => {
-            expect(() => validatePayment(-100, new Date(), tenant)).toThrow('Invalid payment amount: Ksh -100. Amount must be positive.');
+            expect(() => validatePayment(-100, new Date(), tenant, 'Rent')).toThrow('Invalid payment amount: Ksh -100. Amount must be positive.');
         });
 
         it('should throw an error for zero payment amount', () => {
-            expect(() => validatePayment(0, new Date(), tenant)).toThrow('Invalid payment amount: Ksh 0. Amount must be positive.');
+            expect(() => validatePayment(0, new Date(), tenant, 'Rent')).toThrow('Invalid payment amount: Ksh 0. Amount must be positive.');
         });
 
         it('should throw an error for payments exceeding the maximum value', () => {
-            expect(() => validatePayment(1000001, new Date(), tenant)).toThrow('Payment amount Ksh 1,000,001 exceeds the maximum limit of Ksh 1,000,000.');
+            expect(() => validatePayment(1000001, new Date(), tenant, 'Rent')).toThrow('Payment amount Ksh 1,000,001 exceeds the maximum limit of Ksh 1,000,000.');
         });
 
         it('should throw an error for future payment dates', () => {
             const futureDate = new Date();
             futureDate.setDate(futureDate.getDate() + 1);
-            expect(() => validatePayment(1000, futureDate, tenant)).toThrow(/Date cannot be in the future/);
+            expect(() => validatePayment(1000, futureDate, tenant, 'Rent')).toThrow(/Date cannot be in the future/);
         });
 
         it('should throw an error for payment dates before the lease start date', () => {
             const beforeLeaseDate = new Date('2023-01-14');
-            expect(() => validatePayment(1000, beforeLeaseDate, tenant)).toThrow(/Date cannot be before the lease start date/);
+            expect(() => validatePayment(1000, beforeLeaseDate, tenant, 'Rent')).toThrow(/Date cannot be before the lease start date/);
         });
 
         it('should not throw for a valid payment', () => {
             const validDate = new Date('2023-02-01');
-            expect(() => validatePayment(20000, validDate, tenant)).not.toThrow();
+            expect(() => validatePayment(20000, validDate, tenant, 'Rent')).not.toThrow();
         });
 
         it('should not throw for a payment on the lease start date', () => {
             const leaseStartDate = new Date('2023-01-15');
-            expect(() => validatePayment(20000, leaseStartDate, tenant)).not.toThrow();
+            expect(() => validatePayment(20000, leaseStartDate, tenant, 'Rent')).not.toThrow();
         });
     });
 });
