@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef } from 'react';
@@ -16,9 +15,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, FileDown } from 'lucide-react';
 import { bulkUpdateUnitsFromCSV } from '@/lib/data';
 import { useLoading } from '@/hooks/useLoading';
+import { downloadCSV } from '@/lib/utils';
 
 interface Props {
   onUploadComplete: () => void;
@@ -36,6 +36,22 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
     if (event.target.files) {
       setFile(event.target.files[0]);
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [{
+      UnitName: 'ExampleUnitA1',
+      Status: 'vacant',
+      Ownership: 'Landlord',
+      UnitType: 'One Bedroom',
+      UnitOrientation: 'FOREST.RD',
+      ManagementStatus: 'Rented for Clients',
+      HandoverStatus: 'Handed Over',
+      HandoverDate: '2023-01-15',
+      RentAmount: '25000',
+      ServiceCharge: '3000',
+    }];
+    downloadCSV(templateData, 'unit_update_template.csv');
   };
 
   const handleUpload = async () => {
@@ -137,6 +153,10 @@ export function UnitCsvUploader({ onUploadComplete }: Props) {
             <Label htmlFor="csv-file">CSV File</Label>
             <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} ref={fileInputRef} />
           </div>
+          <Button variant="link" type="button" onClick={handleDownloadTemplate} className="justify-start p-0 h-auto">
+            <FileDown className="mr-2 h-4 w-4" />
+            Download CSV Template
+          </Button>
         </div>
         <DialogFooter>
           <Button onClick={handleUpload} disabled={isLoading || !file}>

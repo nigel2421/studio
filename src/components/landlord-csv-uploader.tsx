@@ -15,9 +15,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, FileDown } from 'lucide-react';
 import { addLandlordsFromCSV } from '@/lib/data';
 import { useLoading } from '@/hooks/useLoading';
+import { downloadCSV } from '@/lib/utils';
 
 interface CsvData {
   name: string;
@@ -42,6 +43,16 @@ export function LandlordCsvUploader({ onUploadComplete }: Props) {
     if (event.target.files) {
       setFile(event.target.files[0]);
     }
+  };
+  
+  const handleDownloadTemplate = () => {
+    const templateData = [{
+      name: 'John Doe',
+      email: 'john.doe@example.com',
+      phone: '254712345678',
+      bankAccount: '1234567890 KCB Bank',
+    }];
+    downloadCSV(templateData, 'landlord_upload_template.csv');
   };
 
   const handleUpload = async () => {
@@ -140,6 +151,10 @@ export function LandlordCsvUploader({ onUploadComplete }: Props) {
             <Label htmlFor="csv-file">CSV File</Label>
             <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} ref={fileInputRef} />
           </div>
+           <Button variant="link" type="button" onClick={handleDownloadTemplate} className="justify-start p-0 h-auto">
+            <FileDown className="mr-2 h-4 w-4" />
+            Download CSV Template
+          </Button>
         </div>
         <DialogFooter>
           <Button onClick={handleUpload} disabled={isLoading || !file}>
