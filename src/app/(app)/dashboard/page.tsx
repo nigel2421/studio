@@ -1,4 +1,3 @@
-
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -20,6 +19,7 @@ import { OrientationOverviewChart } from "@/components/dashboard/orientation-ove
 import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart";
 import { isSameMonth } from "date-fns";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
+import { OrientationAnalytics } from "@/components/orientation-analytics";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
