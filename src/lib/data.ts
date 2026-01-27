@@ -1,3 +1,4 @@
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -12,7 +13,7 @@ import {
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth } from './firebase';
-import { reconcileMonthlyBilling, processPayment, validatePayment } from './financial-logic';
+import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus } from './financial-logic';
 import { format } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
@@ -190,8 +191,8 @@ export async function addTenant(data: {
 
     const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate, residentType } = data;
 
-    if (rent <= 0) {
-        throw new Error("Monthly Rent must be a positive value.");
+    if (rent <= 0 && residentType === 'Tenant') {
+        throw new Error("Monthly Rent must be a positive value for tenants.");
     }
 
     const property = await getProperty(propertyId);
@@ -509,14 +510,26 @@ export async function addWaterMeterReading(data: {
     await logActivity(`Added water reading for unit ${data.unitName}`);
 }
 
-export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
+export async function getPaymentHistory(tenantId: string, options?: { startDate?: string, endDate?: string }): Promise<Payment[]> {
+    const constraints = [where("tenantId", "==", tenantId)];
+    if (options?.startDate) {
+        constraints.push(where("date", ">=", options.startDate));
+    }
+    if (options?.endDate) {
+        constraints.push(where("date", "<=", options.endDate));
+    }
+
     const q = query(
         collection(db, "payments"),
-        where("tenantId", "==", tenantId),
+        ...constraints,
         orderBy('date', 'desc')
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+}
+
+export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
+    return getPaymentHistory(tenantId);
 }
 
 export async function getPropertyWaterReadings(propertyId: string): Promise<WaterMeterReading[]> {
@@ -555,7 +568,7 @@ export async function batchProcessPayments(
 
         // Perform validations before processing
         for (const entry of paymentEntries) {
-            validatePayment(entry.amount, new Date(entry.date), tenantData);
+            validatePayment(entry.amount, new Date(entry.date), tenantData, entry.type);
         }
 
         let allPaymentUpdates: any = {};
@@ -570,7 +583,7 @@ export async function batchProcessPayments(
                 createdAt: serverTimestamp() 
             });
             
-            const updates = processPayment(tenantData, entry.amount);
+            const updates = processPayment(tenantData, entry.amount, entry.type);
             
             // Apply updates to in-memory tenantData for the next iteration
             tenantData = {
@@ -580,10 +593,16 @@ export async function batchProcessPayments(
                 lease: {
                     ...tenantData.lease,
                     paymentStatus: updates['lease.paymentStatus'],
-                    lastPaymentDate: updates['lease.lastPaymentDate'],
+                    lastPaymentDate: updates['lease.lastPaymentDate'] || tenantData.lease.lastPaymentDate,
                 }
             };
-            allPaymentUpdates = { ...allPaymentUpdates, ...updates };
+            // Merge updates, ensuring lastPaymentDate is only set by actual payments
+            if (entry.type !== 'Adjustment') {
+                allPaymentUpdates = { ...allPaymentUpdates, ...updates };
+            } else {
+                const { 'lease.lastPaymentDate': _, ...adjustmentUpdates } = updates;
+                allPaymentUpdates = { ...allPaymentUpdates, ...adjustmentUpdates };
+            }
         }
 
         const reconciliationUpdates = reconcileMonthlyBilling(tenantData, new Date());
@@ -608,19 +627,21 @@ export async function batchProcessPayments(
     if (tenant) {
         const property = await getProperty(tenant.propertyId);
         for (const entry of paymentEntries) {
-             try {
-                await sendPaymentReceipt({
-                    tenantEmail: tenant.email,
-                    tenantName: tenant.name,
-                    amount: entry.amount,
-                    date: entry.date,
-                    propertyName: property?.name || 'N/A',
-                    unitName: tenant.unitName,
-                    notes: entry.notes,
-                });
-                await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
-            } catch (error) {
-                console.error("Failed to send receipt email:", error);
+             if (entry.type !== 'Adjustment') { // Don't send receipts for adjustments
+                try {
+                    await sendPaymentReceipt({
+                        tenantEmail: tenant.email,
+                        tenantName: tenant.name,
+                        amount: entry.amount,
+                        date: entry.date,
+                        propertyName: property?.name || 'N/A',
+                        unitName: tenant.unitName,
+                        notes: entry.notes,
+                    });
+                    await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
+                } catch (error) {
+                    console.error("Failed to send receipt email:", error);
+                }
             }
         }
     }

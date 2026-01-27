@@ -18,7 +18,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 
-const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Other'];
+const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
 
 interface PaymentEntry {
   id: number;
@@ -163,7 +163,7 @@ export function AddPaymentDialog({
   const addEntry = (type: Payment['type']) => {
     const newEntry: PaymentEntry = {
         id: Date.now(),
-        amount: getDefaultAmount(type, tenantForDisplay),
+        amount: type === 'Adjustment' ? '' : getDefaultAmount(type, tenantForDisplay),
         type: type,
         date: new Date(),
         notes: '',
@@ -189,10 +189,10 @@ export function AddPaymentDialog({
       return;
     }
 
-    const validEntries = paymentEntries.filter(e => e.amount && Number(e.amount) > 0);
+    const validEntries = paymentEntries.filter(e => e.amount && Number(e.amount) !== 0);
 
     if (validEntries.length === 0) {
-      toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter an amount for at least one payment record.' });
+      toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter a non-zero amount for at least one payment record.' });
       return;
     }
 
@@ -327,7 +327,9 @@ export function AddPaymentDialog({
                       <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor={`amount-${entry.id}`} className="text-xs">Amount (Ksh)</Label>
+                      <Label htmlFor={`amount-${entry.id}`} className="text-xs">
+                        {entry.type === 'Adjustment' ? 'Amount (+/-)' : 'Amount (Ksh)'}
+                      </Label>
                       <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
                     </div>
                     <div className="space-y-1">
@@ -354,7 +356,7 @@ export function AddPaymentDialog({
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes</Label>
-                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} />
+                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} placeholder={entry.type === 'Adjustment' ? 'Reason for adjustment' : 'Optional notes'}/>
                     </div>
                   </div>
                 ))}

@@ -1,3 +1,4 @@
+
 import { Tenant, Payment } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth } from 'date-fns';
 
@@ -40,12 +41,28 @@ export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Dat
 /**
  * Process a new payment and update the tenant's balances.
  */
-export function processPayment(tenant: Tenant, paymentAmount: number): { [key: string]: any } {
+export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type']): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
 
-    // Total available = payment + existing overpayment
-    let totalAvailable = paymentAmount + newAccountBalance;
+    if (paymentType === 'Adjustment') {
+        // Positive amount = DEBIT (increases due balance)
+        // Negative amount = CREDIT (decreases due balance)
+        newDueBalance += paymentAmount;
+        if (newDueBalance < 0) {
+            newAccountBalance += Math.abs(newDueBalance);
+            newDueBalance = 0;
+        }
+        return {
+            dueBalance: newDueBalance,
+            accountBalance: newAccountBalance,
+            'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }),
+        };
+    }
+
+    // This logic is for normal payments (Rent, Water, etc.)
+    const positivePaymentAmount = Math.abs(paymentAmount);
+    let totalAvailable = positivePaymentAmount + newAccountBalance;
     newAccountBalance = 0; // Reset as we are using it
 
     if (totalAvailable >= newDueBalance) {
@@ -112,14 +129,26 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
 export function validatePayment(
     paymentAmount: number,
     paymentDate: Date,
-    tenant: Tenant
+    tenant: Tenant,
+    paymentType: Payment['type']
 ): void {
-    if (paymentAmount <= 0) {
-        throw new Error(`Invalid payment amount: Ksh ${paymentAmount}. Amount must be positive.`);
+
+    if (paymentType !== 'Adjustment') {
+        if (paymentAmount <= 0) {
+            throw new Error(`Invalid payment amount: Ksh ${paymentAmount}. Amount must be positive.`);
+        }
+        if (paymentAmount > 1000000) {
+            throw new Error(`Payment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
+        }
+    } else { // For adjustments
+         if (Math.abs(paymentAmount) > 1000000) {
+            throw new Error(`Adjustment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
+        }
+         if (paymentAmount === 0) {
+             throw new Error(`Adjustment amount cannot be zero.`);
+         }
     }
-    if (paymentAmount > 1000000) {
-        throw new Error(`Payment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
-    }
+
 
     const today = new Date();
     // Set hours to 0 to compare dates only

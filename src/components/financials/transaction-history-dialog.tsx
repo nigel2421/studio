@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, Loader2, FileText, PlusCircle } from 'lucide-react';
 import { Tenant, Payment, Property } from '@/lib/types';
-import { getTenantPayments } from '@/lib/data';
+import { getPaymentHistory } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format } from 'date-fns';
@@ -28,7 +28,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     useEffect(() => {
         if (tenant && open) {
             setIsLoading(true);
-            getTenantPayments(tenant.id)
+            getPaymentHistory(tenant.id)
                 .then(setPayments)
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
@@ -38,7 +38,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     // This effect runs when onPaymentAdded is called from the inner dialog
     useEffect(() => {
         if (tenant && open) {
-            getTenantPayments(tenant.id).then(setPayments);
+            getPaymentHistory(tenant.id).then(setPayments);
         }
     }, [tenant, open, onPaymentAdded]);
 
@@ -105,7 +105,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                             <TableCell>
                                                 {payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A'}
                                             </TableCell>
-                                            <TableCell className="font-medium">Ksh {payment.amount.toLocaleString()}</TableCell>
+                                            <TableCell className={`font-medium ${payment.type === 'Adjustment' && payment.amount < 0 ? 'text-green-600' : payment.type === 'Adjustment' && payment.amount > 0 ? 'text-red-600' : ''}`}>
+                                                Ksh {payment.amount.toLocaleString()}
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge variant={payment.status === 'Failed' ? 'destructive' : payment.status === 'Paid' ? 'default' : 'secondary'}>
                                                     {payment.status || 'Paid'}
@@ -129,5 +131,3 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </Dialog>
     );
 }
-
-    
