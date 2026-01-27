@@ -83,11 +83,12 @@ export default function ArrearsPage() {
                 setNotificationStatus(prev => ({...prev, [tenant.id]: 'idle'}));
             }, 3000);
         } else {
-            throw new Error(result.error);
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to send reminder.' });
+            setNotificationStatus(prev => ({...prev, [tenant.id]: 'error'}));
         }
     } catch (error: any) {
         console.error('Error sending reminder:', error);
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminder.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
         setNotificationStatus(prev => ({...prev, [tenant.id]: 'error'}));
     }
   };

@@ -2,8 +2,9 @@
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
 import { logCommunication, getTenant } from '@/lib/data';
+import { Communication } from '@/lib/types';
 
-export async function performSendCustomEmail(recipients: string[], subject: string, body: string, senderId: string) {
+export async function performSendCustomEmail(recipients: string[], subject: string, body: string, senderId: string, commDetails: Partial<Omit<Communication, 'id'>> = {}) {
   try {
     const result = await sendCustomEmail({ recipients, subject, body });
 
@@ -18,6 +19,7 @@ export async function performSendCustomEmail(recipients: string[], subject: stri
         type: 'announcement',
         status: 'sent',
         timestamp: new Date().toISOString(),
+        ...commDetails,
     });
 
     return { success: true, data: result.data };
@@ -33,6 +35,7 @@ export async function performSendCustomEmail(recipients: string[], subject: stri
         type: 'announcement',
         status: 'failed',
         timestamp: new Date().toISOString(),
+        ...commDetails,
     });
     const message = error.message || 'Failed to send email. Please check the system logs.';
     return { success: false, error: message };
@@ -68,27 +71,31 @@ export async function performSendArrearsReminder(tenantId: string, senderId: str
       return { success: false, error: 'Tenant not found.' };
     }
 
+    if (!tenant.dueBalance || tenant.dueBalance <= 0) {
+      return { success: false, error: 'This resident has no outstanding balance.' };
+    }
+
     const subject = 'Friendly Reminder: Outstanding Account Balance';
     const body = `Dear ${tenant.name},\n\nThis is a friendly reminder regarding your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease make a payment at your earliest convenience to clear your balance.\n\nThank you,\nEracov Properties`;
     
-    // Call the cloud function to send email
-    await sendCustomEmail({ recipients: [tenant.email], subject, body });
+    const result = await performSendCustomEmail(
+      [tenant.email],
+      subject,
+      body,
+      senderId,
+      {
+        relatedTenantId: tenant.id,
+        type: 'automation',
+        subType: 'Arrears Reminder',
+      }
+    );
 
-    // Log communication
-    await logCommunication({
-      recipients: [tenant.email],
-      recipientCount: 1,
-      relatedTenantId: tenant.id,
-      type: 'automation',
-      subType: 'Arrears Reminder',
-      subject: subject,
-      body: body.replace(/\n/g, '<br>'),
-      senderId: senderId,
-      timestamp: new Date().toISOString(),
-      status: 'sent',
-    });
+    if (result.success) {
+        return { success: true, message: `Reminder sent to ${tenant.name}` };
+    } else {
+        return { success: false, error: result.error };
+    }
 
-    return { success: true, message: `Reminder sent to ${tenant.name}` };
   } catch (error: any) {
     console.error("Error sending arrears reminder:", error);
     const message = error.message || 'Failed to send reminder.';
