@@ -36,6 +36,7 @@ const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     address: z.string().min(1, 'Address is required'),
     type: z.string().min(1, 'Type is required'),
+    lateFee: z.coerce.number().min(0, 'Late fee must be a positive number').optional(),
 });
 
 export type EditPropertyFormValues = z.infer<typeof formSchema>;
@@ -75,7 +76,7 @@ export default function PropertyManagementPage() {
 
     const form = useForm<EditPropertyFormValues>({
         resolver: zodResolver(formSchema),
-        defaultValues: { name: '', address: '', type: '' },
+        defaultValues: { name: '', address: '', type: '', lateFee: 0 },
     });
     
     const fetchData = useCallback(() => {
@@ -107,6 +108,7 @@ export default function PropertyManagementPage() {
                 name: property.name,
                 address: property.address,
                 type: property.type,
+                lateFee: property.lateFee || 0,
             });
         }
     }, [property, form.reset]);
@@ -254,7 +256,7 @@ export default function PropertyManagementPage() {
                                   Back to Properties
                               </Link>
                           </Button>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2 items-start">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2 items-start">
                             <FormField
                               control={form.control}
                               name="name"
@@ -289,6 +291,19 @@ export default function PropertyManagementPage() {
                                   <FormLabel className="text-xs text-muted-foreground">Type</FormLabel>
                                   <FormControl>
                                     <Input {...field} className="h-9" disabled={isReadOnly} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="lateFee"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs text-muted-foreground">Late Fee (Ksh)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" {...field} className="h-9" disabled={isReadOnly} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>

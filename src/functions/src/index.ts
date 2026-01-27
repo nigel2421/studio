@@ -14,6 +14,7 @@ import * as logger from "firebase-functions/logger";
 import * as nodemailer from "nodemailer";
 import {defineString} from "firebase-functions/params";
 import * as admin from "firebase-admin";
+import { format } from "date-fns";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -164,45 +165,76 @@ export const checkAndSendLeaseReminders = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 }, async (request) => {
     const tenantsRef = db.collection('tenants');
-    const snapshot = await tenantsRef.where('status', '==', 'active').get();
+    const tenantsSnapshot = await tenantsRef.where('status', '==', 'active').get();
 
-    if (snapshot.empty) {
+    if (tenantsSnapshot.empty) {
         return { success: true, message: "No active tenants found to process." };
     }
 
+    const propertiesRef = db.collection('properties');
+    const propertiesSnap = await getDocs(propertiesRef);
+    const propertiesMap = new Map(propertiesSnap.docs.map(doc => [doc.id, doc.data()]));
+
     const transporter = createTransporter();
     let notificationsSent = 0;
+    let lateFeesApplied = 0;
     const today = new Date();
     const dayOfMonth = today.getDate();
+    const currentPeriod = format(today, 'yyyy-MM');
 
-    const communicationPromises = [];
+    const emailPromises = [];
+    const dbBatch = db.batch();
 
-    for (const doc of snapshot.docs) {
+    for (const doc of tenantsSnapshot.docs) {
         const tenant = doc.data() as any;
         
         if (!tenant.dueBalance || tenant.dueBalance <= 0) continue;
 
-        let shouldSend = false;
+        let shouldSendEmail = false;
         let subject = '';
         let body = '';
         let subType = '';
         
-        // Overdue Notice
+        // --- Late Fee Logic ---
+        const property = propertiesMap.get(tenant.propertyId);
+        const lateFee = property?.lateFee;
+        if (tenant.lease.paymentStatus === 'Overdue' && lateFee > 0 && tenant.lease.lastLateFeeAppliedPeriod !== currentPeriod) {
+            
+            dbBatch.update(doc.ref, {
+                dueBalance: admin.firestore.FieldValue.increment(lateFee),
+                'lease.lastLateFeeAppliedPeriod': currentPeriod
+            });
+            
+            const paymentRef = db.collection('payments').doc();
+            dbBatch.set(paymentRef, {
+                tenantId: doc.id,
+                amount: lateFee,
+                date: format(today, 'yyyy-MM-dd'),
+                notes: `Automated late fee for ${format(today, 'MMMM yyyy')}`,
+                rentForMonth: currentPeriod,
+                status: 'Paid',
+                type: 'Adjustment',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            lateFeesApplied++;
+        }
+
+        // --- Notification Logic ---
         if (tenant.lease.paymentStatus === 'Overdue') {
-            shouldSend = true;
+            shouldSendEmail = true;
             subType = 'Overdue Notice';
             subject = `Urgent: Overdue Balance for ${tenant.name}`;
             body = `Dear ${tenant.name},\n\nThis is a notice regarding an overdue balance on your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease settle this amount immediately to avoid further action.\n\nThank you,\nEracov Properties`;
         } 
-        // Reminder Notice (between 2nd and 5th of the month)
         else if (tenant.lease.paymentStatus === 'Pending' && dayOfMonth >= 2 && dayOfMonth <= 5) {
-            shouldSend = true;
+            shouldSendEmail = true;
             subType = 'Payment Reminder';
             subject = `Reminder: Rent Payment Due Soon`;
             body = `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent payment is due on the 5th of this month. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nThank you,\nEracov Properties`;
         }
 
-        if (shouldSend) {
+        if (shouldSendEmail) {
             notificationsSent++;
             const mailOptions = {
                 from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
@@ -211,8 +243,10 @@ export const checkAndSendLeaseReminders = onCall({
                 html: body.replace(/\n/g, '<br>')
             };
 
-            communicationPromises.push(transporter.sendMail(mailOptions));
-            communicationPromises.push(db.collection('communications').add({
+            emailPromises.push(transporter.sendMail(mailOptions));
+            
+            const commRef = db.collection('communications').doc();
+            dbBatch.set(commRef, {
                 recipients: [tenant.email],
                 recipientCount: 1,
                 relatedTenantId: doc.id,
@@ -223,21 +257,26 @@ export const checkAndSendLeaseReminders = onCall({
                 senderId: 'system',
                 timestamp: new Date().toISOString(),
                 status: 'sent',
-            }));
+            });
         }
     }
     
-    if(communicationPromises.length > 0) {
-        await Promise.all(communicationPromises);
+    // Commit all database writes (late fees, communication logs)
+    await dbBatch.commit();
+    
+    // Send all emails after DB writes are successful
+    if(emailPromises.length > 0) {
+        await Promise.all(emailPromises);
     }
     
-    const message = `Automation complete. Processed ${snapshot.size} tenants and sent ${notificationsSent} notifications.`;
+    const message = `Automation complete. Processed ${tenantsSnapshot.size} tenants, sent ${notificationsSent} notifications, and applied ${lateFeesApplied} late fees.`;
     logger.info(message);
 
+    // Log the summary of the automation run
     await db.collection('communications').add({
         senderId: 'system',
         type: 'automation',
-        subject: 'Lease Reminder Automation Run',
+        subject: 'Lease Reminder & Late Fee Automation Run',
         body: message,
         recipientCount: notificationsSent,
         timestamp: new Date().toISOString(),

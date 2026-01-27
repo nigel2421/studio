@@ -7,6 +7,7 @@ export type Property = {
   units: Unit[];
   imageId: string;
   landlordId?: string;
+  lateFee?: number;
 };
 
 export type PropertyOwner = {
@@ -143,6 +144,7 @@ export type Tenant = {
     paymentStatus: 'Paid' | 'Pending' | 'Overdue';
     lastPaymentDate?: string;
     lastBilledPeriod?: string;
+    lastLateFeeAppliedPeriod?: string;
   };
   accountBalance: number; // For overpayments
   dueBalance: number;      // For carry-over debts
