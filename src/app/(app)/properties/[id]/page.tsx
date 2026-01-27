@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -18,7 +17,7 @@ import { UnitEditDialog } from '@/components/property-unit-edit-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Edit2, Loader2, Filter, X, Save, ArrowLeft } from 'lucide-react';
+import { Search, Edit2, Loader2, Filter, X, Save, ArrowLeft, PlusCircle } from 'lucide-react';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BulkUnitUpdateDialog } from '@/components/unit-bulk-update-dialog';
@@ -31,6 +30,7 @@ import { StatusAnalytics } from '@/components/status-analytics';
 import { Separator } from '@/components/ui/separator';
 import { OrientationAnalytics } from '@/components/orientation-analytics';
 import { UnitCsvUploader } from '@/components/unit-csv-uploader';
+import { AddUnitDialog } from '@/components/add-unit-dialog';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -60,6 +60,7 @@ export default function PropertyManagementPage() {
     const [pageSize, setPageSize] = useState(20);
     const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isAddUnitDialogOpen, setIsAddUnitDialogOpen] = useState(false);
     const [selectedUnitNames, setSelectedUnitNames] = useState<string[]>([]);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
     const [filters, setFilters] = useState<{
@@ -193,6 +194,37 @@ export default function PropertyManagementPage() {
         }
     };
     
+    const handleSaveNewUnit = async (unitData: Omit<Unit, 'status' | 'handoverStatus'>) => {
+        if (!property) return;
+    
+        if (units.some(u => u.name.toLowerCase() === unitData.name.toLowerCase())) {
+            toast({
+                variant: "destructive",
+                title: "Duplicate Unit",
+                description: `A unit with the name "${unitData.name}" already exists.`,
+            });
+            return;
+        }
+    
+        const newUnit: Unit = {
+            ...unitData,
+            status: 'vacant', 
+            handoverStatus: 'Pending Hand Over'
+        };
+    
+        const updatedUnits = [...units, newUnit];
+        setUnits(updatedUnits);
+    
+        try {
+            await updateProperty(property.id, { units: updatedUnits });
+            toast({ title: "Unit Added", description: `Unit ${newUnit.name} has been added successfully.` });
+            fetchData();
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "Failed to add new unit." });
+            setUnits(units);
+        }
+    };
+
     const handleBulkSave = async (updateData: Partial<Omit<Unit, 'name'>>) => {
         if (!property || selectedUnitNames.length === 0) return;
 
@@ -330,6 +362,7 @@ export default function PropertyManagementPage() {
                                 <p className="text-sm text-muted-foreground">Manage and edit individual unit details.</p>
                             </div>
                              <div className="flex items-center gap-2">
+                               {!isReadOnly && <Button size="sm" onClick={() => setIsAddUnitDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4"/>Add Unit</Button>}
                                {!isReadOnly && selectedUnitNames.length > 0 && (
                                  <Button size="sm" onClick={() => setIsBulkDialogOpen(true)}>
                                    Bulk Edit ({selectedUnitNames.length})
@@ -457,6 +490,11 @@ export default function PropertyManagementPage() {
                     </div>
                 </div>
             </form>
+            <AddUnitDialog 
+                open={isAddUnitDialogOpen}
+                onOpenChange={setIsAddUnitDialogOpen}
+                onSave={handleSaveNewUnit}
+            />
             <UnitEditDialog unit={selectedUnit} landlords={landlords} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSave={handleSaveUnit} />
             <BulkUnitUpdateDialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen} unitCount={selectedUnitNames.length} onSave={handleBulkSave} />
         </Form>
