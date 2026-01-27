@@ -17,7 +17,6 @@ import { FinancialOverviewChart } from "@/components/dashboard/financial-overvie
 import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overview-chart";
 import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
 import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
-import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart";
 import { isSameMonth } from "date-fns";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
@@ -243,15 +242,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={properties.length > 0 ? properties[0].id : ""} className="w-full">
-              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
-                {properties.map(property => (
-                  <TabsTrigger key={property.id} value={property.id}>{property.name}</TabsTrigger>
-                ))}
-              </TabsList>
+              <div className="overflow-x-auto pb-2">
+                  <TabsList>
+                    {properties.map(property => (
+                      <TabsTrigger key={property.id} value={property.id} className="whitespace-nowrap">{property.name}</TabsTrigger>
+                    ))}
+                  </TabsList>
+              </div>
               {properties.map(property => (
                 <TabsContent key={property.id} value={property.id} className="space-y-6">
                   <Tabs defaultValue="status-analytics" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                         <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
                         <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
                         <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
@@ -282,5 +283,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
