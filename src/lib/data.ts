@@ -630,6 +630,7 @@ export async function batchProcessPayments(
              if (entry.type !== 'Adjustment') { // Don't send receipts for adjustments
                 try {
                     await sendPaymentReceipt({
+                        tenantId: tenant.id,
                         tenantEmail: tenant.email,
                         tenantName: tenant.name,
                         amount: entry.amount,

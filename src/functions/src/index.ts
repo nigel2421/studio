@@ -13,6 +13,11 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as nodemailer from "nodemailer";
 import {defineString} from "firebase-functions/params";
+import * as admin from "firebase-admin";
+
+admin.initializeApp();
+const db = admin.firestore();
+
 
 // Define environment variables for email configuration
 const emailHost = defineString("EMAIL_HOST");
@@ -47,7 +52,7 @@ const createTransporter = () => {
 export const sendPaymentReceipt = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 }, async (request) => {
-    const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes } = request.data;
+    const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes, tenantId } = request.data;
 
     // Validate essential data
     if (!tenantEmail || !tenantName || !amount || !date || !propertyName || !unitName) {
@@ -82,6 +87,22 @@ export const sendPaymentReceipt = onCall({
     try {
         await transporter.sendMail(mailOptions);
         logger.info(`Receipt sent to ${tenantEmail}`);
+
+        if (tenantId) {
+             await db.collection('communications').add({
+                recipients: [tenantEmail],
+                recipientCount: 1,
+                relatedTenantId: tenantId,
+                type: 'automation',
+                subType: 'Payment Receipt',
+                subject: "Your Payment Receipt",
+                body: mailOptions.html,
+                senderId: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'sent',
+            });
+        }
+
         return { success: true, message: "Receipt sent successfully." };
     } catch (error) {
         logger.error("Error sending email:", error);
@@ -136,4 +157,92 @@ export const sendCustomEmail = onCall({
         logger.error("Error sending bulk email:", error);
         throw new HttpsError("internal", "Failed to send email. This is likely due to missing or incorrect SMTP credentials in your Firebase project's environment configuration. Please ensure EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASS secrets are set correctly.");
     }
+});
+
+
+export const checkAndSendLeaseReminders = onCall({
+    secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+}, async (request) => {
+    const tenantsRef = db.collection('tenants');
+    const snapshot = await tenantsRef.where('status', '==', 'active').get();
+
+    if (snapshot.empty) {
+        return { success: true, message: "No active tenants found to process." };
+    }
+
+    const transporter = createTransporter();
+    let notificationsSent = 0;
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+
+    const communicationPromises = [];
+
+    for (const doc of snapshot.docs) {
+        const tenant = doc.data() as any;
+        
+        if (!tenant.dueBalance || tenant.dueBalance <= 0) continue;
+
+        let shouldSend = false;
+        let subject = '';
+        let body = '';
+        let subType = '';
+        
+        // Overdue Notice
+        if (tenant.lease.paymentStatus === 'Overdue') {
+            shouldSend = true;
+            subType = 'Overdue Notice';
+            subject = `Urgent: Overdue Balance for ${tenant.name}`;
+            body = `Dear ${tenant.name},\n\nThis is a notice regarding an overdue balance on your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease settle this amount immediately to avoid further action.\n\nThank you,\nEracov Properties`;
+        } 
+        // Reminder Notice (between 2nd and 5th of the month)
+        else if (tenant.lease.paymentStatus === 'Pending' && dayOfMonth >= 2 && dayOfMonth <= 5) {
+            shouldSend = true;
+            subType = 'Payment Reminder';
+            subject = `Reminder: Rent Payment Due Soon`;
+            body = `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent payment is due on the 5th of this month. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nThank you,\nEracov Properties`;
+        }
+
+        if (shouldSend) {
+            notificationsSent++;
+            const mailOptions = {
+                from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
+                to: tenant.email,
+                subject: subject,
+                html: body.replace(/\n/g, '<br>')
+            };
+
+            communicationPromises.push(transporter.sendMail(mailOptions));
+            communicationPromises.push(db.collection('communications').add({
+                recipients: [tenant.email],
+                recipientCount: 1,
+                relatedTenantId: doc.id,
+                type: 'automation',
+                subType: subType,
+                subject: subject,
+                body: mailOptions.html,
+                senderId: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'sent',
+            }));
+        }
+    }
+    
+    if(communicationPromises.length > 0) {
+        await Promise.all(communicationPromises);
+    }
+    
+    const message = `Automation complete. Processed ${snapshot.size} tenants and sent ${notificationsSent} notifications.`;
+    logger.info(message);
+
+    await db.collection('communications').add({
+        senderId: 'system',
+        type: 'automation',
+        subject: 'Lease Reminder Automation Run',
+        body: message,
+        recipientCount: notificationsSent,
+        timestamp: new Date().toISOString(),
+        status: 'sent',
+    });
+
+    return { success: true, message: message };
 });
