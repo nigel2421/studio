@@ -1,5 +1,4 @@
-
-import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling } from './financial-logic';
+import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
 import { Tenant, Agent } from './types';
 import { format } from 'date-fns';
 
@@ -166,6 +165,43 @@ describe('Financial Logic Functions', () => {
             const tenant = createMockTenant({ dueBalance: 1000 });
             const date = new Date('2023-03-06');
             expect(getRecommendedPaymentStatus(tenant, date)).toBe('Overdue');
+        });
+    });
+
+    describe('validatePayment', () => {
+        const tenant = createMockTenant({ lease: { startDate: '2023-01-15' } });
+
+        it('should throw an error for negative payment amounts', () => {
+            expect(() => validatePayment(-100, new Date(), tenant)).toThrow('Invalid payment amount: Ksh -100. Amount must be positive.');
+        });
+
+        it('should throw an error for zero payment amount', () => {
+            expect(() => validatePayment(0, new Date(), tenant)).toThrow('Invalid payment amount: Ksh 0. Amount must be positive.');
+        });
+
+        it('should throw an error for payments exceeding the maximum value', () => {
+            expect(() => validatePayment(1000001, new Date(), tenant)).toThrow('Payment amount Ksh 1,000,001 exceeds the maximum limit of Ksh 1,000,000.');
+        });
+
+        it('should throw an error for future payment dates', () => {
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 1);
+            expect(() => validatePayment(1000, futureDate, tenant)).toThrow(/Date cannot be in the future/);
+        });
+
+        it('should throw an error for payment dates before the lease start date', () => {
+            const beforeLeaseDate = new Date('2023-01-14');
+            expect(() => validatePayment(1000, beforeLeaseDate, tenant)).toThrow(/Date cannot be before the lease start date/);
+        });
+
+        it('should not throw for a valid payment', () => {
+            const validDate = new Date('2023-02-01');
+            expect(() => validatePayment(20000, validDate, tenant)).not.toThrow();
+        });
+
+        it('should not throw for a payment on the lease start date', () => {
+            const leaseStartDate = new Date('2023-01-15');
+            expect(() => validatePayment(20000, leaseStartDate, tenant)).not.toThrow();
         });
     });
 });

@@ -1,4 +1,3 @@
-
 import { Tenant, Payment } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth } from 'date-fns';
 
@@ -108,4 +107,35 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
         'lease.lastBilledPeriod': currentPeriod,
     };
+}
+
+export function validatePayment(
+    paymentAmount: number,
+    paymentDate: Date,
+    tenant: Tenant
+): void {
+    if (paymentAmount <= 0) {
+        throw new Error(`Invalid payment amount: Ksh ${paymentAmount}. Amount must be positive.`);
+    }
+    if (paymentAmount > 1000000) {
+        throw new Error(`Payment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
+    }
+
+    const today = new Date();
+    // Set hours to 0 to compare dates only
+    today.setHours(0, 0, 0, 0);
+    const paymentDateOnly = new Date(paymentDate);
+    paymentDateOnly.setHours(0, 0, 0, 0);
+
+    if (paymentDateOnly > today) {
+        throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be in the future.`);
+    }
+
+    if (tenant.lease?.startDate) {
+        const leaseStartDate = new Date(tenant.lease.startDate);
+        leaseStartDate.setHours(0, 0, 0, 0);
+        if (paymentDateOnly < leaseStartDate) {
+            throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be before the lease start date of ${tenant.lease.startDate}.`);
+        }
+    }
 }

@@ -12,7 +12,7 @@ import {
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth } from './firebase';
-import { reconcileMonthlyBilling, processPayment, calculateTargetDue, getRecommendedPaymentStatus } from './financial-logic';
+import { reconcileMonthlyBilling, processPayment, validatePayment } from './financial-logic';
 import { format } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
@@ -189,6 +189,10 @@ export async function addTenant(data: {
 }): Promise<void> {
 
     const { name, email, phone, idNumber, propertyId, unitName, agent, rent, securityDeposit, waterDeposit, leaseStartDate, residentType } = data;
+
+    if (rent <= 0) {
+        throw new Error("Monthly Rent must be a positive value.");
+    }
 
     const property = await getProperty(propertyId);
     if (!property) {
@@ -548,6 +552,11 @@ export async function batchProcessPayments(
             throw new Error("Tenant not found");
         }
         let tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
+
+        // Perform validations before processing
+        for (const entry of paymentEntries) {
+            validatePayment(entry.amount, new Date(entry.date), tenantData);
+        }
 
         let allPaymentUpdates: any = {};
 
