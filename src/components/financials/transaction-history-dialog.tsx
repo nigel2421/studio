@@ -43,7 +43,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 const payments = await getPaymentHistory(tenant.id);
                 setAllTenantPayments(payments); 
                 const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties);
-                setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                setLedger(generatedLedger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {
