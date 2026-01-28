@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -392,10 +393,14 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
 
     // 1. Add payments to ledger as negative amounts
     payments.forEach(p => {
+        const paymentDescription = p.rentForMonth
+            ? `Payment for ${format(new Date(p.rentForMonth + '-02'), 'MMM yyyy')}`
+            : `Payment Received - ${p.type}`;
+
         ledgerItems.push({
             id: p.id,
             date: new Date(p.date),
-            description: p.notes || `Payment Received - ${p.type}`,
+            description: p.notes || paymentDescription,
             amount: p.type === 'Adjustment' ? p.amount : -p.amount,
         });
     });
@@ -694,3 +699,5 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
+  

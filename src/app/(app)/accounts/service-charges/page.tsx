@@ -34,6 +34,7 @@ interface ServiceChargeAccount {
   tenantName?: string;
   paymentStatus: 'Paid' | 'Pending' | 'Vacant';
   paymentAmount?: number;
+  paymentForMonth?: string;
 }
 
 interface VacantArrearsAccount {
@@ -120,6 +121,7 @@ export default function ServiceChargesPage() {
             
             let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
             let paymentAmount: number | undefined;
+            let paymentForMonth: string | undefined;
             
             if (tenant) {
                  const relevantPayment = allPayments.find(p => 
@@ -131,6 +133,7 @@ export default function ServiceChargesPage() {
                 if (relevantPayment && relevantPayment.amount >= (unit.serviceCharge || 0)) {
                     paymentStatus = 'Paid';
                     paymentAmount = relevantPayment.amount;
+                    paymentForMonth = relevantPayment.rentForMonth;
                 }
             }
 
@@ -146,6 +149,7 @@ export default function ServiceChargesPage() {
                 tenantName: tenant?.name,
                 paymentStatus,
                 paymentAmount,
+                paymentForMonth,
             };
         });
         setSelfManagedAccounts(selfManagedServiceChargeAccounts);
@@ -483,7 +487,7 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                             <TableHead>Owner</TableHead>
                             <TableHead>Service Charge</TableHead>
                             <TableHead>Payment Status</TableHead>
-                            <TableHead>Paid Amount</TableHead>
+                            <TableHead>Payment Details</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -505,7 +509,18 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                                         {acc.paymentStatus}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
+                                <TableCell>
+                                    {acc.paymentAmount ? (
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">Ksh {acc.paymentAmount.toLocaleString()}</span>
+                                            {acc.paymentForMonth && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    For {format(new Date(acc.paymentForMonth + '-02'), 'MMM yyyy')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : '-'}
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex gap-2 justify-end">
                                         <Button
@@ -606,3 +621,5 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
 
 
     
+
+  

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -51,10 +52,14 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
 
                     // 1. Add payments to ledger as negative amounts
                     paymentHistory.forEach(p => {
+                        const paymentDescription = p.rentForMonth
+                            ? `Payment for ${format(new Date(p.rentForMonth + '-02'), 'MMM yyyy')}`
+                            : `Payment - ${p.type}`;
+                        
                         ledgerItems.push({
                             id: p.id,
                             date: new Date(p.date),
-                            description: p.notes || `Payment - ${p.type}`,
+                            description: p.notes || paymentDescription,
                             amount: p.type === 'Adjustment' ? p.amount : -p.amount,
                         });
                     });
@@ -217,3 +222,5 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </Dialog>
     );
 }
+
+  
