@@ -10,6 +10,7 @@ import { getPaymentHistory } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format } from 'date-fns';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
@@ -23,6 +24,8 @@ interface TransactionHistoryDialogProps {
 export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPaymentAdded, allProperties, allTenants }: TransactionHistoryDialogProps) {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     useEffect(() => {
         if (tenant && open) {
@@ -31,6 +34,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 .then(setPayments)
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
+            setCurrentPage(1); // Reset to first page when opening
         }
     }, [tenant, open]);
     
@@ -41,6 +45,11 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         }
     }, [tenant, open, onPaymentAdded]);
 
+    const totalPages = Math.ceil(payments.length / pageSize);
+    const paginatedPayments = payments.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
 
     const handleDownloadPDF = async () => {
         if (!tenant) return;
@@ -78,7 +87,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     </Button>
                 </div>
 
-                <div className="max-h-[60vh] overflow-y-auto border rounded-md">
+                <div className="border rounded-md">
                     {isLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -96,8 +105,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {payments.length > 0 ? (
-                                    payments.map((payment) => (
+                                {paginatedPayments.length > 0 ? (
+                                    paginatedPayments.map((payment) => (
                                         <TableRow key={payment.id}>
                                             <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
                                             <TableCell>{payment.type || 'Rent'}</TableCell>
@@ -126,6 +135,21 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                         </Table>
                     )}
                 </div>
+                 {payments.length > 0 && (
+                    <div className="pt-4 border-t">
+                        <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalItems={payments.length}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => {
+                                setPageSize(size);
+                                setCurrentPage(1);
+                            }}
+                        />
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     );
