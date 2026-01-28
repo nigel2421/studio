@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,6 +21,7 @@ import {
 } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 
 const unitSchema = z.object({
     name: z.string(),
@@ -80,13 +82,16 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
     const handleSubmit = async (data: UnitFormValues) => {
         setIsSaving(true);
         try {
-            const dataToSave: Partial<UnitFormValues> = { ...data };
+            const saveData = {
+                ...data,
+                handoverDate: data.handoverDate ? format(data.handoverDate, 'yyyy-MM-dd') : undefined
+            };
 
-            if (data.handoverStatus !== 'Handed Over') {
-                dataToSave.handoverDate = undefined;
+            if (saveData.handoverStatus !== 'Handed Over') {
+                saveData.handoverDate = undefined;
             }
 
-            await onSave(dataToSave as Unit);
+            await onSave(saveData as Unit);
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving unit:", error);
@@ -329,3 +334,5 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
         </Dialog>
     );
 }
+
+    
