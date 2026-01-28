@@ -24,7 +24,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     const [ledger, setLedger] = useState<{ id: string, date: string; description: string; charge: number; payment: number; balance: number }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(5);
+    const [pageSize, setPageSize] = useState(10);
 
     useEffect(() => {
         if (tenant && open) {
@@ -79,7 +79,14 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             charge: c.amount,
                             payment: 0
                         }))
-                    ].sort((a, b) => a.date.getTime() - b.date.getTime()); // Sort chronologically
+                    ].sort((a, b) => {
+                        const dateDiff = a.date.getTime() - b.date.getTime();
+                        if (dateDiff !== 0) return dateDiff;
+                        // If dates are same, charges (debits) should come before payments (credits)
+                        if (a.charge > 0 && b.payment > 0) return -1;
+                        if (a.payment > 0 && b.charge > 0) return 1;
+                        return 0;
+                    });
 
                     // Calculate opening balance
                     const netChangeInPeriod = combined.reduce((sum, item) => sum + item.charge - item.payment, 0);
@@ -92,8 +99,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                         return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance };
                     });
 
-                    // Reverse for display (latest first)
-                    setLedger(ledgerWithBalance.reverse());
+                    // Display oldest first for a standard ledger view
+                    setLedger(ledgerWithBalance);
                 })
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
@@ -162,8 +169,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             </TableHeader>
                             <TableBody>
                                 {paginatedLedger.length > 0 ? (
-                                    paginatedLedger.map((entry) => (
-                                        <TableRow key={entry.id}>
+                                    paginatedLedger.map((entry, index) => (
+                                        <TableRow key={`${entry.id}-${index}`}>
                                             <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
                                             <TableCell>{entry.description}</TableCell>
                                             <TableCell className="text-right text-red-600 font-medium">
