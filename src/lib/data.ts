@@ -576,19 +576,15 @@ export async function batchProcessPayments(
         const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
         
         // Create an up-to-date in-memory representation of the tenant
-        const reconciledTenant: Tenant = {
+        let currentTenantState: Tenant = {
             ...tenantData,
-            dueBalance: reconciliationUpdates.dueBalance ?? tenantData.dueBalance,
-            accountBalance: reconciliationUpdates.accountBalance ?? tenantData.accountBalance,
+            ...reconciliationUpdates,
             lease: {
                 ...tenantData.lease,
-                paymentStatus: reconciliationUpdates['lease.paymentStatus'] || tenantData.lease.paymentStatus,
-                lastBilledPeriod: reconciliationUpdates['lease.lastBilledPeriod'] || tenantData.lease.lastBilledPeriod,
+                ...reconciliationUpdates,
             }
         };
         
-        let currentTenantState = reconciledTenant;
-
         // Perform validations before processing payments
         for (const entry of paymentEntries) {
             validatePayment(entry.amount, new Date(entry.date), currentTenantState, entry.type);
@@ -620,6 +616,7 @@ export async function batchProcessPayments(
         }
         
         // The final state of the in-memory object is what we write to Firestore.
+        // We merge the final state with the reconciliation updates again to be safe.
         const finalUpdates = {
             dueBalance: currentTenantState.dueBalance,
             accountBalance: currentTenantState.accountBalance,

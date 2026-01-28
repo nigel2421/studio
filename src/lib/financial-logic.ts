@@ -201,7 +201,6 @@ export function validatePayment(
         throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be in the future.`);
     }
 
-    // This validation should only apply to tenants, not homeowners whose billing is tied to handover.
     if (tenant.residentType === 'Tenant' && tenant.lease?.startDate) {
         const leaseStartDate = new Date(tenant.lease.startDate);
         leaseStartDate.setHours(0, 0, 0, 0);

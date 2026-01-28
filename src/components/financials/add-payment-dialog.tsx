@@ -46,7 +46,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -229,7 +229,8 @@ export function AddPaymentDialog({
       return;
     }
 
-    const validEntries = paymentEntries.filter(e => e.amount && Number(e.amount) !== 0);
+    const validEntries = paymentEntries.filter(e => e.amount && (e.type === 'Adjustment' ? e.amount !== '0' : Number(e.amount) > 0));
+
 
     if (validEntries.length === 0) {
       toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter a non-zero amount for at least one payment record.' });
@@ -410,5 +411,3 @@ export function AddPaymentDialog({
     </Dialog>
   );
 }
-
-    
