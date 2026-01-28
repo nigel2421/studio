@@ -389,23 +389,8 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.text(`${chargeLabel}: ${formatCurrency(monthlyCharge)}`, 196, 60, { align: 'right' });
     doc.text(`Date Issued: ${dateStr}`, 196, 66, { align: 'right' });
 
-    const ledgerItems: { date: Date; description: string; amount: number; id: string }[] = [];
-
-    // 1. Add payments to ledger as negative amounts
-    payments.forEach(p => {
-        const paymentDescription = p.rentForMonth
-            ? `Payment for ${format(new Date(p.rentForMonth + '-02'), 'MMM yyyy')}`
-            : `Payment Received - ${p.type}`;
-
-        ledgerItems.push({
-            id: p.id,
-            date: new Date(p.date),
-            description: p.notes || paymentDescription,
-            amount: p.type === 'Adjustment' ? p.amount : -p.amount,
-        });
-    });
-
-    // 2. Add charges to ledger as positive amounts
+    // 1. Generate Charges
+    let generatedCharges: { date: string, description: string, amount: number }[] = [];
     if (monthlyCharge > 0) {
         const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
         const leaseStartDate = new Date(tenant.lease.startDate);
@@ -416,9 +401,8 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         let loopDate = billingStartDate;
         const today = new Date();
         while (loopDate <= today) {
-            ledgerItems.push({
-                id: `charge-${format(loopDate, 'yyyy-MM')}`,
-                date: loopDate,
+            generatedCharges.push({
+                date: loopDate.toISOString(),
                 description: `${chargeLabel} for ${format(loopDate, 'MMMM yyyy')}`,
                 amount: monthlyCharge,
             });
@@ -426,26 +410,44 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         }
     }
     
-    // 3. Sort all items chronologically
-    ledgerItems.sort((a, b) => a.date.getTime() - b.date.getTime());
+    // 2. Combine and Sort all transactions
+    const combined = [
+        ...payments.map(p => {
+            const isAdjustment = p.type === 'Adjustment';
+            return {
+                id: p.id,
+                date: new Date(p.date),
+                description: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+                charge: isAdjustment && p.amount > 0 ? p.amount : 0,
+                payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
+            };
+        }),
+        ...generatedCharges.map((c, i) => ({
+            id: `charge-${i}`,
+            date: new Date(c.date),
+            description: c.description,
+            charge: c.amount,
+            payment: 0,
+        }))
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // 4. Calculate opening balance
-    const netChange = ledgerItems.reduce((sum, item) => sum + item.amount, 0);
-    const openingBalance = (tenant.dueBalance || 0) - netChange;
+    // 3. Calculate opening balance
+    const netChangeInPeriod = combined.reduce((sum, item) => sum + item.charge - item.payment, 0);
+    const openingBalance = (tenant.dueBalance || 0) - netChangeInPeriod;
     
-    // 5. Build final ledger with running balance
+    // 4. Build final ledger with running balance
     let runningBalance = openingBalance;
-    const finalLedger: { date: Date; description: string; charge: number; payment: number; balance: number }[] = ledgerItems.map(item => {
-        runningBalance += item.amount;
+    const finalLedger = combined.map(item => {
+        runningBalance += (item.charge - item.payment);
         return {
             date: item.date,
             description: item.description,
-            charge: item.amount > 0 ? item.amount : 0,
-            payment: item.amount < 0 ? -item.amount : 0,
+            charge: item.charge,
+            payment: item.payment,
             balance: runningBalance,
         };
     });
-    
+
     const tableBodyData = finalLedger.reverse().map(t => [
         format(t.date, 'P'),
         t.description,
@@ -468,15 +470,6 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     });
     
     let finalY = (doc as any).lastAutoTable.finalY + 15;
-
-    const totalPaid = payments.filter(p => p.type !== 'Adjustment').reduce((sum, p) => sum + p.amount, 0);
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Paid:', 140, finalY, { align: 'right' });
-    doc.text(formatCurrency(totalPaid), 196, finalY, { align: 'right' });
-    
-    finalY += 7;
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');

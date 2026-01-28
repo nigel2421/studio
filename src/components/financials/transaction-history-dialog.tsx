@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -22,8 +21,6 @@ interface TransactionHistoryDialogProps {
 }
 
 export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPaymentAdded, allProperties, allTenants }: TransactionHistoryDialogProps) {
-    const [payments, setPayments] = useState<Payment[]>([]);
-    const [charges, setCharges] = useState<{ date: string, description: string, amount: number }[]>([]);
     const [ledger, setLedger] = useState<{ id: string, date: string; description: string; charge: number; payment: number; balance: number }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -34,7 +31,6 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
             setIsLoading(true);
             getPaymentHistory(tenant.id)
                 .then(paymentHistory => {
-                    setPayments(paymentHistory);
                     const property = allProperties.find(p => p.id === tenant.propertyId);
                     const unit = property?.units.find(u => u.name === tenant.unitName);
                     
@@ -42,12 +38,12 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                         ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
                         : (tenant.lease.rent || 0);
 
+                    // Generate monthly charges
                     let generatedCharges: { date: string, description: string, amount: number }[] = [];
                     if (monthlyCharge > 0) {
                         const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
                         const leaseStartDate = new Date(tenant.lease.startDate);
                         
-                        // For homeowners, billing starts the month *after* handover
                         const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
                             ? startOfMonth(addMonths(handoverDate, 1))
                             : startOfMonth(leaseStartDate);
@@ -63,17 +59,19 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             loopDate = addMonths(loopDate, 1);
                         }
                     }
-                    setCharges(generatedCharges);
 
-                    // Combine and sort chronologically
+                    // Combine payments and charges into a unified list
                     const combined = [
-                        ...paymentHistory.map(p => ({
-                            id: p.id,
-                            date: new Date(p.date),
-                            description: p.notes || `Payment for ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
-                            charge: 0,
-                            payment: p.type === 'Adjustment' ? -p.amount : p.amount
-                        })),
+                        ...paymentHistory.map(p => {
+                            const isAdjustment = p.type === 'Adjustment';
+                            return {
+                                id: p.id,
+                                date: new Date(p.date),
+                                description: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+                                charge: isAdjustment && p.amount > 0 ? p.amount : 0, // Debits are charges
+                                payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), // Credits are payments
+                            };
+                        }),
                         ...generatedCharges.map((c, i) => ({
                             id: `charge-${i}`,
                             date: new Date(c.date),
@@ -81,14 +79,13 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             charge: c.amount,
                             payment: 0
                         }))
-                    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+                    ].sort((a, b) => a.date.getTime() - b.date.getTime()); // Sort chronologically
 
                     // Calculate opening balance
-                    const totalChargesInPeriod = combined.reduce((sum, item) => sum + item.charge, 0);
-                    const totalPaymentsInPeriod = combined.reduce((sum, item) => sum + item.payment, 0);
-                    const openingBalance = (tenant.dueBalance || 0) - (totalChargesInPeriod - totalPaymentsInPeriod);
+                    const netChangeInPeriod = combined.reduce((sum, item) => sum + item.charge - item.payment, 0);
+                    const openingBalance = (tenant.dueBalance || 0) - netChangeInPeriod;
 
-                    // Calculate running balance from oldest to newest
+                    // Calculate running balance
                     let runningBalance = openingBalance;
                     const ledgerWithBalance = combined.map(item => {
                         runningBalance += (item.charge - item.payment);
