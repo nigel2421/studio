@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -133,30 +132,49 @@ export function AddPaymentDialog({
 
   useEffect(() => {
     if (open) {
-      const type = defaultPaymentType || defaultEntryType;
-      const amount = tenantForDisplay ? getDefaultAmount(type, tenantForDisplay) : '';
-      const initialEntry: PaymentEntry = {
-        id: Date.now(),
-        amount,
-        type,
-        date: new Date(),
-        notes: '',
-        rentForMonth: format(new Date(), 'yyyy-MM'),
-      };
-      setPaymentEntries([initialEntry]);
+        const type = defaultPaymentType || defaultEntryType;
+        const amount = tenantForDisplay ? getDefaultAmount(type, tenantForDisplay) : '';
 
-      if (tenant) {
-        setSelectedProperty(tenant.propertyId);
-      }
+        let rentForMonthDefault = format(new Date(), 'yyyy-MM');
+        if (tenantForDisplay && tenantForDisplay.lease.lastBilledPeriod) {
+            const monthlyCharge = tenantForDisplay.residentType === 'Homeowner' ? (tenantForDisplay.lease.serviceCharge || 0) : (tenantForDisplay.lease.rent || 0);
+            const lastBilledDate = new Date(tenantForDisplay.lease.lastBilledPeriod + '-02');
+            const dueBalance = tenantForDisplay.dueBalance || 0;
+
+            if (dueBalance <= 0) {
+                // No due balance, so payment is for the month after the last billed one.
+                rentForMonthDefault = format(addMonths(lastBilledDate, 1), 'yyyy-MM');
+            } else if (monthlyCharge > 0) {
+                // There is a due balance. Estimate the oldest unpaid month.
+                const monthsDue = Math.ceil(dueBalance / monthlyCharge);
+                const oldestDueDate = addMonths(lastBilledDate, -(monthsDue - 1));
+                rentForMonthDefault = format(oldestDueDate, 'yyyy-MM');
+            }
+        }
+
+        const initialEntry: PaymentEntry = {
+            id: Date.now(),
+            amount,
+            type,
+            date: new Date(),
+            notes: '',
+            rentForMonth: rentForMonthDefault,
+        };
+        setPaymentEntries([initialEntry]);
+
+        if (tenant) {
+            setSelectedProperty(tenant.propertyId);
+        }
     } else {
-      setPaymentEntries([]);
-      if (!tenant) {
-        setSelectedProperty('');
-        setSelectedFloor('');
-        setSelectedUnit('');
-      }
+        setPaymentEntries([]);
+        if (!tenant) {
+            setSelectedProperty('');
+            setSelectedFloor('');
+            setSelectedUnit('');
+        }
     }
-  }, [open, tenant]); // Removed dependencies that cause re-triggering
+}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType]);
+
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
     const d = new Date();
@@ -392,3 +410,5 @@ export function AddPaymentDialog({
     </Dialog>
   );
 }
+
+    
