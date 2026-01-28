@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addTenant } from '@/lib/data';
+import { getProperties, addTenant, getTenants } from '@/lib/data';
 import { agents } from '@/lib/types';
-import type { Property, Unit, Agent } from '@/lib/types';
+import type { Property, Unit, Agent, Tenant } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useLoading } from '@/hooks/useLoading';
@@ -22,6 +22,7 @@ export default function AddTenantPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [properties, setProperties] = useState<Property[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>('');
   const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,19 +39,27 @@ export default function AddTenantPage() {
 
 
   useEffect(() => {
-    async function fetchProperties() {
-      const props = await getProperties();
+    async function fetchData() {
+      const [props, tenantData] = await Promise.all([
+        getProperties(),
+        getTenants(),
+      ]);
       setProperties(props);
+      setTenants(tenantData);
     }
-    fetchProperties();
+    fetchData();
   }, []);
 
   useEffect(() => {
     if (selectedProperty) {
       const property = properties.find(p => p.id === selectedProperty);
       if (property) {
+        const occupiedUnitNames = new Set(
+          tenants.filter(t => t.propertyId === selectedProperty).map(t => t.unitName)
+        );
+
         const units = property.units.filter(u => {
-          if (u.status !== 'vacant') {
+          if (u.status !== 'vacant' || occupiedUnitNames.has(u.name)) {
             return false;
           }
           const isSMManaged = u.ownership === 'SM';
@@ -65,7 +74,7 @@ export default function AddTenantPage() {
       setAvailableUnits([]);
     }
     setUnitName('');
-  }, [selectedProperty, properties]);
+  }, [selectedProperty, properties, tenants]);
 
   useEffect(() => {
     if (unitName) {
