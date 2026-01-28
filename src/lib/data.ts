@@ -14,7 +14,7 @@ import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus } from './financial-logic';
-import { format } from "date-fns";
+import { format, startOfMonth, addMonths } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -1115,8 +1115,14 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
         return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Tenant;
     }
 
-    // If not found, create one
     const serviceCharge = unit.serviceCharge || 0;
+    const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
+    // Billing starts the month after handover
+    const firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
+    const firstBillablePeriod = format(firstBillableMonthDate, 'yyyy-MM');
+
+    // Per user feedback, the first billable month is considered paid.
+    // So we set the initial due balance to 0, but mark the first month as "billed".
     const newTenantData = {
         name: owner.name,
         email: owner.email,
@@ -1132,18 +1138,19 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
             rent: 0,
             serviceCharge: serviceCharge,
-            paymentStatus: 'Pending' as const,
+            paymentStatus: 'Paid' as const, // Start as paid since first month is covered
+            lastBilledPeriod: firstBillablePeriod, // Mark first month as billed
         },
         securityDeposit: 0,
         waterDeposit: 0,
-        dueBalance: serviceCharge, // Initial due balance is the service charge
+        dueBalance: 0, // Start with zero balance
         accountBalance: 0,
         userId: owner.userId,
     };
-    
+
     const tenantDocRef = await addDoc(tenantsRef, newTenantData);
     await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
-    
+
     // Also update the User profile if it exists and doesn't have a tenantId yet.
     // We don't want to overwrite a primary tenantId if they are also a tenant elsewhere.
     if (owner.userId) {
@@ -1153,7 +1160,7 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
             await updateDoc(userRef, { tenantId: tenantDocRef.id });
         }
     }
-    
+
     return { id: tenantDocRef.id, ...newTenantData } as Tenant;
 }
 
