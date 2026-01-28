@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
 import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMonths, isAfter } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmOwnerPaymentDialog } from '@/components/financials/confirm-owner-payment-dialog';
+import { TransactionHistoryDialog } from '@/components/financials/transaction-history-dialog';
 
 
 interface ServiceChargeAccount {
@@ -70,6 +71,8 @@ export default function ServiceChargesPage() {
   const [isOwnerPaymentDialogOpen, setIsOwnerPaymentDialogOpen] = useState(false);
   const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | null>(null);
   const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
+  const [historyTenant, setHistoryTenant] = useState<Tenant | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
 
@@ -219,6 +222,28 @@ export default function ServiceChargesPage() {
         setArrearsAccounts(vacantUnitsInArrears);
     }
   }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
+
+  const handleViewHistory = (account: ServiceChargeAccount) => {
+    if (!account.tenantId) {
+        toast({
+            variant: "destructive",
+            title: "No Resident Found",
+            description: "This unit does not have an active resident to view history for.",
+        });
+        return;
+    }
+    const tenant = allTenants.find(t => t.id === account.tenantId);
+    if (tenant) {
+        setHistoryTenant(tenant);
+        setIsHistoryOpen(true);
+    } else {
+         toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not find the resident's details.",
+        });
+    }
+  };
 
   const handleOpenOwnerPaymentDialog = async (account: ServiceChargeAccount) => {
     if (!account.ownerId) {
@@ -379,7 +404,7 @@ export default function ServiceChargesPage() {
             </div>
         </div>
         <TabsContent value="occupied">
-           <SelfManagedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} />
+           <SelfManagedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} onViewHistory={handleViewHistory} />
         </TabsContent>
         <TabsContent value="arrears">
            <VacantArrearsTab arrears={filteredArrears} onGenerateInvoice={handleGenerateInvoice} />
@@ -396,11 +421,19 @@ export default function ServiceChargesPage() {
           isSaving={isSaving}
         />
       )}
+      <TransactionHistoryDialog
+        tenant={historyTenant}
+        open={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
+        onPaymentAdded={fetchData}
+        allTenants={allTenants}
+        allProperties={allProperties}
+       />
     </div>
   );
 }
 
-const SelfManagedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void }) => {
+const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void, onViewHistory: (acc: ServiceChargeAccount) => void }) => {
     const { toast } = useToast();
 
     const handleConfirmClick = (acc: ServiceChargeAccount) => {
@@ -453,15 +486,28 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: Service
                                 </TableCell>
                                 <TableCell>{acc.paymentAmount ? `Ksh ${acc.paymentAmount.toLocaleString()}` : '-'}</TableCell>
                                 <TableCell className="text-right">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleConfirmClick(acc)}
-                                        disabled={acc.paymentStatus === 'Paid'}
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Confirm Payment
-                                    </Button>
+                                    <div className="flex gap-2 justify-end">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => onViewHistory(acc)}
+                                            disabled={!acc.tenantId}
+                                            className="h-8"
+                                        >
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            View
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleConfirmClick(acc)}
+                                            disabled={acc.paymentStatus === 'Paid'}
+                                            className="h-8"
+                                        >
+                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                            Confirm
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -532,5 +578,7 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
+
+    
 
     
