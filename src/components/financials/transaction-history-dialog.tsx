@@ -105,10 +105,40 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     });
                     
                     // --- CALCULATE RUNNING BALANCE ---
-                    let runningBalance = 0; // Start from zero
+                    let dueBalance = 0;
+                    let accountBalance = 0;
+
                     const ledgerWithBalance = combined.map(item => {
-                        runningBalance += (item.charge - item.payment);
-                        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance };
+                        // 1. Add new charges to the due balance
+                        dueBalance += item.charge;
+
+                        // 2. Apply any existing credit to the new charges first
+                        if (accountBalance > 0 && dueBalance > 0) {
+                            if (accountBalance >= dueBalance) {
+                                accountBalance -= dueBalance;
+                                dueBalance = 0;
+                            } else {
+                                dueBalance -= accountBalance;
+                                accountBalance = 0;
+                            }
+                        }
+                        
+                        // 3. Process new payments
+                        let paymentAmount = item.payment;
+                        if (paymentAmount > 0) {
+                            // First, apply payment to the outstanding due balance
+                            if (paymentAmount >= dueBalance) {
+                                paymentAmount -= dueBalance;
+                                dueBalance = 0;
+                                // Any excess payment becomes a credit
+                                accountBalance += paymentAmount;
+                            } else {
+                                dueBalance -= paymentAmount;
+                            }
+                        }
+
+                        // The "balance" column in the UI will represent the amount owed (dueBalance)
+                        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: dueBalance };
                     });
                     
                     setLedger(ledgerWithBalance);
