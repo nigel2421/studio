@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -107,7 +108,7 @@ export default function ServiceChargesPage() {
         const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
         allProperties.forEach(p => {
             (p.units || []).forEach(u => {
-                if (u.managementStatus === 'Client Managed' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over') {
+                if (u.status === 'client occupied' && u.managementStatus === 'Client Managed' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over') {
                     selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
                 }
             });
@@ -581,3 +582,4 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
     
 
     
+
