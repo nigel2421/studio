@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -569,14 +570,31 @@ export async function batchProcessPayments(
         }
         let tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
-        // Perform validations before processing
+        // First, bring the account fully up-to-date with any missed monthly charges.
+        const property = await getProperty(tenantData.propertyId);
+        const unit = property?.units.find(u => u.name === tenantData.unitName);
+        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
+        
+        // Create an up-to-date in-memory representation of the tenant
+        const reconciledTenant: Tenant = {
+            ...tenantData,
+            dueBalance: reconciliationUpdates.dueBalance ?? tenantData.dueBalance,
+            accountBalance: reconciliationUpdates.accountBalance ?? tenantData.accountBalance,
+            lease: {
+                ...tenantData.lease,
+                paymentStatus: reconciliationUpdates['lease.paymentStatus'] || tenantData.lease.paymentStatus,
+                lastBilledPeriod: reconciliationUpdates['lease.lastBilledPeriod'] || tenantData.lease.lastBilledPeriod,
+            }
+        };
+        
+        let currentTenantState = reconciledTenant;
+
+        // Perform validations before processing payments
         for (const entry of paymentEntries) {
-            validatePayment(entry.amount, new Date(entry.date), tenantData, entry.type);
+            validatePayment(entry.amount, new Date(entry.date), currentTenantState, entry.type);
         }
-
-        let allPaymentUpdates: any = {};
-
-        // Process all payments sequentially and accumulate state changes in memory
+        
+        // Now, process the new payments against the up-to-date account state
         for (const entry of paymentEntries) {
             const paymentDocRef = doc(collection(db, 'payments'));
             transaction.set(paymentDocRef, { 
@@ -586,33 +604,29 @@ export async function batchProcessPayments(
                 createdAt: serverTimestamp() 
             });
             
-            const updates = processPayment(tenantData, entry.amount, entry.type);
+            const updates = processPayment(currentTenantState, entry.amount, entry.type);
             
-            // Apply updates to in-memory tenantData for the next iteration
-            tenantData = {
-                ...tenantData,
+            // Apply updates to the in-memory state for the next iteration
+            currentTenantState = {
+                ...currentTenantState,
                 dueBalance: updates.dueBalance,
                 accountBalance: updates.accountBalance,
                 lease: {
-                    ...tenantData.lease,
+                    ...currentTenantState.lease,
                     paymentStatus: updates['lease.paymentStatus'],
-                    lastPaymentDate: updates['lease.lastPaymentDate'] || tenantData.lease.lastPaymentDate,
+                    lastPaymentDate: updates['lease.lastPaymentDate'] || currentTenantState.lease.lastPaymentDate,
                 }
             };
-            // Merge updates, ensuring lastPaymentDate is only set by actual payments
-            if (entry.type !== 'Adjustment') {
-                allPaymentUpdates = { ...allPaymentUpdates, ...updates };
-            } else {
-                const { 'lease.lastPaymentDate': _, ...adjustmentUpdates } = updates;
-                allPaymentUpdates = { ...allPaymentUpdates, ...adjustmentUpdates };
-            }
         }
-
-        const property = await getProperty(tenantData.propertyId);
-        const unit = property?.units.find(u => u.name === tenantData.unitName);
-
-        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
-        const finalUpdates = { ...allPaymentUpdates, ...reconciliationUpdates };
+        
+        // The final state of the in-memory object is what we write to Firestore.
+        const finalUpdates = {
+            dueBalance: currentTenantState.dueBalance,
+            accountBalance: currentTenantState.accountBalance,
+            'lease.paymentStatus': currentTenantState.lease.paymentStatus,
+            'lease.lastBilledPeriod': currentTenantState.lease.lastBilledPeriod,
+            'lease.lastPaymentDate': currentTenantState.lease.lastPaymentDate,
+        };
 
         transaction.update(tenantRef, finalUpdates);
     });
