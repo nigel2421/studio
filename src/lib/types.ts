@@ -1,6 +1,7 @@
 
 
 
+
 export type Property = {
   id: string;
   name: string;
@@ -133,6 +134,16 @@ export type Payment = {
   transactionId?: string; // e.g., M-Pesa transaction code
   createdAt: Date;
   reference?: string;
+  editHistory?: {
+    editedAt: string;
+    editedBy: string;
+    reason: string;
+    previousValues: {
+      amount: number;
+      date: string;
+      notes?: string;
+    };
+  }[];
 };
 
 /**

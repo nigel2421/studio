@@ -1,5 +1,6 @@
 
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -14,7 +15,7 @@ import {
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth } from './firebase';
-import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus } from './financial-logic';
+import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
@@ -564,33 +565,29 @@ export async function batchProcessPayments(
     const tenantRef = doc(db, 'tenants', tenantId);
 
     await runTransaction(db, async (transaction) => {
-        const tenantSnap = await transaction.get(tenantRef);
+        let tenantSnap = await transaction.get(tenantRef);
         if (!tenantSnap.exists()) {
             throw new Error("Tenant not found");
         }
         let tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
-        // First, bring the account fully up-to-date with any missed monthly charges.
         const property = await getProperty(tenantData.propertyId);
         const unit = property?.units.find(u => u.name === tenantData.unitName);
         const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
         
-        // Create an up-to-date in-memory representation of the tenant
-        let currentTenantState: Tenant = {
-            ...tenantData,
-            ...reconciliationUpdates,
-            lease: {
-                ...tenantData.lease,
-                ...reconciliationUpdates,
-            }
-        };
+        if (Object.keys(reconciliationUpdates).length > 0) {
+            transaction.update(tenantRef, reconciliationUpdates);
+            // Re-read after update to get the latest state for payment processing
+            tenantSnap = await transaction.get(tenantRef);
+            tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
+        }
+
+        let currentTenantState: Tenant = tenantData;
         
-        // Perform validations before processing payments
         for (const entry of paymentEntries) {
             validatePayment(entry.amount, new Date(entry.date), currentTenantState, entry.type);
         }
         
-        // Now, process the new payments against the up-to-date account state
         for (const entry of paymentEntries) {
             const paymentDocRef = doc(collection(db, 'payments'));
             transaction.set(paymentDocRef, { 
@@ -602,7 +599,6 @@ export async function batchProcessPayments(
             
             const updates = processPayment(currentTenantState, entry.amount, entry.type);
             
-            // Apply updates to the in-memory state for the next iteration
             currentTenantState = {
                 ...currentTenantState,
                 dueBalance: updates.dueBalance,
@@ -615,20 +611,15 @@ export async function batchProcessPayments(
             };
         }
         
-        // The final state of the in-memory object is what we write to Firestore.
-        // We merge the final state with the reconciliation updates again to be safe.
         const finalUpdates = {
             dueBalance: currentTenantState.dueBalance,
             accountBalance: currentTenantState.accountBalance,
             'lease.paymentStatus': currentTenantState.lease.paymentStatus,
-            'lease.lastBilledPeriod': currentTenantState.lease.lastBilledPeriod,
             'lease.lastPaymentDate': currentTenantState.lease.lastPaymentDate,
         };
 
         transaction.update(tenantRef, finalUpdates);
     });
-
-    // --- Post-transaction side effects ---
 
     if (taskId) {
         try {
@@ -644,7 +635,7 @@ export async function batchProcessPayments(
     if (tenant) {
         const property = await getProperty(tenant.propertyId);
         for (const entry of paymentEntries) {
-             if (entry.type !== 'Adjustment') { // Don't send receipts for adjustments
+             if (entry.type !== 'Adjustment') { 
                 try {
                     await sendPaymentReceipt({
                         tenantId: tenant.id,
@@ -675,6 +666,63 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>,
         type,
     }];
     await batchProcessPayments(tenantId, entries, taskId);
+}
+
+export async function updatePayment(
+    paymentId: string,
+    updates: { amount: number; date: string; notes?: string },
+    reason: string,
+    editorId: string
+) {
+    const paymentRef = doc(db, 'payments', paymentId);
+    
+    await runTransaction(db, async (transaction) => {
+        const paymentSnap = await transaction.get(paymentRef);
+        if (!paymentSnap.exists()) {
+            throw new Error("Payment to edit not found.");
+        }
+        const oldPayment = paymentSnap.data() as Payment;
+
+        const historyEntry = {
+            editedAt: new Date().toISOString(),
+            editedBy: editorId,
+            reason: reason,
+            previousValues: {
+                amount: oldPayment.amount,
+                date: oldPayment.date,
+                notes: oldPayment.notes,
+            },
+        };
+
+        const newEditHistory = [...(oldPayment.editHistory || []), historyEntry];
+
+        transaction.update(paymentRef, {
+            ...updates,
+            editHistory: newEditHistory
+        });
+    });
+
+    await logActivity(`Edited payment ${paymentId}. Reason: ${reason}`);
+}
+
+export async function forceRecalculateTenantBalance(tenantId: string) {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) {
+        console.error("Tenant not found for recalculation.");
+        return;
+    }
+
+    const allPayments = await getPaymentHistory(tenantId);
+    const allProperties = await getProperties();
+
+    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties);
+    
+    const tenantRef = doc(db, 'tenants', tenantId);
+    await updateDoc(tenantRef, {
+        dueBalance: finalDueBalance,
+        accountBalance: finalAccountBalance,
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
+    });
 }
 
 export async function runMonthlyReconciliation(): Promise<void> {

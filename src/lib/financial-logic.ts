@@ -1,4 +1,4 @@
-import { Tenant, Payment, Unit, LedgerEntry } from './types';
+import { Tenant, Payment, Unit, LedgerEntry, Property } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
 /**
@@ -61,14 +61,15 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
 
     // This logic is for normal payments (Rent, Water, etc.)
     const positivePaymentAmount = Math.abs(paymentAmount);
-    let totalAvailable = positivePaymentAmount; // Do not use existing credit here, reconciliation handles that
+    let totalAvailable = positivePaymentAmount + newAccountBalance; 
 
     if (totalAvailable >= newDueBalance) {
         totalAvailable -= newDueBalance;
         newDueBalance = 0;
-        newAccountBalance += totalAvailable; // Add excess payment to credit
+        newAccountBalance = totalAvailable; // Any excess becomes credit
     } else {
         newDueBalance -= totalAvailable;
+        newAccountBalance = 0;
     }
 
     return {
@@ -208,4 +209,91 @@ export function validatePayment(
             throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be before the lease start date of ${tenant.lease.startDate}.`);
         }
     }
+}
+
+export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], properties: Property[]): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
+    const property = properties.find(p => p.id === tenant.propertyId);
+    const unit = property?.units.find(u => u.name === tenant.unitName);
+    
+    const monthlyCharge = tenant.residentType === 'Homeowner' 
+        ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
+        : (tenant.lease.rent || 0);
+
+    // --- GENERATE ALL CHARGES ---
+    const allCharges: { id: string, date: Date, description: string, charge: number, payment: number }[] = [];
+    const leaseStartDate = new Date(tenant.lease.startDate);
+
+    if (tenant.securityDeposit && tenant.securityDeposit > 0) {
+        allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0 });
+    }
+    if (tenant.waterDeposit && tenant.waterDeposit > 0) {
+         allCharges.push({ id: 'charge-water-deposit', date: leaseStartDate, description: 'Water Deposit', charge: tenant.waterDeposit, payment: 0 });
+    }
+    
+    if (monthlyCharge > 0) {
+        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
+        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
+            ? startOfMonth(addMonths(handoverDate, 1))
+            : startOfMonth(leaseStartDate);
+        let loopDate = billingStartDate;
+        const today = new Date();
+        while (loopDate <= today) {
+            allCharges.push({ id: `charge-${format(loopDate, 'yyyy-MM')}`, date: loopDate, description: `${tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`, charge: monthlyCharge, payment: 0 });
+            loopDate = addMonths(loopDate, 1);
+        }
+    }
+
+    // --- COMBINE WITH PAYMENTS ---
+    const allPayments = allTenantPayments.map(p => {
+        const isAdjustment = p.type === 'Adjustment';
+        return {
+            id: p.id,
+            date: new Date(p.date),
+            description: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+            charge: isAdjustment && p.amount > 0 ? p.amount : 0,
+            payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
+        };
+    });
+
+    const combined = [...allCharges, ...allPayments].sort((a, b) => {
+        const dateDiff = a.date.getTime() - b.date.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        if (a.charge > 0 && b.payment > 0) return -1;
+        if (a.payment > 0 && b.charge > 0) return 1;
+        return 0;
+    });
+    
+    // --- CALCULATE RUNNING BALANCE ---
+    let dueBalance = 0;
+    let accountBalance = 0;
+
+    const ledgerWithBalance: LedgerEntry[] = combined.map(item => {
+        dueBalance += item.charge;
+        if (accountBalance > 0 && dueBalance > 0) {
+            if (accountBalance >= dueBalance) {
+                accountBalance -= dueBalance;
+                dueBalance = 0;
+            } else {
+                dueBalance -= accountBalance;
+                accountBalance = 0;
+            }
+        }
+        let paymentAmount = item.payment;
+        if (paymentAmount > 0) {
+            if (paymentAmount >= dueBalance) {
+                paymentAmount -= dueBalance;
+                dueBalance = 0;
+                accountBalance += paymentAmount;
+            } else {
+                dueBalance -= paymentAmount;
+            }
+        }
+        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: dueBalance };
+    });
+    
+    return {
+        ledger: ledgerWithBalance,
+        finalDueBalance: dueBalance,
+        finalAccountBalance: accountBalance
+    };
 }
