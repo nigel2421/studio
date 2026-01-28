@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary } from '@/lib/financial-utils';
-import { format, startOfMonth, addMonths, addDays } from 'date-fns';
+import { format, startOfMonth, addMonths, addDays, isWithinInterval } from 'date-fns';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -131,8 +131,9 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
 
 export const generateOwnerServiceChargeStatementPDF = (
     owner: PropertyOwner,
-    payments: { date: string; property: string; unit: string; amount: number; forMonth: string }[],
-    summary: { totalDue: number; totalPaid: number; balance: number },
+    allProperties: Property[],
+    allTenants: Tenant[],
+    allPayments: Payment[],
     startDate: Date,
     endDate: Date,
 ) => {
@@ -152,72 +153,126 @@ export const generateOwnerServiceChargeStatementPDF = (
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
     doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
 
-    let yPos = 75;
+    // 1. Get all units owned by this owner
+    const ownerUnits = allProperties.flatMap(p => 
+        p.units
+         .filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
+         .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
+    );
 
-    // Summary Section
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Summary for Period', 14, yPos);
-    yPos += 8;
+    // 2. Get all payments made for these units
+    const ownerUnitIdentifiers = new Set(ownerUnits.map(u => `${u.propertyId}-${u.name}`));
+    const relevantTenants = allTenants.filter(t => ownerUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+    const relevantTenantIds = relevantTenants.map(t => t.id);
+
+    const serviceChargePayments = allPayments.filter(p =>
+        relevantTenantIds.includes(p.tenantId) && 
+        (p.type === 'ServiceCharge' || p.type === 'Rent') // Homeowners rent is service charge
+    );
+
+    // 3. Generate monthly charges for ALL TIME for relevant tenants
+    const generatedCharges: { date: Date, description: string, amount: number }[] = [];
+    relevantTenants.forEach(tenant => {
+        const unit = ownerUnits.find(u => u.propertyId === tenant.propertyId && u.name === tenant.unitName);
+        if (!unit) return;
+
+        const monthlyCharge = unit.serviceCharge || 0;
+        if (monthlyCharge <= 0) return;
+
+        let loopDate = startOfMonth(new Date(tenant.lease.startDate)); // Use tenant's lease start
+        if (unit.handoverDate) {
+            // If handover date is present, billing starts month after
+            loopDate = startOfMonth(addMonths(new Date(unit.handoverDate), 1));
+        }
+        
+        const today = new Date();
+        while (loopDate <= today) {
+            generatedCharges.push({
+                date: loopDate,
+                description: `Service Charge for Unit ${unit.name}`,
+                amount: monthlyCharge
+            });
+            loopDate = addMonths(loopDate, 1);
+        }
+    });
+
+    // 4. Combine ALL charges and payments
+    const combined = [
+         ...serviceChargePayments.map(p => ({
+            date: new Date(p.date),
+            transactionType: 'Payment Received',
+            details: p.notes || `Payment for ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+            charge: 0,
+            payment: p.amount,
+        })),
+        ...generatedCharges.map(c => ({
+            date: c.date,
+            transactionType: 'Invoice',
+            details: c.description,
+            charge: c.amount,
+            payment: 0,
+        }))
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // 5. Calculate opening balance as of `startDate`
+    let openingBalance = 0;
+    combined.forEach(item => {
+        if (item.date < startDate) {
+            openingBalance += item.charge - item.payment;
+        }
+    });
+
+    // 6. Build ledger table for the specified period
+    let yPos = 75;
+    const tableBody: (string | number)[][] = [];
+
+    tableBody.push([
+        format(startDate, 'dd MMM yyyy'),
+        '***Opening Balance***',
+        '',
+        '',
+        '',
+        formatCurrency(openingBalance),
+    ]);
+
+    let runningBalance = openingBalance;
+    combined.forEach(item => {
+        if (item.date < startDate || item.date > endDate) return;
+
+        runningBalance += item.charge - item.payment;
+        tableBody.push([
+            format(item.date, 'dd MMM yyyy'),
+            item.transactionType,
+            item.details,
+            item.charge > 0 ? formatCurrency(item.charge) : '',
+            item.payment > 0 ? formatCurrency(item.payment) : '',
+            formatCurrency(runningBalance),
+        ]);
+    });
 
     autoTable(doc, {
         startY: yPos,
-        body: [
-            ['Total Service Charge Due', formatCurrency(summary.totalDue)],
-            ['Total Amount Paid', formatCurrency(summary.totalPaid)],
-            ['Balance', formatCurrency(summary.balance)],
-        ],
-        theme: 'plain',
-        styles: { fontSize: 10 },
-        columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
-        didDrawCell: (data) => {
-            if (data.row.index === 2) { // Balance row
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(summary.balance <= 0 ? '#16a34a' : '#dc2626'); // green for credit/zero, red for debit
-            }
+        head: [['Date', 'Transactions', 'Details', 'Vatable Amount', 'Payments', 'Balance']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        columnStyles: {
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
         },
-        willDrawCell: (data) => {
-            doc.setFont('helvetica', data.row.index === 2 ? 'bold' : 'normal');
-            doc.setTextColor(0,0,0);
-        }
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
-
-    // Payments Table
-    doc.setFontSize(14);
+    // Summary
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Payment History', 14, yPos);
-    yPos += 8;
-    
-    const totalPaidFromPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'Property', 'Unit', 'For Month', 'Amount Paid']],
-        body: payments.map(p => [
-            new Date(p.date).toLocaleDateString(),
-            p.property,
-            p.unit,
-            p.forMonth,
-            formatCurrency(p.amount)
-        ]),
-        foot: [[
-             { content: 'Total Paid This Period', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } },
-             { content: formatCurrency(totalPaidFromPayments), styles: { fontStyle: 'bold', halign: 'right' } }
-        ]],
-        theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
-        footStyles: { fillColor: [254, 252, 232] },
-        columnStyles: {
-            4: { halign: 'right' }
-        }
-    });
-
+    doc.text('Final Balance Due:', 140, yPos, { align: 'right' });
+    doc.setTextColor(runningBalance > 0 ? '#dc2626' : '#16a34a');
+    doc.text(formatCurrency(runningBalance), 196, yPos, { align: 'right' });
 
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
-
 
 export const generateLandlordStatementPDF = (
     landlord: Landlord,

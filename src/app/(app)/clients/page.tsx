@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,7 +10,6 @@ import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-di
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
-import { isWithinInterval, differenceInMonths, addMonths, startOfMonth, format } from 'date-fns';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -81,57 +79,9 @@ export default function ClientsPage() {
         if (!owner) {
             throw new Error("Owner not found");
         }
-
-        const ownerAssignedUnitIdentifiers = new Set(
-            owner.assignedUnits.flatMap(au => au.unitNames.map(un => `${au.propertyId}-${un}`))
-        );
-
-        const relevantTenants = allTenants.filter(t => 
-            ownerAssignedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`)
-        );
-        const relevantTenantIds = relevantTenants.map(t => t.id);
-
-        const serviceChargePayments = allPayments.filter(p =>
-            relevantTenantIds.includes(p.tenantId) && 
-            p.type === 'ServiceCharge' &&
-            isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
-        );
         
-        const totalPaid = serviceChargePayments.reduce((sum, p) => sum + p.amount, 0);
-
-        const ownerUnits = allProperties.flatMap(p => 
-            p.units.filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
-        );
-
-        const months = differenceInMonths(endDate, startDate);
-        let totalDue = 0;
-        for (let i = 0; i <= months; i++) {
-            ownerUnits.forEach(unit => {
-                totalDue += unit.serviceCharge || 0;
-            });
-        }
+        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, startDate, endDate);
         
-        const balance = totalDue - totalPaid;
-
-        const paymentsForPDF = serviceChargePayments.map(p => {
-            const tenant = allTenants.find(t => t.id === p.tenantId);
-            const property = allProperties.find(prop => prop.id === tenant?.propertyId);
-            return {
-                date: p.date,
-                property: property?.name || 'N/A',
-                unit: tenant?.unitName || 'N/A',
-                amount: p.amount,
-                forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-            };
-        });
-        
-        const summary = {
-            totalDue,
-            totalPaid,
-            balance
-        };
-
-        generateOwnerServiceChargeStatementPDF(owner, paymentsForPDF, summary, startDate, endDate);
         setIsStatementDialogOpen(false);
     } catch (error: any) {
         console.error("Error generating statement:", error);
