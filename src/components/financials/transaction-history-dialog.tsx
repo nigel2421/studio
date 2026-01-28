@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -90,7 +89,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                 <TableRow>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Type</TableHead>
-                                    <TableHead>Rent For</TableHead>
+                                    <TableHead>{tenant?.residentType === 'Homeowner' ? 'Service Charge For' : 'Rent For'}</TableHead>
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Notes</TableHead>
