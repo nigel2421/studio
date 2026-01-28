@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -512,10 +511,34 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     });
 
     // --- CALCULATE RUNNING BALANCE ---
-    let runningBalance = 0; // Start from zero
+    let dueBalance = 0;
+    let accountBalance = 0;
+
     const finalLedger = combined.map(item => {
-        runningBalance += (item.charge - item.payment);
-        return { ...item, balance: runningBalance };
+        dueBalance += item.charge;
+        
+        if (accountBalance > 0) {
+            if (accountBalance >= dueBalance) {
+                accountBalance -= dueBalance;
+                dueBalance = 0;
+            } else {
+                dueBalance -= accountBalance;
+                accountBalance = 0;
+            }
+        }
+        
+        let paymentAmount = item.payment;
+        if (paymentAmount > 0) {
+            if (paymentAmount >= dueBalance) {
+                paymentAmount -= dueBalance;
+                dueBalance = 0;
+                accountBalance += paymentAmount;
+            } else {
+                dueBalance -= paymentAmount;
+            }
+        }
+
+        return { ...item, balance: dueBalance };
     });
 
     const tableBodyData = finalLedger.map(t => [
@@ -554,14 +577,14 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     
-    if (runningBalance < 0) {
+    if (accountBalance > 0) {
         doc.text('Credit Balance:', 140, finalY, { align: 'right' });
         doc.setTextColor('#16a34a'); // Green for credit
-        doc.text(formatCurrency(Math.abs(runningBalance)), 196, finalY, { align: 'right' });
+        doc.text(formatCurrency(accountBalance), 196, finalY, { align: 'right' });
     } else {
         doc.text('Final Balance Due:', 140, finalY, { align: 'right' });
-        doc.setTextColor(runningBalance > 0 ? '#dc2626' : '#16a34a'); // Red for due, green for zero
-        doc.text(formatCurrency(runningBalance), 196, finalY, { align: 'right' });
+        doc.setTextColor(dueBalance > 0 ? '#dc2626' : '#16a34a'); // Red for due, green for zero
+        doc.text(formatCurrency(dueBalance), 196, finalY, { align: 'right' });
     }
     
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);

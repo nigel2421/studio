@@ -1,4 +1,3 @@
-
 import { Tenant, Payment, Unit, LedgerEntry } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
@@ -23,7 +22,7 @@ export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): num
  * Determines if the payment status should be marked as Pending/Overdue
  * based on the 5th of the month rule.
  */
-export function getRecommendedPaymentStatus(tenant: Tenant, date: Date = new Date()): Tenant['lease']['paymentStatus'] {
+export function getRecommendedPaymentStatus(tenant: { dueBalance?: number }, date: Date = new Date()): Tenant['lease']['paymentStatus'] {
     const dueDay = 5;
     const currentDay = date.getDate();
 
@@ -56,28 +55,26 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
         return {
             dueBalance: newDueBalance,
             accountBalance: newAccountBalance,
-            'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }),
+            'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }),
         };
     }
 
     // This logic is for normal payments (Rent, Water, etc.)
     const positivePaymentAmount = Math.abs(paymentAmount);
-    let totalAvailable = positivePaymentAmount + newAccountBalance;
-    newAccountBalance = 0; // Reset as we are using it
+    let totalAvailable = positivePaymentAmount; // Do not use existing credit here, reconciliation handles that
 
     if (totalAvailable >= newDueBalance) {
         totalAvailable -= newDueBalance;
         newDueBalance = 0;
-        newAccountBalance = totalAvailable; // Remaining goes to overpayment
+        newAccountBalance += totalAvailable; // Add excess payment to credit
     } else {
         newDueBalance -= totalAvailable;
-        totalAvailable = 0;
     }
 
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
-        'lease.paymentStatus': newDueBalance <= 0 ? 'Paid' : 'Pending',
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }),
         'lease.lastPaymentDate': format(new Date(), 'yyyy-MM-dd')
     };
 }
@@ -164,7 +161,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
-        'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }, date),
         'lease.lastBilledPeriod': latestBilledPeriod,
     };
 }
