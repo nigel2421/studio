@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
@@ -79,6 +79,23 @@ export function AddPaymentDialog({
     return null;
   }, [tenant, selectedUnit, selectedProperty, tenants]);
   
+  const nextDueDate = useMemo(() => {
+    if (!tenantForDisplay) return null;
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+    let dueDate: Date;
+
+    if (dayOfMonth > 5) {
+        // Due date for next month
+        const nextMonthDate = addMonths(today, 1);
+        dueDate = new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 5);
+    } else {
+        // Due date for this month
+        dueDate = new Date(today.getFullYear(), today.getMonth(), 5);
+    }
+    return format(dueDate, 'do MMMM yyyy');
+  }, [tenantForDisplay]);
+
   const availablePaymentTypes = useMemo(() => {
     if (tenantForDisplay?.residentType === 'Homeowner') {
       return allPaymentTypes.filter(t => t !== 'Rent' && t !== 'Deposit');
@@ -272,24 +289,21 @@ export function AddPaymentDialog({
             {tenantForDisplay && (
                 <div className="p-4 my-2 border rounded-lg bg-blue-50 border-blue-200">
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 mt-2 text-sm">
-                        <div className="text-muted-foreground">Monthly Charge:</div>
-                        <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
-                        
-                        {(tenantForDisplay.securityDeposit || 0) > 0 && (
-                           <>
-                            <div className="text-muted-foreground">Security Deposit:</div>
-                            <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.securityDeposit).toLocaleString()}</div>
-                           </>
-                        )}
-                        {(tenantForDisplay.waterDeposit || 0) > 0 && (
-                           <>
-                            <div className="text-muted-foreground">Water Deposit:</div>
-                            <div className="font-medium text-right md:text-left">Ksh {(tenantForDisplay.waterDeposit).toLocaleString()}</div>
-                           </>
-                        )}
-                        <div className="text-muted-foreground font-bold text-red-600">Total Outstanding:</div>
-                        <div className="font-bold text-red-600 text-right md:text-left">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
+                        <div>
+                            <div className="text-muted-foreground">Monthly Charge:</div>
+                            <div className="font-medium">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <div className="text-muted-foreground">Next Due Date:</div>
+                            <div className="font-medium">{nextDueDate}</div>
+                        </div>
+                        <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
+                             <div className="flex justify-between items-center">
+                                <div className="text-muted-foreground font-bold text-red-600">Total Amount Pending:</div>
+                                <div className="font-bold text-red-600 text-lg">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -351,7 +365,7 @@ export function AddPaymentDialog({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor={`date-${entry.id}`} className="text-xs">Date Paid</Label>
+                      <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
                       <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
                     </div>
                     <div className="space-y-1">
