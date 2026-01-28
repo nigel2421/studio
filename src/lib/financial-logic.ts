@@ -1,6 +1,6 @@
 
 import { Tenant, Payment } from './types';
-import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths } from 'date-fns';
+import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
 /**
  * Calculates the total amount due for a tenant in the current billing cycle.
@@ -93,34 +93,38 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         return {};
     }
 
+    const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
+    if (monthlyCharge <= 0) {
+        return {}; // No charge, no reconciliation needed.
+    }
+
+    // Determine the starting point for billing calculations
     const lastBilledDate = tenant.lease.lastBilledPeriod
         ? new Date(tenant.lease.lastBilledPeriod + '-02') // Use day 2 to avoid timezone issues
         : new Date(tenant.lease.startDate);
 
-    const startOfLastBilledMonth = startOfMonth(lastBilledDate);
-    const startOfCurrentMonth = startOfMonth(date);
+    let monthsToBill = 0;
+    let latestBilledPeriod = tenant.lease.lastBilledPeriod;
 
-    // If the last billed period is already the current month or in the future,
-    // just update the payment status based on the current balance and exit.
-    if (!isAfter(startOfCurrentMonth, startOfLastBilledMonth)) {
+    // Start checking from the month *after* the last billed period
+    let loopDate = startOfMonth(addMonths(lastBilledDate, 1));
+    const startOfToday = startOfMonth(date);
+
+    while (loopDate <= startOfToday) {
+        monthsToBill++;
+        latestBilledPeriod = format(loopDate, 'yyyy-MM');
+        loopDate = addMonths(loopDate, 1);
+    }
+    
+    if (monthsToBill === 0) {
+        // No new months to bill, but status might need update based on current balance
         const updatedStatus = getRecommendedPaymentStatus(tenant, date);
         if (tenant.lease.paymentStatus !== updatedStatus) {
             return { 'lease.paymentStatus': updatedStatus };
         }
         return {};
     }
-    
-    const monthsToBill = differenceInMonths(startOfCurrentMonth, startOfLastBilledMonth);
 
-    if (monthsToBill <= 0) {
-        const updatedStatus = getRecommendedPaymentStatus(tenant, date);
-        if (tenant.lease.paymentStatus !== updatedStatus) {
-            return { 'lease.paymentStatus': updatedStatus };
-        }
-        return {};
-    }
-    
-    const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
     const totalNewCharges = monthsToBill * monthlyCharge;
 
     let newDueBalance = (tenant.dueBalance || 0) + totalNewCharges;
@@ -136,14 +140,12 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
             newAccountBalance = 0;
         }
     }
-    
-    const currentPeriod = format(startOfCurrentMonth, 'yyyy-MM');
 
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
         'lease.paymentStatus': getRecommendedPaymentStatus({ ...tenant, dueBalance: newDueBalance }, date),
-        'lease.lastBilledPeriod': currentPeriod,
+        'lease.lastBilledPeriod': latestBilledPeriod,
     };
 }
 
