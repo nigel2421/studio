@@ -109,135 +109,133 @@ export default function ServiceChargesPage() {
   }, []);
 
   useEffect(() => {
-    if(allProperties.length > 0) {
-        // Self-managed Units Logic
-        const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
-        allProperties.forEach(p => {
-            (p.units || []).forEach(u => {
-                if (u.status === 'client occupied' && u.managementStatus === 'Client Managed' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over') {
-                    selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
-                }
-            });
-        });
+    if(loading) return;
 
-        const selfManagedServiceChargeAccounts = selfManagedUnits.map(unit => {
-            const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
-            const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-            
-            let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
-            let paymentAmount: number | undefined;
-            let paymentForMonth: string | undefined;
-
-            if (tenant) {
-                // If tenant's due balance is zero or less, they are considered paid up.
-                if ((tenant.dueBalance || 0) <= 0) {
-                    paymentStatus = 'Paid';
-                } else {
-                    // This is an approximation. A more complex check might be needed for historical months
-                    // but for the current state, if there's a balance, it's pending.
-                    paymentStatus = 'Pending';
-                }
-
-                // For display purposes, find a payment that was marked for the selected month
-                const paymentInSelectedMonth = allPayments
-                    .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
-                    .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
-
-                if (paymentInSelectedMonth) {
-                    paymentAmount = paymentInSelectedMonth.amount;
-                    paymentForMonth = paymentInSelectedMonth.rentForMonth;
-                }
-            }
-
-
-            return {
-                propertyId: unit.propertyId,
-                propertyName: unit.propertyName,
-                unitName: unit.name,
-                unitServiceCharge: unit.serviceCharge || 0,
-                ownerId: owner?.id,
-                ownerName: owner?.name || 'Unassigned',
-                tenantId: tenant?.id,
-                tenantName: tenant?.name,
-                paymentStatus,
-                paymentAmount,
-                paymentForMonth,
-            };
-        });
-        setSelfManagedAccounts(selfManagedServiceChargeAccounts);
-
-        // Vacant Units in Arrears Logic
-        const vacantUnitsInArrears: VacantArrearsAccount[] = [];
-        const unitsForArrears = allProperties.flatMap(p => p.units.map(u => ({...u, property: p}))).filter(u => 
-            u.ownership === 'Landlord' &&
-            u.handoverStatus === 'Handed Over' &&
-            u.status === 'vacant'
-        );
-
-        unitsForArrears.forEach(unit => {
-            const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
-            if (!owner) return;
-            
-            const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
-            const homeownerPayments = homeownerTenant ? allPayments.filter(p => p.tenantId === homeownerTenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent')) : [];
-            
-            let creditPool = homeownerPayments.reduce((sum, p) => sum + p.amount, 0);
-
-            const handoverDate = new Date(unit.handoverDate!);
-            const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-            const today = new Date();
-            const lastBillableMonth = startOfMonth(today);
-
-            if (isAfter(firstBillableMonth, lastBillableMonth)) return;
-
-            const monthsToBillCount = differenceInMonths(lastBillableMonth, firstBillableMonth);
-            
-            const arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[] = [];
-            let totalBilledAmount = 0;
-
-            for (let i = 0; i <= monthsToBillCount; i++) {
-                const currentMonthDate = addMonths(firstBillableMonth, i);
-                const monthLabel = format(currentMonthDate, 'MMMM yyyy');
-                const chargeForMonth = unit.serviceCharge || 0;
-
-                if (chargeForMonth <= 0) continue;
-
-                totalBilledAmount += chargeForMonth;
-
-                let status: 'Paid' | 'Pending';
-                if (creditPool >= chargeForMonth) {
-                    status = 'Paid';
-                    creditPool -= chargeForMonth;
-                } else {
-                    status = 'Pending';
-                }
-                
-                arrearsDetail.push({ month: monthLabel, amount: chargeForMonth, status });
-            }
-
-            const totalPaid = homeownerPayments.reduce((sum, p) => sum + p.amount, 0);
-            const totalDue = Math.max(0, totalBilledAmount - totalPaid);
-
-            if (totalDue > 0) {
-                vacantUnitsInArrears.push({
-                    ownerId: owner.id,
-                    ownerName: owner.name,
-                    propertyId: unit.property.id,
-                    propertyName: unit.property.name,
-                    unitName: unit.name,
-                    unitHandoverDate: unit.handoverDate!,
-                    monthsInArrears: arrearsDetail.filter(d => d.status === 'Pending').length,
-                    totalDue,
-                    arrearsDetail,
-                    unit,
-                    owner,
-                    property: unit.property
-                });
+    // Self-managed Units Logic
+    const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
+    allProperties.forEach(p => {
+        (p.units || []).forEach(u => {
+            if (u.status === 'client occupied' && u.managementStatus === 'Client Managed' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over') {
+                selfManagedUnits.push({ ...u, propertyId: p.id, propertyName: p.name });
             }
         });
-        setArrearsAccounts(vacantUnitsInArrears);
-    }
-  }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
+    });
+
+    const selfManagedServiceChargeAccounts = selfManagedUnits.map(unit => {
+        const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+        const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+        
+        let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
+        let paymentAmount: number | undefined;
+        let paymentForMonth: string | undefined;
+
+        if (tenant) {
+            if ((tenant.dueBalance || 0) <= 0) {
+                paymentStatus = 'Paid';
+            } else {
+                paymentStatus = 'Pending';
+            }
+            const paymentInSelectedMonth = allPayments
+                .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
+                .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
+
+            if (paymentInSelectedMonth) {
+                paymentAmount = paymentInSelectedMonth.amount;
+                paymentForMonth = paymentInSelectedMonth.rentForMonth;
+            }
+        }
+
+        return {
+            propertyId: unit.propertyId,
+            propertyName: unit.propertyName,
+            unitName: unit.name,
+            unitServiceCharge: unit.serviceCharge || 0,
+            ownerId: owner?.id,
+            ownerName: owner?.name || 'Unassigned',
+            tenantId: tenant?.id,
+            tenantName: tenant?.name,
+            paymentStatus,
+            paymentAmount,
+            paymentForMonth,
+        };
+    });
+    setSelfManagedAccounts(selfManagedServiceChargeAccounts);
+
+    // --- Vacant Units in Arrears Logic ---
+    const vacantArrears: VacantArrearsAccount[] = [];
+
+    const liableUnits = allProperties.flatMap(p => 
+      p.units
+        .filter(u => u.status === 'vacant' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over' && u.handoverDate)
+        .map(u => ({ ...u, property: p }))
+    );
+
+    liableUnits.forEach(unit => {
+      const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
+      if (!owner) return; 
+
+      const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
+      const paymentsForUnit = homeownerTenant 
+        ? allPayments.filter(p => p.tenantId === homeownerTenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent'))
+        : [];
+      const totalPaid = paymentsForUnit.reduce((sum, p) => sum + p.amount, 0);
+
+      const handoverDate = new Date(unit.handoverDate!);
+      const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+      const today = new Date();
+      
+      if (isAfter(firstBillableMonth, today)) return; 
+
+      let totalBilled = 0;
+      const arrearsDetail: VacantArrearsAccount['arrearsDetail'] = [];
+      let loopDate = firstBillableMonth;
+
+      while (loopDate <= today) {
+        const chargeForMonth = unit.serviceCharge || 0;
+        if (chargeForMonth > 0) {
+          totalBilled += chargeForMonth;
+          arrearsDetail.push({
+            month: format(loopDate, 'MMMM yyyy'),
+            amount: chargeForMonth,
+            status: 'Pending'
+          });
+        }
+        loopDate = addMonths(loopDate, 1);
+      }
+      
+      const totalDue = Math.max(0, totalBilled - totalPaid);
+
+      if (totalDue > 0) {
+        let paidAmountTracker = totalPaid;
+        for (const detail of arrearsDetail) {
+          if (paidAmountTracker >= detail.amount) {
+            detail.status = 'Paid';
+            paidAmountTracker -= detail.amount;
+          } else {
+            break; 
+          }
+        }
+
+        vacantArrears.push({
+          ownerId: owner.id,
+          ownerName: owner.name,
+          propertyId: unit.property.id,
+          propertyName: unit.property.name,
+          unitName: unit.name,
+          unitHandoverDate: unit.handoverDate!,
+          monthsInArrears: arrearsDetail.filter(d => d.status === 'Pending').length,
+          totalDue,
+          arrearsDetail,
+          unit,
+          owner,
+          property: unit.property
+        });
+      }
+    });
+
+    setArrearsAccounts(vacantArrears);
+
+  }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments]);
 
   const handleViewHistory = async (account: ServiceChargeAccount) => {
     startLoading("Fetching resident details...");
@@ -254,7 +252,6 @@ export default function ServiceChargesPage() {
 
             if (property && unit && owner) {
                 tenantToView = await findOrCreateHomeownerTenant(owner, unit, property.id);
-                // After creating, we should refresh the main data so the tenantId is available next time.
                 fetchData();
             } else {
                 throw new Error("An owner must be assigned to this unit to view its history.");
@@ -318,12 +315,10 @@ export default function ServiceChargesPage() {
     try {
         let remainingAmount = paymentData.amount;
 
-        // Step 1: Ensure all tenants exist and get their data.
         const tenantPromises = accountsForPayment.map(async (acc) => {
             let tenant = allTenants.find(t => t.propertyId === acc.propertyId && t.unitName === acc.unitName);
             if (tenant) return tenant;
 
-            // If not found locally, try to find/create it in the database.
             const property = allProperties.find(p => p.id === acc.propertyId);
             const unit = property?.units.find(u => u.name === acc.unitName);
             if (property && unit && ownerForPayment) {
@@ -338,7 +333,6 @@ export default function ServiceChargesPage() {
             throw new Error(`Could not find or create resident accounts for all selected units. Expected ${accountsForPayment.length}, found ${tenantsForPayment.length}.`);
         }
 
-        // Step 2: Create payment promises.
         const paymentPromises = [];
         let paymentsRecorded = 0;
 
@@ -364,13 +358,12 @@ export default function ServiceChargesPage() {
             }
         }
         
-        // Step 3: Execute all payments.
         await Promise.all(paymentPromises);
 
         toast({ title: "Payment Recorded", description: `${paymentsRecorded} service charge payment(s) for ${ownerForPayment.name} have been recorded.` });
         
         setIsOwnerPaymentDialogOpen(false);
-        fetchData(); // Refreshes all data.
+        fetchData();
 
     } catch (error: any) {
         console.error("Error recording consolidated payment:", error);
