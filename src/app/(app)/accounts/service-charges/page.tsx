@@ -122,18 +122,25 @@ export default function ServiceChargesPage() {
             let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
             let paymentAmount: number | undefined;
             let paymentForMonth: string | undefined;
-            
+
             if (tenant) {
-                 const relevantPayment = allPayments.find(p => 
-                    p.tenantId === tenant.id &&
-                    (p.type === 'ServiceCharge' || p.type === 'Rent') &&
-                    p.status === 'Paid' &&
-                    isSameMonth(new Date(p.date), selectedMonth)
-                );
-                if (relevantPayment && relevantPayment.amount >= (unit.serviceCharge || 0)) {
+                // If tenant's due balance is zero or less, they are considered paid up.
+                if ((tenant.dueBalance || 0) <= 0) {
                     paymentStatus = 'Paid';
-                    paymentAmount = relevantPayment.amount;
-                    paymentForMonth = relevantPayment.rentForMonth;
+                } else {
+                    // This is an approximation. A more complex check might be needed for historical months
+                    // but for the current state, if there's a balance, it's pending.
+                    paymentStatus = 'Pending';
+                }
+
+                // For display purposes, find a payment that was marked for the selected month
+                const paymentInSelectedMonth = allPayments
+                    .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
+                    .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
+
+                if (paymentInSelectedMonth) {
+                    paymentAmount = paymentInSelectedMonth.amount;
+                    paymentForMonth = paymentInSelectedMonth.rentForMonth;
                 }
             }
 
@@ -487,7 +494,7 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                             <TableHead>Owner</TableHead>
                             <TableHead>Service Charge</TableHead>
                             <TableHead>Payment Status</TableHead>
-                            <TableHead>Payment Details</TableHead>
+                            <TableHead>Statement</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -510,39 +517,25 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {acc.paymentAmount ? (
-                                        <div className="flex flex-col">
-                                            <span className="font-medium">Ksh {acc.paymentAmount.toLocaleString()}</span>
-                                            {acc.paymentForMonth && (
-                                                <span className="text-xs text-muted-foreground">
-                                                    For {format(new Date(acc.paymentForMonth + '-02'), 'MMM yyyy')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : '-'}
+                                    <Button
+                                        variant="link"
+                                        className="h-auto p-0 text-sm"
+                                        onClick={() => onViewHistory(acc)}
+                                    >
+                                        View Statement
+                                    </Button>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <div className="flex gap-2 justify-end">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => onViewHistory(acc)}
-                                            className="h-8"
-                                        >
-                                            <Eye className="mr-2 h-4 w-4" />
-                                            View
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => handleConfirmClick(acc)}
-                                            disabled={acc.paymentStatus === 'Paid'}
-                                            className="h-8"
-                                        >
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Confirm
-                                        </Button>
-                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleConfirmClick(acc)}
+                                        disabled={acc.paymentStatus === 'Paid'}
+                                        className="h-8"
+                                    >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Confirm
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))}
