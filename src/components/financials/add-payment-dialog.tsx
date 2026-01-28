@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { batchProcessPayments } from '@/lib/data';
-import type { Tenant, Property, Payment } from '@/lib/types';
+import type { Tenant, Property, Payment, Unit } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -83,10 +83,13 @@ export function AddPaymentDialog({
   const displayData = useMemo(() => {
     if (!tenantForDisplay) return { balance: 0, nextDueDate: null };
 
+    const property = properties.find(p => p.id === tenantForDisplay.propertyId);
+    const unit = property?.units.find(u => u.name === tenantForDisplay.unitName);
+
     // Create a deep copy to avoid mutations
     const tempTenant: Tenant = JSON.parse(JSON.stringify(tenantForDisplay));
     
-    const reconciliationUpdates = reconcileMonthlyBilling(tempTenant, new Date());
+    const reconciliationUpdates = reconcileMonthlyBilling(tempTenant, unit, new Date());
 
     // Apply updates to the temporary tenant object to get the latest state
     if (reconciliationUpdates.dueBalance !== undefined) {
@@ -113,7 +116,7 @@ export function AddPaymentDialog({
         nextDueDate: format(dueDate, 'do MMMM yyyy')
     };
 
-  }, [tenantForDisplay]);
+  }, [tenantForDisplay, properties]);
   
 
   const availablePaymentTypes = useMemo(() => {

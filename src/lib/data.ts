@@ -494,8 +494,11 @@ export async function addWaterMeterReading(data: {
         }
     };
     
+    const property = await getProperty(originalTenant.propertyId);
+    const unit = property?.units.find(u => u.name === originalTenant.unitName);
+    
     // 4. Run reconciliation on this new transient state
-    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, new Date());
+    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, new Date());
 
     // 5. Merge all updates for the final write
     const finalUpdates = {
@@ -605,7 +608,10 @@ export async function batchProcessPayments(
             }
         }
 
-        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, new Date());
+        const property = await getProperty(tenantData.propertyId);
+        const unit = property?.units.find(u => u.name === tenantData.unitName);
+
+        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
         const finalUpdates = { ...allPaymentUpdates, ...reconciliationUpdates };
 
         transaction.update(tenantRef, finalUpdates);
@@ -665,11 +671,16 @@ export async function runMonthlyReconciliation(): Promise<void> {
     const tenantsSnap = await getDocs(tenantsRef);
     const today = new Date();
 
+    const allProperties = await getProperties();
+    const propertiesMap = new Map(allProperties.map(p => [p.id, p]));
+
     const batch = writeBatch(db);
 
     for (const tenantDoc of tenantsSnap.docs) {
         const tenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
-        const updates = reconcileMonthlyBilling(tenant, today);
+        const property = propertiesMap.get(tenant.propertyId);
+        const unit = property?.units.find(u => u.name === tenant.unitName);
+        const updates = reconcileMonthlyBilling(tenant, unit, today);
 
         if (updates && Object.keys(updates).length > 0) {
             batch.update(tenantDoc.ref, updates);

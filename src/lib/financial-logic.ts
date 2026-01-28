@@ -1,5 +1,5 @@
 
-import { Tenant, Payment } from './types';
+import { Tenant, Payment, Unit } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
 /**
@@ -87,7 +87,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
  * and returns the necessary updates for the tenant object. It's designed to be run
  * to bring a tenant's account up-to-date before displaying a balance or processing a new transaction.
  */
-export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): { [key: string]: any } {
+export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, date: Date = new Date()): { [key: string]: any } {
     if (!tenant.lease || (!tenant.lease.rent && !tenant.lease.serviceCharge)) {
         console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease or charge information.`);
         return {};
@@ -95,19 +95,37 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
 
     const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
     if (monthlyCharge <= 0) {
-        return {}; // No charge, no reconciliation needed.
+        // If there's no monthly charge, just update the status based on current balance
+        const updatedStatus = getRecommendedPaymentStatus(tenant, date);
+        if (tenant.lease.paymentStatus !== updatedStatus) {
+            return { 'lease.paymentStatus': updatedStatus };
+        }
+        return {};
     }
 
-    // Determine the starting point for billing calculations
+    // Determine the true start of billing
+    let billingStartDate: Date;
+    const leaseStartDate = new Date(tenant.lease.startDate);
+
+    if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
+        // For homeowners, billing starts the month *after* handover.
+        billingStartDate = startOfMonth(addMonths(new Date(unit.handoverDate), 1));
+    } else {
+        billingStartDate = startOfMonth(leaseStartDate);
+    }
+    
     const lastBilledDate = tenant.lease.lastBilledPeriod
-        ? new Date(tenant.lease.lastBilledPeriod + '-02') // Use day 2 to avoid timezone issues
-        : new Date(tenant.lease.startDate);
+        ? startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
+        : null;
+
+    // The first month we should even consider billing for.
+    // If they've been billed before, it's the month after that bill.
+    // If they've never been billed, it's their billing start date.
+    const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
 
     let monthsToBill = 0;
     let latestBilledPeriod = tenant.lease.lastBilledPeriod;
-
-    // Start checking from the month *after* the last billed period
-    let loopDate = startOfMonth(addMonths(lastBilledDate, 1));
+    let loopDate = firstBillableMonth;
     const startOfToday = startOfMonth(date);
 
     while (loopDate <= startOfToday) {
@@ -126,11 +144,10 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
     }
 
     const totalNewCharges = monthsToBill * monthlyCharge;
-
     let newDueBalance = (tenant.dueBalance || 0) + totalNewCharges;
     let newAccountBalance = tenant.accountBalance || 0;
 
-    // Apply overpayment credit if any
+    // Apply any existing overpayment credit
     if (newAccountBalance > 0) {
         if (newAccountBalance >= newDueBalance) {
             newAccountBalance -= newDueBalance;
