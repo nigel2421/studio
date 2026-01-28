@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Loader2, PlusCircle } from 'lucide-react';
 import { Tenant, Payment, Property } from '@/lib/types';
 import { getPaymentHistory } from '@/lib/data';
-import { Badge } from '@/components/ui/badge';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format, startOfMonth, addMonths } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -16,11 +14,10 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 interface LedgerEntry {
     id: string;
     date: string;
-    type: Payment['type'] | 'Charge';
-    rentForMonth: string;
-    amount: number;
-    status: 'Paid' | 'Pending';
-    notes?: string;
+    description: string;
+    charge: number;
+    payment: number;
+    balance: number;
 }
 
 interface TransactionHistoryDialogProps {
@@ -48,22 +45,21 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     const monthlyCharge = tenant.residentType === 'Homeowner' 
                         ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
                         : (tenant.lease.rent || 0);
-                    const chargeLabel = tenant.residentType === 'Homeowner' ? 'ServiceCharge' : 'Rent';
-                    
-                    const ledgerItems: { date: Date; description: string; amount: number; type: 'Charge' | Payment['type']; rentForMonth: string; }[] = [];
+                    const chargeLabel = tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent';
 
-                    // Add payments as negative amounts
+                    const ledgerItems: { date: Date; description: string; amount: number; id: string }[] = [];
+
+                    // 1. Add payments to ledger as negative amounts
                     paymentHistory.forEach(p => {
                         ledgerItems.push({
+                            id: p.id,
                             date: new Date(p.date),
-                            description: p.notes || `Payment Received - ${p.type}`,
+                            description: p.notes || `Payment - ${p.type}`,
                             amount: p.type === 'Adjustment' ? p.amount : -p.amount,
-                            type: p.type,
-                            rentForMonth: p.rentForMonth || format(new Date(p.date), 'yyyy-MM')
                         });
                     });
 
-                    // Add all historical charges as positive amounts
+                    // 2. Add monthly charges to ledger as positive amounts
                     if (monthlyCharge > 0) {
                         const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
                         const leaseStartDate = new Date(tenant.lease.startDate);
@@ -75,63 +71,38 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                         const today = new Date();
                         while (loopDate <= today) {
                             ledgerItems.push({
+                                id: `charge-${format(loopDate, 'yyyy-MM')}`,
                                 date: loopDate,
                                 description: `${chargeLabel} for ${format(loopDate, 'MMMM yyyy')}`,
                                 amount: monthlyCharge,
-                                type: 'Charge',
-                                rentForMonth: format(loopDate, 'yyyy-MM')
                             });
                             loopDate = addMonths(loopDate, 1);
                         }
                     }
-                    
+
+                    // 3. Sort all ledger items chronologically
                     ledgerItems.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+                    // 4. Calculate opening balance to reconcile with current dueBalance
+                    const netChange = ledgerItems.reduce((sum, item) => sum + item.amount, 0);
+                    const openingBalance = (tenant.dueBalance || 0) - netChange;
                     
-                    const netChangeInLedger = ledgerItems.reduce((sum, item) => sum + item.amount, 0);
-                    const openingBalance = (tenant.dueBalance || 0) - netChangeInLedger;
-
+                    // 5. Build final ledger with a running balance
                     let runningBalance = openingBalance;
-                    const finalLedger: LedgerEntry[] = [];
-
-                    // Create a map to track paid months
-                    const paidMonths = new Set<string>();
-                    paymentHistory.forEach(p => {
-                        if (p.rentForMonth && (p.type === 'Rent' || p.type === 'ServiceCharge')) {
-                            paidMonths.add(p.rentForMonth);
-                        }
+                    const finalLedger: LedgerEntry[] = ledgerItems.map(item => {
+                        runningBalance += item.amount;
+                        return {
+                            id: item.id,
+                            date: format(item.date, 'yyyy-MM-dd'),
+                            description: item.description,
+                            charge: item.amount > 0 ? item.amount : 0,
+                            payment: item.amount < 0 ? -item.amount : 0,
+                            balance: runningBalance,
+                        };
                     });
 
-                    // Add pending charges to display
-                    ledgerItems.filter(item => item.type === 'Charge').forEach(charge => {
-                        if (!paidMonths.has(charge.rentForMonth)) {
-                            finalLedger.push({
-                                id: `charge-${charge.rentForMonth}`,
-                                date: charge.date.toISOString(),
-                                type: chargeLabel as Payment['type'],
-                                rentForMonth: charge.rentForMonth,
-                                amount: charge.amount,
-                                status: 'Pending',
-                                notes: 'Outstanding balance for this period.',
-                            });
-                        }
-                    });
-
-                    // Add payments to display
-                    paymentHistory.forEach(payment => {
-                        finalLedger.push({
-                            id: payment.id,
-                            date: payment.date,
-                            type: payment.type,
-                            rentForMonth: payment.rentForMonth || '',
-                            amount: payment.amount,
-                            status: 'Paid',
-                            notes: payment.notes,
-                        });
-                    });
-
-                    finalLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                    setLedger(finalLedger);
+                    // Reverse for newest-first display in the UI
+                    setLedger(finalLedger.reverse());
                 })
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
@@ -149,14 +120,11 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     const handleDownloadPDF = async () => {
         if (!tenant) return;
         const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
-        // We need to fetch the original full payment history for the PDF, not the mixed ledger
         const fullPaymentHistory = await getPaymentHistory(tenant.id);
         generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties);
     };
 
     if (!tenant) return null;
-
-    const chargeOrRentLabel = tenant?.residentType === 'Homeowner' ? 'Service Charge For' : 'Rent For';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,11 +164,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>{chargeOrRentLabel}</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Notes</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead className="text-right">Charge</TableHead>
+                                    <TableHead className="text-right">Payment</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -208,25 +175,22 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                     paginatedLedger.map((entry) => (
                                         <TableRow key={entry.id}>
                                             <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                            <TableCell>{entry.type || 'Rent'}</TableCell>
-                                            <TableCell>
-                                                {entry.rentForMonth ? format(new Date(entry.rentForMonth + '-02'), 'MMM yyyy') : 'N/A'}
+                                            <TableCell>{entry.description}</TableCell>
+                                            <TableCell className="text-right text-red-600 font-medium">
+                                                {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
                                             </TableCell>
-                                            <TableCell className={`font-medium ${entry.type === 'Adjustment' && entry.amount < 0 ? 'text-green-600' : entry.type === 'Adjustment' && entry.amount > 0 ? 'text-red-600' : ''}`}>
-                                                Ksh {entry.amount.toLocaleString()}
+                                            <TableCell className="text-right text-green-600 font-medium">
+                                                {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge variant={entry.status === 'Pending' ? 'destructive' : entry.status === 'Paid' ? 'default' : 'secondary'}>
-                                                    {entry.status}
-                                                </Badge>
+                                            <TableCell className="text-right font-bold">
+                                                Ksh {entry.balance.toLocaleString()}
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground">{entry.notes}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                            No transaction history or pending charges found.
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            No transaction history found.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -253,4 +217,3 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </Dialog>
     );
 }
-

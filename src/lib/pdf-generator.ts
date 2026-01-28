@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -389,94 +388,75 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.text(`${chargeLabel}: ${formatCurrency(monthlyCharge)}`, 196, 60, { align: 'right' });
     doc.text(`Date Issued: ${dateStr}`, 196, 66, { align: 'right' });
 
-    // --- New Balance Calculation Logic ---
-    const ledgerItems: { date: Date; description: string; amount: number; type: 'Charge' | Payment['type']; rentForMonth?: string; }[] = [];
+    const ledgerItems: { date: Date; description: string; amount: number; id: string }[] = [];
 
-    // 1. Add payments to ledger
+    // 1. Add payments to ledger as negative amounts
     payments.forEach(p => {
         ledgerItems.push({
+            id: p.id,
             date: new Date(p.date),
-            description: p.notes || (p.type === 'Adjustment' ? 'Adjustment' : ''),
-            amount: p.type === 'Adjustment' ? p.amount : -p.amount, // Payments are credits (negative)
-            type: p.type,
-            rentForMonth: p.rentForMonth
+            description: p.notes || `Payment Received - ${p.type}`,
+            amount: p.type === 'Adjustment' ? p.amount : -p.amount,
         });
     });
 
-    // 2. Simulate and add charges to ledger
-    const leaseStartDate = new Date(tenant.lease.startDate);
-    const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
-    
-    // For homeowners, billing starts the month AFTER handover.
-    const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
-        ? startOfMonth(addMonths(handoverDate, 1))
-        : startOfMonth(leaseStartDate);
-
-    // Determine the date range for simulating charges.
-    const firstTransactionDate = payments.length > 0 
-        ? payments.reduce((min, p) => new Date(p.date) < min ? new Date(p.date) : min, new Date()) 
-        : new Date();
-    const simStartDate = billingStartDate < firstTransactionDate ? billingStartDate : firstTransactionDate;
-
-    let loopDate = startOfMonth(simStartDate);
-    const today = new Date();
-
-    while (loopDate <= today) {
-        if (loopDate >= billingStartDate) {
+    // 2. Add charges to ledger as positive amounts
+    if (monthlyCharge > 0) {
+        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
+        const leaseStartDate = new Date(tenant.lease.startDate);
+        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
+            ? startOfMonth(addMonths(handoverDate, 1))
+            : startOfMonth(leaseStartDate);
+        
+        let loopDate = billingStartDate;
+        const today = new Date();
+        while (loopDate <= today) {
             ledgerItems.push({
+                id: `charge-${format(loopDate, 'yyyy-MM')}`,
                 date: loopDate,
                 description: `${chargeLabel} for ${format(loopDate, 'MMMM yyyy')}`,
-                amount: monthlyCharge, // Charges are debits (positive)
-                type: 'Charge',
-                rentForMonth: format(loopDate, 'yyyy-MM'),
+                amount: monthlyCharge,
             });
+            loopDate = addMonths(loopDate, 1);
         }
-        loopDate = addMonths(loopDate, 1);
     }
     
-    // 3. Sort all ledger items chronologically
+    // 3. Sort all items chronologically
     ledgerItems.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // 4. Calculate opening balance needed to arrive at the current dueBalance
-    const totalCharges = ledgerItems.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-    const totalCredits = ledgerItems.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0);
-    const openingBalance = (tenant.dueBalance || 0) - (totalCharges + totalCredits);
-
-    // 5. Build final transaction list with running balance
-    const allTransactions: { date: Date; description: string; charge: number; payment: number; balance: number; type: 'Charge' | Payment['type']; rentForMonth?: string; }[] = [];
+    // 4. Calculate opening balance
+    const netChange = ledgerItems.reduce((sum, item) => sum + item.amount, 0);
+    const openingBalance = (tenant.dueBalance || 0) - netChange;
+    
+    // 5. Build final ledger with running balance
     let runningBalance = openingBalance;
-
-    for (const item of ledgerItems) {
+    const finalLedger: { date: Date; description: string; charge: number; payment: number; balance: number }[] = ledgerItems.map(item => {
         runningBalance += item.amount;
-        allTransactions.push({
+        return {
             date: item.date,
             description: item.description,
             charge: item.amount > 0 ? item.amount : 0,
             payment: item.amount < 0 ? -item.amount : 0,
             balance: runningBalance,
-            type: item.type,
-            rentForMonth: item.rentForMonth,
-        });
-    }
-
-    // 6. Prepare data for the table (newest first)
-    const paymentTransactions = allTransactions.filter(t => t.type !== 'Charge');
-
-    const tableBodyData = paymentTransactions.reverse().map(t => [
+        };
+    });
+    
+    const tableBodyData = finalLedger.reverse().map(t => [
         format(t.date, 'P'),
-        t.type,
-        t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-        formatCurrency(t.payment),
+        t.description,
+        t.charge > 0 ? formatCurrency(t.charge) : '-',
+        t.payment > 0 ? formatCurrency(t.payment) : '-',
         formatCurrency(t.balance)
     ]);
 
     autoTable(doc, {
         startY: 75,
-        head: [['Date', 'Type', 'For Month', 'Amount Paid', 'Balance']],
+        head: [['Date', 'Description', 'Charge', 'Payment', 'Balance']],
         body: tableBodyData,
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] },
         columnStyles: {
+            2: { halign: 'right' },
             3: { halign: 'right' },
             4: { halign: 'right' }
         }
@@ -714,5 +694,3 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
-
-    
