@@ -223,25 +223,46 @@ export default function ServiceChargesPage() {
     }
   }, [selectedMonth, allProperties, allOwners, allTenants, allPayments]);
 
-  const handleViewHistory = (account: ServiceChargeAccount) => {
-    if (!account.tenantId) {
+  const handleViewHistory = async (account: ServiceChargeAccount) => {
+    startLoading("Fetching resident details...");
+    try {
+        let tenantToView: Tenant | null = null;
+        if (account.tenantId) {
+            tenantToView = allTenants.find(t => t.id === account.tenantId) || null;
+        }
+
+        if (!tenantToView) {
+            const property = allProperties.find(p => p.id === account.propertyId);
+            const unit = property?.units.find(u => u.name === account.unitName);
+            const owner = allOwners.find(o => o.id === account.ownerId);
+
+            if (property && unit && owner) {
+                tenantToView = await findOrCreateHomeownerTenant(owner, unit, property.id);
+                // After creating, we should refresh the main data so the tenantId is available next time.
+                fetchData();
+            } else {
+                throw new Error("An owner must be assigned to this unit to view its history.");
+            }
+        }
+        
+        if (tenantToView) {
+            setHistoryTenant(tenantToView);
+            setIsHistoryOpen(true);
+        } else {
+             toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not find or create the resident's details.",
+            });
+        }
+    } catch (error: any) {
         toast({
             variant: "destructive",
-            title: "No Resident Found",
-            description: "This unit does not have an active resident to view history for.",
+            title: 'Error',
+            description: error.message || "An unexpected error occurred while fetching history.",
         });
-        return;
-    }
-    const tenant = allTenants.find(t => t.id === account.tenantId);
-    if (tenant) {
-        setHistoryTenant(tenant);
-        setIsHistoryOpen(true);
-    } else {
-         toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Could not find the resident's details.",
-        });
+    } finally {
+        stopLoading();
     }
   };
 
@@ -491,7 +512,6 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                                             size="sm"
                                             variant="ghost"
                                             onClick={() => onViewHistory(acc)}
-                                            disabled={!acc.tenantId}
                                             className="h-8"
                                         >
                                             <Eye className="mr-2 h-4 w-4" />
@@ -583,3 +603,6 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
 
     
 
+
+
+    
