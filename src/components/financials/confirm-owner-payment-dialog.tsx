@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -52,12 +51,11 @@ export function ConfirmOwnerPaymentDialog({
     useEffect(() => {
         if (isOpen) {
             setAmount(totalDue.toString());
-            const unitNames = accounts.map(a => a.unitName).join(', ');
-            setNotes(`Consolidated service charge for units: ${unitNames}`);
+            setNotes('');
             setDate(new Date());
             setForMonth(format(new Date(), 'yyyy-MM'));
         }
-    }, [isOpen, totalDue, accounts]);
+    }, [isOpen, totalDue]);
 
     const handleSubmit = () => {
         if (Number(amount) > 0 && forMonth) {
@@ -130,5 +128,3 @@ export function ConfirmOwnerPaymentDialog({
         </Dialog>
     );
 }
-
-    

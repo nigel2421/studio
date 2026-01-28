@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -316,7 +315,7 @@ export default function ServiceChargesPage() {
                     tenantId: tenant.id,
                     amount: amountToApply,
                     date: format(paymentData.date, 'yyyy-MM-dd'),
-                    notes: `Part of consolidated payment. ${paymentData.notes}`,
+                    notes: paymentData.notes,
                     rentForMonth: paymentData.forMonth,
                     status: 'Paid',
                     type: 'ServiceCharge',
