@@ -174,23 +174,26 @@ export default function ServiceChargesPage() {
       const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
       if (!owner) return; 
 
-      const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
-      const paymentsForUnit = homeownerTenant 
-        ? allPayments.filter(p => p.tenantId === homeownerTenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent'))
-        : [];
-      const totalPaid = paymentsForUnit.reduce((sum, p) => sum + p.amount, 0);
-
       const handoverDate = new Date(unit.handoverDate!);
+      if (isNaN(handoverDate.getTime())) return;
+
       const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
       const today = new Date();
       
       if (isAfter(firstBillableMonth, today)) return; 
 
+      const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
+      const paymentsForUnit = homeownerTenant 
+        ? allPayments.filter(p => p.tenantId === homeownerTenant.id)
+        : [];
+      const totalPaid = paymentsForUnit.reduce((sum, p) => sum + p.amount, 0);
+
       let totalBilled = 0;
       const arrearsDetail: VacantArrearsAccount['arrearsDetail'] = [];
       let loopDate = firstBillableMonth;
+      const startOfToday = startOfMonth(today);
 
-      while (loopDate <= today) {
+      while (startOfMonth(loopDate) <= startOfToday) {
         const chargeForMonth = unit.serviceCharge || 0;
         if (chargeForMonth > 0) {
           totalBilled += chargeForMonth;
@@ -203,19 +206,21 @@ export default function ServiceChargesPage() {
         loopDate = addMonths(loopDate, 1);
       }
       
-      const totalDue = Math.max(0, totalBilled - totalPaid);
-
-      if (totalDue > 0) {
-        let paidAmountTracker = totalPaid;
-        for (const detail of arrearsDetail) {
+      let paidAmountTracker = totalPaid;
+      for (const detail of arrearsDetail) {
           if (paidAmountTracker >= detail.amount) {
-            detail.status = 'Paid';
-            paidAmountTracker -= detail.amount;
+              detail.status = 'Paid';
+              paidAmountTracker -= detail.amount;
           } else {
-            break; 
+              break; // Not enough payment to cover this month
           }
-        }
+      }
 
+      const finalTotalDue = arrearsDetail
+        .filter(d => d.status === 'Pending')
+        .reduce((sum, d) => sum + d.amount, 0);
+
+      if (finalTotalDue > 0) {
         vacantArrears.push({
           ownerId: owner.id,
           ownerName: owner.name,
@@ -224,7 +229,7 @@ export default function ServiceChargesPage() {
           unitName: unit.name,
           unitHandoverDate: unit.handoverDate!,
           monthsInArrears: arrearsDetail.filter(d => d.status === 'Pending').length,
-          totalDue,
+          totalDue: finalTotalDue,
           arrearsDetail,
           unit,
           owner,
