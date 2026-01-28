@@ -370,7 +370,8 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         day: 'numeric',
     });
 
-    addHeader(doc, 'Tenant Statement');
+    const statementTitle = tenant.residentType === 'Homeowner' ? 'Service Charge Statement' : 'Tenant Statement';
+    addHeader(doc, statementTitle);
 
     const property = properties.find(p => p.id === tenant.propertyId);
     const unit = property?.units.find(u => u.name === tenant.unitName);
@@ -714,3 +715,4 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
+    
