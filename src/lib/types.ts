@@ -1,5 +1,6 @@
 
 
+
 export type Property = {
   id: string;
   name: string;
@@ -264,3 +265,12 @@ export type FinancialDocument = {
   description?: string;
   sourceData: Payment | WaterMeterReading | ServiceChargeStatement;
 };
+
+export interface LedgerEntry {
+    id: string;
+    date: string;
+    description: string;
+    charge: number;
+    payment: number;
+    balance: number;
+}

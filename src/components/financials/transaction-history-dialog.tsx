@@ -6,20 +6,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, Loader2, PlusCircle } from 'lucide-react';
-import { Tenant, Payment, Property } from '@/lib/types';
+import { Tenant, Payment, Property, LedgerEntry } from '@/lib/types';
 import { getPaymentHistory } from '@/lib/data';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format, startOfMonth, addMonths } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-
-interface LedgerEntry {
-    id: string;
-    date: string;
-    description: string;
-    charge: number;
-    payment: number;
-    balance: number;
-}
+import { calculateLedger } from '@/lib/financial-logic';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
@@ -43,67 +35,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 .then(async (paymentHistory) => {
                     const property = allProperties.find(p => p.id === tenant.propertyId);
                     const unit = property?.units.find(u => u.name === tenant.unitName);
-                    const monthlyCharge = tenant.residentType === 'Homeowner' 
-                        ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
-                        : (tenant.lease.rent || 0);
-                    const chargeLabel = tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent';
-
-                    const ledgerItems: { date: Date; description: string; amount: number; id: string }[] = [];
-
-                    // 1. Add payments to ledger as negative amounts
-                    paymentHistory.forEach(p => {
-                        const paymentDescription = p.rentForMonth
-                            ? `Payment for ${format(new Date(p.rentForMonth + '-02'), 'MMM yyyy')}`
-                            : `Payment - ${p.type}`;
-                        
-                        ledgerItems.push({
-                            id: p.id,
-                            date: new Date(p.date),
-                            description: p.notes || paymentDescription,
-                            amount: p.type === 'Adjustment' ? p.amount : -p.amount,
-                        });
-                    });
-
-                    // 2. Add monthly charges to ledger as positive amounts
-                    if (monthlyCharge > 0) {
-                        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
-                        const leaseStartDate = new Date(tenant.lease.startDate);
-                        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
-                            ? startOfMonth(addMonths(handoverDate, 1))
-                            : startOfMonth(leaseStartDate);
-                        
-                        let loopDate = billingStartDate;
-                        const today = new Date();
-                        while (loopDate <= today) {
-                            ledgerItems.push({
-                                id: `charge-${format(loopDate, 'yyyy-MM')}`,
-                                date: loopDate,
-                                description: `${chargeLabel} for ${format(loopDate, 'MMMM yyyy')}`,
-                                amount: monthlyCharge,
-                            });
-                            loopDate = addMonths(loopDate, 1);
-                        }
-                    }
-
-                    // 3. Sort all ledger items chronologically
-                    ledgerItems.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-                    // 4. Build final ledger with a running balance, assuming 0 balance at the start of the records.
-                    let runningBalance = 0;
-                    const finalLedger: LedgerEntry[] = ledgerItems.map(item => {
-                        runningBalance += item.amount;
-                        return {
-                            id: item.id,
-                            date: format(item.date, 'yyyy-MM-dd'),
-                            description: item.description,
-                            charge: item.amount > 0 ? item.amount : 0,
-                            payment: item.amount < 0 ? -item.amount : 0,
-                            balance: runningBalance,
-                        };
-                    });
-
-                    // Reverse for newest-first display in the UI
-                    setLedger(finalLedger.reverse());
+                    
+                    const ledgerData = calculateLedger(tenant, paymentHistory, unit);
+                    setLedger(ledgerData);
                 })
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
