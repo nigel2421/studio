@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { batchProcessPayments } from '@/lib/data';
 import type { Tenant, Property, Payment, Unit } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,6 @@ import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { getPaymentHistory } from '@/lib/data';
-import { calculateLedger } from '@/lib/financial-logic';
 
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
@@ -49,7 +47,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -58,7 +56,6 @@ export function AddPaymentDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([]);
-  const [calculatedBalance, setCalculatedBalance] = useState<number | null>(null);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
@@ -82,25 +79,6 @@ export function AddPaymentDialog({
     return null;
   }, [tenant, selectedUnit, selectedProperty, tenants]);
 
-  const calculateLatestBalance = useCallback(async () => {
-      if (tenantForDisplay) {
-          setCalculatedBalance(null);
-          const paymentHistory = await getPaymentHistory(tenantForDisplay.id);
-          const property = properties.find(p => p.id === tenantForDisplay.propertyId);
-          const unit = property?.units.find(u => u.name === tenantForDisplay.unitName);
-          const ledger = calculateLedger(tenantForDisplay, paymentHistory, unit);
-          const latestBalance = ledger.length > 0 ? ledger[0].balance : 0;
-          setCalculatedBalance(latestBalance);
-      }
-  }, [tenantForDisplay, properties]);
-
-  useEffect(() => {
-      if (open) {
-        calculateLatestBalance();
-      }
-  }, [open, tenantForDisplay, calculateLatestBalance]);
-
-
   const displayData = useMemo(() => {
     if (!tenantForDisplay) return { balance: 0, nextDueDate: null };
 
@@ -117,12 +95,11 @@ export function AddPaymentDialog({
 
 
     return {
-        balance: calculatedBalance ?? tenantForDisplay.dueBalance ?? 0, // Fallback to old balance while loading
+        balance: tenantForDisplay.dueBalance || 0,
         nextDueDate: format(dueDate, 'do MMMM yyyy')
     };
 
-  }, [tenantForDisplay, calculatedBalance]);
-  
+  }, [tenantForDisplay]);
 
   const availablePaymentTypes = useMemo(() => {
     if (tenantForDisplay?.residentType === 'Homeowner') {
@@ -171,7 +148,6 @@ export function AddPaymentDialog({
       if (tenant) {
         setSelectedProperty(tenant.propertyId);
       }
-      setCalculatedBalance(tenant?.dueBalance ?? 0); // Set initial quick balance
     } else {
       setPaymentEntries([]);
       if (!tenant) {
@@ -179,7 +155,6 @@ export function AddPaymentDialog({
         setSelectedFloor('');
         setSelectedUnit('');
       }
-      setCalculatedBalance(null);
     }
   }, [open, tenant]); // Removed dependencies that cause re-triggering
 
@@ -257,8 +232,6 @@ export function AddPaymentDialog({
       await batchProcessPayments(finalTenantId, paymentsToBatch, taskId);
 
       toast({ title: 'Payments Added', description: `${validEntries.length} payment(s) have been successfully recorded.` });
-      // We call onPaymentAdded which should trigger a re-fetch in the parent,
-      // which in turn will re-calculate the balance here via the useEffect.
       onPaymentAdded();
       setOpen(false);
     } catch (error: any) {
@@ -330,13 +303,9 @@ export function AddPaymentDialog({
                             <div className="font-medium">{displayData.nextDueDate}</div>
                         </div>
                         <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
-                             <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center">
                                 <div className="text-muted-foreground font-bold text-red-600">Total Amount Pending:</div>
-                                {calculatedBalance === null ? (
-                                    <Loader2 className="h-5 w-5 animate-spin text-red-600" />
-                                ) : (
-                                    <div className="font-bold text-red-600 text-lg">Ksh {displayData.balance.toLocaleString()}</div>
-                                )}
+                                <div className="font-bold text-red-600 text-lg">Ksh {displayData.balance.toLocaleString()}</div>
                             </div>
                         </div>
                     </div>

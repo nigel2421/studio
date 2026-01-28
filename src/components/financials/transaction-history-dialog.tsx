@@ -11,7 +11,6 @@ import { getPaymentHistory } from '@/lib/data';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format, startOfMonth, addMonths } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import { calculateLedger } from '@/lib/financial-logic';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
@@ -23,7 +22,9 @@ interface TransactionHistoryDialogProps {
 }
 
 export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPaymentAdded, allProperties, allTenants }: TransactionHistoryDialogProps) {
-    const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [charges, setCharges] = useState<{ date: string, description: string, amount: number }[]>([]);
+    const [ledger, setLedger] = useState<{ id: string, date: string; description: string; charge: number; payment: number; balance: number }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(5);
@@ -32,19 +33,76 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (tenant && open) {
             setIsLoading(true);
             getPaymentHistory(tenant.id)
-                .then(async (paymentHistory) => {
+                .then(paymentHistory => {
+                    setPayments(paymentHistory);
                     const property = allProperties.find(p => p.id === tenant.propertyId);
                     const unit = property?.units.find(u => u.name === tenant.unitName);
                     
-                    const ledgerData = calculateLedger(tenant, paymentHistory, unit);
-                    setLedger(ledgerData);
+                    const monthlyCharge = tenant.residentType === 'Homeowner' 
+                        ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
+                        : (tenant.lease.rent || 0);
+
+                    let generatedCharges: { date: string, description: string, amount: number }[] = [];
+                    if (monthlyCharge > 0) {
+                        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
+                        const leaseStartDate = new Date(tenant.lease.startDate);
+                        
+                        // For homeowners, billing starts the month *after* handover
+                        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
+                            ? startOfMonth(addMonths(handoverDate, 1))
+                            : startOfMonth(leaseStartDate);
+
+                        let loopDate = billingStartDate;
+                        const today = new Date();
+                        while (loopDate <= today) {
+                            generatedCharges.push({
+                                date: loopDate.toISOString(),
+                                description: `${tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`,
+                                amount: monthlyCharge
+                            });
+                            loopDate = addMonths(loopDate, 1);
+                        }
+                    }
+                    setCharges(generatedCharges);
+
+                    // Combine and sort
+                    const combined = [
+                        ...paymentHistory.map(p => ({
+                            id: p.id,
+                            date: new Date(p.date),
+                            description: p.notes || `Payment for ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+                            charge: 0,
+                            payment: p.type === 'Adjustment' ? -p.amount : p.amount
+                        })),
+                        ...generatedCharges.map((c, i) => ({
+                            id: `charge-${i}`,
+                            date: new Date(c.date),
+                            description: c.description,
+                            charge: c.amount,
+                            payment: 0
+                        }))
+                    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+                    // Calculate running balance (from latest to oldest)
+                    let balance = tenant.dueBalance || 0;
+                    const finalLedger = combined.map(item => {
+                        const currentBalance = balance;
+                        if (item.payment > 0) {
+                            balance += item.payment;
+                        }
+                        if (item.charge > 0) {
+                            balance -= item.charge;
+                        }
+                        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: currentBalance };
+                    });
+
+                    setLedger(finalLedger);
                 })
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
             setCurrentPage(1);
         }
     }, [tenant, open, onPaymentAdded, allProperties]);
-    
 
     const totalPages = Math.ceil(ledger.length / pageSize);
     const paginatedLedger = ledger.slice(
@@ -152,5 +210,3 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </Dialog>
     );
 }
-
-  
