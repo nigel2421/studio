@@ -88,12 +88,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     // 3. Sort all ledger items chronologically
                     ledgerItems.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-                    // 4. Calculate opening balance to reconcile with current dueBalance
-                    const netChange = ledgerItems.reduce((sum, item) => sum + item.amount, 0);
-                    const openingBalance = (tenant.dueBalance || 0) - netChange;
-                    
-                    // 5. Build final ledger with a running balance
-                    let runningBalance = openingBalance;
+                    // 4. Build final ledger with a running balance, assuming 0 balance at the start of the records.
+                    let runningBalance = 0;
                     const finalLedger: LedgerEntry[] = ledgerItems.map(item => {
                         runningBalance += item.amount;
                         return {
