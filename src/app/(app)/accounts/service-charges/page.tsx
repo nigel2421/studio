@@ -58,8 +58,13 @@ export default function ServiceChargesPage() {
   
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  
+  const [smCurrentPage, setSmCurrentPage] = useState(1);
+  const [smPageSize, setSmPageSize] = useState(10);
+  const [smStatusFilter, setSmStatusFilter] = useState<'all' | 'Paid' | 'Pending'>('all');
+
+  const [arrearsCurrentPage, setArrearsCurrentPage] = useState(1);
+  const [arrearsPageSize, setArrearsPageSize] = useState(10);
   
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
@@ -383,14 +388,21 @@ export default function ServiceChargesPage() {
 
 
   const filteredAccounts = useMemo(() => {
-    if (!searchTerm) return selfManagedAccounts;
+    let accounts = selfManagedAccounts;
+    if (smStatusFilter !== 'all') {
+      accounts = accounts.filter(acc => acc.paymentStatus === smStatusFilter);
+    }
+    if (!searchTerm) return accounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return selfManagedAccounts.filter(acc =>
+    return accounts.filter(acc =>
         acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
         acc.unitName.toLowerCase().includes(lowercasedFilter) ||
         acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
-  }, [selfManagedAccounts, searchTerm]);
+  }, [selfManagedAccounts, searchTerm, smStatusFilter]);
+  
+  const smTotalPages = Math.ceil(filteredAccounts.length / smPageSize);
+  const paginatedSmAccounts = filteredAccounts.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
   
   const filteredArrears = useMemo(() => {
     if (!searchTerm) return arrearsAccounts;
@@ -401,6 +413,9 @@ export default function ServiceChargesPage() {
         acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
   }, [arrearsAccounts, searchTerm]);
+
+  const arrearsTotalPages = Math.ceil(filteredArrears.length / arrearsPageSize);
+  const paginatedArrears = filteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
 
   return (
     <div className="space-y-6">
@@ -436,10 +451,31 @@ export default function ServiceChargesPage() {
             </div>
         </div>
         <TabsContent value="occupied">
-           <SelfManagedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} onViewHistory={handleViewHistory} />
+           <SelfManagedUnitsTab
+              accounts={paginatedSmAccounts}
+              onConfirmPayment={handleOpenOwnerPaymentDialog}
+              onViewHistory={handleViewHistory}
+              statusFilter={smStatusFilter}
+              onStatusFilterChange={(status) => { setSmStatusFilter(status); setSmCurrentPage(1); }}
+              currentPage={smCurrentPage}
+              pageSize={smPageSize}
+              totalPages={smTotalPages}
+              onPageChange={setSmCurrentPage}
+              onPageSizeChange={setSmPageSize}
+              totalItems={filteredAccounts.length}
+            />
         </TabsContent>
         <TabsContent value="arrears">
-           <VacantArrearsTab arrears={filteredArrears} onGenerateInvoice={handleGenerateInvoice} />
+           <VacantArrearsTab
+              arrears={paginatedArrears}
+              onGenerateInvoice={handleGenerateInvoice}
+              currentPage={arrearsCurrentPage}
+              pageSize={arrearsPageSize}
+              totalPages={arrearsTotalPages}
+              onPageChange={setArrearsCurrentPage}
+              onPageSizeChange={setArrearsPageSize}
+              totalItems={filteredArrears.length}
+            />
         </TabsContent>
       </Tabs>
       
@@ -465,7 +501,31 @@ export default function ServiceChargesPage() {
   );
 }
 
-const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void, onViewHistory: (acc: ServiceChargeAccount) => void }) => {
+const SelfManagedUnitsTab = ({
+    accounts,
+    onConfirmPayment,
+    onViewHistory,
+    statusFilter,
+    onStatusFilterChange,
+    currentPage,
+    pageSize,
+    totalPages,
+    onPageChange,
+    onPageSizeChange,
+    totalItems,
+}: {
+    accounts: ServiceChargeAccount[];
+    onConfirmPayment: (acc: ServiceChargeAccount) => void;
+    onViewHistory: (acc: ServiceChargeAccount) => void;
+    statusFilter: 'all' | 'Paid' | 'Pending';
+    onStatusFilterChange: (status: 'all' | 'Paid' | 'Pending') => void;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+    totalItems: number;
+}) => {
     const { toast } = useToast();
 
     const handleConfirmClick = (acc: ServiceChargeAccount) => {
@@ -485,6 +545,18 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
             <CardHeader>
                 <CardTitle>Self-managed Unit Service Charges</CardTitle>
                 <CardDescription>Payments for units that are currently self-managed by clients.</CardDescription>
+                <div className="flex justify-end">
+                    <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="Paid">Paid</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -549,11 +621,39 @@ const SelfManagedUnitsTab = ({ accounts, onConfirmPayment, onViewHistory }: { ac
                     </TableBody>
                 </Table>
             </CardContent>
+            <div className="p-4 border-t">
+                <PaginationControls
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                    totalItems={totalItems}
+                    onPageChange={onPageChange}
+                    onPageSizeChange={onPageSizeChange}
+                />
+            </div>
         </Card>
     );
 };
 
-const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrearsAccount[], onGenerateInvoice: (acc: VacantArrearsAccount) => void }) => {
+const VacantArrearsTab = ({
+    arrears,
+    onGenerateInvoice,
+    currentPage,
+    pageSize,
+    totalPages,
+    onPageChange,
+    onPageSizeChange,
+    totalItems,
+}: {
+    arrears: VacantArrearsAccount[];
+    onGenerateInvoice: (acc: VacantArrearsAccount) => void;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+    totalItems: number;
+}) => {
     return (
         <Card>
             <CardHeader>
@@ -603,6 +703,16 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
                     </TableBody>
                 </Table>
             </CardContent>
+            <div className="p-4 border-t">
+                <PaginationControls
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                    totalItems={totalItems}
+                    onPageChange={onPageChange}
+                    onPageSizeChange={onPageSizeChange}
+                />
+            </div>
         </Card>
     );
 }
