@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -9,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
-import { isSameMonth, startOfMonth, format, addMonths, subMonths, differenceInMonths, isAfter } from 'date-fns';
+import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
@@ -174,7 +173,7 @@ export default function ServiceChargesPage() {
       const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
       if (!owner) return; 
 
-      const handoverDate = new Date(unit.handoverDate!);
+      const handoverDate = parseISO(unit.handoverDate!);
       if (isNaN(handoverDate.getTime())) return;
 
       const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
@@ -714,13 +713,3 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
-
-    
-
-    
-
-
-
-    
-
-  
