@@ -51,7 +51,7 @@ interface VacantArrearsAccount {
 }
 
 export default function ServiceChargesPage() {
-  const [occupiedAccounts, setOccupiedAccounts] = useState<ServiceChargeAccount[]>([]);
+  const [selfManagedAccounts, setSelfManagedAccounts] = useState<ServiceChargeAccount[]>([]);
   const [arrearsAccounts, setArrearsAccounts] = useState<VacantArrearsAccount[]>([]);
   
   const [loading, setLoading] = useState(true);
@@ -101,7 +101,7 @@ export default function ServiceChargesPage() {
 
   useEffect(() => {
     if(allProperties.length > 0) {
-        // Occupied Units Logic
+        // Self-managed Units Logic
         const selfManagedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
         allProperties.forEach(p => {
             (p.units || []).forEach(u => {
@@ -111,7 +111,7 @@ export default function ServiceChargesPage() {
             });
         });
 
-        const occupiedServiceChargeAccounts = selfManagedUnits.map(unit => {
+        const selfManagedServiceChargeAccounts = selfManagedUnits.map(unit => {
             const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
             const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
             
@@ -145,7 +145,7 @@ export default function ServiceChargesPage() {
                 paymentAmount,
             };
         });
-        setOccupiedAccounts(occupiedServiceChargeAccounts);
+        setSelfManagedAccounts(selfManagedServiceChargeAccounts);
 
         // Vacant Units in Arrears Logic
         const vacantUnitsInArrears: VacantArrearsAccount[] = [];
@@ -231,7 +231,7 @@ export default function ServiceChargesPage() {
         const owner = allOwners.find(o => o.id === account.ownerId);
         if (!owner) throw new Error("Owner not found");
 
-        const ownerAccounts = occupiedAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
+        const ownerAccounts = selfManagedAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
         if (ownerAccounts.length === 0) {
             toast({ title: "No Pending Charges", description: "This owner has no pending service charges for the selected month." });
             return;
@@ -326,14 +326,14 @@ export default function ServiceChargesPage() {
 
 
   const filteredAccounts = useMemo(() => {
-    if (!searchTerm) return occupiedAccounts;
+    if (!searchTerm) return selfManagedAccounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return occupiedAccounts.filter(acc =>
+    return selfManagedAccounts.filter(acc =>
         acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
         acc.unitName.toLowerCase().includes(lowercasedFilter) ||
         acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
-  }, [occupiedAccounts, searchTerm]);
+  }, [selfManagedAccounts, searchTerm]);
   
   const filteredArrears = useMemo(() => {
     if (!searchTerm) return arrearsAccounts;
@@ -365,7 +365,7 @@ export default function ServiceChargesPage() {
       <Tabs defaultValue="occupied">
         <div className="flex justify-between items-center">
             <TabsList>
-                <TabsTrigger value="occupied">Occupied Units</TabsTrigger>
+                <TabsTrigger value="occupied">Self-managed Units</TabsTrigger>
                 <TabsTrigger value="arrears">Vacant Units in Arrears</TabsTrigger>
             </TabsList>
             <div className="relative w-full sm:w-[300px]">
@@ -379,7 +379,7 @@ export default function ServiceChargesPage() {
             </div>
         </div>
         <TabsContent value="occupied">
-           <OccupiedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} />
+           <SelfManagedUnitsTab accounts={filteredAccounts} onConfirmPayment={handleOpenOwnerPaymentDialog} />
         </TabsContent>
         <TabsContent value="arrears">
            <VacantArrearsTab arrears={filteredArrears} onGenerateInvoice={handleGenerateInvoice} />
@@ -400,7 +400,7 @@ export default function ServiceChargesPage() {
   );
 }
 
-const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void }) => {
+const SelfManagedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceChargeAccount[], onConfirmPayment: (acc: ServiceChargeAccount) => void }) => {
     const { toast } = useToast();
 
     const handleConfirmClick = (acc: ServiceChargeAccount) => {
@@ -418,8 +418,8 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Occupied Unit Service Charges</CardTitle>
-                <CardDescription>Payments for units that are currently client-occupied.</CardDescription>
+                <CardTitle>Self-managed Unit Service Charges</CardTitle>
+                <CardDescription>Payments for units that are currently self-managed by clients.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
@@ -468,7 +468,7 @@ const OccupiedUnitsTab = ({ accounts, onConfirmPayment }: { accounts: ServiceCha
                          {accounts.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-24 text-center">
-                                    No occupied units match the criteria for this month.
+                                    No self-managed units match the criteria for this month.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -532,11 +532,5 @@ const VacantArrearsTab = ({ arrears, onGenerateInvoice }: { arrears: VacantArrea
         </Card>
     );
 }
-
-    
-
-    
-
-    
 
     
