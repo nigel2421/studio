@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary } from '@/lib/financial-utils';
-import { format, startOfMonth, addMonths } from 'date-fns';
+import { format, startOfMonth, addMonths, addDays } from 'date-fns';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -389,15 +389,16 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.text(`Date Issued: ${dateStr}`, 196, 66, { align: 'right' });
 
     // --- New Balance Calculation Logic ---
-    const allTransactions: { date: Date; description: string; charge: number; payment: number; balance: number }[] = [];
-    const ledgerItems: { date: Date; description: string; amount: number }[] = [];
+    const ledgerItems: { date: Date; description: string; amount: number; type: 'Charge' | Payment['type']; rentForMonth?: string; }[] = [];
 
     // 1. Add payments to ledger
     payments.forEach(p => {
         ledgerItems.push({
             date: new Date(p.date),
-            description: p.notes || `${p.type} for ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'period'}`,
+            description: p.notes || (p.type === 'Adjustment' ? 'Adjustment' : ''),
             amount: p.type === 'Adjustment' ? p.amount : -p.amount, // Payments are credits (negative)
+            type: p.type,
+            rentForMonth: p.rentForMonth
         });
     });
 
@@ -425,6 +426,8 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
                 date: loopDate,
                 description: `${chargeLabel} for ${format(loopDate, 'MMMM yyyy')}`,
                 amount: monthlyCharge, // Charges are debits (positive)
+                type: 'Charge',
+                rentForMonth: format(loopDate, 'yyyy-MM'),
             });
         }
         loopDate = addMonths(loopDate, 1);
@@ -439,7 +442,9 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     const openingBalance = (tenant.dueBalance || 0) - (totalCharges + totalCredits);
 
     // 5. Build final transaction list with running balance
+    const allTransactions: { date: Date; description: string; charge: number; payment: number; balance: number; type: 'Charge' | Payment['type']; rentForMonth?: string; }[] = [];
     let runningBalance = openingBalance;
+
     for (const item of ledgerItems) {
         runningBalance += item.amount;
         allTransactions.push({
@@ -448,26 +453,31 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
             charge: item.amount > 0 ? item.amount : 0,
             payment: item.amount < 0 ? -item.amount : 0,
             balance: runningBalance,
+            type: item.type,
+            rentForMonth: item.rentForMonth,
         });
     }
 
     // 6. Prepare data for the table (newest first)
-    const tableBodyData = allTransactions.reverse().map(t => [
+    const paymentTransactions = allTransactions.filter(t => t.type !== 'Charge');
+
+    const tableBodyData = paymentTransactions.reverse().map(t => [
         format(t.date, 'P'),
-        t.description,
-        t.payment > 0 ? formatCurrency(t.payment) : '-',
+        t.type,
+        t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+        formatCurrency(t.payment),
         formatCurrency(t.balance)
     ]);
 
     autoTable(doc, {
         startY: 75,
-        head: [['Date', 'Description', 'Amount Paid', 'Balance']],
+        head: [['Date', 'Type', 'For Month', 'Amount Paid', 'Balance']],
         body: tableBodyData,
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] },
         columnStyles: {
-            2: { halign: 'right' },
-            3: { halign: 'right' }
+            3: { halign: 'right' },
+            4: { halign: 'right' }
         }
     });
     
@@ -490,7 +500,6 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
 
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
-
 
 export const generateDashboardReportPDF = (
     stats: { title: string; value: string | number }[],
@@ -704,3 +713,4 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
