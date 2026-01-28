@@ -1,6 +1,6 @@
 
 import { Tenant, Payment } from './types';
-import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth } from 'date-fns';
+import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths } from 'date-fns';
 
 /**
  * Calculates the total amount due for a tenant in the current billing cycle.
@@ -83,28 +83,47 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
 }
 
 /**
- * Monthly reconciliation logic (should run on the 1st or when dashboard loads)
- * This adds the monthly rent to the dueBalance.
+ * Monthly reconciliation logic. This function calculates any missed monthly charges
+ * and returns the necessary updates for the tenant object. It's designed to be run
+ * to bring a tenant's account up-to-date before displaying a balance or processing a new transaction.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date()): { [key: string]: any } {
-    if (!tenant.lease) {
-        console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease information.`);
+    if (!tenant.lease || (!tenant.lease.rent && !tenant.lease.serviceCharge)) {
+        console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease or charge information.`);
         return {};
     }
 
-    const currentPeriod = format(date, 'yyyy-MM');
+    const lastBilledDate = tenant.lease.lastBilledPeriod
+        ? new Date(tenant.lease.lastBilledPeriod + '-02') // Use day 2 to avoid timezone issues
+        : new Date(tenant.lease.startDate);
 
-    // If we've already billed for this period, just update the status if needed and exit.
-    if (tenant.lease.lastBilledPeriod === currentPeriod) {
+    const startOfLastBilledMonth = startOfMonth(lastBilledDate);
+    const startOfCurrentMonth = startOfMonth(date);
+
+    // If the last billed period is already the current month or in the future,
+    // just update the payment status based on the current balance and exit.
+    if (!isAfter(startOfCurrentMonth, startOfLastBilledMonth)) {
         const updatedStatus = getRecommendedPaymentStatus(tenant, date);
         if (tenant.lease.paymentStatus !== updatedStatus) {
             return { 'lease.paymentStatus': updatedStatus };
         }
-        return {}; // No changes needed
+        return {};
     }
+    
+    const monthsToBill = differenceInMonths(startOfCurrentMonth, startOfLastBilledMonth);
 
+    if (monthsToBill <= 0) {
+        const updatedStatus = getRecommendedPaymentStatus(tenant, date);
+        if (tenant.lease.paymentStatus !== updatedStatus) {
+            return { 'lease.paymentStatus': updatedStatus };
+        }
+        return {};
+    }
+    
     const monthlyCharge = (tenant.lease.rent || 0) + (tenant.lease.serviceCharge || 0);
-    let newDueBalance = (tenant.dueBalance || 0) + monthlyCharge;
+    const totalNewCharges = monthsToBill * monthlyCharge;
+
+    let newDueBalance = (tenant.dueBalance || 0) + totalNewCharges;
     let newAccountBalance = tenant.accountBalance || 0;
 
     // Apply overpayment credit if any
@@ -117,6 +136,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
             newAccountBalance = 0;
         }
     }
+    
+    const currentPeriod = format(startOfCurrentMonth, 'yyyy-MM');
 
     return {
         dueBalance: newDueBalance,
@@ -125,6 +146,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, date: Date = new Date())
         'lease.lastBilledPeriod': currentPeriod,
     };
 }
+
 
 export function validatePayment(
     paymentAmount: number,

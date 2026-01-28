@@ -97,52 +97,75 @@ describe('Financial Logic Functions', () => {
     });
 
     describe('reconcileMonthlyBilling', () => {
-        const march1st = new Date('2023-03-01');
-        const march10th = new Date('2023-03-10');
+        const may10th = new Date('2023-05-10');
 
-        it('should add monthly rent to dueBalance if a new billing period has started', () => {
+        it('should add monthly rent for one missed month', () => {
             const tenant = createMockTenant({
                 dueBalance: 0,
+                lease: { lastBilledPeriod: '2023-04', rent: 20000 }
+            });
+            const updates = reconcileMonthlyBilling(tenant, may10th);
+            expect(updates.dueBalance).toBe(20000);
+            expect(updates['lease.paymentStatus']).toBe('Overdue');
+            expect(updates['lease.lastBilledPeriod']).toBe('2023-05');
+        });
+
+        it('should add monthly rent for multiple missed months', () => {
+            const tenant = createMockTenant({
+                dueBalance: 1000, // previous arrears
                 lease: { lastBilledPeriod: '2023-02', rent: 20000 }
             });
-            const updates = reconcileMonthlyBilling(tenant, march1st);
-            expect(updates.dueBalance).toBe(20000);
-            expect(updates['lease.paymentStatus']).toBe('Pending');
-            expect(updates['lease.lastBilledPeriod']).toBe('2023-03');
+            // Should bill for Mar, Apr, May (3 months)
+            const updates = reconcileMonthlyBilling(tenant, may10th);
+            expect(updates.dueBalance).toBe(1000 + (3 * 20000)); // 61000
+            expect(updates['lease.paymentStatus']).toBe('Overdue');
+            expect(updates['lease.lastBilledPeriod']).toBe('2023-05');
         });
 
         it('should not bill again if already billed for the current period', () => {
             const tenant = createMockTenant({
                 dueBalance: 20000,
-                lease: { lastBilledPeriod: '2023-03' }
+                lease: { lastBilledPeriod: '2023-05' }
             });
-            const updates = reconcileMonthlyBilling(tenant, march10th);
-            expect(updates.dueBalance).toBeUndefined(); // No change to due balance
-            expect(updates['lease.paymentStatus']).toBe('Overdue'); // Status should update
+            const updates = reconcileMonthlyBilling(tenant, may10th);
+            // No change to due balance, just status update
+            expect(updates.dueBalance).toBeUndefined(); 
+            expect(updates['lease.paymentStatus']).toBe('Overdue');
+            expect(updates['lease.lastBilledPeriod']).toBeUndefined();
         });
         
-        it('should apply account balance to the new monthly charge', () => {
+        it('should apply account balance to the new monthly charges', () => {
             const tenant = createMockTenant({
                 dueBalance: 0,
                 accountBalance: 5000,
-                lease: { lastBilledPeriod: '2023-02', rent: 20000 }
+                lease: { lastBilledPeriod: '2023-04', rent: 20000 }
             });
-            const updates = reconcileMonthlyBilling(tenant, march1st);
+            const updates = reconcileMonthlyBilling(tenant, may10th); // Bill for May
             expect(updates.dueBalance).toBe(15000); // 20000 (rent) - 5000 (credit)
             expect(updates.accountBalance).toBe(0);
-            expect(updates['lease.paymentStatus']).toBe('Pending');
+            expect(updates['lease.paymentStatus']).toBe('Overdue');
         });
 
-        it('should handle account balance that fully covers the new rent', () => {
+        it('should handle account balance that fully covers multiple new rent charges', () => {
             const tenant = createMockTenant({
                 dueBalance: 0,
-                accountBalance: 25000,
+                accountBalance: 45000,
                 lease: { lastBilledPeriod: '2023-02', rent: 20000 }
             });
-            const updates = reconcileMonthlyBilling(tenant, march1st);
-            expect(updates.dueBalance).toBe(0);
-            expect(updates.accountBalance).toBe(5000);
-            expect(updates['lease.paymentStatus']).toBe('Paid');
+             // Should bill for Mar, Apr, May (3 months * 20k = 60k)
+            const updates = reconcileMonthlyBilling(tenant, may10th);
+            expect(updates.dueBalance).toBe(15000); // 60000 - 45000
+            expect(updates.accountBalance).toBe(0);
+            expect(updates['lease.paymentStatus']).toBe('Overdue');
+        });
+
+        it('should return only status update if next billable month is in the future', () => {
+             const tenant = createMockTenant({
+                dueBalance: 0,
+                lease: { lastBilledPeriod: '2023-05' }
+            });
+            const updates = reconcileMonthlyBilling(tenant, may10th);
+            expect(updates).toEqual({ 'lease.paymentStatus': 'Paid' });
         });
     });
     

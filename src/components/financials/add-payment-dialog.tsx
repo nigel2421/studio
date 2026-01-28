@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, addMonths } from 'date-fns';
+import { format, addMonths, startOfMonth } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { reconcileMonthlyBilling } from '@/lib/financial-logic';
 
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
@@ -78,23 +79,42 @@ export function AddPaymentDialog({
     }
     return null;
   }, [tenant, selectedUnit, selectedProperty, tenants]);
-  
-  const nextDueDate = useMemo(() => {
-    if (!tenantForDisplay) return null;
+
+  const displayData = useMemo(() => {
+    if (!tenantForDisplay) return { balance: 0, nextDueDate: null };
+
+    // Create a deep copy to avoid mutations
+    const tempTenant: Tenant = JSON.parse(JSON.stringify(tenantForDisplay));
+    
+    const reconciliationUpdates = reconcileMonthlyBilling(tempTenant, new Date());
+
+    // Apply updates to the temporary tenant object to get the latest state
+    if (reconciliationUpdates.dueBalance !== undefined) {
+      tempTenant.dueBalance = reconciliationUpdates.dueBalance;
+    }
+    if (reconciliationUpdates.accountBalance !== undefined) {
+        tempTenant.accountBalance = reconciliationUpdates.accountBalance;
+    }
+
     const today = new Date();
     const dayOfMonth = today.getDate();
     let dueDate: Date;
 
     if (dayOfMonth > 5) {
-        // Due date for next month
-        const nextMonthDate = addMonths(today, 1);
-        dueDate = new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 5);
+        dueDate = startOfMonth(addMonths(today, 1));
     } else {
-        // Due date for this month
-        dueDate = new Date(today.getFullYear(), today.getMonth(), 5);
+        dueDate = startOfMonth(today);
     }
-    return format(dueDate, 'do MMMM yyyy');
+     dueDate.setDate(5);
+
+
+    return {
+        balance: tempTenant.dueBalance || 0,
+        nextDueDate: format(dueDate, 'do MMMM yyyy')
+    };
+
   }, [tenantForDisplay]);
+  
 
   const availablePaymentTypes = useMemo(() => {
     if (tenantForDisplay?.residentType === 'Homeowner') {
@@ -296,12 +316,12 @@ export function AddPaymentDialog({
                         </div>
                         <div>
                             <div className="text-muted-foreground">Next Due Date:</div>
-                            <div className="font-medium">{nextDueDate}</div>
+                            <div className="font-medium">{displayData.nextDueDate}</div>
                         </div>
                         <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
                              <div className="flex justify-between items-center">
                                 <div className="text-muted-foreground font-bold text-red-600">Total Amount Pending:</div>
-                                <div className="font-bold text-red-600 text-lg">Ksh {(tenantForDisplay.dueBalance || 0).toLocaleString()}</div>
+                                <div className="font-bold text-red-600 text-lg">Ksh {(displayData.balance).toLocaleString()}</div>
                             </div>
                         </div>
                     </div>
