@@ -54,7 +54,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     const handleDownloadPDF = async () => {
         if (!tenant) return;
         const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
-        generateTenantStatementPDF(tenant, payments);
+        generateTenantStatementPDF(tenant, payments, allProperties);
     };
 
     if (!tenant) return null;

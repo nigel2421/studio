@@ -362,7 +362,7 @@ export const generateLandlordStatementPDF = (
     doc.save(`landlord_statement_${landlord.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
-export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) => {
+export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], properties: Property[]) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
@@ -372,111 +372,82 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[]) 
 
     addHeader(doc, 'Tenant Statement');
 
+    const property = properties.find(p => p.id === tenant.propertyId);
+    const unit = property?.units.find(u => u.name === tenant.unitName);
+    const monthlyCharge = tenant.residentType === 'Homeowner' ? (tenant.lease.serviceCharge || 0) : (tenant.lease.rent || 0);
+    const chargeLabel = tenant.residentType === 'Homeowner' ? 'Monthly Service Charge' : 'Monthly Rent';
+
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(tenant.name, 196, 48, { align: 'right' });
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Unit: ${tenant.unitName}`, 196, 54, { align: 'right' });
-    doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+    doc.text(`Unit: ${tenant.unitName} (${unit?.unitType || 'N/A'})`, 196, 54, { align: 'right' });
+    doc.text(`${chargeLabel}: ${formatCurrency(monthlyCharge)}`, 196, 60, { align: 'right' });
+    doc.text(`Date Issued: ${dateStr}`, 196, 66, { align: 'right' });
+    
+    // --- Balance Calculation ---
+    const chronologicalPayments = [...payments].reverse(); // oldest first
+
+    const totalPaymentsValue = payments.reduce((sum, p) => {
+        if (p.type === 'Adjustment') {
+            return sum - p.amount;
+        }
+        return sum + p.amount;
+    }, 0);
+    
+    const balanceBeforePeriod = (tenant.dueBalance || 0) + totalPaymentsValue;
+    
+    let runningBalance = balanceBeforePeriod;
+    
+    const tableDataWithBalance = chronologicalPayments.map(p => {
+        const balanceChange = p.type === 'Adjustment' ? p.amount : -p.amount;
+        runningBalance += balanceChange;
+        return {
+            ...p,
+            balanceAfter: runningBalance
+        };
+    });
+
+    const tableBodyData = tableDataWithBalance.reverse().map(t => [ // reverse back to newest first
+        new Date(t.date).toLocaleDateString(),
+        t.type || 'Rent',
+        t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+        formatCurrency(t.amount),
+        formatCurrency(t.balanceAfter)
+    ]);
 
     autoTable(doc, {
-        startY: 70,
-        head: [['Date', 'Type', 'For Month', 'Notes', 'Amount Paid']],
-        body: payments.map(p => [
-            new Date(p.date).toLocaleDateString(),
-            p.type || 'Rent',
-            p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-            p.notes || '',
-            formatCurrency(p.amount)
-        ]),
+        startY: 75,
+        head: [['Date', 'Type', 'For Month', 'Amount Paid', 'Balance']],
+        body: tableBodyData,
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] },
         columnStyles: {
+            3: { halign: 'right' },
             4: { halign: 'right' }
         }
     });
     
     let finalY = (doc as any).lastAutoTable.finalY + 15;
 
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments.reduce((sum, p) => p.type !== 'Adjustment' ? sum + p.amount : sum, 0);
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('Total Paid:', 140, finalY, { align: 'right' });
     doc.text(formatCurrency(totalPaid), 196, finalY, { align: 'right' });
-
-    doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
-export const generateVacantServiceChargeInvoicePDF = (
-    owner: PropertyOwner,
-    unit: Unit,
-    property: Property,
-    arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[],
-    totalDue: number
-) => {
-    const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    addHeader(doc, 'Service Charge Invoice');
     
-    // Owner Details
+    finalY += 7;
+
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(owner.name, 196, 48, { align: 'right' });
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(owner.email, 196, 54, { align: 'right' });
-    doc.text(`Invoice Date: ${dateStr}`, 196, 60, { align: 'right' });
-    
-    // Property and Unit Details
-    let yPos = 70;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Invoice For:', 14, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Property: ${property.name}`, 14, yPos + 6);
-    doc.text(`Unit: ${unit.name}`, 14, yPos + 11);
-    doc.text(`Handover Date: ${unit.handoverDate ? new Date(unit.handoverDate).toLocaleDateString() : 'N/A'}`, 14, yPos + 16);
-    yPos += 25;
+    doc.text('Final Balance Due:', 140, finalY, { align: 'right' });
+    doc.setTextColor((tenant.dueBalance || 0) > 0 ? '#dc2626' : '#16a34a');
+    doc.text(formatCurrency(tenant.dueBalance || 0), 196, finalY, { align: 'right' });
 
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Month', 'Description', 'Status', 'Amount']],
-        body: arrearsDetail.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
-        theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
-        foot: [[{ content: 'TOTAL DUE', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(totalDue)]],
-        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
-        columnStyles: {
-            3: { halign: 'right' }
-        },
-        didDrawCell: (data) => {
-            if (data.section === 'body' && data.column.index === 2) {
-                const status = data.cell.raw as string;
-                doc.setFont(doc.getFont().fontName, 'bold');
-                if (status === 'Paid') {
-                    doc.setTextColor(15, 118, 110); // tailwind teal-700
-                } else if (status === 'Pending') {
-                    doc.setTextColor(199, 24, 24); // tailwind red-600
-                }
-            }
-        },
-        willDrawCell: (data) => {
-            if (!(data.section === 'body' && data.column.index === 2)) {
-                doc.setFont(doc.getFont().fontName, 'normal');
-                doc.setTextColor(40, 40, 40);
-            }
-        },
-    });
 
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-    doc.setTextColor(40);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Please remit payment at your earliest convenience to avoid further penalties.', 14, yPos);
-
-    doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
 export const generateDashboardReportPDF = (
@@ -620,4 +591,74 @@ export const generateDashboardReportPDF = (
     });
 
     doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const generateVacantServiceChargeInvoicePDF = (
+    owner: PropertyOwner,
+    unit: Unit,
+    property: Property,
+    arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[],
+    totalDue: number
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    addHeader(doc, 'Service Charge Invoice');
+    
+    // Owner Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(owner.name, 196, 48, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(owner.email, 196, 54, { align: 'right' });
+    doc.text(`Invoice Date: ${dateStr}`, 196, 60, { align: 'right' });
+    
+    // Property and Unit Details
+    let yPos = 70;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice For:', 14, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Property: ${property.name}`, 14, yPos + 6);
+    doc.text(`Unit: ${unit.name}`, 14, yPos + 11);
+    doc.text(`Handover Date: ${unit.handoverDate ? new Date(unit.handoverDate).toLocaleDateString() : 'N/A'}`, 14, yPos + 16);
+    yPos += 25;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Month', 'Description', 'Status', 'Amount']],
+        body: arrearsDetail.map(item => [item.month, `Service Charge for Vacant Unit`, item.status, formatCurrency(item.amount)]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        foot: [[{ content: 'TOTAL DUE', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(totalDue)]],
+        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
+        columnStyles: {
+            3: { halign: 'right' }
+        },
+        didDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 2) {
+                const status = data.cell.raw as string;
+                doc.setFont(doc.getFont().fontName, 'bold');
+                if (status === 'Paid') {
+                    doc.setTextColor(15, 118, 110); // tailwind teal-700
+                } else if (status === 'Pending') {
+                    doc.setTextColor(199, 24, 24); // tailwind red-600
+                }
+            }
+        },
+        willDrawCell: (data) => {
+            if (!(data.section === 'body' && data.column.index === 2)) {
+                doc.setFont(doc.getFont().fontName, 'normal');
+                doc.setTextColor(40, 40, 40);
+            }
+        },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.setTextColor(40);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Please remit payment at your earliest convenience to avoid further penalties.', 14, yPos);
+
+    doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
