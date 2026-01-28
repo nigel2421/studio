@@ -65,7 +65,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     }
                     setCharges(generatedCharges);
 
-                    // Combine and sort
+                    // Combine and sort chronologically
                     const combined = [
                         ...paymentHistory.map(p => ({
                             id: p.id,
@@ -81,22 +81,22 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                             charge: c.amount,
                             payment: 0
                         }))
-                    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+                    ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-                    // Calculate running balance (from latest to oldest)
-                    let balance = tenant.dueBalance || 0;
-                    const finalLedger = combined.map(item => {
-                        const currentBalance = balance;
-                        if (item.payment > 0) {
-                            balance += item.payment;
-                        }
-                        if (item.charge > 0) {
-                            balance -= item.charge;
-                        }
-                        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: currentBalance };
+                    // Calculate opening balance
+                    const totalChargesInPeriod = combined.reduce((sum, item) => sum + item.charge, 0);
+                    const totalPaymentsInPeriod = combined.reduce((sum, item) => sum + item.payment, 0);
+                    const openingBalance = (tenant.dueBalance || 0) - (totalChargesInPeriod - totalPaymentsInPeriod);
+
+                    // Calculate running balance from oldest to newest
+                    let runningBalance = openingBalance;
+                    const ledgerWithBalance = combined.map(item => {
+                        runningBalance += (item.charge - item.payment);
+                        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance };
                     });
 
-                    setLedger(finalLedger);
+                    // Reverse for display (latest first)
+                    setLedger(ledgerWithBalance.reverse());
                 })
                 .catch(console.error)
                 .finally(() => setIsLoading(false));
