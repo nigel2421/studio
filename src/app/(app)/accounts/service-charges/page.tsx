@@ -183,7 +183,17 @@ export default function ServiceChargesPage() {
       const handoverDate = parseISO(unit.handoverDate!);
       if (isNaN(handoverDate.getTime())) return;
 
-      const firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+      const handoverDay = handoverDate.getDate();
+      let firstBillableMonth: Date;
+
+      if (handoverDay <= 10) {
+        // Handover on or before the 10th. Arrears start next month.
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+      } else {
+        // Handover after the 10th. Arrears start the month after next.
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+      }
+      
       const today = new Date();
       
       if (isAfter(firstBillableMonth, today)) return; 
@@ -720,4 +730,5 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
 

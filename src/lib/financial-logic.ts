@@ -109,8 +109,16 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     const leaseStartDate = new Date(tenant.lease.startDate);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-        // For homeowners, billing starts the month *after* handover.
-        billingStartDate = startOfMonth(addMonths(new Date(unit.handoverDate), 1));
+        // For homeowners, apply waiver logic based on handover date
+        const handoverDate = new Date(unit.handoverDate);
+        const handoverDay = handoverDate.getDate();
+        if (handoverDay <= 10) {
+            // Handover on or before the 10th. Arrears start next month.
+            billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+        } else {
+            // Handover after the 10th. Arrears start the month after next.
+            billingStartDate = startOfMonth(addMonths(handoverDate, 2));
+        }
     } else {
         billingStartDate = startOfMonth(leaseStartDate);
     }
