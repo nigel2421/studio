@@ -44,6 +44,7 @@ export default function LandlordsPage() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
+  const [showAllUnassigned, setShowAllUnassigned] = useState(false);
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -249,12 +250,19 @@ export default function LandlordsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {unassignedLandlordUnits.map((unit, index) => (
+              {(showAllUnassigned ? unassignedLandlordUnits : unassignedLandlordUnits.slice(0, 18)).map((unit, index) => (
                 <div key={index} className="px-3 py-1 text-xs font-semibold rounded-full bg-white border shadow-sm">
                   {unit.propertyName}: Unit {unit.name}
                 </div>
               ))}
             </div>
+            {unassignedLandlordUnits.length > 18 && (
+              <div className="mt-4">
+                <Button variant="link" className="p-0 h-auto text-xs text-amber-700 hover:text-amber-800" onClick={() => setShowAllUnassigned(!showAllUnassigned)}>
+                  {showAllUnassigned ? 'Show Less' : `... and ${unassignedLandlordUnits.length - 18} more`}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
