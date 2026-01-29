@@ -17,6 +17,7 @@ import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -40,6 +41,9 @@ export default function LandlordsPage() {
   
   const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -204,6 +208,12 @@ export default function LandlordsPage() {
   
   const filteredLandlords = landlords.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  const totalPages = Math.ceil(filteredLandlords.length / pageSize);
+  const paginatedLandlords = filteredLandlords.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -254,46 +264,60 @@ export default function LandlordsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredLandlords.map((landlord) => {
-            const assignedUnits = landlordUnitsMap.get(landlord.id) || [];
-            return (
-              <Card key={landlord.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>{landlord.name}</CardTitle>
-                      <CardDescription>{landlord.email}</CardDescription>
-                      <CardDescription>{landlord.phone}</CardDescription>
+        <>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {paginatedLandlords.map((landlord) => {
+              const assignedUnits = landlordUnitsMap.get(landlord.id) || [];
+              return (
+                <Card key={landlord.id} className="flex flex-col">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{landlord.name}</CardTitle>
+                        <CardDescription>{landlord.email}</CardDescription>
+                        <CardDescription>{landlord.phone}</CardDescription>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
+                        <Edit className="h-4 w-4 mr-2" /> Edit
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
-                      <Edit className="h-4 w-4 mr-2" /> Edit
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  {assignedUnits.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 pt-4 border-t">
-                      {assignedUnits.map((unit, index) => (
-                        <Badge variant="secondary" key={index} className="font-normal">
-                          {unit.propertyName}: Unit {unit.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned yet.</p>
-                  )}
-                </CardContent>
-                <CardFooter>
-                    <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Generate Statement
-                    </Button>
-                </CardFooter>
-              </Card>
-            )
-          })}
-        </div>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    {assignedUnits.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pt-4 border-t">
+                        {assignedUnits.map((unit, index) => (
+                          <Badge variant="secondary" key={index} className="font-normal">
+                            {unit.propertyName}: Unit {unit.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned yet.</p>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                      <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Generate Statement
+                      </Button>
+                  </CardFooter>
+                </Card>
+              )
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div className="mt-6">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={filteredLandlords.length}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
+            </div>
+          )}
+        </>
       )}
 
       {isManageDialogOpen && (
@@ -317,5 +341,3 @@ export default function LandlordsPage() {
     </div>
   );
 }
-
-    
