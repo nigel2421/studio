@@ -13,6 +13,12 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as nodemailer from "nodemailer";
 import {defineString} from "firebase-functions/params";
+import * as admin from "firebase-admin";
+import { format } from "date-fns";
+
+admin.initializeApp();
+const db = admin.firestore();
+
 
 // Define environment variables for email configuration
 const emailHost = defineString("EMAIL_HOST");
@@ -21,6 +27,7 @@ const emailUser = defineString("EMAIL_USER");
 const emailPass = defineString("EMAIL_PASS");
 
 setGlobalOptions({ 
+    minInstances: 1,
     maxInstances: 10,
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 });
@@ -47,7 +54,7 @@ const createTransporter = () => {
 export const sendPaymentReceipt = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 }, async (request) => {
-    const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes } = request.data;
+    const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes, tenantId } = request.data;
 
     // Validate essential data
     if (!tenantEmail || !tenantName || !amount || !date || !propertyName || !unitName) {
@@ -82,6 +89,22 @@ export const sendPaymentReceipt = onCall({
     try {
         await transporter.sendMail(mailOptions);
         logger.info(`Receipt sent to ${tenantEmail}`);
+
+        if (tenantId) {
+             await db.collection('communications').add({
+                recipients: [tenantEmail],
+                recipientCount: 1,
+                relatedTenantId: tenantId,
+                type: 'automation',
+                subType: 'Payment Receipt',
+                subject: "Your Payment Receipt",
+                body: mailOptions.html,
+                senderId: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'sent',
+            });
+        }
+
         return { success: true, message: "Receipt sent successfully." };
     } catch (error) {
         logger.error("Error sending email:", error);
@@ -137,3 +160,134 @@ export const sendCustomEmail = onCall({
         throw new HttpsError("internal", "Failed to send email. This is likely due to missing or incorrect SMTP credentials in your Firebase project's environment configuration. Please ensure EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASS secrets are set correctly.");
     }
 });
+
+
+export const checkAndSendLeaseReminders = onCall({
+    secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+}, async (request) => {
+    const tenantsRef = db.collection('tenants');
+    const propertiesRef = db.collection('properties');
+
+    const [tenantsSnapshot, propertiesSnap] = await Promise.all([
+        tenantsRef.where('status', '==', 'active').get(),
+        propertiesRef.get()
+    ]);
+
+    if (tenantsSnapshot.empty) {
+        return { success: true, message: "No active tenants found to process." };
+    }
+
+    const propertiesMap = new Map(propertiesSnap.docs.map(doc => [doc.id, doc.data()]));
+
+    const transporter = createTransporter();
+    let notificationsSent = 0;
+    let lateFeesApplied = 0;
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+    const currentPeriod = format(today, 'yyyy-MM');
+
+    const emailPromises = [];
+    const dbBatch = db.batch();
+
+    for (const doc of tenantsSnapshot.docs) {
+        const tenant = doc.data() as any;
+        
+        if (!tenant.dueBalance || tenant.dueBalance <= 0) continue;
+
+        let shouldSendEmail = false;
+        let subject = '';
+        let body = '';
+        let subType = '';
+        
+        // --- Late Fee Logic ---
+        const property = propertiesMap.get(tenant.propertyId);
+        const lateFee = property?.lateFee;
+        if (tenant.lease.paymentStatus === 'Overdue' && lateFee > 0 && tenant.lease.lastLateFeeAppliedPeriod !== currentPeriod) {
+            
+            dbBatch.update(doc.ref, {
+                dueBalance: admin.firestore.FieldValue.increment(lateFee),
+                'lease.lastLateFeeAppliedPeriod': currentPeriod
+            });
+            
+            const paymentRef = db.collection('payments').doc();
+            dbBatch.set(paymentRef, {
+                tenantId: doc.id,
+                amount: lateFee,
+                date: format(today, 'yyyy-MM-dd'),
+                notes: `Automated late fee for ${format(today, 'MMMM yyyy')}`,
+                rentForMonth: currentPeriod,
+                status: 'Paid',
+                type: 'Adjustment',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            lateFeesApplied++;
+        }
+
+        // --- Notification Logic ---
+        if (tenant.lease.paymentStatus === 'Overdue') {
+            shouldSendEmail = true;
+            subType = 'Overdue Notice';
+            subject = `Urgent: Overdue Balance for ${tenant.name}`;
+            body = `Dear ${tenant.name},\n\nThis is a notice regarding an overdue balance on your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease settle this amount immediately to avoid further action.\n\nThank you,\nEracov Properties`;
+        } 
+        else if (tenant.lease.paymentStatus === 'Pending' && dayOfMonth >= 2 && dayOfMonth <= 5) {
+            shouldSendEmail = true;
+            subType = 'Payment Reminder';
+            subject = `Reminder: Rent Payment Due Soon`;
+            body = `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent payment is due on the 5th of this month. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nThank you,\nEracov Properties`;
+        }
+
+        if (shouldSendEmail) {
+            notificationsSent++;
+            const mailOptions = {
+                from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
+                to: tenant.email,
+                subject: subject,
+                html: body.replace(/\n/g, '<br>')
+            };
+
+            emailPromises.push(transporter.sendMail(mailOptions));
+            
+            const commRef = db.collection('communications').doc();
+            dbBatch.set(commRef, {
+                recipients: [tenant.email],
+                recipientCount: 1,
+                relatedTenantId: doc.id,
+                type: 'automation',
+                subType: subType,
+                subject: subject,
+                body: mailOptions.html,
+                senderId: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'sent',
+            });
+        }
+    }
+    
+    // Commit all database writes (late fees, communication logs)
+    await dbBatch.commit();
+    
+    // Send all emails after DB writes are successful
+    if(emailPromises.length > 0) {
+        await Promise.all(emailPromises);
+    }
+    
+    const message = `Automation complete. Processed ${tenantsSnapshot.size} tenants, sent ${notificationsSent} notifications, and applied ${lateFeesApplied} late fees.`;
+    logger.info(message);
+
+    // Log the summary of the automation run
+    await db.collection('communications').add({
+        senderId: 'system',
+        type: 'automation',
+        subject: 'Lease Reminder & Late Fee Automation Run',
+        body: message,
+        recipientCount: notificationsSent,
+        timestamp: new Date().toISOString(),
+        status: 'sent',
+    });
+
+    return { success: true, message: message };
+});
+
+    

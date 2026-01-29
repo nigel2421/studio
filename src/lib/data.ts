@@ -1,3 +1,4 @@
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -17,14 +18,15 @@ import { format, startOfMonth, addMonths } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
 
-export async function logActivity(action: string) {
+export async function logActivity(action: string, userEmail?: string | null) {
     const user = auth.currentUser;
-    if (!user) return; // Don't log if user isn't authenticated
+    // Don't log if user isn't authenticated, unless an email is passed (for server-side logging)
+    if (!user && !userEmail) return; 
 
     try {
         await addDoc(collection(db, 'logs'), {
-            userId: user.uid,
-            userEmail: user.email,
+            userId: user?.uid || 'system',
+            userEmail: user?.email || userEmail || 'system',
             action,
             timestamp: new Date().toISOString(),
         });
@@ -32,6 +34,7 @@ export async function logActivity(action: string) {
         console.error("Error logging activity:", error);
     }
 }
+
 
 export async function logCommunication(data: Omit<Communication, 'id'>) {
     try {
@@ -51,8 +54,12 @@ export async function getUsers(): Promise<UserProfile[]> {
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
     try {
         const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if(!userSnap.exists()) throw new Error("User not found.");
+        const userEmail = userSnap.data().email;
+
         await updateDoc(userRef, { role });
-        await logActivity(`Updated role for user ${userId} to ${role}`);
+        await logActivity(`Updated role for user ${userEmail} to ${role}`);
     } catch (error: any) {
         console.error(`Error updating role for user ${userId}:`, error);
         if (error.code === 'permission-denied') {
@@ -114,9 +121,6 @@ export async function getProperties(): Promise<Property[]> {
 }
 
 export async function getTenants(): Promise<Tenant[]> {
-    // OPTIMIZATION: Removed fetching ALL water readings. 
-    // Water readings should be fetched on a per-tenant basis when needed, not for the entire list.
-    // The getTenant(id) function already handles fetching readings for a single tenant.
     const tenants = await getCollection<Tenant>('tenants');
     return tenants;
 }
@@ -140,20 +144,19 @@ export async function getProperty(id: string): Promise<Property | null> {
     return null;
 }
 
+async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
+    const readingsQuery = query(
+        collection(db, 'waterReadings'),
+        where('tenantId', '==', tenantId),
+        orderBy('createdAt', 'desc'),
+        limit(12)
+    );
+    const readingsSnapshot = await getDocs(readingsQuery);
+    return readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+}
+
 export async function getTenant(id: string): Promise<Tenant | null> {
-    const tenant = await getDocument<Tenant>('tenants', id);
-    if (tenant) {
-        const readingsQuery = query(
-            collection(db, 'waterReadings'),
-            where('tenantId', '==', id),
-            orderBy('createdAt', 'desc'),
-            limit(12)
-        );
-        const readingsSnapshot = await getDocs(readingsQuery);
-        const readings = readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
-        tenant.waterReadings = readings;
-    }
-    return tenant;
+    return getDocument<Tenant>('tenants', id);
 }
 
 export async function addTenant(data: {
@@ -350,19 +353,18 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     if (docSnap.exists()) {
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
-        // Eagerly fetch tenant details as they are needed for the tenant dashboard immediately.
         if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
-            const tenantData = await getTenant(userProfile.tenantId);
+            // Fetch tenant details and water readings in parallel
+            const [tenantData, waterReadings] = await Promise.all([
+                getTenant(userProfile.tenantId),
+                getTenantWaterReadings(userProfile.tenantId)
+            ]);
+            
             if (tenantData) {
+                tenantData.waterReadings = waterReadings;
                 userProfile.tenantDetails = tenantData;
             }
         }
-
-        // OPTIMIZATION: Removed fetching of landlordDetails and propertyOwnerDetails.
-        // This is a major performance bottleneck, fetching all properties on every auth check.
-        // This data should be fetched on the specific dashboard pages that need it,
-        // not during the global authentication process.
-
         return userProfile;
     }
     return null;

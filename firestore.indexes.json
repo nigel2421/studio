@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -78,6 +79,16 @@
       "fields": [
         {
           "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tenants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
           "order": "ASCENDING"
         }
       ]
