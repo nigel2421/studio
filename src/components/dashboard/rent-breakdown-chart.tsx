@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -59,11 +60,11 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
       return (
         <Card>
             <CardHeader>
-                <CardTitle>Rent Revenue by Ownership</CardTitle>
+                <CardTitle>Recent Rent Revenue by Ownership (90d)</CardTitle>
                 <CardDescription>Breakdown of rent collected by unit type and ownership.</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-center h-[300px]">
-                <p className="text-sm text-muted-foreground">No rent payment data available.</p>
+                <p className="text-sm text-muted-foreground">No rent payment data available for the last 90 days.</p>
             </CardContent>
         </Card>
       )
@@ -72,8 +73,8 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rent Revenue by Ownership</CardTitle>
-        <CardDescription>Breakdown of rent collected by unit type and ownership (SM vs. Landlord).</CardDescription>
+        <CardTitle>Recent Rent Revenue by Ownership (90d)</CardTitle>
+        <CardDescription>Breakdown of rent collected in the past 90 days by unit type and ownership.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

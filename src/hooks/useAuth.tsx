@@ -28,13 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user) {
         let profile = await getUserProfile(user.uid);
         if (!profile) {
-          // User exists in Auth, but not in Firestore. Create a profile.
-          // This is for users added manually via the Firebase console.
           try {
-            // Default role for manually added users. Admins can then elevate them.
             const defaultRole: UserRole = 'viewer';
             await createUserProfile(user.uid, user.email!, defaultRole);
-            // Re-fetch the newly created profile
             profile = await getUserProfile(user.uid);
           } catch (error) {
             console.error("Failed to create user profile on-the-fly:", error);

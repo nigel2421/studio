@@ -75,8 +75,8 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     { title: "Occupied Units", value: occupiedUnits, icon: Building2, color: "text-purple-500" },
     { title: "Vacant Units", value: vacantUnits, icon: Home, color: "text-gray-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
-    { title: "Eracovs Management Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
-    { title: "Pending Maintenance", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
+    { title: "Recent Mgmt. Revenue (90d)", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
+    { title: "Pending Maintenance (90d)", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
     { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
   ];
 

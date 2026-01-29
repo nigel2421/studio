@@ -3,10 +3,10 @@
 
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { getMaintenanceRequests, getTenants, getProperties, getAllPayments } from "@/lib/data";
+import { getMaintenanceRequests, getTenants, getProperties, getAllPayments, getAllPaymentsForReport, getAllMaintenanceRequestsForReport } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Building2, FileDown } from "lucide-react";
+import { ArrowRight, Building2, FileDown, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MaintenanceRequest, Tenant, Property, Payment, Unit, UnitType, unitTypes, UnitOrientation, unitOrientations } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
@@ -21,15 +21,16 @@ import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart"
 import { isSameMonth } from "date-fns";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
+import { useLoading } from "@/hooks/useLoading";
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const { startLoading, stopLoading, isLoading } = useLoading();
 
   useEffect(() => {
-    // Replaced real-time listeners with a single, parallelized fetch for performance.
     const fetchData = async () => {
       const [
         maintenanceData, 
@@ -53,123 +54,141 @@ export default function DashboardPage() {
   }, []);
   
   const handleExportPDF = async () => {
-    const { generateDashboardReportPDF } = await import('@/lib/pdf-generator');
-    // 1. Prepare stats data
-    const totalTenants = tenants.length;
-    const totalProperties = properties.length;
-    const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
-    const totalArrears = tenants
-      .filter(t => (t.dueBalance || 0) > 0)
-      .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
-    const totalUnits = properties.reduce((sum, p) => sum + (p.units?.length || 0), 0);
-    const occupiedUnits = (() => {
-      const occupiedUnitIdentifiers = new Set<string>();
-      tenants.forEach(tenant => {
-        occupiedUnitIdentifiers.add(`${tenant.propertyId}-${tenant.unitName}`);
-      });
-      properties.forEach(property => {
+    startLoading('Generating full report...');
+    try {
+      const { generateDashboardReportPDF } = await import('@/lib/pdf-generator');
+      
+      const [
+        allPaymentsForReport,
+        allMaintenanceForReport,
+        allTenantsForReport, // Assuming tenants/props are small enough or we accept this for the report
+        allPropertiesForReport
+      ] = await Promise.all([
+        getAllPaymentsForReport(),
+        getAllMaintenanceRequestsForReport(),
+        getTenants(),
+        getProperties()
+      ]);
+
+      const totalTenants = allTenantsForReport.length;
+      const totalProperties = allPropertiesForReport.length;
+      const pendingMaintenance = allMaintenanceForReport.filter(r => r.status !== 'Completed').length;
+      const totalArrears = allTenantsForReport
+        .filter(t => (t.dueBalance || 0) > 0)
+        .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+      const totalUnits = allPropertiesForReport.reduce((sum, p) => sum + (p.units?.length || 0), 0);
+      
+      const occupiedUnits = (() => {
+        const occupiedUnitIdentifiers = new Set<string>();
+        allTenantsForReport.forEach(tenant => {
+          occupiedUnitIdentifiers.add(`${tenant.propertyId}-${tenant.unitName}`);
+        });
+        allPropertiesForReport.forEach(property => {
+          if (Array.isArray(property.units)) {
+            property.units.forEach(unit => {
+              if (unit.status !== 'vacant') {
+                occupiedUnitIdentifiers.add(`${property.id}-${unit.name}`);
+              }
+            });
+          }
+        });
+        return occupiedUnitIdentifiers.size;
+      })();
+
+      const vacantUnits = totalUnits - occupiedUnits;
+      const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+      
+      const totalMgmtFees = allPaymentsForReport.reduce((sum, p) => {
+          if (p.type === 'Deposit') return sum;
+          const tenant = allTenantsForReport.find(t => t.id === p.tenantId);
+          if (!tenant) return sum;
+          const property = allPropertiesForReport.find(prop => prop.id === tenant.propertyId);
+          const unit = property?.units.find(u => u.name === tenant.unitName);
+          const unitRent = unit?.rentAmount || tenant.lease.rent || 0;
+          const serviceCharge = unit?.serviceCharge || tenant.lease.serviceCharge || 0;
+          const breakdown = calculateTransactionBreakdown(p.amount, unitRent, serviceCharge);
+          return sum + breakdown.managementFee;
+      }, 0);
+
+      const statsForPDF = [
+        { title: "Total Tenants", value: totalTenants },
+        { title: "Properties Managed", value: totalProperties },
+        { title: "Occupied Units", value: occupiedUnits },
+        { title: "Vacant Units", value: vacantUnits },
+        { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%` },
+        { title: "Eracovs Management Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}` },
+        { title: "Pending Maintenance", value: pendingMaintenance },
+        { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}` },
+      ];
+
+      const collectedThisMonth = allPaymentsForReport
+        .filter(p => p.status === 'Paid' && isSameMonth(new Date(p.date), new Date()))
+        .reduce((sum, p) => sum + p.amount, 0);
+      const totalOutstanding = allTenantsForReport.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+      const financialDataForPDF = [
+        { name: 'Collected This Month', amount: collectedThisMonth },
+        { name: 'Total Outstanding', amount: totalOutstanding },
+      ];
+      
+      const rentBreakdownForPDF = (() => {
+          const unitMap = new Map<string, Unit>();
+          allPropertiesForReport.forEach(p => {
+              if (p.units) {
+                  p.units.forEach(u => {
+                      unitMap.set(`${p.id}-${u.name}`, u);
+                  });
+              }
+          });
+          const breakdown: { [key in UnitType]?: { smRent: number, landlordRent: number } } = {};
+          unitTypes.forEach(type => {
+              breakdown[type] = { smRent: 0, landlordRent: 0 };
+          });
+          const rentPayments = allPaymentsForReport.filter(p => p.status === 'Paid' && p.type === 'Rent');
+          rentPayments.forEach(payment => {
+              const tenant = allTenantsForReport.find(t => t.id === payment.tenantId);
+              if (!tenant) return;
+              const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+              if (!unit || !unit.unitType) return;
+              if (breakdown[unit.unitType]) {
+                  if (unit.ownership === 'SM') {
+                      breakdown[unit.unitType]!.smRent += payment.amount;
+                  } else if (unit.ownership === 'Landlord') {
+                      breakdown[unit.unitType]!.landlordRent += payment.amount;
+                  }
+              }
+          });
+          return unitTypes.map(type => ({
+            unitType: type,
+            ...breakdown[type]
+          })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
+      })();
+      
+      const maintenanceBreakdownForPDF = (['New', 'In Progress', 'Completed'] as const).map(status => ({
+          status,
+          count: allMaintenanceForReport.filter(r => r.status === status).length
+      }));
+
+      const orientationCounts: { [key in UnitOrientation]?: number } = {};
+      allPropertiesForReport.forEach(property => {
         if (Array.isArray(property.units)) {
           property.units.forEach(unit => {
-            if (unit.status !== 'vacant') {
-              occupiedUnitIdentifiers.add(`${property.id}-${unit.name}`);
+            if (unit.unitOrientation) {
+              orientationCounts[unit.unitOrientation] = (orientationCounts[unit.unitOrientation] || 0) + 1;
             }
           });
         }
       });
-      return occupiedUnitIdentifiers.size;
-    })();
-    const vacantUnits = totalUnits - occupiedUnits;
-    const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
-    const totalMgmtFees = payments.reduce((sum, p) => {
-        if (p.type === 'Deposit') return sum;
-        const tenant = tenants.find(t => t.id === p.tenantId);
-        if (!tenant) return sum;
-        const property = properties.find(prop => prop.id === tenant.propertyId);
-        const unit = property?.units.find(u => u.name === tenant.unitName);
-        const unitRent = unit?.rentAmount || tenant.lease.rent || 0;
-        const serviceCharge = unit?.serviceCharge || tenant.lease.serviceCharge || 0;
-        const breakdown = calculateTransactionBreakdown(p.amount, unitRent, serviceCharge);
-        return sum + breakdown.managementFee;
-    }, 0);
-
-    const statsForPDF = [
-      { title: "Total Tenants", value: totalTenants },
-      { title: "Properties Managed", value: totalProperties },
-      { title: "Occupied Units", value: occupiedUnits },
-      { title: "Vacant Units", value: vacantUnits },
-      { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%` },
-      { title: "Eracovs Management Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}` },
-      { title: "Pending Maintenance", value: pendingMaintenance },
-      { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}` },
-    ];
-
-    // 2. Prepare financial data
-    const collectedThisMonth = payments
-      .filter(p => p.status === 'Paid' && isSameMonth(new Date(p.date), new Date()))
-      .reduce((sum, p) => sum + p.amount, 0);
-    const totalOutstanding = tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
-    const financialDataForPDF = [
-      { name: 'Collected This Month', amount: collectedThisMonth },
-      { name: 'Total Outstanding', amount: totalOutstanding },
-    ];
-    
-    // 3. Prepare rent breakdown data
-    const rentBreakdownForPDF = (() => {
-        const unitMap = new Map<string, Unit>();
-        properties.forEach(p => {
-            if (p.units) {
-                p.units.forEach(u => {
-                    unitMap.set(`${p.id}-${u.name}`, u);
-                });
-            }
-        });
-        const breakdown: { [key in UnitType]?: { smRent: number, landlordRent: number } } = {};
-        unitTypes.forEach(type => {
-            breakdown[type] = { smRent: 0, landlordRent: 0 };
-        });
-        const rentPayments = payments.filter(p => p.status === 'Paid' && p.type === 'Rent');
-        rentPayments.forEach(payment => {
-            const tenant = tenants.find(t => t.id === payment.tenantId);
-            if (!tenant) return;
-            const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-            if (!unit || !unit.unitType) return;
-            if (breakdown[unit.unitType]) {
-                if (unit.ownership === 'SM') {
-                    breakdown[unit.unitType]!.smRent += payment.amount;
-                } else if (unit.ownership === 'Landlord') {
-                    breakdown[unit.unitType]!.landlordRent += payment.amount;
-                }
-            }
-        });
-        return unitTypes.map(type => ({
-          unitType: type,
-          ...breakdown[type]
-        })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
-    })();
-    
-    // 4. Maintenance breakdown
-    const maintenanceBreakdownForPDF = (['New', 'In Progress', 'Completed'] as const).map(status => ({
-        status,
-        count: maintenanceRequests.filter(r => r.status === status).length
-    }));
-
-    // 5. Orientation breakdown
-    const orientationCounts: { [key in UnitOrientation]?: number } = {};
-    properties.forEach(property => {
-      if (Array.isArray(property.units)) {
-        property.units.forEach(unit => {
-          if (unit.unitOrientation) {
-            orientationCounts[unit.unitOrientation] = (orientationCounts[unit.unitOrientation] || 0) + 1;
-          }
-        });
-      }
-    });
-    const orientationBreakdownForPDF = unitOrientations.map(orientation => ({
-      name: orientation.toLowerCase().replace(/_/g, ' '),
-      value: orientationCounts[orientation] || 0,
-    })).filter(d => d.value > 0);
-    
-    generateDashboardReportPDF(statsForPDF, financialDataForPDF, rentBreakdownForPDF, maintenanceBreakdownForPDF, orientationBreakdownForPDF);
+      const orientationBreakdownForPDF = unitOrientations.map(orientation => ({
+        name: orientation.toLowerCase().replace(/_/g, ' '),
+        value: orientationCounts[orientation] || 0,
+      })).filter(d => d.value > 0);
+      
+      generateDashboardReportPDF(statsForPDF, financialDataForPDF, rentBreakdownForPDF, maintenanceBreakdownForPDF, orientationBreakdownForPDF);
+    } catch (error) {
+        console.error("Error generating PDF report:", error);
+    } finally {
+        stopLoading();
+    }
   }
 
   const recentRequests = maintenanceRequests
@@ -186,8 +205,8 @@ export default function DashboardPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Welcome, Property Manager</h2>
           <p className="text-sm text-muted-foreground">Here's a summary of your properties today.</p>
         </div>
-         <Button variant="outline" onClick={handleExportPDF}>
-          <FileDown className="mr-2 h-4 w-4" />
+         <Button variant="outline" onClick={handleExportPDF} disabled={isLoading}>
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
           Export PDF Report
         </Button>
       </div>
@@ -217,7 +236,7 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Recent Maintenance Requests</CardTitle>
-            <CardDescription>Top pending requests from tenants.</CardDescription>
+            <CardDescription>Top pending requests from the last 90 days.</CardDescription>
           </div>
           <Link href="/maintenance">
             <Button variant="outline" size="sm">

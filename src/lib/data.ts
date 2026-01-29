@@ -70,7 +70,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 }
 
 export async function getLogs(): Promise<Log[]> {
-    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
+    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(1000));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log));
 }
@@ -130,6 +130,19 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
 }
 
 export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const q = query(
+        collection(db, 'maintenanceRequests'), 
+        where('createdAt', '>=', ninetyDaysAgo),
+        orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+}
+
+export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
     const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
@@ -354,16 +367,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
         if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
-            // Fetch tenant details and water readings in parallel
-            const [tenantData, waterReadings] = await Promise.all([
-                getTenant(userProfile.tenantId),
-                getTenantWaterReadings(userProfile.tenantId)
-            ]);
-            
-            if (tenantData) {
-                tenantData.waterReadings = waterReadings;
-                userProfile.tenantDetails = tenantData;
-            }
+            userProfile.tenantDetails = await getTenant(userProfile.tenantId);
         }
         return userProfile;
     }
@@ -931,7 +935,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
 
     // Logic for Tenants (View their own documents)
     if (role === 'tenant') {
-        const tenant = await getTenant(userId) || (await getTenants()).find(t => t.email === userId);
+        const tenant = (await getTenants()).find(t => t.userId === userId);
 
         if (tenant) {
             // 1. Fetch Payments (Rent Receipts)
@@ -1261,8 +1265,22 @@ export async function getLandlordPropertiesAndUnits(landlordId: string): Promise
     return result;
 }
 
-export async function getAllPayments(): Promise<Payment[]> {
+export async function getAllPaymentsForReport(): Promise<Payment[]> {
     return getCollection<Payment>('payments');
+}
+
+export async function getAllPayments(): Promise<Payment[]> {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
+
+    const q = query(
+        collection(db, 'payments'),
+        where('date', '>=', dateStr),
+        orderBy('date', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 }
 
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {

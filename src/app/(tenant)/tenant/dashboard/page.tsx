@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,20 +22,25 @@ import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { getTenantWaterReadings } from '@/lib/data';
+
 
 export default function TenantDashboardPage() {
     const { userProfile } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const tenantDetails = userProfile?.tenantDetails;
-    const latestWaterReading = tenantDetails?.waterReadings?.[0];
     const [payments, setPayments] = useState<Payment[]>([]);
+    const [waterReadings, setWaterReadings] = useState<any[]>([]);
 
     useEffect(() => {
         if (userProfile?.tenantId) {
             getTenantPayments(userProfile.tenantId).then(setPayments);
+            getTenantWaterReadings(userProfile.tenantId).then(setWaterReadings);
         }
     }, [userProfile]);
+
+    const latestWaterReading = waterReadings?.[0];
 
     const handleSignOut = async () => {
         await signOut(auth);

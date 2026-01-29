@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord } from '@/lib/types';
-import { getTenants, getAllPayments, getProperties } from '@/lib/data';
+import { getTenants, getAllPaymentsForReport, getProperties } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -36,11 +36,10 @@ export default function LandlordDashboardPage() {
                 setLoading(true);
                 const [allTenants, allPayments, allProperties] = await Promise.all([
                     getTenants(),
-                    getAllPayments(),
-                    getProperties(), // Fetch properties here now
+                    getAllPaymentsForReport(), // Use the full report for landlord's view
+                    getProperties(),
                 ]);
 
-                // This logic is moved from getUserProfile
                 const landlordProperties: { property: Property, units: Unit[] }[] = [];
                 allProperties.forEach(p => {
                     const units = p.units.filter(u => u.landlordId === userProfile.landlordId);
@@ -68,7 +67,6 @@ export default function LandlordDashboardPage() {
                 });
                 setLoading(false);
             } else if (userProfile) {
-                // Not a landlord or data is missing, stop loading
                 setLoading(false);
             }
         }
