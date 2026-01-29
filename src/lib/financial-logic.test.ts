@@ -1,4 +1,3 @@
-
 import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
 import { Tenant, Agent, Unit } from './types';
 import { format, startOfMonth } from 'date-fns';
@@ -87,11 +86,12 @@ describe('Financial Logic Functions', () => {
     describe('processPayment', () => {
         it('should correctly process a full payment that clears the due balance', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 0 });
-            const updates = processPayment(tenant, 20000, 'Rent');
+            const paymentDate = new Date();
+            const updates = processPayment(tenant, 20000, 'Rent', paymentDate);
             expect(updates.dueBalance).toBe(0);
             expect(updates.accountBalance).toBe(0);
             expect(updates['lease.paymentStatus']).toBe('Paid');
-            expect(updates['lease.lastPaymentDate']).toBe(format(new Date(), 'yyyy-MM-dd'));
+            expect(updates['lease.lastPaymentDate']).toBe(format(paymentDate, 'yyyy-MM-dd'));
         });
 
         it('should handle overpayment correctly, adding the excess to accountBalance', () => {
@@ -104,7 +104,8 @@ describe('Financial Logic Functions', () => {
 
         it('should handle partial payment correctly, reducing the dueBalance', () => {
             const tenant = createMockTenant({ dueBalance: 20000, accountBalance: 0 });
-            const updates = processPayment(tenant, 15000, 'Rent');
+            const paymentDate = new Date('2023-03-04'); // before 5th
+            const updates = processPayment(tenant, 15000, 'Rent', paymentDate);
             expect(updates.dueBalance).toBe(5000);
             expect(updates.accountBalance).toBe(0);
             expect(updates['lease.paymentStatus']).toBe('Pending');

@@ -40,7 +40,7 @@ export function getRecommendedPaymentStatus(tenant: { dueBalance?: number }, dat
 /**
  * Process a new payment and update the tenant's balances.
  */
-export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type']): { [key: string]: any } {
+export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type'], paymentDate: Date = new Date()): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
 
@@ -55,7 +55,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
         return {
             dueBalance: newDueBalance,
             accountBalance: newAccountBalance,
-            'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }),
+            'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }, paymentDate),
         };
     }
 
@@ -75,8 +75,8 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
     return {
         dueBalance: newDueBalance,
         accountBalance: newAccountBalance,
-        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }),
-        'lease.lastPaymentDate': format(new Date(), 'yyyy-MM-dd')
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }, paymentDate),
+        'lease.lastPaymentDate': format(paymentDate, 'yyyy-MM-dd')
     };
 }
 
@@ -248,13 +248,13 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
         let loopDate = billingStartDate;
         const today = new Date();
         while (loopDate <= today) {
-            allCharges.push({ id: `charge-${format(loopDate, 'yyyy-MM')}`, date: loopDate, description: `${tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`, charge: monthlyCharge, payment: 0 });
+            allCharges.push({ id: `charge-${format(loopDate, 'yyyy-MM')}`, date: loopDate, description: `${tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`, charge: monthlyCharge, payment: 0 });
             loopDate = addMonths(loopDate, 1);
         }
     }
 
     // --- COMBINE WITH PAYMENTS ---
-    const allPayments = allTenantPayments.map(p => {
+    const allPaymentsAndAdjustments = allTenantPayments.map(p => {
         const isAdjustment = p.type === 'Adjustment';
         return {
             id: p.id,
@@ -265,7 +265,7 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
         };
     });
 
-    const combined = [...allCharges, ...allPayments].sort((a, b) => {
+    const combined = [...allCharges, ...allPaymentsAndAdjustments].sort((a, b) => {
         const dateDiff = a.date.getTime() - b.date.getTime();
         if (dateDiff !== 0) return dateDiff;
         if (a.charge > 0 && b.payment > 0) return -1;
@@ -307,5 +307,3 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
         finalAccountBalance: accountBalance
     };
 }
-
-    

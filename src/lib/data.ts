@@ -1,7 +1,3 @@
-
-
-
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -598,7 +594,7 @@ export async function batchProcessPayments(
                 createdAt: serverTimestamp() 
             });
             
-            const updates = processPayment(currentTenantState, entry.amount, entry.type);
+            const updates = processPayment(currentTenantState, entry.amount, entry.type, new Date(entry.date));
             
             currentTenantState = {
                 ...currentTenantState,
@@ -1181,10 +1177,10 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
 
     let firstBillableMonthDate: Date;
     if (handoverDay <= 10) {
-        // Billing starts this month.
+        // Handover on or before the 10th. Billing starts this month.
         firstBillableMonthDate = startOfMonth(handoverDate);
     } else {
-        // Billing starts next month.
+        // Handover after the 10th. Billing starts next month.
         firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
     }
     
