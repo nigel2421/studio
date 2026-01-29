@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
-import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isBefore } from 'date-fns';
+import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isBefore, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
@@ -148,15 +148,19 @@ export default function ServiceChargesPage() {
 
         let isBillable = false;
         if (unit.handoverDate) {
-            const handoverDate = parseISO(unit.handoverDate);
-            if (!isNaN(handoverDate.getTime())) {
+            const handoverDateSource = unit.handoverDate as any;
+            const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+                ? handoverDateSource.toDate()
+                : parseISO(handoverDateSource);
+            
+            if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
                 const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
                 if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
                     isBillable = true;
                 }
             }
-        } else {
+        } else if (unit.handoverStatus === 'Handed Over') {
             // For legacy units without a handover date, assume they are always billable.
             isBillable = true;
         }
@@ -224,8 +228,11 @@ export default function ServiceChargesPage() {
 
       let isBillable = false;
       if (unit.handoverDate) {
-        const handoverDate = parseISO(unit.handoverDate);
-        if (!isNaN(handoverDate.getTime())) {
+        const handoverDateSource = unit.handoverDate as any;
+        const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+            ? handoverDateSource.toDate()
+            : parseISO(handoverDateSource);
+        if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
           const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
           if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
@@ -280,8 +287,11 @@ export default function ServiceChargesPage() {
       const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
       if (!owner) return; 
 
-      const handoverDate = parseISO(unit.handoverDate!);
-      if (isNaN(handoverDate.getTime())) return;
+      const handoverDateSource = unit.handoverDate! as any;
+      const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+          ? handoverDateSource.toDate()
+          : parseISO(handoverDateSource);
+      if (!isValid(handoverDate)) return;
 
       const handoverDay = handoverDate.getDate();
       let firstBillableMonth: Date;
@@ -898,3 +908,6 @@ const VacantArrearsTab = ({
     
 
 
+
+
+    
