@@ -157,7 +157,7 @@ export async function getProperty(id: string): Promise<Property | null> {
     return null;
 }
 
-async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
+export async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
     const readingsQuery = query(
         collection(db, 'waterReadings'),
         where('tenantId', '==', tenantId),
@@ -367,7 +367,8 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
         if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
-            userProfile.tenantDetails = await getTenant(userProfile.tenantId);
+            const tenantDetails = await getTenant(userProfile.tenantId);
+            userProfile.tenantDetails = tenantDetails ?? undefined;
         }
         return userProfile;
     }
