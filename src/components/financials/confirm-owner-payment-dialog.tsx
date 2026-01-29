@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -46,13 +45,11 @@ export function ConfirmOwnerPaymentDialog({
     const totalDue = useMemo(() => accounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0), [accounts]);
     const [amount, setAmount] = useState<string>('');
     const [date, setDate] = useState<Date>(new Date());
-    const [notes, setNotes] = useState('');
     const [forMonth, setForMonth] = useState<string>('');
 
     useEffect(() => {
         if (isOpen) {
             setAmount(totalDue.toString());
-            setNotes('');
             setDate(new Date());
             setForMonth(format(new Date(), 'yyyy-MM'));
         }
@@ -60,7 +57,7 @@ export function ConfirmOwnerPaymentDialog({
 
     const handleSubmit = () => {
         if (Number(amount) > 0 && forMonth) {
-            onConfirm({ amount: Number(amount), date, notes, forMonth });
+            onConfirm({ amount: Number(amount), date, notes: '', forMonth });
         }
     };
 
@@ -108,14 +105,6 @@ export function ConfirmOwnerPaymentDialog({
                                 ))}
                             </SelectContent>
                         </Select>
-                    </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Input
-                            id="notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                        />
                     </div>
                 </div>
                 <DialogFooter>
