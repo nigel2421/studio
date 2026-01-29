@@ -26,20 +26,28 @@ import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for Rent tab
+  const [rentCurrentPage, setRentCurrentPage] = useState(1);
+  const [rentPageSize, setRentPageSize] = useState(10);
+  const [rentSearchTerm, setRentSearchTerm] = useState('');
+
+  // State for Service Charge tab
+  const [scCurrentPage, setScCurrentPage] = useState(1);
+  const [scPageSize, setScPageSize] = useState(10);
+  const [scSearchTerm, setScSearchTerm] = useState('');
+
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const fetchAllData = async () => {
     try {
-      // await runMonthlyReconciliation(); // This was causing status to reset after payment.
       const [tenantsData, propertiesData, paymentsData] = await Promise.all([
         getTenants(),
         getProperties(),
@@ -58,6 +66,7 @@ export default function AccountsPage() {
   }, []);
 
   const rentTenants = useMemo(() => tenants.filter(t => t.residentType === 'Tenant'), [tenants]);
+  const homeowners = useMemo(() => tenants.filter(t => t.residentType === 'Homeowner'), [tenants]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
@@ -77,35 +86,47 @@ export default function AccountsPage() {
     }
   };
 
-  const rentCollected = payments
-    .filter(p => p.type === 'Rent' && p.status === 'Paid')
+  const totalCollected = payments
+    .filter(p => (p.type === 'Rent' || p.type === 'ServiceCharge') && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const rentDue = rentTenants
-    .filter(t => t.lease?.paymentStatus === 'Pending' || t.lease?.paymentStatus === 'Overdue')
-    .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+  const totalArrears = tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
 
   const totalUnits = properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0);
   const occupiedUnits = tenants.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Rent Collected", value: `Ksh ${rentCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Total Arrears", value: `Ksh ${rentDue.toLocaleString()}`, icon: AlertCircle, color: "text-amber-500" },
+    { title: "Total Collected", value: `Ksh ${totalCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
+    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
     { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-blue-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
   ];
 
-  const filteredTenants = rentTenants.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.email.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtering for Rent tab
+  const filteredRentTenants = rentTenants.filter(t =>
+    t.name.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
+    t.unitName.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
+    t.email.toLowerCase().includes(rentSearchTerm.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filteredTenants.length / pageSize);
-  const paginatedTenants = filteredTenants.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+  const rentTotalPages = Math.ceil(filteredRentTenants.length / rentPageSize);
+  const paginatedRentTenants = filteredRentTenants.slice(
+    (rentCurrentPage - 1) * rentPageSize,
+    rentCurrentPage * rentPageSize
+  );
+
+  // Filtering for Service Charge tab
+  const filteredHomeowners = homeowners.filter(t =>
+    t.name.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
+    t.unitName.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
+    t.email.toLowerCase().includes(scSearchTerm.toLowerCase())
+  );
+
+  const scTotalPages = Math.ceil(filteredHomeowners.length / scPageSize);
+  const paginatedHomeowners = filteredHomeowners.slice(
+    (scCurrentPage - 1) * scPageSize,
+    scCurrentPage * scPageSize
   );
 
   const handleViewHistory = (tenant: Tenant) => {
@@ -139,91 +160,186 @@ export default function AccountsPage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tenant Financial Status</CardTitle>
-          <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
-            <div className="relative w-full sm:w-[300px]">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tenant, unit or email..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'financial_status.csv')}>
-              <DollarSign className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>Property</TableHead>
-                <TableHead>Rent Amount</TableHead>
-                <TableHead>Billed For</TableHead>
-                <TableHead>Excess (Cr)</TableHead>
-                <TableHead className="text-right">Payment Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedTenants.map((tenant) => (
-                <TableRow key={tenant.id}>
-                  <TableCell>
-                    <div className="font-medium">{tenant.name}</div>
-                    <div className="text-sm text-muted-foreground">{tenant.email}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{getPropertyName(tenant.propertyId)}</div>
-                    <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
-                  </TableCell>
-                  <TableCell>
-                    {tenant.lease && typeof tenant.lease.rent === 'number'
-                      ? `Ksh ${tenant.lease.rent.toLocaleString()}`
-                      : 'N/A'
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {tenant.lease?.lastBilledPeriod 
-                      ? format(new Date(tenant.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-green-600 font-semibold">
-                    Ksh {(tenant.accountBalance || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
-                      {tenant.lease?.paymentStatus || 'N/A'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleViewHistory(tenant)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
+      <Tabs defaultValue="rent">
+        <TabsList>
+            <TabsTrigger value="rent">Rent Status</TabsTrigger>
+            <TabsTrigger value="service-charge">Service Charge Status</TabsTrigger>
+        </TabsList>
+        <TabsContent value="rent" className="mt-4">
+            <Card>
+                <CardHeader>
+                <CardTitle>Rent Financial Status</CardTitle>
+                <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
+                    <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search tenant, unit or email..."
+                        className="pl-9"
+                        value={rentSearchTerm}
+                        onChange={(e) => setRentSearchTerm(e.target.value)}
+                    />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredRentTenants, 'rent_financial_status.csv')}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Export CSV
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <div className="p-4 border-t">
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={rentTenants.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
-          />
-        </div>
-      </Card>
+                </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead>Property</TableHead>
+                        <TableHead>Rent Amount</TableHead>
+                        <TableHead>Billed For</TableHead>
+                        <TableHead>Excess (Cr)</TableHead>
+                        <TableHead className="text-right">Payment Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {paginatedRentTenants.map((tenant) => (
+                        <TableRow key={tenant.id}>
+                        <TableCell>
+                            <div className="font-medium">{tenant.name}</div>
+                            <div className="text-sm text-muted-foreground">{tenant.email}</div>
+                        </TableCell>
+                        <TableCell>
+                            <div>{getPropertyName(tenant.propertyId)}</div>
+                            <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
+                        </TableCell>
+                        <TableCell>
+                            {tenant.lease && typeof tenant.lease.rent === 'number'
+                            ? `Ksh ${tenant.lease.rent.toLocaleString()}`
+                            : 'N/A'
+                            }
+                        </TableCell>
+                        <TableCell>
+                            {tenant.lease?.lastBilledPeriod 
+                            ? format(new Date(tenant.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-green-600 font-semibold">
+                            Ksh {(tenant.accountBalance || 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
+                            {tenant.lease?.paymentStatus || 'N/A'}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => handleViewHistory(tenant)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                            </Button>
+                        </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+                </CardContent>
+                <div className="p-4 border-t">
+                <PaginationControls
+                    currentPage={rentCurrentPage}
+                    totalPages={rentTotalPages}
+                    pageSize={rentPageSize}
+                    totalItems={filteredRentTenants.length}
+                    onPageChange={setRentCurrentPage}
+                    onPageSizeChange={setRentPageSize}
+                />
+                </div>
+            </Card>
+        </TabsContent>
+        <TabsContent value="service-charge" className="mt-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Service Charge Financial Status</CardTitle>
+                    <CardDescription>Detailed list of homeowner service charge information.</CardDescription>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
+                        <div className="relative w-full sm:w-[300px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search homeowner, unit or email..."
+                            className="pl-9"
+                            value={scSearchTerm}
+                            onChange={(e) => setScSearchTerm(e.target.value)}
+                        />
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredHomeowners, 'service_charge_status.csv')}>
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Export CSV
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Homeowner</TableHead>
+                                <TableHead>Property</TableHead>
+                                <TableHead>S/C Amount</TableHead>
+                                <TableHead>Billed For</TableHead>
+                                <TableHead>Excess (Cr)</TableHead>
+                                <TableHead className="text-right">Payment Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {paginatedHomeowners.map((homeowner) => (
+                            <TableRow key={homeowner.id}>
+                                <TableCell>
+                                    <div className="font-medium">{homeowner.name}</div>
+                                    <div className="text-sm text-muted-foreground">{homeowner.email}</div>
+                                </TableCell>
+                                <TableCell>
+                                    <div>{getPropertyName(homeowner.propertyId)}</div>
+                                    <div className="text-sm text-muted-foreground">Unit: {homeowner.unitName}</div>
+                                </TableCell>
+                                <TableCell>
+                                    {homeowner.lease && typeof homeowner.lease.serviceCharge === 'number'
+                                    ? `Ksh ${homeowner.lease.serviceCharge.toLocaleString()}`
+                                    : 'N/A'
+                                    }
+                                </TableCell>
+                                <TableCell>
+                                    {homeowner.lease?.lastBilledPeriod 
+                                    ? format(new Date(homeowner.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
+                                    : 'N/A'}
+                                </TableCell>
+                                <TableCell className="text-green-600 font-semibold">
+                                    Ksh {(homeowner.accountBalance || 0).toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Badge variant={getPaymentStatusVariant(homeowner.lease?.paymentStatus)}>
+                                    {homeowner.lease?.paymentStatus || 'N/A'}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm" onClick={() => handleViewHistory(homeowner)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+                <div className="p-4 border-t">
+                    <PaginationControls
+                        currentPage={scCurrentPage}
+                        totalPages={scTotalPages}
+                        pageSize={scPageSize}
+                        totalItems={filteredHomeowners.length}
+                        onPageChange={setScCurrentPage}
+                        onPageSizeChange={setScPageSize}
+                    />
+                </div>
+            </Card>
+        </TabsContent>
+      </Tabs>
 
       <TransactionHistoryDialog
         tenant={selectedTenant}
@@ -236,3 +352,4 @@ export default function AccountsPage() {
     </div>
   );
 }
+
