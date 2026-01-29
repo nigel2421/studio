@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary } from '@/lib/financial-utils';
 import { format, startOfMonth, addMonths, addDays, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { generateLedger } from './financial-logic';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -156,6 +157,27 @@ export const generateOwnerServiceChargeStatementPDF = (
          .filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
          .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
     );
+    
+    let yPos = 75;
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Your Units:', 14, yPos);
+    yPos += 6;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    ownerUnits.slice(0, 3).forEach(unit => {
+        const text = `- ${unit.propertyName} / ${unit.name} (${unit.unitType}): Service Charge ${formatCurrency(unit.serviceCharge || 0)}/mo`;
+        doc.text(text, 14, yPos);
+        yPos += 5;
+    });
+    if (ownerUnits.length > 3) {
+        doc.text(`...and ${ownerUnits.length - 3} more units.`, 14, yPos);
+        yPos += 5;
+    }
+
+    yPos += 5; 
 
     const ownerUnitIdentifiers = new Set(ownerUnits.map(u => `${u.propertyId}-${u.name}`));
     const relevantTenants = allTenants.filter(t => ownerUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
@@ -238,7 +260,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    let yPos = 75;
     const tableBody: (string | number)[][] = [];
 
     let dueBalance = openingDueBalance;
@@ -265,7 +286,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         let payment = item.payment;
         totalPaymentsInPeriod += payment;
         if (dueBalance > 0) {
-            if (dueBalance >= payment) {
+             if (dueBalance >= payment) {
                 dueBalance -= payment;
                 payment = 0;
             } else {
@@ -279,15 +300,15 @@ export const generateOwnerServiceChargeStatementPDF = (
             format(item.date, 'dd MMM yyyy'),
             item.transactionType,
             item.details,
-            item.charge > 0 ? formatCurrency(item.charge) : '',
-            item.payment > 0 ? formatCurrency(item.payment) : '',
+            charge > 0 ? formatCurrency(charge) : '',
+            payment > 0 ? formatCurrency(payment) : '',
             formatCurrency(dueBalance),
         ]);
     });
     
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Transactions', 'Details', 'Charge', 'Payments', 'Balance']],
+        head: [['Date', 'Transactions', 'Details', 'S.Charge', 'Payments', 'Balance']],
         body: tableBody,
         foot: [
              [
@@ -299,11 +320,14 @@ export const generateOwnerServiceChargeStatementPDF = (
         ],
         theme: 'striped',
         headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
-        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
         columnStyles: {
-            3: { halign: 'right' },
-            4: { halign: 'right' },
-            5: { halign: 'right' },
+            0: { cellWidth: 22 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 'auto' },
+            3: { halign: 'right', cellWidth: 25 },
+            4: { halign: 'right', cellWidth: 25 },
+            5: { halign: 'right', cellWidth: 25 },
         },
     });
     
@@ -485,120 +509,22 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.setFontSize(10);
     doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
 
-
-    // --- GENERATE ALL CHARGES ---
-    const allCharges: { date: Date, description: string, charge: number, payment: number, id: string }[] = [];
-    const leaseStartDate = new Date(tenant.lease.startDate);
-
-    // 1. Initial deposits
-    if (tenant.securityDeposit && tenant.securityDeposit > 0) {
-        allCharges.push({
-            id: 'charge-security-deposit',
-            date: leaseStartDate,
-            description: 'Security Deposit',
-            charge: tenant.securityDeposit,
-            payment: 0,
-        });
-    }
-    if (tenant.waterDeposit && tenant.waterDeposit > 0) {
-         allCharges.push({
-            id: 'charge-water-deposit',
-            date: leaseStartDate,
-            description: 'Water Deposit',
-            charge: tenant.waterDeposit,
-            payment: 0,
-        });
-    }
-    
-    // 2. Generate monthly charges
-    if (monthlyCharge > 0) {
-        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
-        
-        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
-            ? startOfMonth(handoverDate)
-            : startOfMonth(leaseStartDate);
-
-        let loopDate = billingStartDate;
-        const today = new Date();
-        while (loopDate <= today) {
-            allCharges.push({
-                id: `charge-${format(loopDate, 'yyyy-MM')}`,
-                date: loopDate,
-                description: `${tenant.residentType === 'Homeowner' ? 'Service Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`,
-                charge: monthlyCharge,
-                payment: 0,
-            });
-            loopDate = addMonths(loopDate, 1);
-        }
-    }
-
-    // --- COMBINE WITH PAYMENTS ---
-    const allPayments = payments.map(p => {
-        const isAdjustment = p.type === 'Adjustment';
-        return {
-            id: p.id,
-            date: new Date(p.date),
-            description: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
-            charge: isAdjustment && p.amount > 0 ? p.amount : 0, // Debits are charges
-            payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), // Credits are payments
-        };
-    });
-
-    const combined = [...allCharges, ...allPayments].sort((a, b) => {
-        const dateDiff = a.date.getTime() - b.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        // If on the same day, charges come before payments
-        if (a.charge > 0 && b.payment > 0) return -1;
-        if (a.payment > 0 && b.charge > 0) return 1;
-        return 0;
-    });
-
-    // --- CALCULATE RUNNING BALANCE ---
-    let dueBalance = 0;
-    let accountBalance = 0;
-
-    const finalLedger = combined.map(item => {
-        dueBalance += item.charge;
-        
-        if (accountBalance > 0) {
-            if (accountBalance >= dueBalance) {
-                accountBalance -= dueBalance;
-                dueBalance = 0;
-            } else {
-                dueBalance -= accountBalance;
-                accountBalance = 0;
-            }
-        }
-        
-        let paymentAmount = item.payment;
-        if (paymentAmount > 0) {
-            if (paymentAmount >= dueBalance) {
-                paymentAmount -= dueBalance;
-                dueBalance = 0;
-                accountBalance += paymentAmount;
-            } else {
-                dueBalance -= paymentAmount;
-            }
-        }
-
-        return { ...item, balance: dueBalance };
-    });
+    const { ledger: finalLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, properties);
 
     const tableBodyData = finalLedger.map(t => [
-        format(t.date, 'P'),
+        t.date,
         t.description,
         t.charge > 0 ? formatCurrency(t.charge) : '',
         t.payment > 0 ? formatCurrency(t.payment) : '',
         formatCurrency(t.balance)
     ]);
-
+    
+    const chargeColumnTitle = tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Charge';
     const totalCharges = finalLedger.reduce((sum, item) => sum + item.charge, 0);
     const totalPayments = finalLedger.reduce((sum, item) => sum + item.payment, 0);
     
-    const chargeColumnTitle = tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Charge';
-
     autoTable(doc, {
-        startY: 75,
+        startY: 80, // Increased startY for more space
         head: [['Date', 'Description', chargeColumnTitle, 'Payment', 'Balance']],
         body: tableBodyData,
         foot: [[
@@ -609,11 +535,13 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         ]],
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] },
-        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] }, // slate-100 bg, slate-900 text
         columnStyles: {
-            2: { halign: 'right' },
-            3: { halign: 'right' },
-            4: { halign: 'right' }
+            0: { cellWidth: 25 },
+            1: { cellWidth: 'auto' },
+            2: { halign: 'right', cellWidth: 30 },
+            3: { halign: 'right', cellWidth: 30 },
+            4: { halign: 'right', cellWidth: 30 }
         }
     });
     
@@ -835,5 +763,3 @@ export const generateVacantServiceChargeInvoicePDF = (
 };
 
   
-
-    
