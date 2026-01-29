@@ -141,7 +141,6 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     addHeader(doc, 'Service Charge Statement');
     
-    // Owner Details
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(owner.name, 196, 48, { align: 'right' });
@@ -152,24 +151,21 @@ export const generateOwnerServiceChargeStatementPDF = (
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
     doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
 
-    // 1. Get all units owned by this owner
     const ownerUnits = allProperties.flatMap(p => 
         p.units
          .filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
          .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
     );
 
-    // 2. Get all payments made for these units
     const ownerUnitIdentifiers = new Set(ownerUnits.map(u => `${u.propertyId}-${u.name}`));
     const relevantTenants = allTenants.filter(t => ownerUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
     const relevantTenantIds = relevantTenants.map(t => t.id);
 
     const serviceChargePayments = allPayments.filter(p =>
         relevantTenantIds.includes(p.tenantId) && 
-        (p.type === 'ServiceCharge' || p.type === 'Rent') // Homeowners rent is service charge
+        (p.type === 'ServiceCharge' || p.type === 'Rent')
     );
 
-    // 3. Generate monthly charges for ALL TIME for relevant tenants
     const generatedCharges: { date: Date, description: string, amount: number }[] = [];
     relevantTenants.forEach(tenant => {
         const unit = ownerUnits.find(u => u.propertyId === tenant.propertyId && u.name === tenant.unitName);
@@ -178,9 +174,8 @@ export const generateOwnerServiceChargeStatementPDF = (
         const monthlyCharge = unit.serviceCharge || 0;
         if (monthlyCharge <= 0) return;
 
-        let loopDate = startOfMonth(new Date(tenant.lease.startDate)); // Use tenant's lease start
+        let loopDate = startOfMonth(new Date(tenant.lease.startDate));
         if (unit.handoverDate) {
-            // If handover date is present, billing starts month after
             loopDate = startOfMonth(addMonths(new Date(unit.handoverDate), 1));
         }
         
@@ -195,7 +190,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    // 4. Combine ALL charges and payments
     const combined = [
          ...serviceChargePayments.map(p => ({
             date: new Date(p.date),
@@ -213,7 +207,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         }))
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // 5. Calculate opening balance as of `startDate`
     let openingBalance = 0;
     combined.forEach(item => {
         if (item.date < startDate) {
@@ -221,24 +214,20 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    // 6. Build ledger table for the specified period
     let yPos = 75;
     const tableBody: (string | number)[][] = [];
 
-    tableBody.push([
-        format(startDate, 'dd MMM yyyy'),
-        '***Opening Balance***',
-        '',
-        '',
-        '',
-        formatCurrency(openingBalance),
-    ]);
-
     let runningBalance = openingBalance;
+    let totalChargesInPeriod = 0;
+    let totalPaymentsInPeriod = 0;
+
     combined.forEach(item => {
         if (item.date < startDate || item.date > endDate) return;
 
         runningBalance += item.charge - item.payment;
+        totalChargesInPeriod += item.charge;
+        totalPaymentsInPeriod += item.payment;
+
         tableBody.push([
             format(item.date, 'dd MMM yyyy'),
             item.transactionType,
@@ -249,27 +238,42 @@ export const generateOwnerServiceChargeStatementPDF = (
         ]);
     });
 
+    let balanceLabel = 'Balance';
+    let balanceColor = '#000000';
+    if (runningBalance > 0) {
+        balanceLabel = 'Balance Due';
+        balanceColor = '#dc2626';
+    } else if (runningBalance < 0) {
+        balanceLabel = 'Credit Balance';
+        balanceColor = '#16a34a';
+    }
+    
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Transactions', 'Details', 'Vatable Amount', 'Payments', 'Balance']],
+        head: [['Date', 'Transactions', 'Details', 'Charge', 'Payments', 'Balance']],
         body: tableBody,
+        foot: [
+             [
+                { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: formatCurrency(totalChargesInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: formatCurrency(totalPaymentsInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: '' }
+            ],
+            [
+                { content: balanceLabel, colSpan: 5, styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: formatCurrency(Math.abs(runningBalance)), styles: { fontStyle: 'bold', halign: 'right', textColor: balanceColor } }
+            ]
+        ],
         theme: 'striped',
         headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
+        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
         columnStyles: {
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' },
         },
     });
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-
-    // Summary
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Final Balance Due:', 140, yPos, { align: 'right' });
-    doc.setTextColor(runningBalance > 0 ? '#dc2626' : '#16a34a');
-    doc.text(formatCurrency(runningBalance), 196, yPos, { align: 'right' });
-
+    
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
@@ -335,7 +339,7 @@ export const generateLandlordStatementPDF = (
         startY: yPos,
         body: summaryData,
         theme: 'plain',
-        styles: { fontSize: 10 },
+        styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
