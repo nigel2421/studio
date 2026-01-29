@@ -2,8 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant, addPayment } from '@/lib/data';
-import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
+import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant, addPayment, getLandlords } from '@/lib/data';
+import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +73,7 @@ export default function ServiceChargesPage() {
   
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
+  const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
 
@@ -89,17 +90,19 @@ export default function ServiceChargesPage() {
 
   const fetchData = async () => {
     try {
-      const [propertiesData, ownersData, tenantsData, paymentsData] = await Promise.all([
+      const [propertiesData, ownersData, tenantsData, paymentsData, landlordsData] = await Promise.all([
         getProperties(),
         getPropertyOwners(),
         getTenants(),
         getAllPayments(),
+        getLandlords(),
       ]);
       
       setAllProperties(propertiesData);
       setAllOwners(ownersData);
       setAllTenants(tenantsData);
       setAllPayments(paymentsData);
+      setAllLandlords(landlordsData);
 
     } catch (error) {
       console.error("Failed to fetch service charge data:", error);
@@ -127,7 +130,16 @@ export default function ServiceChargesPage() {
     });
 
     const clientOccupiedServiceChargeAccounts = clientOccupiedUnits.map(unit => {
-        const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+        let owner: { id: string; name: string } | undefined;
+
+        if (unit.landlordId) {
+            owner = allLandlords.find(l => l.id === unit.landlordId);
+        }
+        
+        if (!owner) {
+            owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+        }
+
         const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
         
         let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
@@ -175,7 +187,16 @@ export default function ServiceChargesPage() {
     });
     
     const managedVacantServiceChargeAccounts = managedVacantUnits.map(unit => {
-      const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+      let owner: { id: string; name: string } | undefined;
+
+      if (unit.landlordId) {
+          owner = allLandlords.find(l => l.id === unit.landlordId);
+      }
+      
+      if (!owner) {
+          owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+      }
+
       const homeownerTenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
@@ -312,7 +333,7 @@ export default function ServiceChargesPage() {
 
     setArrearsAccounts(vacantArrears);
 
-  }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments]);
+  }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments, allLandlords]);
 
   const handleViewHistory = async (account: ServiceChargeAccount) => {
     startLoading("Fetching resident details...");
@@ -426,7 +447,7 @@ export default function ServiceChargesPage() {
                     tenantId: tenant.id,
                     amount: amountToApply,
                     date: format(paymentData.date, 'yyyy-MM-dd'),
-                    notes: paymentData.notes,
+                    notes: '',
                     rentForMonth: paymentData.forMonth,
                     status: 'Paid',
                     type: 'ServiceCharge',
