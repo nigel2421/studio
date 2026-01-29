@@ -1,8 +1,9 @@
+
 'use client';
 
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { listenToMaintenanceRequests, listenToTenants, listenToProperties, listenToPayments } from "@/lib/data";
+import { getMaintenanceRequests, getTenants, getProperties, getAllPayments } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2, FileDown } from "lucide-react";
@@ -28,17 +29,27 @@ export default function DashboardPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
-    const unsubMaintenance = listenToMaintenanceRequests(setMaintenanceRequests);
-    const unsubTenants = listenToTenants(setTenants);
-    const unsubProperties = listenToProperties(setProperties);
-    const unsubPayments = listenToPayments(setPayments);
+    // Replaced real-time listeners with a single, parallelized fetch for performance.
+    const fetchData = async () => {
+      const [
+        maintenanceData, 
+        tenantsData, 
+        propertiesData, 
+        paymentsData
+      ] = await Promise.all([
+        getMaintenanceRequests(),
+        getTenants(),
+        getProperties(),
+        getAllPayments()
+      ]);
 
-    return () => {
-      unsubMaintenance();
-      unsubTenants();
-      unsubProperties();
-      unsubPayments();
+      setMaintenanceRequests(maintenanceData);
+      setTenants(tenantsData);
+      setProperties(propertiesData);
+      setPayments(paymentsData);
     };
+
+    fetchData();
   }, []);
   
   const handleExportPDF = async () => {
