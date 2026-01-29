@@ -299,7 +299,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         ],
         theme: 'striped',
         headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
-        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
         columnStyles: {
             3: { halign: 'right' },
             4: { halign: 'right' },
@@ -471,15 +471,20 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
         : (tenant.lease.rent || 0);
     const chargeLabel = tenant.residentType === 'Homeowner' ? 'Monthly Service Charge' : 'Monthly Rent';
-
-    doc.setFontSize(12);
+    
+    // Add tenant details to the left
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(tenant.name, 196, 48, { align: 'right' });
-    doc.setFontSize(10);
+    doc.text(`STATEMENT FOR:`, 14, 48);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Unit: ${tenant.unitName} (${unit?.unitType || 'N/A'})`, 196, 54, { align: 'right' });
-    doc.text(`${chargeLabel}: ${formatCurrency(monthlyCharge)}`, 196, 60, { align: 'right' });
-    doc.text(`Date Issued: ${dateStr}`, 196, 66, { align: 'right' });
+    doc.text(tenant.name, 14, 54);
+    doc.text(`Unit: ${tenant.unitName} (${unit?.unitType || 'N/A'})`, 14, 60);
+    doc.text(`${chargeLabel}: ${formatCurrency(monthlyCharge)}`, 14, 66);
+    
+    // Right-aligned info
+    doc.setFontSize(10);
+    doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
+
 
     // --- GENERATE ALL CHARGES ---
     const allCharges: { date: Date, description: string, charge: number, payment: number, id: string }[] = [];
@@ -582,17 +587,19 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     const tableBodyData = finalLedger.map(t => [
         format(t.date, 'P'),
         t.description,
-        t.charge > 0 ? formatCurrency(t.charge) : '-',
-        t.payment > 0 ? formatCurrency(t.payment) : '-',
+        t.charge > 0 ? formatCurrency(t.charge) : '',
+        t.payment > 0 ? formatCurrency(t.payment) : '',
         formatCurrency(t.balance)
     ]);
 
     const totalCharges = finalLedger.reduce((sum, item) => sum + item.charge, 0);
     const totalPayments = finalLedger.reduce((sum, item) => sum + item.payment, 0);
+    
+    const chargeColumnTitle = tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Charge';
 
     autoTable(doc, {
         startY: 75,
-        head: [['Date', 'Description', 'Charge', 'Payment', 'Balance']],
+        head: [['Date', 'Description', chargeColumnTitle, 'Payment', 'Balance']],
         body: tableBodyData,
         foot: [[
             { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -602,7 +609,7 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         ]],
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] },
-        footStyles: { fillColor: [239, 246, 255], textColor: [0,0,0] },
+        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
         columnStyles: {
             2: { halign: 'right' },
             3: { halign: 'right' },
@@ -610,23 +617,9 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         }
     });
     
-    let finalY = (doc as any).lastAutoTable.finalY + 15;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    
-    if (accountBalance > 0) {
-        doc.text('Credit Balance:', 140, finalY, { align: 'right' });
-        doc.setTextColor('#16a34a'); // Green for credit
-        doc.text(formatCurrency(accountBalance), 196, finalY, { align: 'right' });
-    } else {
-        doc.text('Final Balance Due:', 140, finalY, { align: 'right' });
-        doc.setTextColor(dueBalance > 0 ? '#dc2626' : '#16a34a'); // Red for due, green for zero
-        doc.text(formatCurrency(dueBalance), 196, finalY, { align: 'right' });
-    }
-    
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
 
 export const generateDashboardReportPDF = (
     stats: { title: string; value: string | number }[],
