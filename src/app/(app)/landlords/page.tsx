@@ -43,7 +43,7 @@ export default function LandlordsPage() {
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(2);
 
   const fetchData = () => {
     startLoading('Loading property data...');

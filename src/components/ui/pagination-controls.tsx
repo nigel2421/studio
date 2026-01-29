@@ -32,7 +32,7 @@ export function PaginationControls({
                         <SelectValue placeholder={pageSize} />
                     </SelectTrigger>
                     <SelectContent side="top">
-                        {[10, 20, 50, 100].map((size) => (
+                        {[2, 4, 6, 10, 20].map((size) => (
                             <SelectItem key={size} value={size.toString()}>
                                 {size}
                             </SelectItem>
