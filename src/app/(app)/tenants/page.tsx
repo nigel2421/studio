@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getTenants, getProperties, archiveTenant } from "@/lib/data";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ import { Input } from '@/components/ui/input';
 import { useLoading } from '@/hooks/useLoading';
 
 export default function TenantsPage() {
-    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [allResidents, setAllResidents] = useState<Tenant[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const { toast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
@@ -51,20 +51,22 @@ export default function TenantsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    const fetchTenants = () => {
-        getTenants().then(setTenants);
+    const fetchResidents = () => {
+        getTenants().then(setAllResidents);
     }
 
     useEffect(() => {
-        fetchTenants();
+        fetchResidents();
         getProperties().then(setProperties);
     }, []);
+
+    const tenants = useMemo(() => allResidents.filter(r => r.residentType === 'Tenant'), [allResidents]);
 
     const handleArchive = async (tenantId: string) => {
         startLoading('Archiving resident...');
         try {
             await archiveTenant(tenantId);
-            fetchTenants();
+            fetchResidents();
             toast({
                 title: "Resident Archived",
                 description: "The occupant has been moved to the archived list.",
@@ -310,4 +312,5 @@ export default function TenantsPage() {
             )}
         </div>
     );
-}
+
+    
