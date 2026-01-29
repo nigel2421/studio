@@ -187,11 +187,11 @@ export default function ServiceChargesPage() {
       let firstBillableMonth: Date;
 
       if (handoverDay <= 10) {
-        // Handover on or before the 10th. Arrears start next month.
-        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+        // Handover on or before the 10th. Billing starts this month.
+        firstBillableMonth = startOfMonth(handoverDate);
       } else {
-        // Handover after the 10th. Arrears start the month after next.
-        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+        // Handover after the 10th. Billing starts next month.
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
       }
       
       const today = new Date();
@@ -732,3 +732,6 @@ const VacantArrearsTab = ({
 }
 
 
+
+
+    

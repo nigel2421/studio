@@ -109,15 +109,15 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     const leaseStartDate = new Date(tenant.lease.startDate);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-        // For homeowners, apply waiver logic based on handover date
+        // For homeowners, billing starts based on handover date
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
         if (handoverDay <= 10) {
-            // Handover on or before the 10th. Arrears start next month.
-            billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+            // Handover on or before the 10th. Billing starts this month.
+            billingStartDate = startOfMonth(handoverDate);
         } else {
-            // Handover after the 10th. Arrears start the month after next.
-            billingStartDate = startOfMonth(addMonths(handoverDate, 2));
+            // Handover after the 10th. Billing starts next month.
+            billingStartDate = startOfMonth(addMonths(handoverDate, 1));
         }
     } else {
         billingStartDate = startOfMonth(leaseStartDate);
@@ -240,9 +240,11 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
     
     if (monthlyCharge > 0) {
         const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
+        
         const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
             ? startOfMonth(addMonths(handoverDate, 1))
             : startOfMonth(leaseStartDate);
+
         let loopDate = billingStartDate;
         const today = new Date();
         while (loopDate <= today) {
@@ -305,3 +307,5 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
         finalAccountBalance: accountBalance
     };
 }
+
+    

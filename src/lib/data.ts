@@ -1,6 +1,7 @@
 
 
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -1176,12 +1177,21 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
 
     const serviceCharge = unit.serviceCharge || 0;
     const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
-    // Billing starts the month after handover
-    const firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
-    const firstBillablePeriod = format(firstBillableMonthDate, 'yyyy-MM');
+    const handoverDay = handoverDate.getDate();
 
-    // Per user feedback, the first billable month is considered paid.
-    // So we set the initial due balance to 0, but mark the first month as "billed".
+    let firstBillableMonthDate: Date;
+    if (handoverDay <= 10) {
+        // Billing starts this month.
+        firstBillableMonthDate = startOfMonth(handoverDate);
+    } else {
+        // Billing starts next month.
+        firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
+    }
+    
+    // The last billed period is the month *before* the first billable month.
+    const lastBilledPeriodDate = addMonths(firstBillableMonthDate, -1);
+    const lastBilledPeriod = format(lastBilledPeriodDate, 'yyyy-MM');
+
     const newTenantData = {
         name: owner.name,
         email: owner.email,
@@ -1197,8 +1207,8 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
             rent: 0,
             serviceCharge: serviceCharge,
-            paymentStatus: 'Paid' as const, // Start as paid since first month is covered
-            lastBilledPeriod: firstBillablePeriod, // Mark first month as billed
+            paymentStatus: 'Paid' as const, // Start as paid, reconciliation will create first charge.
+            lastBilledPeriod: lastBilledPeriod, // Set to month before first charge
         },
         securityDeposit: 0,
         waterDeposit: 0,
@@ -1409,3 +1419,5 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     });
     return unsubscribe;
 }
+
+    
