@@ -2,6 +2,7 @@
 
 
 
+
 export type Property = {
   id: string;
   name: string;
@@ -219,6 +220,7 @@ export type UserProfile = {
 export type Log = {
   id: string;
   userId: string;
+  userEmail?: string;
   action: string;
   timestamp: string;
 }

@@ -2,8 +2,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getLogs, getUserProfile } from '@/lib/data';
-import type { Log, UserProfile } from '@/lib/types';
+import { getLogs } from '@/lib/data';
+import type { Log } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,7 +15,6 @@ import { downloadCSV } from '@/lib/utils';
 
 export default function LogsPage() {
   const [logs, setLogs] = useState<Log[]>([]);
-  const [users, setUsers] = useState<Map<string, UserProfile>>(new Map());
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const { user, userProfile, isLoading } = useAuth();
@@ -34,32 +33,19 @@ export default function LogsPage() {
       async function fetchData() {
         const logData = await getLogs();
         setLogs(logData);
-
-        const userIds = [...new Set(logData.map(log => log.userId))];
-        const userPromises = userIds.map(id => getUserProfile(id));
-        const userResults = await Promise.all(userPromises);
-
-        const userMap = new Map<string, UserProfile>();
-        userResults.forEach(user => {
-          if (user) {
-            userMap.set(user.id, user);
-          }
-        });
-        setUsers(userMap);
       }
       fetchData();
     }
   }, [userProfile, user]);
 
-  const getUserNameOrEmail = (userId: string) => {
-    const user = users.get(userId);
-    return user?.name || user?.email || 'Unknown';
+  const getUserNameOrEmail = (log: Log) => {
+    return log.userEmail || log.userId;
   };
 
   const handleDownloadCSV = () => {
     const dataToExport = logs.map(log => ({
       Date: new Date(log.timestamp).toLocaleString(),
-      User: getUserNameOrEmail(log.userId),
+      User: getUserNameOrEmail(log),
       Action: log.action,
     }));
     downloadCSV(dataToExport, 'activity_logs.csv');
@@ -103,7 +89,7 @@ export default function LogsPage() {
               {paginatedLogs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>{getUserNameOrEmail(log.userId)}</TableCell>
+                  <TableCell>{getUserNameOrEmail(log)}</TableCell>
                   <TableCell>{log.action}</TableCell>
                 </TableRow>
               ))}

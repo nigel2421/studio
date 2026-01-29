@@ -24,6 +24,7 @@ export async function logActivity(action: string) {
     try {
         await addDoc(collection(db, 'logs'), {
             userId: user.uid,
+            userEmail: user.email,
             action,
             timestamp: new Date().toISOString(),
         });

@@ -27,6 +27,7 @@ const emailUser = defineString("EMAIL_USER");
 const emailPass = defineString("EMAIL_PASS");
 
 setGlobalOptions({ 
+    minInstances: 1,
     maxInstances: 10,
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 });
