@@ -166,7 +166,13 @@ export default function ServiceChargesPage() {
 
     const liableUnits = allProperties.flatMap(p => 
       p.units
-        .filter(u => u.status === 'vacant' && u.ownership === 'Landlord' && u.handoverStatus === 'Handed Over' && u.handoverDate)
+        .filter(u => 
+            u.status === 'vacant' && 
+            u.ownership === 'Landlord' && 
+            u.handoverStatus === 'Handed Over' && 
+            u.handoverDate &&
+            u.managementStatus === 'Rented for Clients'
+        )
         .map(u => ({ ...u, property: p }))
     );
 
