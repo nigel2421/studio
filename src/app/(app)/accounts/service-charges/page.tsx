@@ -32,7 +32,7 @@ interface ServiceChargeAccount {
   ownerName?: string;
   tenantId?: string;
   tenantName?: string;
-  paymentStatus: 'Paid' | 'Pending' | 'Vacant' | 'N/A';
+  paymentStatus: 'Paid' | 'Pending' | 'N/A';
   paymentAmount?: number;
   paymentForMonth?: string;
 }
@@ -142,11 +142,28 @@ export default function ServiceChargesPage() {
 
         const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
         
-        let paymentStatus: ServiceChargeAccount['paymentStatus'] = 'Pending';
+        let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
         let paymentAmount: number | undefined;
         let paymentForMonth: string | undefined;
 
-        if (tenant) {
+        let isBillable = false;
+        if (unit.handoverDate) {
+            const handoverDate = parseISO(unit.handoverDate);
+            if (!isNaN(handoverDate.getTime())) {
+                const handoverDay = handoverDate.getDate();
+                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
+                    isBillable = true;
+                }
+            }
+        } else {
+            // For legacy units without a handover date, assume they are always billable.
+            isBillable = true;
+        }
+
+        if (!isBillable) {
+            paymentStatus = 'N/A';
+        } else if (tenant) {
             const paymentInSelectedMonth = allPayments
                 .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
                 .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
@@ -158,6 +175,10 @@ export default function ServiceChargesPage() {
             } else {
                  paymentStatus = 'Pending';
             }
+        } else {
+            // If the unit is billable but has no tenant record, it's pending.
+            // A tenant record (even for a homeowner) is needed to log payments against.
+            paymentStatus = 'Pending';
         }
 
         return {
@@ -679,14 +700,6 @@ const ServiceChargeStatusTable = ({
     const { toast } = useToast();
 
     const handleConfirmClick = (acc: ServiceChargeAccount) => {
-        if (acc.paymentStatus === 'Vacant') {
-            toast({
-                variant: "destructive",
-                title: "Cannot Record Payment",
-                description: "This unit is vacant. Service charges for vacant units are handled under the 'Vacant Units in Arrears' tab or billed directly to the landlord.",
-            });
-            return;
-        }
         if (acc.paymentStatus === 'N/A') {
             toast({
                 variant: "destructive",
@@ -883,4 +896,5 @@ const VacantArrearsTab = ({
     
 
     
+
 
