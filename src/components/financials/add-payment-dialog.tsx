@@ -46,7 +46,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,

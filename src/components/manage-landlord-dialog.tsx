@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -128,7 +127,7 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
               <ScrollArea className="h-40 rounded-md border p-4">
                 <div className="space-y-2">
                   {allLandlordOwnedUnits.map(unit => {
-                    const isAssignedToOther = unit.landlordId && landlord?.id !== unit.landlordId;
+                    const isAssignedToOther = !!(unit.landlordId && landlord?.id !== unit.landlordId);
                     const otherLandlord = isAssignedToOther ? allLandlords.find(l => l.id === unit.landlordId) : null;
                     
                     return (
