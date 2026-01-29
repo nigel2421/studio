@@ -346,10 +346,26 @@ export default function ServiceChargesPage() {
         if (!tenantToView) {
             const property = allProperties.find(p => p.id === account.propertyId);
             const unit = property?.units.find(u => u.name === account.unitName);
-            const owner = allOwners.find(o => o.id === account.ownerId);
+            
+            // Look for owner in both `propertyOwners` and `landlords`
+            let owner: PropertyOwner | Landlord | undefined = allOwners.find(o => o.id === account.ownerId);
+            if (!owner) {
+                owner = allLandlords.find(l => l.id === account.ownerId);
+            }
 
             if (property && unit && owner) {
-                tenantToView = await findOrCreateHomeownerTenant(owner, unit, property.id);
+                // `findOrCreateHomeownerTenant` expects a `PropertyOwner`. We can safely cast because the needed fields are present on both.
+                const ownerAsPropertyOwner: PropertyOwner = {
+                    id: owner.id,
+                    name: owner.name,
+                    email: owner.email,
+                    phone: owner.phone,
+                    bankAccount: owner.bankAccount,
+                    userId: owner.userId,
+                    assignedUnits: (owner as PropertyOwner).assignedUnits || [],
+                };
+
+                tenantToView = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
                 fetchData();
             } else {
                 throw new Error("An owner must be assigned to this unit to view its history.");
@@ -867,3 +883,4 @@ const VacantArrearsTab = ({
     
 
     
+
