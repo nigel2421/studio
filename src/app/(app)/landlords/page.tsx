@@ -43,7 +43,7 @@ export default function LandlordsPage() {
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(2);
+  const [pageSize, setPageSize] = useState(6);
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -268,6 +268,9 @@ export default function LandlordsPage() {
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {paginatedLandlords.map((landlord) => {
               const assignedUnits = landlordUnitsMap.get(landlord.id) || [];
+              const unitsToShow = assignedUnits.slice(0, 9);
+              const hiddenUnitCount = assignedUnits.length - unitsToShow.length;
+
               return (
                 <Card key={landlord.id} className="flex flex-col">
                   <CardHeader>
@@ -285,11 +288,16 @@ export default function LandlordsPage() {
                   <CardContent className="flex-grow">
                     {assignedUnits.length > 0 ? (
                       <div className="flex flex-wrap gap-2 pt-4 border-t">
-                        {assignedUnits.map((unit, index) => (
+                        {unitsToShow.map((unit, index) => (
                           <Badge variant="secondary" key={index} className="font-normal">
                             {unit.propertyName}: Unit {unit.name}
                           </Badge>
                         ))}
+                        {hiddenUnitCount > 0 && (
+                            <Badge variant="outline">
+                                +{hiddenUnitCount} more
+                            </Badge>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned yet.</p>
