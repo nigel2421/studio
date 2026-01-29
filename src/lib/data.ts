@@ -114,28 +114,10 @@ export async function getProperties(): Promise<Property[]> {
 }
 
 export async function getTenants(): Promise<Tenant[]> {
+    // OPTIMIZATION: Removed fetching ALL water readings. 
+    // Water readings should be fetched on a per-tenant basis when needed, not for the entire list.
+    // The getTenant(id) function already handles fetching readings for a single tenant.
     const tenants = await getCollection<Tenant>('tenants');
-    
-    // Fetch all water readings in a single query
-    const readingsQuery = query(collection(db, 'waterReadings'), orderBy('createdAt', 'desc'));
-    const readingsSnapshot = await getDocs(readingsQuery);
-    const allReadings = readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
-
-    // Group readings by tenantId for efficient lookup
-    const readingsByTenant = new Map<string, WaterMeterReading[]>();
-    for (const reading of allReadings) {
-        if (!readingsByTenant.has(reading.tenantId)) {
-            readingsByTenant.set(reading.tenantId, []);
-        }
-        // Since we ordered by desc, the first one for each tenant will be the latest
-        readingsByTenant.get(reading.tenantId)!.push(reading);
-    }
-    
-    // Attach readings to each tenant
-    for (const tenant of tenants) {
-        tenant.waterReadings = readingsByTenant.get(tenant.id) || [];
-    }
-
     return tenants;
 }
 
@@ -368,6 +350,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     if (docSnap.exists()) {
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
+        // Eagerly fetch tenant details as they are needed for the tenant dashboard immediately.
         if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
             const tenantData = await getTenant(userProfile.tenantId);
             if (tenantData) {
@@ -375,35 +358,11 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
             }
         }
 
-        if (userProfile.role === 'landlord' && userProfile.landlordId) {
-            const allProperties = await getProperties();
-            if (userProfile.landlordId) {
-                 const landlordProperties: { property: Property, units: Unit[] }[] = [];
-                 allProperties.forEach(p => {
-                    const units = p.units.filter(u => u.landlordId === userProfile.landlordId);
-                    if (units.length > 0) {
-                        landlordProperties.push({ property: p, units });
-                    }
-                });
-                userProfile.landlordDetails = { properties: landlordProperties };
-            }
-        }
+        // OPTIMIZATION: Removed fetching of landlordDetails and propertyOwnerDetails.
+        // This is a major performance bottleneck, fetching all properties on every auth check.
+        // This data should be fetched on the specific dashboard pages that need it,
+        // not during the global authentication process.
 
-        if (userProfile.role === 'homeowner' && userProfile.propertyOwnerId) {
-            const allProperties = await getProperties();
-            const owner = await getPropertyOwner(userProfile.propertyOwnerId);
-            if (owner) {
-                const ownerProperties: { property: Property, units: Unit[] }[] = [];
-                owner.assignedUnits.forEach(assigned => {
-                    const property = allProperties.find(p => p.id === assigned.propertyId);
-                    if (property) {
-                        const units = property.units.filter(u => assigned.unitNames.includes(u.name));
-                        ownerProperties.push({ property, units });
-                    }
-                });
-                userProfile.propertyOwnerDetails = { properties: ownerProperties };
-            }
-        }
         return userProfile;
     }
     return null;

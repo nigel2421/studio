@@ -1,13 +1,14 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, WaterMeterReading } from '@/lib/types';
+import type { Property, Unit, Tenant, Payment, WaterMeterReading, PropertyOwner } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Home, Users, Wallet, DollarSign, Calendar, Droplets, LogOut, Building, AlertCircle, PlusCircle } from 'lucide-react';
-import { getTenants, getTenantPayments, getAllPayments } from '@/lib/data';
+import { getTenants, getTenantPayments, getAllPayments, getProperties, getPropertyOwner } from '@/lib/data';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -219,14 +220,27 @@ function InvestorDashboard() {
 
     useEffect(() => {
         async function fetchData() {
-            if (userProfile?.role === 'homeowner' && userProfile.propertyOwnerDetails) {
+            if (userProfile?.role === 'homeowner' && userProfile.propertyOwnerId) {
                 setLoading(true);
-                const [allTenants, allPayments] = await Promise.all([
+                const [allTenants, allPayments, allProperties, owner] = await Promise.all([
                     getTenants(),
                     getAllPayments(),
+                    getProperties(),
+                    getPropertyOwner(userProfile.propertyOwnerId)
                 ]);
 
-                const ownerProperties = userProfile.propertyOwnerDetails.properties;
+                // This logic is moved from getUserProfile
+                let ownerProperties: { property: Property; units: Unit[]; }[] = [];
+                if (owner) {
+                    owner.assignedUnits.forEach(assigned => {
+                        const property = allProperties.find(p => p.id === assigned.propertyId);
+                        if (property) {
+                            const units = property.units.filter(u => assigned.unitNames.includes(u.name));
+                            ownerProperties.push({ property, units });
+                        }
+                    });
+                }
+                
                 const ownedUnitIdentifiers = new Set<string>();
                 ownerProperties.forEach(p => {
                     p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));

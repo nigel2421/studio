@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord } from '@/lib/types';
-import { getTenants, getAllPayments } from '@/lib/data';
+import { getTenants, getAllPayments, getProperties } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -32,14 +32,23 @@ export default function LandlordDashboardPage() {
 
     useEffect(() => {
         async function fetchData() {
-            if (userProfile?.role === 'landlord' && userProfile.landlordDetails) {
+            if (userProfile?.role === 'landlord' && userProfile.landlordId) {
                 setLoading(true);
-                const [allTenants, allPayments] = await Promise.all([
+                const [allTenants, allPayments, allProperties] = await Promise.all([
                     getTenants(),
                     getAllPayments(),
+                    getProperties(), // Fetch properties here now
                 ]);
 
-                const landlordProperties = userProfile.landlordDetails.properties;
+                // This logic is moved from getUserProfile
+                const landlordProperties: { property: Property, units: Unit[] }[] = [];
+                allProperties.forEach(p => {
+                    const units = p.units.filter(u => u.landlordId === userProfile.landlordId);
+                    if (units.length > 0) {
+                        landlordProperties.push({ property: p, units });
+                    }
+                });
+
                 const ownedUnitIdentifiers = new Set<string>();
                 landlordProperties.forEach(p => {
                     p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));
