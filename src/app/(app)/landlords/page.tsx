@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -68,11 +67,12 @@ export default function LandlordsPage() {
     fetchData();
   }, []);
 
-  const { landlordUnitsMap, unassignedLandlordUnits } = useMemo(() => {
+  const { landlordUnitsMap, unassignedLandlordUnits, clientOnlyLandlordIds } = useMemo(() => {
     const map = new Map<string, (Unit & { propertyName: string; propertyId: string })[]>();
     const unassigned: (Unit & { propertyName: string; propertyId: string })[] = [];
+    const clientIds = new Set<string>();
 
-    if (!properties || properties.length === 0) return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned };
+    if (!properties || properties.length === 0) return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned, clientOnlyLandlordIds: clientIds };
 
     properties.forEach(p => {
       if (p.units) {
@@ -94,7 +94,17 @@ export default function LandlordsPage() {
         });
       }
     });
-    return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned };
+    
+    for (const [landlordId, units] of map.entries()) {
+        if (landlordId !== SOIL_MERCHANTS_LANDLORD.id) {
+            const isClientOnly = units.every(u => u.managementStatus === 'Client Managed');
+            if (isClientOnly) {
+                clientIds.add(landlordId);
+            }
+        }
+    }
+
+    return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned, clientOnlyLandlordIds: clientIds };
   }, [properties]);
 
   const handleOpenDialog = (landlord: Landlord | null) => {
@@ -207,7 +217,9 @@ export default function LandlordsPage() {
     }
   };
   
-  const filteredLandlords = landlords.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredLandlords = landlords
+    .filter(l => !clientOnlyLandlordIds.has(l.id))
+    .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const totalPages = Math.ceil(filteredLandlords.length / pageSize);
   const paginatedLandlords = filteredLandlords.slice(
@@ -219,8 +231,8 @@ export default function LandlordsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Landlords</h2>
-          <p className="text-muted-foreground">Manage landlords and their assigned units.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Landlords (Investors)</h2>
+          <p className="text-muted-foreground">Manage landlords whose units are managed by Eracov.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">

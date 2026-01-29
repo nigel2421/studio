@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments } from '@/lib/data';
-import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
+import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments, getLandlords } from '@/lib/data';
+import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, UserCog, PlusCircle, FileSignature } from 'lucide-react';
@@ -14,6 +14,7 @@ import { StatementOptionsDialog } from '@/components/financials/statement-option
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [propertyOwners, setPropertyOwners] = useState<PropertyOwner[]>([]);
+  const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
 
@@ -27,52 +28,99 @@ export default function ClientsPage() {
   const [ownerForStatement, setOwnerForStatement] = useState<PropertyOwner | null>(null);
 
   const fetchData = async () => {
-    const [props, owners, tenants, payments] = await Promise.all([
+    const [props, owners, tenants, payments, landlords] = await Promise.all([
       getProperties(),
       getPropertyOwners(),
       getTenants(),
-      getAllPayments()
+      getAllPayments(),
+      getLandlords(),
     ]);
     setAllProperties(props);
     setPropertyOwners(owners);
     setAllTenants(tenants);
     setAllPayments(payments);
+    setAllLandlords(landlords);
   }
 
   useEffect(() => {
     fetchData();
   }, []);
-  
+
   const allUnitsMap = useMemo(() => {
-      const map = new Map<string, Unit>();
-      allProperties.forEach(p => {
-          p.units.forEach(u => {
-              map.set(`${p.id}-${u.name}`, u);
-          });
+    const map = new Map<string, Unit>();
+    allProperties.forEach(p => {
+      p.units.forEach(u => {
+        map.set(`${p.id}-${u.name}`, u);
       });
-      return map;
+    });
+    return map;
   }, [allProperties]);
 
-  const clientOnlyOwners = useMemo(() => {
-      return propertyOwners.filter(owner => {
-          if (!owner.assignedUnits || owner.assignedUnits.length === 0) {
-              return false;
-          }
-          // Check if there are ANY assigned units that are NOT 'Client Managed'.
-          // If there are, this owner is NOT a "client only" owner.
-          const isInvestor = owner.assignedUnits.some(assignedProp => 
-              assignedProp.unitNames.some(unitName => {
-                  const unit = allUnitsMap.get(`${assignedProp.propertyId}-${unitName}`);
-                  return unit && unit.managementStatus !== 'Client Managed';
-              })
-          );
-          return !isInvestor;
-      });
-  }, [propertyOwners, allUnitsMap]);
+  const unifiedClientOwners = useMemo(() => {
+    // 1. Get clients from the propertyOwners collection
+    const clientOnlyPropertyOwners = propertyOwners.filter(owner => {
+        if (!owner.assignedUnits || owner.assignedUnits.length === 0) return false;
+        return !owner.assignedUnits.some(assignedProp => 
+            assignedProp.unitNames.some(unitName => {
+                const unit = allUnitsMap.get(`${assignedProp.propertyId}-${unitName}`);
+                return unit && unit.managementStatus !== 'Client Managed';
+            })
+        );
+    });
+
+    // 2. Identify and format clients from the landlords collection
+    const landlordUnitsMap = new Map<string, Unit[]>();
+    allProperties.forEach(p => {
+        if (p.units) {
+            p.units.forEach(u => {
+                if (u.landlordId) {
+                    if (!landlordUnitsMap.has(u.landlordId)) {
+                        landlordUnitsMap.set(u.landlordId, []);
+                    }
+                    landlordUnitsMap.get(u.landlordId)!.push({ ...u, propertyId: p.id });
+                }
+            });
+        }
+    });
+
+    const clientLandlords = allLandlords.filter(landlord => {
+        const units = landlordUnitsMap.get(landlord.id);
+        if (!units || units.length === 0) return false;
+        return units.every(u => u.managementStatus === 'Client Managed');
+    });
+
+    const formattedClientLandlords: PropertyOwner[] = clientLandlords.map(landlord => {
+        const units = landlordUnitsMap.get(landlord.id) || [];
+        const assignedUnits = units.reduce((acc, unit) => {
+            if (!unit.propertyId) return acc;
+            let prop = acc.find(p => p.propertyId === unit.propertyId);
+            if (!prop) {
+                prop = { propertyId: unit.propertyId, unitNames: [] };
+                acc.push(prop);
+            }
+            prop.unitNames.push(unit.name);
+            return acc;
+        }, [] as { propertyId: string, unitNames: string[] }[]);
+
+        return {
+            id: landlord.id,
+            name: landlord.name,
+            email: landlord.email,
+            phone: landlord.phone,
+            bankAccount: landlord.bankAccount,
+            userId: landlord.userId,
+            assignedUnits,
+        };
+    });
+
+    // 3. Combine them
+    return [...clientOnlyPropertyOwners, ...formattedClientLandlords];
+
+  }, [propertyOwners, allLandlords, allProperties, allUnitsMap]);
   
   const clientProperties = useMemo(() => {
       const propertyIdsWithClients = new Set<string>();
-      clientOnlyOwners.forEach(owner => {
+      unifiedClientOwners.forEach(owner => {
           if (owner.assignedUnits) {
               owner.assignedUnits.forEach(au => propertyIdsWithClients.add(au.propertyId));
           }
@@ -85,7 +133,7 @@ export default function ClientsPage() {
       });
 
       return allProperties.filter(p => propertyIdsWithClients.has(p.id) && p.units.some(u => u.managementStatus === 'Client Managed'));
-  }, [allProperties, clientOnlyOwners]);
+  }, [allProperties, unifiedClientOwners]);
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
@@ -142,7 +190,7 @@ export default function ClientsPage() {
           {clientProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {clientProperties.map(property => {
-                const ownersForProperty = clientOnlyOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
+                const ownersForProperty = unifiedClientOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
                 const assignedUnitNamesForProperty = new Set(
                     ownersForProperty.flatMap(o => o.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames || [])
                 );
