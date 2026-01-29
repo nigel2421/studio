@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,12 +42,50 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+  
+  const allUnitsMap = useMemo(() => {
+      const map = new Map<string, Unit>();
+      allProperties.forEach(p => {
+          p.units.forEach(u => {
+              map.set(`${p.id}-${u.name}`, u);
+          });
+      });
+      return map;
+  }, [allProperties]);
 
-  const isClientManagedUnit = (u: Unit) =>
-    u.status === 'client occupied' &&
-    u.ownership === 'Landlord' &&
-    u.managementStatus === 'Client Managed' &&
-    u.handoverStatus === 'Handed Over';
+  const clientOnlyOwners = useMemo(() => {
+      return propertyOwners.filter(owner => {
+          if (!owner.assignedUnits || owner.assignedUnits.length === 0) {
+              return false;
+          }
+          // Check if there are ANY assigned units that are NOT 'Client Managed'.
+          // If there are, this owner is NOT a "client only" owner.
+          const isInvestor = owner.assignedUnits.some(assignedProp => 
+              assignedProp.unitNames.some(unitName => {
+                  const unit = allUnitsMap.get(`${assignedProp.propertyId}-${unitName}`);
+                  return unit && unit.managementStatus !== 'Client Managed';
+              })
+          );
+          return !isInvestor;
+      });
+  }, [propertyOwners, allUnitsMap]);
+  
+  const clientProperties = useMemo(() => {
+      const propertyIdsWithClients = new Set<string>();
+      clientOnlyOwners.forEach(owner => {
+          if (owner.assignedUnits) {
+              owner.assignedUnits.forEach(au => propertyIdsWithClients.add(au.propertyId));
+          }
+      });
+
+      allProperties.forEach(p => {
+          if (p.units.some(u => u.managementStatus === 'Client Managed')) {
+               propertyIdsWithClients.add(p.id);
+          }
+      });
+
+      return allProperties.filter(p => propertyIdsWithClients.has(p.id) && p.units.some(u => u.managementStatus === 'Client Managed'));
+  }, [allProperties, clientOnlyOwners]);
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
@@ -92,16 +129,12 @@ export default function ClientsPage() {
     }
   };
 
-  const clientProperties = allProperties.filter(p => 
-    p.units.some(isClientManagedUnit)
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Property Owners (Clients)</h2>
-          <p className="text-muted-foreground">Manage property owner contact information and unit assignments.</p>
+          <p className="text-muted-foreground">Manage contact information for owners who fully manage their own units.</p>
         </div>
       </div>
 
@@ -109,11 +142,11 @@ export default function ClientsPage() {
           {clientProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {clientProperties.map(property => {
-                const ownersForProperty = propertyOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
+                const ownersForProperty = clientOnlyOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
                 const assignedUnitNamesForProperty = new Set(
-                    ownersForProperty.flatMap(o => o.assignedUnits.find(au => au.propertyId === property.id)?.unitNames || [])
+                    ownersForProperty.flatMap(o => o.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames || [])
                 );
-                const unassignedUnits = property.units.filter(u => isClientManagedUnit(u) && !assignedUnitNamesForProperty.has(u.name));
+                const unassignedUnits = property.units.filter(u => u.managementStatus === 'Client Managed' && !assignedUnitNamesForProperty.has(u.name));
 
                 return (
                   <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-amber-500/10">
@@ -132,7 +165,7 @@ export default function ClientsPage() {
                       <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
                         <span>Property Owners</span>
                         <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full lowercase font-medium">
-                          {property.units.filter(isClientManagedUnit).length} total client units
+                          {property.units.filter(u => u.managementStatus === 'Client Managed').length} total client units
                         </span>
                       </div>
 
@@ -260,5 +293,3 @@ function EmptyState({ message }: { message: string }) {
     </div>
   );
 }
-
-    
