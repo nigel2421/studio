@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary } from '@/lib/financial-utils';
-import { format, startOfMonth, addMonths, addDays, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, addMonths, addDays, isWithinInterval, isBefore, isAfter } from 'date-fns';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string) => {
@@ -176,7 +176,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
         let loopDate = startOfMonth(new Date(tenant.lease.startDate));
         if (unit.handoverDate) {
-            loopDate = startOfMonth(addMonths(new Date(unit.handoverDate), 1));
+            loopDate = startOfMonth(new Date(unit.handoverDate));
         }
         
         const today = new Date();
@@ -207,46 +207,83 @@ export const generateOwnerServiceChargeStatementPDF = (
         }))
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    let openingBalance = 0;
+    let openingDueBalance = 0;
+    let openingCreditBalance = 0;
+
     combined.forEach(item => {
-        if (item.date < startDate) {
-            openingBalance += item.charge - item.payment;
+        if (isBefore(item.date, startDate)) {
+            let charge = item.charge;
+            if (openingCreditBalance > 0) {
+                if (openingCreditBalance >= charge) {
+                    openingCreditBalance -= charge;
+                    charge = 0;
+                } else {
+                    charge -= openingCreditBalance;
+                    openingCreditBalance = 0;
+                }
+            }
+            openingDueBalance += charge;
+            
+            let payment = item.payment;
+            if (openingDueBalance > 0) {
+                 if (openingDueBalance >= payment) {
+                    openingDueBalance -= payment;
+                    payment = 0;
+                } else {
+                    payment -= openingDueBalance;
+                    openingDueBalance = 0;
+                }
+            }
+            openingCreditBalance += payment;
         }
     });
 
     let yPos = 75;
     const tableBody: (string | number)[][] = [];
 
-    let runningBalance = openingBalance;
+    let dueBalance = openingDueBalance;
+    let creditBalance = openingCreditBalance;
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
 
     combined.forEach(item => {
-        if (item.date < startDate || item.date > endDate) return;
+        if (isBefore(item.date, startDate) || isAfter(item.date, endDate)) return;
 
-        runningBalance += item.charge - item.payment;
-        totalChargesInPeriod += item.charge;
-        totalPaymentsInPeriod += item.payment;
+        let charge = item.charge;
+        totalChargesInPeriod += charge;
+        if (creditBalance > 0) {
+            if (creditBalance >= charge) {
+                creditBalance -= charge;
+                charge = 0;
+            } else {
+                charge -= creditBalance;
+                creditBalance = 0;
+            }
+        }
+        dueBalance += charge;
 
+        let payment = item.payment;
+        totalPaymentsInPeriod += payment;
+        if (dueBalance > 0) {
+            if (dueBalance >= payment) {
+                dueBalance -= payment;
+                payment = 0;
+            } else {
+                payment -= dueBalance;
+                dueBalance = 0;
+            }
+        }
+        creditBalance += payment;
+        
         tableBody.push([
             format(item.date, 'dd MMM yyyy'),
             item.transactionType,
             item.details,
             item.charge > 0 ? formatCurrency(item.charge) : '',
             item.payment > 0 ? formatCurrency(item.payment) : '',
-            formatCurrency(runningBalance),
+            formatCurrency(dueBalance),
         ]);
     });
-
-    let balanceLabel = 'Balance';
-    let balanceColor = '#000000';
-    if (runningBalance > 0) {
-        balanceLabel = 'Balance Due';
-        balanceColor = '#dc2626';
-    } else if (runningBalance < 0) {
-        balanceLabel = 'Credit Balance';
-        balanceColor = '#16a34a';
-    }
     
     autoTable(doc, {
         startY: yPos,
@@ -258,10 +295,6 @@ export const generateOwnerServiceChargeStatementPDF = (
                 { content: formatCurrency(totalChargesInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(totalPaymentsInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: '' }
-            ],
-            [
-                { content: balanceLabel, colSpan: 5, styles: { fontStyle: 'bold', halign: 'right' } },
-                { content: formatCurrency(Math.abs(runningBalance)), styles: { fontStyle: 'bold', halign: 'right', textColor: balanceColor } }
             ]
         ],
         theme: 'striped',
@@ -276,6 +309,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
 
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
@@ -476,7 +510,7 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
         
         const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
-            ? startOfMonth(addMonths(handoverDate, 1))
+            ? startOfMonth(handoverDate)
             : startOfMonth(leaseStartDate);
 
         let loopDate = billingStartDate;
