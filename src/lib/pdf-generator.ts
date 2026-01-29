@@ -229,81 +229,36 @@ export const generateOwnerServiceChargeStatementPDF = (
         }))
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    let openingDueBalance = 0;
-    let openingCreditBalance = 0;
-
+    let openingBalance = 0;
     combined.forEach(item => {
-        if (isBefore(item.date, startDate)) {
-            let charge = item.charge;
-            if (openingCreditBalance > 0) {
-                if (openingCreditBalance >= charge) {
-                    openingCreditBalance -= charge;
-                    charge = 0;
-                } else {
-                    charge -= openingCreditBalance;
-                    openingCreditBalance = 0;
-                }
-            }
-            openingDueBalance += charge;
-            
-            let payment = item.payment;
-            if (openingDueBalance > 0) {
-                 if (openingDueBalance >= payment) {
-                    openingDueBalance -= payment;
-                    payment = 0;
-                } else {
-                    payment -= openingDueBalance;
-                    openingDueBalance = 0;
-                }
-            }
-            openingCreditBalance += payment;
+        if(isBefore(item.date, startDate)) {
+            openingBalance += item.charge;
+            openingBalance -= item.payment;
         }
     });
 
     const tableBody: (string | number)[][] = [];
-
-    let dueBalance = openingDueBalance;
-    let creditBalance = openingCreditBalance;
+    let runningBalance = openingBalance;
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
 
     combined.forEach(item => {
-        if (isBefore(item.date, startDate) || isAfter(item.date, endDate)) return;
+        if (isWithinInterval(item.date, { start: startDate, end: endDate })) {
+            runningBalance += item.charge;
+            runningBalance -= item.payment;
 
-        let charge = item.charge;
-        totalChargesInPeriod += charge;
-        if (creditBalance > 0) {
-            if (creditBalance >= charge) {
-                creditBalance -= charge;
-                charge = 0;
-            } else {
-                charge -= creditBalance;
-                creditBalance = 0;
-            }
-        }
-        dueBalance += charge;
+            totalChargesInPeriod += item.charge;
+            totalPaymentsInPeriod += item.payment;
 
-        let payment = item.payment;
-        totalPaymentsInPeriod += payment;
-        if (dueBalance > 0) {
-             if (dueBalance >= payment) {
-                dueBalance -= payment;
-                payment = 0;
-            } else {
-                payment -= dueBalance;
-                dueBalance = 0;
-            }
+            tableBody.push([
+                format(item.date, 'dd MMM yyyy'),
+                item.transactionType,
+                item.details,
+                item.charge > 0 ? formatCurrency(item.charge) : '',
+                item.payment > 0 ? formatCurrency(item.payment) : '',
+                formatCurrency(runningBalance > 0 ? runningBalance : 0),
+            ]);
         }
-        creditBalance += payment;
-        
-        tableBody.push([
-            format(item.date, 'dd MMM yyyy'),
-            item.transactionType,
-            item.details,
-            charge > 0 ? formatCurrency(charge) : '',
-            payment > 0 ? formatCurrency(payment) : '',
-            formatCurrency(dueBalance),
-        ]);
     });
     
     autoTable(doc, {
@@ -315,7 +270,7 @@ export const generateOwnerServiceChargeStatementPDF = (
                 { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(totalChargesInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(totalPaymentsInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
-                { content: '' }
+                { content: formatCurrency(runningBalance > 0 ? runningBalance : 0), styles: { fontStyle: 'bold', halign: 'right' } }
             ]
         ],
         theme: 'striped',
@@ -761,5 +716,3 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
-
-  
