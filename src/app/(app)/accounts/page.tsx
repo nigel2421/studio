@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -86,21 +85,33 @@ export default function AccountsPage() {
     }
   };
 
-  const totalCollected = payments
-    .filter(p => (p.type === 'Rent' || p.type === 'ServiceCharge') && p.status === 'Paid')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const rentCollected = useMemo(() => payments
+    .filter(p => p.type === 'Rent' && p.status === 'Paid')
+    .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const totalArrears = tenants.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+  const serviceChargeCollected = useMemo(() => payments
+    .filter(p => p.type === 'ServiceCharge' && p.status === 'Paid')
+    .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const totalUnits = properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0);
+  const rentArrears = useMemo(() => tenants
+    .filter(t => t.residentType === 'Tenant')
+    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [tenants]);
+
+  const serviceChargeArrears = useMemo(() => tenants
+    .filter(t => t.residentType === 'Homeowner')
+    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [tenants]);
+  
+  const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
   const occupiedUnits = tenants.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Total Collected", value: `Ksh ${totalCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
-    { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-blue-500" },
-    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-blue-500" },
+    { title: "Rent Collected", value: `Ksh ${rentCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
+    { title: "S/C Collected", value: `Ksh ${serviceChargeCollected.toLocaleString()}`, icon: ClipboardList, color: "text-blue-500" },
+    { title: "Rent Arrears", value: `Ksh ${rentArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
+    { title: "S/C Arrears", value: `Ksh ${serviceChargeArrears.toLocaleString()}`, icon: AlertCircle, color: "text-orange-500" },
+    { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-purple-500" },
+    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
   ];
 
   // Filtering for Rent tab
@@ -144,7 +155,7 @@ export default function AccountsPage() {
         <AddPaymentDialog properties={properties} tenants={tenants} onPaymentAdded={fetchAllData} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {stats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 space-y-0">
@@ -352,4 +363,3 @@ export default function AccountsPage() {
     </div>
   );
 }
-
