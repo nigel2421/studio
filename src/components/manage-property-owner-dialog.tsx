@@ -10,16 +10,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Property, PropertyOwner, Unit } from '@/lib/types';
 import { useLoading } from '@/hooks/useLoading';
+import { cn } from '@/lib/utils';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     owner?: PropertyOwner | null;
     property: Property;
+    allOwners: PropertyOwner[];
     onSave: (ownerData: PropertyOwner, selectedUnitNames: string[]) => Promise<void>;
 }
 
-export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, onSave }: Props) {
+export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, allOwners, onSave }: Props) {
     const [formData, setFormData] = useState<PropertyOwner>({
         id: '',
         name: '',
@@ -133,21 +135,36 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
                         <ScrollArea className="h-[120px] pr-4 border rounded-md p-2">
                             {clientUnits.length > 0 ? (
                                 <div className="grid grid-cols-2 gap-2">
-                                    {clientUnits.map((unit) => (
-                                        <div key={unit.name} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`unit-${unit.name}`}
-                                                checked={selectedUnits.includes(unit.name)}
-                                                onCheckedChange={() => handleUnitToggle(unit.name)}
-                                            />
-                                            <label
-                                                htmlFor={`unit-${unit.name}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                            >
-                                                {unit.name}
-                                            </label>
-                                        </div>
-                                    ))}
+                                    {clientUnits.map((unit) => {
+                                        const assignedOwner = allOwners.find(o =>
+                                            o.id !== owner?.id &&
+                                            o.assignedUnits?.some(au =>
+                                                au.propertyId === property.id && au.unitNames.includes(unit.name)
+                                            )
+                                        );
+                                        const isDisabled = !!assignedOwner;
+
+                                        return (
+                                            <div key={unit.name} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`unit-${unit.name}`}
+                                                    checked={selectedUnits.includes(unit.name)}
+                                                    onCheckedChange={() => handleUnitToggle(unit.name)}
+                                                    disabled={isDisabled}
+                                                />
+                                                <label
+                                                    htmlFor={`unit-${unit.name}`}
+                                                    className={cn(
+                                                        "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                                                        isDisabled && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {unit.name}
+                                                    {assignedOwner && <span className="text-xs"> ({assignedOwner.name})</span>}
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground text-center py-4">No units matching client-managed criteria found.</p>
@@ -164,5 +181,3 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, on
         </Dialog>
     );
 }
-
-    

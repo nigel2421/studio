@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -233,6 +234,7 @@ export default function ClientsPage() {
           onClose={() => setIsOwnerDialogOpen(false)}
           owner={selectedOwner}
           property={selectedProperty}
+          allOwners={propertyOwners}
           onSave={handleSaveOwner}
         />
       )}

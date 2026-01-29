@@ -301,6 +301,7 @@ export default function LandlordsPage() {
           isOpen={isManageDialogOpen}
           onClose={() => setIsManageDialogOpen(false)}
           landlord={selectedLandlord}
+          allLandlords={landlords}
           properties={properties}
           onSave={handleSaveLandlord}
         />

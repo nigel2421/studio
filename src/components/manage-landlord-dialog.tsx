@@ -18,16 +18,18 @@ import { Loader2 } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { useLoading } from '@/hooks/useLoading';
+import { cn } from '@/lib/utils';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   landlord: Landlord | null;
   properties: Property[];
+  allLandlords: Landlord[];
   onSave: (landlord: Landlord, selectedUnitNames: string[]) => Promise<void>;
 }
 
-export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, onSave }: Props) {
+export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, allLandlords, onSave }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -125,22 +127,31 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, on
               <Label>Assign Landlord Units</Label>
               <ScrollArea className="h-40 rounded-md border p-4">
                 <div className="space-y-2">
-                  {allLandlordOwnedUnits.map(unit => (
-                    <div key={`${unit.propertyId}-${unit.name}`} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`unit-${unit.name}`}
-                        checked={selectedUnits.includes(unit.name)}
-                        onCheckedChange={() => handleUnitToggle(unit.name)}
-                        disabled={unit.landlordId !== undefined && unit.landlordId !== landlord?.id}
-                      />
-                      <label
-                        htmlFor={`unit-${unit.name}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {unit.propertyName}: Unit {unit.name}
-                      </label>
-                    </div>
-                  ))}
+                  {allLandlordOwnedUnits.map(unit => {
+                    const isAssignedToOther = unit.landlordId && landlord?.id !== unit.landlordId;
+                    const otherLandlord = isAssignedToOther ? allLandlords.find(l => l.id === unit.landlordId) : null;
+                    
+                    return (
+                        <div key={`${unit.propertyId}-${unit.name}`} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`unit-${unit.name}`}
+                                checked={selectedUnits.includes(unit.name)}
+                                onCheckedChange={() => handleUnitToggle(unit.name)}
+                                disabled={isAssignedToOther}
+                            />
+                            <label
+                                htmlFor={`unit-${unit.name}`}
+                                className={cn(
+                                    "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                                    isAssignedToOther && "text-muted-foreground"
+                                )}
+                            >
+                                {unit.propertyName}: Unit {unit.name}
+                                {otherLandlord && <span className="text-xs"> (Assigned)</span>}
+                            </label>
+                        </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </div>
@@ -157,4 +168,3 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, on
     </Dialog>
   );
 }
-
