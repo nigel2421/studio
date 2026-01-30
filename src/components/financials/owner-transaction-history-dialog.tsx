@@ -12,6 +12,7 @@ import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
 import { useToast } from '@/hooks/use-toast';
 import { performSendServiceChargeInvoice } from '@/app/actions';
+import { InvoicePreviewDialog } from './invoice-preview-dialog';
 
 interface Transaction {
     date: Date;
@@ -40,12 +41,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
     const { toast } = useToast();
     const [isSending, setIsSending] = useState(false);
+    const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
 
     useEffect(() => {
         if (owner && open && selectedMonth) {
             setIsLoading(true);
 
-            // 1. Identify all units belonging to this owner
             const ownerUnits: Unit[] = allProperties.flatMap(p =>
                 (p.units || [])
                     .filter(u =>
@@ -55,7 +56,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
 
-            // 2. Collect all historical charges and payments for these units
             const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
             
             const relevantTenants = allTenants.filter(t => 
@@ -82,15 +82,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
                 let firstBillableMonth: Date;
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                     const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
-                     if (isAfter(lastBilledDate, addMonths(new Date(), -36))) { // Look back max 3 years
-                        firstBillableMonth = addMonths(lastBilledDate, 1);
-                     } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-                        const handoverDate = new Date(unit.handoverDate);
-                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                     } else {
-                        return;
-                     }
+                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
                 } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
                     const handoverDate = new Date(unit.handoverDate);
                     const handoverDay = handoverDate.getDate();
@@ -116,21 +108,18 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             });
 
-            // 3. Calculate Opening Balance and running balance
             const startOfSelectedMonth = startOfMonth(selectedMonth);
             let openingBalance = 0;
-            let runningBalance = 0;
-            const ledger: Transaction[] = [];
-
             allHistoricalTransactions.forEach(t => {
                 if (isBefore(t.date, startOfSelectedMonth)) {
                     openingBalance += t.charge;
                     openingBalance -= t.payment;
                 }
             });
-            runningBalance = openingBalance;
+
+            let runningBalance = openingBalance;
+            const ledger: Transaction[] = [];
             
-            // 4. Filter for display month and build ledger from the opening balance
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
             
             const groupedCharges = displayTransactions
@@ -190,7 +179,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (openingBalance > 0) {
+            if (openingBalance > 0 && paymentStatusForMonth !== 'Pending') {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
@@ -206,12 +195,22 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         }
     }, [owner, open, selectedMonth, paymentStatusForMonth, allProperties, allTenants, allPayments]);
 
-    const handleSendInvoice = async () => {
+    const handleOpenInvoicePreview = () => {
+        setIsInvoicePreviewOpen(true);
+    };
+
+    const handleConfirmAndSend = async () => {
         if (!owner || transactions.length === 0) return;
     
         setIsSending(true);
         try {
             const totalDue = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+            if (totalDue <= 0) {
+                 toast({ variant: 'default', title: 'No Balance Due', description: `There is no outstanding balance to invoice.` });
+                 setIsInvoicePreviewOpen(false);
+                 return;
+            }
+
             const invoiceDetails = {
                 month: format(selectedMonth, 'MMMM yyyy'),
                 items: transactions
@@ -233,6 +232,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     
             if (result.success) {
                 toast({ title: 'Invoice Sent', description: `An invoice has been emailed to ${owner.name}.` });
+                setIsInvoicePreviewOpen(false);
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: result.error });
             }
@@ -243,7 +243,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             setIsSending(false);
         }
     };
-
 
     const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, status: 'Paid' | 'Pending' | 'N/A' | null) => {
         startPdfLoading('Generating Statement...');
@@ -324,8 +323,8 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     <DialogFooter>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                         {paymentStatusForMonth === 'Pending' && (
-                             <Button onClick={handleSendInvoice} disabled={isSending}>
-                                {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                             <Button onClick={handleOpenInvoicePreview} disabled={isSending}>
+                                <Mail className="mr-2 h-4 w-4" />
                                 Send Invoice
                             </Button>
                         )}
@@ -336,6 +335,18 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <InvoicePreviewDialog
+                isOpen={isInvoicePreviewOpen}
+                onClose={() => setIsInvoicePreviewOpen(false)}
+                ownerName={owner.name}
+                month={format(selectedMonth, 'MMMM yyyy')}
+                items={transactions
+                    .filter(t => t.charge > 0)
+                    .map(t => ({ description: t.details, amount: t.charge }))}
+                totalDue={transactions.length > 0 ? transactions[transactions.length - 1].balance : 0}
+                onConfirm={handleConfirmAndSend}
+                isSending={isSending}
+            />
             <StatementOptionsDialog
                 isOpen={isStatementOptionsOpen}
                 onClose={() => setIsStatementOptionsOpen(false)}
