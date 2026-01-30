@@ -1,0 +1,172 @@
+import { processServiceChargeData, groupAccounts } from './service-charge';
+import type { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
+import { startOfMonth, addMonths, format } from 'date-fns';
+
+// Mock data setup
+const createMockUnit = (name: string, overrides: Partial<Unit>): Unit => ({
+    name,
+    status: 'vacant',
+    ownership: 'Landlord',
+    unitType: 'One Bedroom',
+    managementStatus: 'Rented for Clients',
+    handoverStatus: 'Pending Hand Over',
+    serviceCharge: 2000,
+    ...overrides
+});
+
+const createMockProperty = (id: string, units: Unit[]): Property => ({
+    id,
+    name: `Property ${id}`,
+    address: '123 Test St',
+    type: 'Residential',
+    imageId: '1',
+    units,
+});
+
+const createMockOwner = (id: string, name: string, assignedUnits: { propertyId: string, unitNames: string[] }[]): PropertyOwner => ({
+    id,
+    name,
+    email: `${name.toLowerCase().replace(' ', '')}@test.com`,
+    phone: '123456789',
+    assignedUnits,
+});
+
+const createMockLandlord = (id: string, name: string): Landlord => ({
+    id,
+    name,
+    email: `${name.toLowerCase().replace(' ', '')}@test.com`,
+    phone: '987654321',
+});
+
+const createMockHomeownerTenant = (id: string, propertyId: string, unitName: string, serviceCharge: number, lastBilledPeriod: string): Tenant => ({
+    id,
+    name: `Homeowner ${id}`,
+    email: `homeowner${id}@test.com`,
+    phone: '555-1234',
+    idNumber: '12345',
+    propertyId,
+    unitName,
+    agent: 'Susan',
+    status: 'active',
+    residentType: 'Homeowner',
+    lease: {
+        startDate: '2023-01-01',
+        endDate: '2099-01-01',
+        rent: 0,
+        serviceCharge,
+        paymentStatus: 'Paid',
+        lastBilledPeriod,
+    },
+    securityDeposit: 0,
+    waterDeposit: 0,
+    dueBalance: 0,
+    accountBalance: 0,
+});
+
+const createMockPayment = (tenantId: string, amount: number, type: Payment['type'], date: string, rentForMonth: string): Payment => ({
+    id: `payment-${Math.random()}`,
+    tenantId,
+    amount,
+    date,
+    type,
+    status: 'Paid',
+    rentForMonth,
+    createdAt: new Date(),
+});
+
+
+describe('Service Charge Logic', () => {
+
+    const today = new Date();
+    const thisMonth = startOfMonth(today);
+    const lastMonth = startOfMonth(addMonths(today, -1));
+    const twoMonthsAgo = startOfMonth(addMonths(today, -2));
+
+    const thisMonthFormatted = format(thisMonth, 'yyyy-MM');
+    const lastMonthFormatted = format(lastMonth, 'yyyy-MM');
+
+    // MOCK DATA
+    const mockOwners: PropertyOwner[] = [
+        createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['A101']}]),
+        createMockOwner('owner-2', 'Bob', [{ propertyId: 'prop-1', unitNames: ['B201', 'B202']}]),
+    ];
+
+    const mockLandlords: Landlord[] = [
+        createMockLandlord('landlord-1', 'Charlie'),
+    ];
+
+    const mockUnits: Unit[] = [
+        // Client Occupied Unit
+        createMockUnit('A101', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500 }),
+        // Managed Vacant Units
+        createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
+        createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
+        // Vacant Arrears Unit
+        createMockUnit('C301', { ownership: 'Landlord', status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', handoverDate: format(twoMonthsAgo, 'yyyy-MM-05'), serviceCharge: 1500, landlordId: 'landlord-1' }),
+    ];
+
+    const mockProperties: Property[] = [
+        createMockProperty('prop-1', mockUnits),
+    ];
+    
+    const mockTenants: Tenant[] = [
+        // Homeowner for client occupied unit
+        createMockHomeownerTenant('tenant-A101', 'prop-1', 'A101', 2500, lastMonthFormatted),
+        // Homeowner for managed vacant unit B202 (to test payments)
+        createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, lastMonthFormatted),
+    ];
+
+    const mockPayments: Payment[] = [
+        // Payment for unit B202 for this month
+        createMockPayment('tenant-B202', 3000, 'ServiceCharge', format(thisMonth, 'yyyy-MM-dd'), thisMonthFormatted),
+    ];
+
+
+    test('should identify client occupied units and determine payment status', () => {
+        const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], thisMonth);
+        
+        expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+        const account = clientOccupiedServiceChargeAccounts[0];
+        expect(account.unitName).toBe('A101');
+        expect(account.ownerName).toBe('Alice');
+        expect(account.paymentStatus).toBe('Pending'); // No payment was mocked for this month
+    });
+
+    test('should identify managed vacant units and determine payment status', () => {
+        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], thisMonth);
+
+        expect(managedVacantServiceChargeAccounts).toHaveLength(2);
+        
+        const unpaidAccount = managedVacantServiceChargeAccounts.find(a => a.unitName === 'B201');
+        expect(unpaidAccount).toBeDefined();
+        expect(unpaidAccount?.ownerName).toBe('Bob');
+        expect(unpaidAccount?.paymentStatus).toBe('Pending');
+
+        const paidAccount = managedVacantServiceChargeAccounts.find(a => a.unitName === 'B202');
+        expect(paidAccount).toBeDefined();
+        expect(paidAccount?.ownerName).toBe('Bob');
+        expect(paidAccount?.paymentStatus).toBe('Paid');
+    });
+
+    test('should calculate arrears for vacant, handed-over units', () => {
+        // Run against this month, it should have arrears for last month and this month
+        const { vacantArrears } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], thisMonth);
+        
+        expect(vacantArrears).toHaveLength(1);
+        const arrearsAccount = vacantArrears[0];
+        expect(arrearsAccount.unitName).toBe('C301');
+        expect(arrearsAccount.monthsInArrears).toBe(2); // Last month and this month
+        expect(arrearsAccount.totalDue).toBe(3000); // 1500 * 2
+    });
+
+    test('should correctly group multiple accounts for one owner', () => {
+        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], thisMonth);
+        const grouped = groupAccounts(managedVacantServiceChargeAccounts);
+
+        const bobGroup = grouped.find(g => g.ownerName === 'Bob');
+        expect(bobGroup).toBeDefined();
+        expect(bobGroup?.units).toHaveLength(2);
+        expect(bobGroup?.totalServiceCharge).toBe(6000);
+        expect(bobGroup?.paymentStatus).toBe('Pending'); // Because one unit is pending
+    });
+});
