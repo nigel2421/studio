@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -102,103 +101,30 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
-                <DialogHeader>
+            <DialogContent className="max-w-2xl flex flex-col max-h-[90vh] p-0">
+                <DialogHeader className="p-6 pb-4">
                     <DialogTitle>Edit Unit: {unit?.name}</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="status"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Rental Status</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select status" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {unitStatuses.map((status) => (
-                                                    <SelectItem key={status} value={status} className="capitalize">
-                                                        {status}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="unitType"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Unit Type</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select type" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {unitTypes.map((type) => (
-                                                    <SelectItem key={type} value={type}>
-                                                        {type}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="ownership"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Ownership</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select type" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {ownershipTypes.map((type) => (
-                                                    <SelectItem key={type} value={type}>
-                                                        {type}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            {form.watch('ownership') === 'Landlord' && (
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
-                                    name="landlordId"
+                                    name="status"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Landlord</FormLabel>
+                                            <FormLabel>Rental Status</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder="Assign Landlord" />
+                                                        <SelectValue placeholder="Select status" />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="none">None</SelectItem>
-                                                    {landlords.map((landlord) => (
-                                                        <SelectItem key={landlord.id} value={landlord.id}>
-                                                            {landlord.name}
+                                                    {unitStatuses.map((status) => (
+                                                        <SelectItem key={status} value={status} className="capitalize">
+                                                            {status}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -207,122 +133,197 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                                         </FormItem>
                                     )}
                                 />
-                            )}
-                             <FormField
-                                control={form.control}
-                                name="unitOrientation"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Unit Orientation</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select orientation" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {unitOrientations.map((orientation) => (
-                                                    <SelectItem key={orientation} value={orientation}>
-                                                        {orientation}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="managementStatus"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Management Status</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select status" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {managementStatuses.map((status) => (
-                                                    <SelectItem key={status} value={status}>
-                                                        {status}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="handoverStatus"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Handover Status</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select status" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {handoverStatuses.map((status) => (
-                                                    <SelectItem key={status} value={status}>
-                                                        {status}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             {form.watch('handoverStatus') === 'Handed Over' && (
                                 <FormField
                                     control={form.control}
-                                    name="handoverDate"
+                                    name="unitType"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-col">
-                                            <FormLabel>Handover Date</FormLabel>
-                                             <FormControl>
-                                                <DatePicker value={field.value} onChange={field.onChange} />
-                                             </FormControl>
+                                        <FormItem>
+                                            <FormLabel>Unit Type</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {unitTypes.map((type) => (
+                                                        <SelectItem key={type} value={type}>
+                                                            {type}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
-                            )}
-                            <FormField
-                                control={form.control}
-                                name="rentAmount"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Rent Amount (Ksh)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                <FormField
+                                    control={form.control}
+                                    name="ownership"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Ownership</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {ownershipTypes.map((type) => (
+                                                        <SelectItem key={type} value={type}>
+                                                            {type}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {form.watch('ownership') === 'Landlord' && (
+                                    <FormField
+                                        control={form.control}
+                                        name="landlordId"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Landlord</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Assign Landlord" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {landlords.map((landlord) => (
+                                                            <SelectItem key={landlord.id} value={landlord.id}>
+                                                                {landlord.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="serviceCharge"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Service Charge (Ksh)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                 <FormField
+                                    control={form.control}
+                                    name="unitOrientation"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Unit Orientation</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select orientation" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {unitOrientations.map((orientation) => (
+                                                        <SelectItem key={orientation} value={orientation}>
+                                                            {orientation}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="managementStatus"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Management Status</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select status" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {managementStatuses.map((status) => (
+                                                        <SelectItem key={status} value={status}>
+                                                            {status}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="handoverStatus"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Handover Status</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select status" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {handoverStatuses.map((status) => (
+                                                        <SelectItem key={status} value={status}>
+                                                            {status}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                 {form.watch('handoverStatus') === 'Handed Over' && (
+                                    <FormField
+                                        control={form.control}
+                                        name="handoverDate"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-col">
+                                                <FormLabel>Handover Date</FormLabel>
+                                                 <FormControl>
+                                                    <DatePicker value={field.value} onChange={field.onChange} />
+                                                 </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 )}
-                            />
+                                <FormField
+                                    control={form.control}
+                                    name="rentAmount"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Rent Amount (Ksh)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="serviceCharge"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Service Charge (Ksh)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="p-6 pt-4 border-t mt-auto">
                             <Button type="submit" disabled={isSaving}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Save Changes
@@ -334,5 +335,3 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
         </Dialog>
     );
 }
-
-    
