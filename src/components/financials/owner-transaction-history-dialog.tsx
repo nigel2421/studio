@@ -54,21 +54,28 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
             // Generate charges based on all of the owner's units and their specific handover dates.
             ownerUnits.forEach(unit => {
+                const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
                 const monthlyCharge = unit.serviceCharge || 0;
-                if (monthlyCharge <= 0 || unit.handoverStatus !== 'Handed Over' || !unit.handoverDate) {
-                    return;
-                }
+                
+                if (monthlyCharge <= 0) return;
 
-                const handoverDate = new Date(unit.handoverDate);
-                const handoverDay = handoverDate.getDate();
                 let firstBillableMonth: Date;
 
-                if (handoverDay <= 10) {
-                    firstBillableMonth = startOfMonth(handoverDate);
+                if (tenant?.lease.lastBilledPeriod) {
+                    const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
+                    firstBillableMonth = addMonths(lastBilledDate, 1);
+                } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+                    const handoverDate = new Date(unit.handoverDate);
+                    const handoverDay = handoverDate.getDate();
+                    if (handoverDay <= 10) {
+                        firstBillableMonth = startOfMonth(handoverDate);
+                    } else {
+                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                    }
                 } else {
-                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                    return; // Cannot determine billing start
                 }
-
+                
                 let loopDate = firstBillableMonth;
                 const today = new Date();
                 
