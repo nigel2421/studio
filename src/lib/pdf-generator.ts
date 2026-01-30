@@ -144,7 +144,10 @@ export const generateOwnerServiceChargeStatementPDF = (
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(owner.name, 196, 48, { align: 'right' });
+    const nameParts = owner.name.split('&').map(n => n.trim());
+    const displayName = nameParts.length > 1 ? [nameParts[0], `& ${nameParts[1]}`] : owner.name;
+    doc.text(displayName, 196, 48, { align: 'right' });
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(owner.email, 196, 54, { align: 'right' });
@@ -168,7 +171,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     ownerUnits.slice(0, 3).forEach(unit => {
-        const text = `- ${unit.propertyName} / ${unit.name} (${unit.unitType}): Service Charge ${formatCurrency(unit.serviceCharge || 0)}/mo`;
+        const text = `- ${unit.name} (${unit.unitType}): Service Charge ${formatCurrency(unit.serviceCharge || 0)}/mo`;
         doc.text(text, 14, yPos);
         yPos += 5;
     });
@@ -207,7 +210,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
 
         let firstBillableMonth: Date;
-        if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
+        if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
             firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
         } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
             const handoverDate = new Date(unit.handoverDate);
@@ -244,13 +247,47 @@ export const generateOwnerServiceChargeStatementPDF = (
     });
 
     const tableBody: (string | number)[][] = [];
-    let runningBalance = 0; // Start from 0 for the period
+    let runningBalance = 0;
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
-    
+
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
 
-    transactionsInPeriod.forEach(item => {
+    // Group charges by month
+    const groupedCharges = transactionsInPeriod
+        .filter(t => t.charge > 0)
+        .reduce((acc, t) => {
+            const monthKey = format(t.date, 'yyyy-MM');
+            if (!acc[monthKey]) {
+                acc[monthKey] = { date: t.date, totalCharge: 0, unitNames: [] };
+            }
+            acc[monthKey].totalCharge += t.charge;
+            const unitMatch = t.details.match(/Unit (.*)/);
+            if (unitMatch && unitMatch[1]) {
+                acc[monthKey].unitNames.push(unitMatch[1]);
+            }
+            return acc;
+        }, {} as Record<string, { date: Date; totalCharge: number; unitNames: string[] }>);
+
+    const chargeTransactionsForTable = Object.values(groupedCharges).map(group => ({
+        date: group.date,
+        details: `S.Charge for Units: ${group.unitNames.join(', ')}`,
+        charge: group.totalCharge,
+        payment: 0,
+    }));
+
+    const paymentTransactionsForTable = transactionsInPeriod.filter(t => t.payment > 0);
+
+    const allItemsForTable = [...chargeTransactionsForTable, ...paymentTransactionsForTable]
+        .sort((a, b) => {
+            const dateDiff = a.date.getTime() - b.date.getTime();
+            if (dateDiff !== 0) return dateDiff;
+            if (a.charge > 0 && b.payment > 0) return -1; // charges first
+            if (a.payment > 0 && b.charge > 0) return 1;
+            return 0;
+        });
+
+    allItemsForTable.forEach(item => {
         runningBalance += item.charge;
         runningBalance -= item.payment;
 
