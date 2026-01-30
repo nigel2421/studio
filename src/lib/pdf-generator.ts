@@ -1,9 +1,10 @@
 
 
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
-import { FinancialSummary } from '@/lib/financial-utils';
+import { FinancialSummary, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { format, startOfMonth, addMonths, addDays, isWithinInterval, isBefore, isAfter, isSameMonth } from 'date-fns';
 import { generateLedger } from './financial-logic';
 

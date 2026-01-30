@@ -1,33 +1,51 @@
 
+
 import { Payment, Property, Tenant, Unit } from "./types";
+import { isSameMonth, parseISO } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
  * 
  * Logic:
  * 1. Gross Amount = The unit's standard rent.
- * 2. Management Fee = 5% of the unit's standard rent amount.
+ * 2. Management Fee:
+ *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant.
+ *    - Otherwise, it's 5% of the unit's standard rent.
  * 3. Service Charge = The unit's standard service charge.
  * 4. Net to Landlord = Gross Rent - Service Charge - Management Fee.
  * 
- * @param paymentAmount The actual amount paid (used for finding transactions, but not for gross calculation).
- * @param unitRent The standard monthly rent for the unit.
- * @param serviceCharge The service charge amount for the unit.
+ * @param payment The payment object.
+ * @param unit The unit associated with the payment.
+ * @param tenant The tenant associated with the payment.
  */
 export function calculateTransactionBreakdown(
-    paymentAmount: number,
-    unitRent: number,
-    serviceCharge: number = 0
+    payment: Payment,
+    unit: Unit | undefined,
+    tenant: Tenant | undefined
 ) {
+    const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+    const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
+
     // Gross amount for the statement line item is the unit's standard rent.
     const grossAmount = unitRent;
-
-    // Management fee is 5% of the standard rent for the unit.
-    const managementFeeRate = 0.05;
-    const managementFee = unitRent * managementFeeRate;
     
     // The service charge is deducted.
     const serviceChargeDeduction = serviceCharge;
+
+    let managementFee = 0;
+    const standardManagementFeeRate = 0.05;
+
+    // Check for the special 50% first-month commission
+    if (
+        unit?.managementStatus === 'Rented for Clients' &&
+        tenant?.lease?.startDate &&
+        payment.rentForMonth &&
+        isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`))
+    ) {
+        managementFee = unitRent * 0.50;
+    } else {
+        managementFee = unitRent * standardManagementFeeRate;
+    }
 
     // Net to landlord is what's left after deductions from the standard rent.
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
@@ -73,10 +91,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         const tenant = tenants.find(t => t.id === payment.tenantId);
         const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
         
-        const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
-        const unitServiceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-
-        const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, unitServiceCharge);
+        const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
 
         summary.totalRevenue += breakdown.gross;
         summary.totalServiceCharges += breakdown.serviceChargeDeduction;

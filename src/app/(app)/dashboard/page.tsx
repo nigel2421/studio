@@ -104,9 +104,7 @@ export default function DashboardPage() {
           if (!tenant) return sum;
           const property = allPropertiesForReport.find(prop => prop.id === tenant.propertyId);
           const unit = property?.units.find(u => u.name === tenant.unitName);
-          const unitRent = unit?.rentAmount || tenant.lease.rent || 0;
-          const serviceCharge = unit?.serviceCharge || tenant.lease.serviceCharge || 0;
-          const breakdown = calculateTransactionBreakdown(p.amount, unitRent, serviceCharge);
+          const breakdown = calculateTransactionBreakdown(p, unit, tenant);
           return sum + breakdown.managementFee;
       }, 0);
 
