@@ -167,24 +167,21 @@ export default function ServiceChargesPage() {
 
         if (!isBillable) {
             paymentStatus = 'N/A';
-        } else if (tenant) {
-            const paymentInSelectedMonth = allPayments
+        } else {
+            const paymentInSelectedMonth = tenant ? allPayments
                 .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
-                .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
+                .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
 
             if (paymentInSelectedMonth) {
                 paymentStatus = 'Paid';
                 paymentAmount = paymentInSelectedMonth.amount;
                 paymentForMonth = paymentInSelectedMonth.rentForMonth;
             } else {
-                 paymentStatus = 'Pending';
-            }
-        } else {
-            // Unit is billable, but no tenant record exists.
-            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
-                paymentStatus = 'Paid';
-            } else {
-                paymentStatus = 'Pending';
+                if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+                    paymentStatus = 'Paid';
+                } else {
+                    paymentStatus = 'Pending';
+                }
             }
         }
 
@@ -246,20 +243,23 @@ export default function ServiceChargesPage() {
 
       if (!isBillable) {
         paymentStatus = 'N/A';
-      } else if (homeownerTenant) {
-        const paymentForMonthExists = allPayments.some(p => 
-          p.tenantId === homeownerTenant.id &&
-          p.rentForMonth === format(selectedMonth, 'yyyy-MM') &&
-          p.status === 'Paid' &&
-          (p.type === 'ServiceCharge')
-        );
-        paymentStatus = paymentForMonthExists ? 'Paid' : 'Pending';
       } else {
-          if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
-              paymentStatus = 'Paid';
-          } else {
-              paymentStatus = 'Pending';
-          }
+        const paymentForMonthExists = homeownerTenant ? allPayments.some(p =>
+            p.tenantId === homeownerTenant.id &&
+            p.rentForMonth === format(selectedMonth, 'yyyy-MM') &&
+            p.status === 'Paid' &&
+            (p.type === 'ServiceCharge')
+        ) : false;
+
+        if (paymentForMonthExists) {
+            paymentStatus = 'Paid';
+        } else {
+            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+                paymentStatus = 'Paid';
+            } else {
+                paymentStatus = 'Pending';
+            }
+        }
       }
 
       return {
@@ -917,6 +917,9 @@ const VacantArrearsTab = ({
     
 
 
+
+
+    
 
 
     
