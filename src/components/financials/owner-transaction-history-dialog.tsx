@@ -67,10 +67,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 const monthlyCharge = unit.serviceCharge || 0;
                 if (monthlyCharge <= 0) return;
 
+                // Determine the true start of billing
                 let billingStartDate: Date;
                 const leaseStartDate = new Date(tenant.lease.startDate);
 
                 if (tenant.residentType === 'Homeowner' && unit.handoverDate) {
+                    // For homeowners, billing starts based on handover date
                     const handoverDate = new Date(unit.handoverDate);
                     const handoverDay = handoverDate.getDate();
                     if (handoverDay <= 10) {
@@ -81,8 +83,14 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 } else {
                     billingStartDate = startOfMonth(leaseStartDate);
                 }
+
+                const lastBilledDate = tenant.lease.lastBilledPeriod
+                    ? startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'))
+                    : null;
                 
-                let loopDate = billingStartDate;
+                const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
+                
+                let loopDate = firstBillableMonth;
                 const today = new Date();
                 while (loopDate <= today) {
                     const monthKey = format(loopDate, 'yyyy-MM');
