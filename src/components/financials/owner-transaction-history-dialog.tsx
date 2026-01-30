@@ -80,7 +80,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
                 let firstBillableMonth: Date;
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                    firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
+                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
                 } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
                     const handoverDate = new Date(unit.handoverDate);
                     const handoverDay = handoverDate.getDate();
@@ -178,7 +178,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (openingBalance > 0) {
+            if (openingBalance > 0 && paymentStatusForMonth !== 'Pending') {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
@@ -254,7 +254,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                 </TableHeader>
                                 <TableBody>
                                     {transactions.map((t, index) => (
-                                        <TableRow key={index} className={t.transactionType === 'Balance Brought Forward' ? 'bg-muted/50' : ''}>
+                                        <TableRow key={index} className={t.transactionType === 'Opening Balance' ? 'bg-muted/50' : ''}>
                                             <TableCell>{format(t.date, 'dd MMM yyyy')}</TableCell>
                                             <TableCell>{t.details}</TableCell>
                                             <TableCell className="text-right">{t.charge > 0 ? `Ksh ${t.charge.toLocaleString()}` : '-'}</TableCell>
