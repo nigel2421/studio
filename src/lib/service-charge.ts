@@ -1,7 +1,7 @@
 'use server';
 
 import { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
-import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth } from 'date-fns';
+import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore } from 'date-fns';
 
 export interface ServiceChargeAccount {
   propertyId: string;
@@ -298,7 +298,7 @@ export function processServiceChargeData(
         firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
       }
       
-      const today = new Date();
+      const today = selectedMonth;
       
       if (isAfter(firstBillableMonth, today)) return; 
 
@@ -311,7 +311,7 @@ export function processServiceChargeData(
       let loopDate = firstBillableMonth;
       const startOfToday = startOfMonth(today);
 
-      while (startOfMonth(loopDate) <= startOfToday) {
+      while (isBefore(startOfMonth(loopDate), startOfToday)) {
         const chargeForMonth = unit.serviceCharge || 0;
         if (chargeForMonth > 0) {
           totalBilled += chargeForMonth;

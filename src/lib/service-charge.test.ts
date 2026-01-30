@@ -1,8 +1,8 @@
 import { processServiceChargeData, groupAccounts } from './service-charge';
 import type { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
-import { startOfMonth, addMonths, format } from 'date-fns';
+import { startOfMonth, addMonths, format, parseISO, isValid } from 'date-fns';
 
-// Mock data setup
+// Helper to create mock data, ensuring consistency
 const createMockUnit = (name: string, overrides: Partial<Unit>): Unit => ({
     name,
     status: 'vacant',
@@ -106,8 +106,8 @@ describe('Service Charge Logic', () => {
         // Test-specific data
         const mockOwners = [ createMockOwner('owner-2', 'Bob', [{ propertyId: 'prop-1', unitNames: ['B201', 'B202']}]) ];
         const mockUnits = [
-            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
-            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
+            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
+            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
         ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
         const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, lastMonthFormatted) ];
@@ -129,26 +129,37 @@ describe('Service Charge Logic', () => {
     });
 
     test('should calculate arrears for vacant, handed-over units', () => {
-        // Test-specific data
+        const twoMonthsAgo = startOfMonth(addMonths(new Date(), -2));
         const mockLandlords = [ createMockLandlord('landlord-1', 'Charlie') ];
-        const mockUnits = [ createMockUnit('C301', { ownership: 'Landlord', status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', handoverDate: format(twoMonthsAgo, 'yyyy-MM-05'), serviceCharge: 1500, landlordId: 'landlord-1' }) ];
+        const mockUnits = [ 
+            createMockUnit('C301', { 
+                ownership: 'Landlord', 
+                status: 'vacant', 
+                managementStatus: 'Rented for Clients', 
+                handoverStatus: 'Handed Over', 
+                handoverDate: format(twoMonthsAgo, 'yyyy-MM-05'),
+                serviceCharge: 1500, 
+                landlordId: 'landlord-1' 
+            }) 
+        ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
 
+        // Pass `thisMonth` to check arrears up to the beginning of the current month
         const { vacantArrears } = processServiceChargeData(mockProperties, [], [], [], mockLandlords, thisMonth);
         
         expect(vacantArrears).toHaveLength(1);
         const arrearsAccount = vacantArrears[0];
         expect(arrearsAccount.unitName).toBe('C301');
+        // If handed over 2 months ago (e.g. May 5th, and it's now July), arrears are for May and June.
         expect(arrearsAccount.monthsInArrears).toBe(2); 
         expect(arrearsAccount.totalDue).toBe(3000);
     });
 
     test('should correctly group multiple accounts for one owner', () => {
-        // Reuse data from the managed vacant test
         const mockOwners = [ createMockOwner('owner-2', 'Bob', [{ propertyId: 'prop-1', unitNames: ['B201', 'B202']}]) ];
         const mockUnits = [
-            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
-            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000 }),
+            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
+            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
         ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
         const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, lastMonthFormatted) ];
