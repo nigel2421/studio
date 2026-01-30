@@ -1,4 +1,6 @@
-import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment, calculateTransactionBreakdown } from './financial-logic';
+
+import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
+import { calculateTransactionBreakdown } from './financial-utils';
 import { Tenant, Agent, Unit, Payment, UnitStatus, OwnershipType, UnitType, ManagementStatus } from './types';
 import { format, startOfMonth } from 'date-fns';
 
