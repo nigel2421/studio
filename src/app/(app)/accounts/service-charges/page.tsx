@@ -140,13 +140,14 @@ export default function ServiceChargesPage() {
             owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
         }
 
-        const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+        const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
         
         let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
         let paymentAmount: number | undefined;
         let paymentForMonth: string | undefined;
 
         let isBillable = false;
+        let firstBillableMonth: Date | null = null;
         if (unit.handoverDate) {
             const handoverDateSource = unit.handoverDate as any;
             const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
@@ -155,13 +156,12 @@ export default function ServiceChargesPage() {
             
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
                 if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
                     isBillable = true;
                 }
             }
         } else if (unit.handoverStatus === 'Handed Over') {
-            // For legacy units without a handover date, assume they are always billable.
             isBillable = true;
         }
 
@@ -180,9 +180,12 @@ export default function ServiceChargesPage() {
                  paymentStatus = 'Pending';
             }
         } else {
-            // If the unit is billable but has no tenant record, it's pending.
-            // A tenant record (even for a homeowner) is needed to log payments against.
-            paymentStatus = 'Pending';
+            // Unit is billable, but no tenant record exists.
+            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+                paymentStatus = 'Paid';
+            } else {
+                paymentStatus = 'Pending';
+            }
         }
 
         return {
@@ -225,8 +228,8 @@ export default function ServiceChargesPage() {
       const homeownerTenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
-
       let isBillable = false;
+      let firstBillableMonth: Date | null = null;
       if (unit.handoverDate) {
         const handoverDateSource = unit.handoverDate as any;
         const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
@@ -234,7 +237,7 @@ export default function ServiceChargesPage() {
             : parseISO(handoverDateSource);
         if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
-          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+          firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
           if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
             isBillable = true;
           }
@@ -251,6 +254,12 @@ export default function ServiceChargesPage() {
           (p.type === 'ServiceCharge')
         );
         paymentStatus = paymentForMonthExists ? 'Paid' : 'Pending';
+      } else {
+          if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+              paymentStatus = 'Paid';
+          } else {
+              paymentStatus = 'Pending';
+          }
       }
 
       return {
