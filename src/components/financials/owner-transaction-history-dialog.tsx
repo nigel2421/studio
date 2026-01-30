@@ -104,7 +104,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 return {
                     date: new Date(monthKey + '-01T12:00:00Z'),
                     transactionType: 'Invoice',
-                    details: `Service Charge for Units: ${unitList}`,
+                    details: `S.Charge for Units: ${unitList}`,
                     charge: data.totalAmount,
                     payment: 0,
                 };
@@ -119,7 +119,14 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     payment: p.amount,
                 })),
                 ...aggregatedCharges
-            ].sort((a, b) => a.date.getTime() - b.date.getTime());
+            ].sort((a, b) => {
+                const dateDiff = a.date.getTime() - b.date.getTime();
+                if (dateDiff !== 0) return dateDiff;
+                // If on the same day, charges should come before payments
+                if (a.charge > 0 && b.payment > 0) return -1;
+                if (a.payment > 0 && b.charge > 0) return 1;
+                return 0;
+            });
 
             let runningBalance = 0;
             const ledger: Transaction[] = combined.map(item => {
