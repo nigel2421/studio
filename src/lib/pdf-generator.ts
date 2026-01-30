@@ -138,25 +138,32 @@ export const generateOwnerServiceChargeStatementPDF = (
     allPayments: Payment[],
     startDate: Date,
     endDate: Date,
-    paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     addHeader(doc, 'Service Charge Statement');
     
+    // Header section with dynamic Y positioning for email
+    let yPosHeader = 48;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     const nameParts = owner.name.split('&').map(n => n.trim());
     const displayName = nameParts.length > 1 ? [nameParts[0], `& ${nameParts[1]}`] : owner.name;
-    doc.text(displayName, 196, 48, { align: 'right' });
+    doc.text(displayName, 196, yPosHeader, { align: 'right' });
+
+    // Adjust y position for email based on name length
+    yPosHeader += Array.isArray(displayName) ? (displayName.length * 5) : 6;
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(owner.email, 196, 54, { align: 'right' });
-    doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+    doc.text(owner.email, 196, yPosHeader, { align: 'right' });
+    yPosHeader += 6;
+    doc.text(`Date Issued: ${dateStr}`, 196, yPosHeader, { align: 'right' });
+    yPosHeader += 6;
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
-    doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
+    doc.text(`Period: ${periodStr}`, 196, yPosHeader, { align: 'right' });
+
 
     const ownerUnits = allProperties.flatMap(p => 
         p.units
@@ -173,15 +180,11 @@ export const generateOwnerServiceChargeStatementPDF = (
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    ownerUnits.slice(0, 3).forEach(unit => {
+    ownerUnits.forEach(unit => {
         const text = `- ${unit.name} (${unit.unitType}): Service Charge ${formatCurrency(unit.serviceCharge || 0)}/mo`;
         doc.text(text, 14, yPos);
         yPos += 5;
     });
-    if (ownerUnits.length > 3) {
-        doc.text(`...and ${ownerUnits.length - 3} more units.`, 14, yPos);
-        yPos += 5;
-    }
 
     yPos += 5; 
 
@@ -242,10 +245,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     });
 
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
-    const transactionsBeforePeriod = allHistoricalTransactions.filter(item => isBefore(item.date, startDate));
-
-    let openingBalance = transactionsBeforePeriod.reduce((acc, t) => acc + t.charge - t.payment, 0);
-
+    
     // Group charges by month
     const groupedCharges = transactionsInPeriod
         .filter(t => t.charge > 0)
@@ -293,7 +293,7 @@ export const generateOwnerServiceChargeStatementPDF = (
             return 0;
         });
     
-    let runningBalance = openingBalance;
+    let runningBalance = 0; // No Balance Brought Forward
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
 
@@ -313,17 +313,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         ];
     });
 
-    if (openingBalance > 0) {
-        tableBody.unshift([
-            format(startDate, 'dd MMM yyyy'),
-            '',
-            'Balance Brought Forward',
-            '',
-            '',
-            formatCurrency(openingBalance)
-        ]);
-    }
-    
     autoTable(doc, {
         startY: yPos,
         head: [['Date', 'Month', 'Details', 'Charge', 'Payment', 'Balance']],
