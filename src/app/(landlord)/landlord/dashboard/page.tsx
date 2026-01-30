@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -16,6 +17,8 @@ import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
 import { generateLandlordStatementPDF, generateTenantStatementPDF } from '@/lib/pdf-generator';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 enum LandlordType {
   Investor,
@@ -38,7 +41,12 @@ export default function LandlordDashboardPage() {
     // Derived state
     const [landlordType, setLandlordType] = useState<LandlordType>(LandlordType.Loading);
     const [investorData, setInvestorData] = useState<any>(null);
-    const [clientData, setClientData] = useState<any>(null);
+    const [clientData, setClientData] = useState<{
+        tenantDetails: Tenant | null;
+        payments: Payment[];
+        waterReadings: any[];
+        units: (Unit & { propertyName: string })[];
+    } | null>(null);
 
     useEffect(() => {
         if (!authLoading && userProfile) {
@@ -62,13 +70,13 @@ export default function LandlordDashboardPage() {
                 }
 
                 // Determine landlord type
-                const landlordUnits = properties.flatMap(p => p.units.filter(u => u.landlordId === currentLandlord.id));
+                const landlordUnits = properties.flatMap(p => p.units.filter(u => u.landlordId === currentLandlord.id).map(unit => ({...unit, propertyName: p.name})));
                 const isClientType = landlordUnits.length > 0 && landlordUnits.every(u => u.managementStatus === 'Client Managed');
 
                 if (isClientType) {
                     setLandlordType(LandlordType.Client);
-                    // Find the associated homeowner-type tenant record for this client
                     const homeownerTenant = tenants.find(t => t.residentType === 'Homeowner' && t.userId === userProfile.id);
+                    
                     if (homeownerTenant) {
                         const [tenantPayments, tenantWaterReadings] = await Promise.all([
                             getTenantPayments(homeownerTenant.id),
@@ -77,7 +85,15 @@ export default function LandlordDashboardPage() {
                         setClientData({
                             tenantDetails: homeownerTenant,
                             payments: tenantPayments,
-                            waterReadings: tenantWaterReadings
+                            waterReadings: tenantWaterReadings,
+                            units: landlordUnits,
+                        });
+                    } else {
+                         setClientData({
+                            tenantDetails: null,
+                            payments: [],
+                            waterReadings: [],
+                            units: landlordUnits,
                         });
                     }
                 } else {
@@ -161,12 +177,41 @@ export default function LandlordDashboardPage() {
                 </div>
             </header>
             
+            {clientData && clientData.units.length > 0 && (
+                <Card className="mb-8">
+                    <CardHeader>
+                        <CardTitle>Your Units</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Property</TableHead>
+                                    <TableHead>Unit</TableHead>
+                                    <TableHead className="text-right">Monthly Service Charge</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {clientData.units.map(unit => (
+                                    <TableRow key={unit.name}>
+                                        <TableCell>{unit.propertyName}</TableCell>
+                                        <TableCell>{unit.name}</TableCell>
+                                        <TableCell className="text-right">Ksh {(unit.serviceCharge || 0).toLocaleString()}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
             {landlordType === LandlordType.Client && clientData ? (
                 <ClientLandlordDashboard 
                     tenantDetails={clientData.tenantDetails} 
                     payments={clientData.payments} 
                     waterReadings={clientData.waterReadings}
                     allProperties={allProperties}
+                    units={clientData.units}
                 />
             ) : investorData ? (
                 <LandlordDashboardContent {...investorData} />

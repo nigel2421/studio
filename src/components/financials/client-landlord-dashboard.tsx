@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Tenant, Payment, Property } from '@/lib/types';
+import type { Tenant, Payment, Property, Unit } from '@/lib/types';
 import { DollarSign, Calendar, Droplets, PlusCircle, AlertCircle, FileDown } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import {
@@ -22,20 +23,22 @@ import { useLoading } from '@/hooks/useLoading';
 
 
 interface ClientLandlordDashboardProps {
-    tenantDetails: Tenant;
+    tenantDetails: Tenant | null;
     payments: Payment[];
     waterReadings: any[];
     allProperties: Property[];
+    units: (Unit & { propertyName: string })[];
 }
 
-export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties }: ClientLandlordDashboardProps) {
+export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units }: ClientLandlordDashboardProps) {
     const { toast } = useToast();
     const { startLoading, stopLoading, isLoading: isGenerating } = useLoading();
     const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
     
     const latestWaterReading = waterReadings?.[0];
+    const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);
 
-    const getPaymentStatusVariant = (status: Tenant['lease']['paymentStatus']) => {
+    const getPaymentStatusVariant = (status?: Tenant['lease']['paymentStatus']) => {
         switch (status) {
             case 'Paid': return 'default';
             case 'Pending': return 'secondary';
@@ -49,6 +52,10 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
     const handleGenerateStatement = (landlord: any, startDate: Date, endDate: Date) => {
         startLoading('Generating Statement...');
         try {
+            if (!tenantDetails) {
+                 toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate statement without resident details.' });
+                 return;
+            }
             generateTenantStatementPDF(tenantDetails, payments, allProperties);
             setIsStatementDialogOpen(false);
         } catch (e) {
@@ -74,10 +81,12 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {(tenantDetails.lease.serviceCharge || 0).toLocaleString()}</div>
-                        <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
-                            {tenantDetails.lease.paymentStatus}
-                        </Badge>
+                        <div className="text-2xl font-bold">Ksh {monthlyServiceCharge.toLocaleString()}</div>
+                        {tenantDetails && (
+                            <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
+                                {tenantDetails.lease.paymentStatus}
+                            </Badge>
+                        )}
                     </CardContent>
                 </Card>
                 <Card>
@@ -107,7 +116,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         <AlertCircle className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails.dueBalance || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails?.dueBalance || 0).toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                     </CardContent>
                 </Card>
@@ -117,7 +126,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         <PlusCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails.accountBalance || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails?.accountBalance || 0).toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                     </CardContent>
                 </Card>
@@ -154,13 +163,15 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                 </CardContent>
             </Card>
 
-            <StatementOptionsDialog
-                isOpen={isStatementDialogOpen}
-                onClose={() => setIsStatementDialogOpen(false)}
-                landlord={{ id: tenantDetails.id, name: tenantDetails.name, email: tenantDetails.email, phone: tenantDetails.phone }}
-                onGenerate={handleGenerateStatement}
-                isGenerating={isGenerating}
-            />
+            {tenantDetails && (
+                <StatementOptionsDialog
+                    isOpen={isStatementDialogOpen}
+                    onClose={() => setIsStatementDialogOpen(false)}
+                    landlord={{ id: tenantDetails.id, name: tenantDetails.name, email: tenantDetails.email, phone: tenantDetails.phone }}
+                    onGenerate={handleGenerateStatement}
+                    isGenerating={isGenerating}
+                />
+            )}
         </div>
     );
 }
