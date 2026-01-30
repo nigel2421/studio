@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown } from 'lucide-react';
+import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature } from 'lucide-react';
 import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isBefore, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmOwnerPaymentDialog } from '@/components/financials/confirm-owner-payment-dialog';
-import { TransactionHistoryDialog } from '@/components/financials/transaction-history-dialog';
+import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 
 
 interface ServiceChargeAccount {
@@ -94,8 +94,9 @@ export default function ServiceChargesPage() {
   const [isOwnerPaymentDialogOpen, setIsOwnerPaymentDialogOpen] = useState(false);
   const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | null>(null);
   const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
-  const [historyTenant, setHistoryTenant] = useState<Tenant | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  
+  const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
+  const [ownerForStatement, setOwnerForStatement] = useState<PropertyOwner | Landlord | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
 
@@ -220,7 +221,7 @@ export default function ServiceChargesPage() {
                 paymentAmount = paymentInSelectedMonth.amount;
                 paymentForMonth = paymentInSelectedMonth.rentForMonth;
             } else {
-                if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+                if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth) && !tenant) {
                     paymentStatus = 'Paid';
                 } else {
                     paymentStatus = 'Pending';
@@ -298,7 +299,7 @@ export default function ServiceChargesPage() {
         if (paymentForMonthExists) {
             paymentStatus = 'Paid';
         } else {
-            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
+            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth) && !homeownerTenant) {
                 paymentStatus = 'Paid';
             } else {
                 paymentStatus = 'Pending';
@@ -420,59 +421,55 @@ export default function ServiceChargesPage() {
 
   }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments, allLandlords]);
 
-  const handleViewHistory = async (account: ServiceChargeAccount) => {
-    startLoading("Fetching resident details...");
+  const handleOpenStatementDialog = (group: GroupedServiceChargeAccount) => {
+    let ownerForPdf: PropertyOwner | undefined;
+
+    let ownerFromPropertyOwners = allOwners.find(o => o.id === group.ownerId);
+
+    if (ownerFromPropertyOwners) {
+        ownerForPdf = ownerFromPropertyOwners;
+    } else {
+        const landlordFromLandlords = allLandlords.find(l => l.id === group.ownerId);
+        if (landlordFromLandlords) {
+            const assignedUnits = group.units.reduce((acc, unit) => {
+                let prop = acc.find(p => p.propertyId === unit.propertyId);
+                if (!prop) {
+                    prop = { propertyId: unit.propertyId, unitNames: [] };
+                    acc.push(prop);
+                }
+                prop.unitNames.push(unit.unitName);
+                return acc;
+            }, [] as { propertyId: string, unitNames: string[] }[]);
+
+            ownerForPdf = {
+                id: landlordFromLandlords.id,
+                name: landlordFromLandlords.name,
+                email: landlordFromLandlords.email,
+                phone: landlordFromLandlords.phone,
+                bankAccount: landlordFromLandlords.bankAccount,
+                userId: landlordFromLandlords.userId,
+                assignedUnits: assignedUnits,
+            };
+        }
+    }
+    
+    if (ownerForPdf) {
+        setOwnerForStatement(ownerForPdf);
+        setIsStatementDialogOpen(true);
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Owner details not found.' });
+    }
+  };
+
+  const handleGenerateStatement = async (owner: PropertyOwner, startDate: Date, endDate: Date) => {
+    startLoading('Generating Statement...');
     try {
-        let tenantToView: Tenant | null = null;
-        if (account.tenantId) {
-            tenantToView = allTenants.find(t => t.id === account.tenantId) || null;
-        }
-
-        if (!tenantToView) {
-            const property = allProperties.find(p => p.id === account.propertyId);
-            const unit = property?.units.find(u => u.name === account.unitName);
-            
-            // Look for owner in both `propertyOwners` and `landlords`
-            let owner: PropertyOwner | Landlord | undefined = allOwners.find(o => o.id === account.ownerId);
-            if (!owner) {
-                owner = allLandlords.find(l => l.id === account.ownerId);
-            }
-
-            if (property && unit && owner) {
-                // `findOrCreateHomeownerTenant` expects a `PropertyOwner`. We can safely cast because the needed fields are present on both.
-                const ownerAsPropertyOwner: PropertyOwner = {
-                    id: owner.id,
-                    name: owner.name,
-                    email: owner.email,
-                    phone: owner.phone,
-                    bankAccount: owner.bankAccount,
-                    userId: owner.userId,
-                    assignedUnits: (owner as PropertyOwner).assignedUnits || [],
-                };
-
-                tenantToView = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
-                fetchData();
-            } else {
-                throw new Error("An owner must be assigned to this unit to view its history.");
-            }
-        }
-        
-        if (tenantToView) {
-            setHistoryTenant(tenantToView);
-            setIsHistoryOpen(true);
-        } else {
-             toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not find or create the resident's details.",
-            });
-        }
+        const { generateOwnerServiceChargeStatementPDF } = await import('@/lib/pdf-generator');
+        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, startDate, endDate);
+        setIsStatementDialogOpen(false);
     } catch (error: any) {
-        toast({
-            variant: "destructive",
-            title: 'Error',
-            description: error.message || "An unexpected error occurred while fetching history.",
-        });
+        console.error("Error generating statement:", error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to generate statement.' });
     } finally {
         stopLoading();
     }
@@ -666,7 +663,7 @@ export default function ServiceChargesPage() {
               description="Payments for units currently occupied and managed by clients."
               accounts={paginatedSmAccounts}
               onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
-              onViewHistory={handleViewHistory}
+              onGenerateStatement={handleOpenStatementDialog}
               statusFilter={smStatusFilter}
               onStatusFilterChange={(status) => { setSmStatusFilter(status as any); setSmCurrentPage(1); }}
               currentPage={smCurrentPage}
@@ -683,7 +680,7 @@ export default function ServiceChargesPage() {
               description="Service charge payments for handed-over vacant units managed by Eracov."
               accounts={paginatedMvAccounts}
               onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
-              onViewHistory={handleViewHistory}
+              onGenerateStatement={handleOpenStatementDialog}
               statusFilter={mvStatusFilter}
               onStatusFilterChange={(status) => { setMvStatusFilter(status as any); setMvCurrentPage(1); }}
               currentPage={mvCurrentPage}
@@ -718,14 +715,15 @@ export default function ServiceChargesPage() {
           isSaving={isSaving}
         />
       )}
-      <TransactionHistoryDialog
-        tenant={historyTenant}
-        open={isHistoryOpen}
-        onOpenChange={setIsHistoryOpen}
-        onPaymentAdded={fetchData}
-        allTenants={allTenants}
-        allProperties={allProperties}
-       />
+      {ownerForStatement && (
+        <StatementOptionsDialog
+            isOpen={isStatementDialogOpen}
+            onClose={() => setIsStatementDialogOpen(false)}
+            landlord={ownerForStatement}
+            onGenerate={handleGenerateStatement as any}
+            isGenerating={isSaving}
+        />
+      )}
     </div>
   );
 }
@@ -735,7 +733,7 @@ const ServiceChargeStatusTable = ({
     description,
     accounts,
     onConfirmPayment,
-    onViewHistory,
+    onGenerateStatement,
     statusFilter,
     onStatusFilterChange,
     currentPage,
@@ -749,7 +747,7 @@ const ServiceChargeStatusTable = ({
     description: string;
     accounts: GroupedServiceChargeAccount[];
     onConfirmPayment: (acc: ServiceChargeAccount) => void;
-    onViewHistory: (acc: ServiceChargeAccount) => void;
+    onGenerateStatement: (group: GroupedServiceChargeAccount) => void;
     statusFilter: 'all' | 'Paid' | 'Pending' | 'N/A';
     onStatusFilterChange: (status: 'all' | 'Paid' | 'Pending' | 'N/A') => void;
     currentPage: number;
@@ -830,22 +828,15 @@ const ServiceChargeStatusTable = ({
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8">
-                                                    <Eye className="mr-2 h-4 w-4" /> View
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuLabel>View Statement For</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {group.units.map(unit => (
-                                                     <DropdownMenuItem key={unit.unitName} onSelect={() => onViewHistory(unit)}>
-                                                        Unit {unit.unitName}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8"
+                                            onClick={() => onGenerateStatement(group)}
+                                        >
+                                            <FileSignature className="mr-2 h-4 w-4" />
+                                            View Statement
+                                        </Button>
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -965,6 +956,7 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
 
 
 
