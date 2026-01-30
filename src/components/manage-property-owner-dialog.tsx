@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -75,7 +74,6 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
     };
 
     const clientUnits = property.units.filter(u =>
-        u.status === 'client occupied' &&
         u.ownership === 'Landlord' &&
         u.managementStatus === 'Client Managed' &&
         u.handoverStatus === 'Handed Over'
