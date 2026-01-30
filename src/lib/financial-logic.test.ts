@@ -1,5 +1,5 @@
-import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
-import { Tenant, Agent, Unit } from './types';
+import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment, calculateTransactionBreakdown } from './financial-logic';
+import { Tenant, Agent, Unit, Payment, UnitStatus, OwnershipType, UnitType, ManagementStatus } from './types';
 import { format, startOfMonth } from 'date-fns';
 
 describe('Financial Logic Functions', () => {
@@ -37,6 +37,30 @@ describe('Financial Logic Functions', () => {
         return { ...defaultTenant, ...otherOverrides, lease: mergedLease as Tenant['lease'] };
     };
 
+    const createMockUnit = (overrides: Partial<Unit> = {}): Unit => ({
+        name: 'A1',
+        status: 'rented' as UnitStatus,
+        ownership: 'Landlord' as OwnershipType,
+        unitType: 'One Bedroom' as UnitType,
+        managementStatus: 'Rented for Clients' as ManagementStatus,
+        rentAmount: 30000,
+        serviceCharge: 4000,
+        ...overrides,
+    });
+
+    const createMockPayment = (overrides: Partial<Payment> = {}): Payment => ({
+      id: 'payment-1',
+      tenantId: 'tenant-1',
+      amount: 30000,
+      date: '2023-10-10',
+      type: 'Rent',
+      status: 'Paid',
+      rentForMonth: '2023-10',
+      createdAt: new Date(),
+      ...overrides
+    });
+
+
     const createMockHomeowner = (overrides: Omit<Partial<Tenant>, 'lease'> & { lease?: Partial<Tenant['lease']> } = {}): Tenant => {
         const defaultLease = {
             rent: 0,
@@ -55,7 +79,7 @@ describe('Financial Logic Functions', () => {
         });
     };
 
-    const createMockUnit = (handoverDate?: string, serviceCharge: number = 5000): Unit => ({
+    const createMockUnitWithDefaults = (handoverDate?: string, serviceCharge: number = 5000): Unit => ({
         name: 'A1',
         status: 'vacant',
         ownership: 'Landlord',
@@ -206,7 +230,7 @@ describe('Financial Logic Functions', () => {
             const may10th = new Date('2023-05-10');
 
             it('should start billing in the same month if handover is on/before 10th', () => {
-                const unit = createMockUnit('2023-03-08'); // Handover March 8th
+                const unit = createMockUnitWithDefaults('2023-03-08'); // Handover March 8th
                 const homeowner = createMockHomeowner({ lease: { lastBilledPeriod: '2023-02' }});
                 
                 // Reconcile on May 10th. Should bill for March, April, May (3 months).
@@ -217,7 +241,7 @@ describe('Financial Logic Functions', () => {
             });
 
             it('should start billing in the next month if handover is after 10th', () => {
-                const unit = createMockUnit('2023-03-12'); // Handover March 12th
+                const unit = createMockUnitWithDefaults('2023-03-12'); // Handover March 12th
                 const homeowner = createMockHomeowner({ lease: { lastBilledPeriod: '2023-03' }});
 
                 // Reconcile on May 10th. Should bill for April, May (2 months).
@@ -228,7 +252,7 @@ describe('Financial Logic Functions', () => {
             });
 
             it('should not bill if lastBilledPeriod is already up to date', () => {
-                 const unit = createMockUnit('2023-01-05'); 
+                 const unit = createMockUnitWithDefaults('2023-01-05'); 
                  const homeowner = createMockHomeowner({ 
                      dueBalance: 5000,
                      lease: { lastBilledPeriod: '2023-05' }
@@ -298,6 +322,127 @@ describe('Financial Logic Functions', () => {
         it('should not throw for a payment on the lease start date', () => {
             const leaseStartDate = new Date('2023-01-15');
             expect(() => validatePayment(20000, leaseStartDate, tenant, 'Rent')).not.toThrow();
+        });
+    });
+
+    describe('calculateTransactionBreakdown', () => {
+        it('should calculate standard 5% management fee and service charge deduction', () => {
+            const tenant = createMockTenant({ lease: { rent: 20000 } });
+            const unit = createMockUnit({ rentAmount: 20000, serviceCharge: 3000, managementStatus: 'Rented for Soil Merchants' });
+            const payment = createMockPayment({ amount: 20000 });
+
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+
+            expect(breakdown.gross).toBe(20000);
+            expect(breakdown.serviceChargeDeduction).toBe(3000);
+            expect(breakdown.managementFee).toBe(1000); // 5% of 20000
+            expect(breakdown.netToLandlord).toBe(16000); // 20000 - 3000 - 1000
+        });
+
+        it('should calculate 50% commission for first month on a "Rented for Clients" unit', () => {
+            const tenant = createMockTenant({
+                lease: {
+                    rent: 40000,
+                    startDate: '2023-05-01',
+                },
+            });
+            const unit = createMockUnit({
+                rentAmount: 40000,
+                serviceCharge: 5000,
+                managementStatus: 'Rented for Clients',
+            });
+            const payment = createMockPayment({
+                amount: 40000,
+                rentForMonth: '2023-05', // This matches the tenant's start month
+            });
+
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+
+            expect(breakdown.gross).toBe(40000);
+            expect(breakdown.serviceChargeDeduction).toBe(5000);
+            expect(breakdown.managementFee).toBe(20000); // 50% of 40000
+            expect(breakdown.netToLandlord).toBe(15000); // 40000 - 5000 - 20000
+        });
+
+        it('should revert to 5% commission on the second month for a "Rented for Clients" unit', () => {
+            const tenant = createMockTenant({
+                lease: {
+                    rent: 40000,
+                    startDate: '2023-05-01',
+                },
+            });
+            const unit = createMockUnit({
+                rentAmount: 40000,
+                serviceCharge: 5000,
+                managementStatus: 'Rented for Clients',
+            });
+            const payment = createMockPayment({
+                amount: 40000,
+                rentForMonth: '2023-06', // Second month
+            });
+
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+
+            expect(breakdown.gross).toBe(40000);
+            expect(breakdown.serviceChargeDeduction).toBe(5000);
+            expect(breakdown.managementFee).toBe(2000); // 5% of 40000
+            expect(breakdown.netToLandlord).toBe(33000); // 40000 - 5000 - 2000
+        });
+
+        it('should use standard 5% fee for "Rented for Soil Merchants" units even on first month', () => {
+            const tenant = createMockTenant({
+                lease: { rent: 50000, startDate: '2023-09-01' }
+            });
+            const unit = createMockUnit({
+                rentAmount: 50000,
+                serviceCharge: 6000,
+                managementStatus: 'Rented for Soil Merchants',
+            });
+            const payment = createMockPayment({
+                amount: 50000,
+                rentForMonth: '2023-09' // First month
+            });
+
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+
+            expect(breakdown.gross).toBe(50000);
+            expect(breakdown.serviceChargeDeduction).toBe(6000);
+            expect(breakdown.managementFee).toBe(2500); // 5% of 50000
+            expect(breakdown.netToLandlord).toBe(41500); // 50000 - 6000 - 2500
+        });
+
+        it('should handle missing unit or tenant gracefully', () => {
+            const tenant = createMockTenant({ lease: { rent: 20000 } });
+            const unit = createMockUnit({ rentAmount: 20000, serviceCharge: 3000 });
+            const payment = createMockPayment({ amount: 20000 });
+
+            // Case 1: Unit is undefined, but tenant has rent info
+            const breakdown1 = calculateTransactionBreakdown(payment, undefined, tenant);
+            expect(breakdown1.gross).toBe(20000);
+            expect(breakdown1.serviceChargeDeduction).toBe(0); // No unit, no service charge
+            expect(breakdown1.managementFee).toBe(1000); // 5% of tenant's rent
+            expect(breakdown1.netToLandlord).toBe(19000); // 20000 - 0 - 1000
+
+            // Case 2: Tenant is undefined, but unit has rent info
+            const breakdown2 = calculateTransactionBreakdown(payment, unit, undefined);
+            expect(breakdown2.gross).toBe(20000);
+            expect(breakdown2.serviceChargeDeduction).toBe(3000); // Has unit, so has service charge
+            expect(breakdown2.managementFee).toBe(1000); // 5% of unit's rent (20000)
+            expect(breakdown2.netToLandlord).toBe(16000); // 20000 - 3000 - 1000
+        });
+
+        it('should correctly calculate net payout when payment amount differs from rent', () => {
+            const tenant = createMockTenant({ lease: { rent: 20000 } });
+            const unit = createMockUnit({ rentAmount: 20000, serviceCharge: 3000 });
+            // Tenant makes a partial payment
+            const payment = createMockPayment({ amount: 10000 });
+
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+
+            expect(breakdown.gross).toBe(10000);
+            expect(breakdown.serviceChargeDeduction).toBe(3000);
+            expect(breakdown.managementFee).toBe(1000); // Fee is based on standard rent
+            expect(breakdown.netToLandlord).toBe(6000); // 10000 - 3000 - 1000
         });
     });
 });
