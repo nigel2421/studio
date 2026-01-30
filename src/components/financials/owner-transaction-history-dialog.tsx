@@ -53,54 +53,9 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
 
-            const relevantTenantIds = allTenants
-                .filter(t => ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName))
-                .map(t => t.id);
-
-            // --- Calculate Opening Balance ---
-            const startOfSelectedMonth = startOfMonth(selectedMonth);
-            let openingBalance = 0;
-
-            const openingBalanceCharges: {date: Date, charge: number}[] = [];
-            ownerUnits.forEach(unit => {
-                const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
-                const monthlyCharge = unit.serviceCharge || 0;
-                if (monthlyCharge <= 0) return;
-
-                let firstBillableMonth: Date;
-                 if (tenant?.lease.lastBilledPeriod) {
-                    const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
-                    firstBillableMonth = addMonths(lastBilledDate, 1);
-                } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-                    const handoverDate = new Date(unit.handoverDate);
-                    const handoverDay = handoverDate.getDate();
-                     if (handoverDay <= 10) {
-                        firstBillableMonth = startOfMonth(handoverDate);
-                    } else {
-                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                    }
-                } else {
-                    return; 
-                }
-
-                let loopDate = firstBillableMonth;
-                while (isBefore(loopDate, startOfSelectedMonth)) {
-                    openingBalanceCharges.push({ date: loopDate, charge: monthlyCharge });
-                    loopDate = addMonths(loopDate, 1);
-                }
-            });
-            openingBalance = openingBalanceCharges.reduce((sum, c) => sum + c.charge, 0);
-
-            const pastPayments = allPayments
-                .filter(p => relevantTenantIds.includes(p.tenantId) && isBefore(new Date(p.date), startOfSelectedMonth))
-                .reduce((sum, p) => sum + p.amount, 0);
-            
-            openingBalance -= pastPayments;
-
-
             // --- Get Transactions for the Display Month ---
+            const startOfSelectedMonth = startOfMonth(selectedMonth);
             const displayTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
-            const monthKey = format(selectedMonth, 'yyyy-MM');
 
             if (paymentStatusForMonth === 'Paid') {
                 let chargeAmountForMonth = 0;
@@ -112,7 +67,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                      if (monthlyCharge <= 0) return;
 
                      let firstBillableMonth: Date;
-                     if (tenant?.lease.lastBilledPeriod) {
+                     if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
                         const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
                         firstBillableMonth = addMonths(lastBilledDate, 1);
                     } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
@@ -158,7 +113,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                       if (monthlyCharge <= 0) return;
 
                      let firstBillableMonth: Date;
-                     if (tenant?.lease.lastBilledPeriod) {
+                     if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
                         const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
                         firstBillableMonth = addMonths(lastBilledDate, 1);
                     } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
@@ -189,6 +144,10 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     });
                 }
 
+                const relevantTenantIds = allTenants
+                    .filter(t => ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName))
+                    .map(t => t.id);
+
                 const paymentsForMonth = allPayments.filter(p =>
                     relevantTenantIds.includes(p.tenantId) &&
                     isSameMonth(new Date(p.date), selectedMonth)
@@ -206,16 +165,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
             // --- Build final ledger for display ---
             const ledger: Transaction[] = [];
-            let runningBalance = openingBalance;
-
-            ledger.push({
-                date: startOfSelectedMonth,
-                transactionType: 'Balance Brought Forward',
-                details: 'Opening Balance',
-                charge: 0,
-                payment: 0,
-                balance: openingBalance
-            });
+            let runningBalance = 0;
 
             displayTransactions.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
