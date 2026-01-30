@@ -1,4 +1,5 @@
 
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -241,6 +242,9 @@ export const generateOwnerServiceChargeStatementPDF = (
     });
 
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
+    const transactionsBeforePeriod = allHistoricalTransactions.filter(item => isBefore(item.date, startDate));
+
+    let openingBalance = transactionsBeforePeriod.reduce((acc, t) => acc + t.charge - t.payment, 0);
 
     // Group charges by month
     const groupedCharges = transactionsInPeriod
@@ -278,22 +282,10 @@ export const generateOwnerServiceChargeStatementPDF = (
             payment: t.payment,
         }));
     
-    if (paymentStatusForMonth === 'Paid') {
-        const totalChargesThisMonth = chargeTransactionsForTable.reduce((sum, t) => sum + t.charge, 0);
-        const hasRealPaymentThisMonth = paymentTransactionsForTable.length > 0;
-        if (totalChargesThisMonth > 0 && !hasRealPaymentThisMonth) {
-            paymentTransactionsForTable.push({
-                date: startOfMonth(startDate),
-                month: format(startOfMonth(startDate), 'MMM yyyy'),
-                details: 'Payment Received',
-                charge: 0,
-                payment: totalChargesThisMonth
-            });
-        }
-    }
-
-    const allItemsForTable = [...chargeTransactionsForTable, ...paymentTransactionsForTable]
-        .sort((a, b) => {
+    const allItemsForTable = [
+        ...chargeTransactionsForTable, 
+        ...paymentTransactionsForTable
+    ].sort((a, b) => {
             const dateDiff = a.date.getTime() - b.date.getTime();
             if (dateDiff !== 0) return dateDiff;
             if (a.charge > 0 && b.payment > 0) return -1;
@@ -301,7 +293,7 @@ export const generateOwnerServiceChargeStatementPDF = (
             return 0;
         });
     
-    let runningBalance = 0;
+    let runningBalance = openingBalance;
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
 
@@ -320,6 +312,17 @@ export const generateOwnerServiceChargeStatementPDF = (
             formatCurrency(runningBalance),
         ];
     });
+
+    if (openingBalance > 0) {
+        tableBody.unshift([
+            format(startDate, 'dd MMM yyyy'),
+            '',
+            'Balance Brought Forward',
+            '',
+            '',
+            formatCurrency(openingBalance)
+        ]);
+    }
     
     autoTable(doc, {
         startY: yPos,
@@ -708,7 +711,7 @@ export const generateDashboardReportPDF = (
 };
 
 export const generateVacantServiceChargeInvoicePDF = (
-    owner: PropertyOwner,
+    owner: PropertyOwner | Landlord,
     unit: Unit,
     property: Property,
     arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[],

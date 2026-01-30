@@ -37,7 +37,7 @@ export interface VacantArrearsAccount {
     totalDue: number;
     arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[];
     unit: Unit;
-    owner: PropertyOwner;
+    owner: PropertyOwner | Landlord;
     property: Property;
 }
 
@@ -221,7 +221,10 @@ export function processServiceChargeData(
             isBillable = true;
           }
         }
+      } else if (unit.handoverStatus === 'Handed Over') {
+          isBillable = true;
       }
+
 
       if (!isBillable) {
         paymentStatus = 'N/A';
@@ -274,7 +277,10 @@ export function processServiceChargeData(
     );
 
     liableUnits.forEach(unit => {
-      const owner = ownerByUnitMap.get(`${unit.property.id}-${unit.name}`);
+      let owner: PropertyOwner | Landlord | undefined = ownerByUnitMap.get(`${unit.property.id}-${unit.name}`);
+      if (!owner && unit.landlordId) {
+          owner = landlordMap.get(unit.landlordId);
+      }
       if (!owner) return; 
 
       const handoverDateSource = unit.handoverDate! as any;
