@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -44,6 +43,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         if (owner && open && selectedMonth) {
             setIsLoading(true);
 
+            // 1. Identify all units belonging to this owner
             const ownerUnits: Unit[] = allProperties.flatMap(p =>
                 (p.units || [])
                     .filter(u =>
@@ -53,121 +53,97 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
 
-            // --- Get Transactions for the Display Month ---
+            // 2. Collect all historical charges and payments for these units
+            const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
+            
+            const relevantTenants = allTenants.filter(t => 
+                t.residentType === 'Homeowner' &&
+                ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName)
+            );
+            const relevantTenantIds = relevantTenants.map(t => t.id);
+            const allOwnerPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
+
+            allOwnerPayments.forEach(p => {
+                allHistoricalTransactions.push({
+                    date: new Date(p.date),
+                    details: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+                    charge: 0,
+                    payment: p.amount
+                });
+            });
+
+            ownerUnits.forEach(unit => {
+                const monthlyCharge = unit.serviceCharge || 0;
+                if (monthlyCharge <= 0) return;
+
+                const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+
+                let firstBillableMonth: Date;
+                if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
+                    const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
+                    firstBillableMonth = addMonths(lastBilledDate, 1);
+                } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+                    const handoverDate = new Date(unit.handoverDate);
+                    const handoverDay = handoverDate.getDate();
+                    firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 2));
+                } else {
+                    return; 
+                }
+
+                let loopDate = firstBillableMonth;
+                const today = new Date();
+                while (startOfMonth(loopDate) <= startOfMonth(today)) {
+                    allHistoricalTransactions.push({
+                        date: loopDate,
+                        details: `S.Charge for Unit ${unit.name}`,
+                        charge: monthlyCharge,
+                        payment: 0,
+                    });
+                    loopDate = addMonths(loopDate, 1);
+                }
+            });
+
+            // 3. Calculate Opening Balance
             const startOfSelectedMonth = startOfMonth(selectedMonth);
-            const displayTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
-
-            if (paymentStatusForMonth === 'Paid') {
-                let chargeAmountForMonth = 0;
-                const unitsInCharge: string[] = [];
-
-                ownerUnits.forEach(unit => {
-                    const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
-                    const monthlyCharge = unit.serviceCharge || 0;
-                     if (monthlyCharge <= 0) return;
-
-                     let firstBillableMonth: Date;
-                     if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                        const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
-                        firstBillableMonth = addMonths(lastBilledDate, 1);
-                    } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-                        const handoverDate = new Date(unit.handoverDate);
-                        const handoverDay = handoverDate.getDate();
-                         if (handoverDay <= 10) {
-                            firstBillableMonth = startOfMonth(handoverDate);
-                        } else {
-                            firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                        }
-                    } else {
-                        return; 
-                    }
-
-                    if (!isAfter(firstBillableMonth, selectedMonth)) {
-                        chargeAmountForMonth += monthlyCharge;
-                        if (!unitsInCharge.includes(unit.name)) {
-                            unitsInCharge.push(unit.name);
-                        }
-                    }
-                });
-
-                if (chargeAmountForMonth > 0) {
-                     displayTransactions.push({
-                        date: startOfSelectedMonth,
-                        details: `S.Charge for Units: ${unitsInCharge.sort().join(', ')}`,
-                        charge: chargeAmountForMonth,
-                        payment: 0
-                    });
-                     displayTransactions.push({
-                        date: startOfSelectedMonth,
-                        details: `Payment Received`,
-                        charge: 0,
-                        payment: chargeAmountForMonth
-                    });
+            let openingBalance = 0;
+            allHistoricalTransactions.forEach(t => {
+                if (isBefore(t.date, startOfSelectedMonth)) {
+                    openingBalance += t.charge;
+                    openingBalance -= t.payment;
                 }
-            } else { // 'Pending' or 'N/A'
-                let totalCharge = 0;
-                const unitsInCharge: string[] = [];
-                 ownerUnits.forEach(unit => {
-                     const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
-                     const monthlyCharge = unit.serviceCharge || 0;
-                      if (monthlyCharge <= 0) return;
-
-                     let firstBillableMonth: Date;
-                     if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                        const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
-                        firstBillableMonth = addMonths(lastBilledDate, 1);
-                    } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-                        const handoverDate = new Date(unit.handoverDate);
-                        const handoverDay = handoverDate.getDate();
-                        if (handoverDay <= 10) {
-                            firstBillableMonth = startOfMonth(handoverDate);
-                        } else {
-                            firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                        }
-                    } else {
-                        return; 
-                    }
-
-                    if (!isAfter(firstBillableMonth, selectedMonth)) {
-                        totalCharge += monthlyCharge;
-                         if (!unitsInCharge.includes(unit.name)) {
-                            unitsInCharge.push(unit.name);
-                        }
-                    }
-                });
-                if (totalCharge > 0) {
-                     displayTransactions.push({
-                        date: startOfSelectedMonth,
-                        details: `S.Charge for Units: ${unitsInCharge.sort().join(', ')}`,
-                        charge: totalCharge,
-                        payment: 0
-                    });
-                }
-
-                const relevantTenantIds = allTenants
-                    .filter(t => ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName))
-                    .map(t => t.id);
-
-                const paymentsForMonth = allPayments.filter(p =>
-                    relevantTenantIds.includes(p.tenantId) &&
-                    isSameMonth(new Date(p.date), selectedMonth)
-                );
-                paymentsForMonth.forEach(p => {
-                    displayTransactions.push({
-                        date: new Date(p.date),
-                        details: p.notes || `Payment - ${p.type}`,
-                        charge: 0,
-                        payment: p.amount
-                    });
-                });
-            }
-
-
-            // --- Build final ledger for display ---
+            });
+            
+            // 4. Filter for display month and build ledger from the opening balance
+            const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
             const ledger: Transaction[] = [];
-            let runningBalance = 0;
+            let runningBalance = openingBalance;
 
-            displayTransactions.sort((a, b) => {
+            const groupedCharges = displayTransactions
+                .filter(t => t.charge > 0)
+                .reduce((acc, t) => {
+                    const dateKey = format(t.date, 'yyyy-MM-dd');
+                    if (!acc[dateKey]) {
+                        acc[dateKey] = { date: t.date, totalCharge: 0, units: [] };
+                    }
+                    acc[dateKey].totalCharge += t.charge;
+                    const unitMatch = t.details.match(/Unit (.*)/);
+                    if (unitMatch && unitMatch[1] && !acc[dateKey].units.includes(unitMatch[1])) {
+                        acc[dateKey].units.push(unitMatch[1]);
+                    }
+                    return acc;
+                }, {} as Record<string, { date: Date; totalCharge: number; units: string[] }>);
+
+            const combinedTransactionsForMonth = [
+                ...Object.values(groupedCharges).map(group => ({
+                    date: group.date,
+                    details: `S.Charge for Units: ${group.units.sort().join(', ')}`,
+                    charge: group.totalCharge,
+                    payment: 0,
+                })),
+                ...displayTransactions.filter(t => t.payment > 0)
+            ];
+
+            combinedTransactionsForMonth.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
                 if (a.charge > 0 && b.payment > 0) return -1;
@@ -186,6 +162,22 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
+            if (paymentStatusForMonth === 'Paid') {
+                const totalChargeForMonth = combinedTransactionsForMonth.reduce((sum, t) => sum + t.charge, 0);
+                const hasPaymentRecord = combinedTransactionsForMonth.some(t => t.payment > 0);
+                if (totalChargeForMonth > 0 && !hasPaymentRecord) {
+                    runningBalance -= totalChargeForMonth;
+                     ledger.push({
+                        date: startOfSelectedMonth,
+                        transactionType: 'Payment',
+                        details: 'Payment Received',
+                        charge: 0,
+                        payment: totalChargeForMonth,
+                        balance: runningBalance
+                    });
+                }
+            }
+            
             setTransactions(ledger);
             setIsLoading(false);
         }
