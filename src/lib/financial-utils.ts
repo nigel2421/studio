@@ -7,12 +7,12 @@ import { isSameMonth, parseISO } from 'date-fns';
  * Calculates the breakdown of a rent payment, including management fees and service charges.
  * 
  * Logic:
- * 1. Gross Amount = The unit's standard rent.
+ * 1. Gross Amount = The actual payment amount made.
  * 2. Management Fee:
- *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant.
+ *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant (calculated on standard rent).
  *    - Otherwise, it's 5% of the unit's standard rent.
  * 3. Service Charge = The unit's standard service charge.
- * 4. Net to Landlord = Gross Rent - Service Charge - Management Fee.
+ * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
  * 
  * @param payment The payment object.
  * @param unit The unit associated with the payment.
@@ -26,16 +26,16 @@ export function calculateTransactionBreakdown(
     const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
-    // Gross amount for the statement line item is the unit's standard rent.
-    const grossAmount = unitRent;
+    // Gross amount for the statement line item is the actual payment amount.
+    const grossAmount = payment.amount;
     
-    // The service charge is deducted.
+    // The service charge is deducted from the gross.
     const serviceChargeDeduction = serviceCharge;
 
     let managementFee = 0;
     const standardManagementFeeRate = 0.05;
 
-    // Check for the special 50% first-month commission
+    // Fee is still calculated on the standard rent, not the payment amount.
     if (
         unit?.managementStatus === 'Rented for Clients' &&
         tenant?.lease?.startDate &&
@@ -47,7 +47,7 @@ export function calculateTransactionBreakdown(
         managementFee = unitRent * standardManagementFeeRate;
     }
 
-    // Net to landlord is what's left after deductions from the standard rent.
+    // Net to landlord is the payment amount minus deductions.
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
 
     return {
