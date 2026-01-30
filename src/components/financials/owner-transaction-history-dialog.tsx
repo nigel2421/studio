@@ -40,7 +40,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     useEffect(() => {
         if (owner && open) {
             setIsLoading(true);
-            // Logic to generate transaction history
             const ownerUnits = allProperties.flatMap(p =>
                 (p.units || [])
                  .filter(u =>
@@ -58,8 +57,9 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 relevantTenantIds.includes(p.tenantId) &&
                 (p.type === 'ServiceCharge' || p.type === 'Rent')
             );
+            
+            const monthlyCharges = new Map<string, { totalAmount: number; unitNames: string[] }>();
 
-            const generatedCharges: { date: Date, description: string, amount: number }[] = [];
             relevantTenants.forEach(tenant => {
                 const unit = ownerUnits.find(u => u.propertyId === tenant.propertyId && u.name === tenant.unitName);
                 if (!unit) return;
@@ -67,7 +67,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 const monthlyCharge = unit.serviceCharge || 0;
                 if (monthlyCharge <= 0) return;
 
-                // Determine the true start of billing
                 let billingStartDate: Date;
                 const leaseStartDate = new Date(tenant.lease.startDate);
 
@@ -86,13 +85,29 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 let loopDate = billingStartDate;
                 const today = new Date();
                 while (loopDate <= today) {
-                    generatedCharges.push({
-                        date: loopDate,
-                        description: `Service Charge for Unit ${unit.name}`,
-                        amount: monthlyCharge
-                    });
+                    const monthKey = format(loopDate, 'yyyy-MM');
+                    if (!monthlyCharges.has(monthKey)) {
+                        monthlyCharges.set(monthKey, { totalAmount: 0, unitNames: [] });
+                    }
+                    const chargeForMonth = monthlyCharges.get(monthKey)!;
+                    chargeForMonth.totalAmount += monthlyCharge;
+                    if (!chargeForMonth.unitNames.includes(unit.name)) {
+                        chargeForMonth.unitNames.push(unit.name);
+                    }
+                    
                     loopDate = addMonths(loopDate, 1);
                 }
+            });
+
+            const aggregatedCharges = Array.from(monthlyCharges.entries()).map(([monthKey, data]) => {
+                const unitList = data.unitNames.sort().join(', ');
+                return {
+                    date: new Date(monthKey + '-01T12:00:00Z'),
+                    transactionType: 'Invoice',
+                    details: `Service Charge for Units: ${unitList}`,
+                    charge: data.totalAmount,
+                    payment: 0,
+                };
             });
 
             const combined = [
@@ -103,13 +118,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     charge: 0,
                     payment: p.amount,
                 })),
-                ...generatedCharges.map(c => ({
-                    date: c.date,
-                    transactionType: 'Invoice',
-                    details: c.description,
-                    charge: c.amount,
-                    payment: 0,
-                }))
+                ...aggregatedCharges
             ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
             let runningBalance = 0;
