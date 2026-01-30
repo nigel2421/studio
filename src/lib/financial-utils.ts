@@ -27,7 +27,7 @@ export function calculateTransactionBreakdown(
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
     // Gross amount for the statement line item is the actual payment amount.
-    const grossAmount = payment.amount;
+    const grossAmount = payment.amount || 0;
     
     // The service charge is deducted from the gross.
     const serviceChargeDeduction = serviceCharge;

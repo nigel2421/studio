@@ -1,6 +1,5 @@
 
 
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -32,7 +31,7 @@ const addHeader = (doc: jsPDF, title: string) => {
 };
 
 // Helper for currency formatting
-const formatCurrency = (amount: number) => `KSh ${amount.toLocaleString()}`;
+const formatCurrency = (amount: number) => `KSh ${(amount || 0).toLocaleString()}`;
 
 export const generateDocumentPDF = (document: FinancialDocument) => {
     const doc = new jsPDF();
