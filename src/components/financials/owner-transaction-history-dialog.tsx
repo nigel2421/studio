@@ -106,21 +106,25 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             });
 
-            // 3. Calculate Opening Balance
+            // 3. Calculate Opening Balance and running balance
             const startOfSelectedMonth = startOfMonth(selectedMonth);
             let openingBalance = 0;
-            allHistoricalTransactions.forEach(t => {
-                if (isBefore(t.date, startOfSelectedMonth)) {
-                    openingBalance += t.charge;
-                    openingBalance -= t.payment;
-                }
-            });
+            let runningBalance = 0;
+            const ledger: Transaction[] = [];
+
+            if (paymentStatusForMonth !== 'Pending') {
+                allHistoricalTransactions.forEach(t => {
+                    if (isBefore(t.date, startOfSelectedMonth)) {
+                        openingBalance += t.charge;
+                        openingBalance -= t.payment;
+                    }
+                });
+                runningBalance = openingBalance;
+            }
             
             // 4. Filter for display month and build ledger from the opening balance
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
-            const ledger: Transaction[] = [];
-            let runningBalance = openingBalance;
-
+            
             const groupedCharges = displayTransactions
                 .filter(t => t.charge > 0)
                 .reduce((acc, t) => {
@@ -151,7 +155,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 const hasPaymentRecord = combinedTransactionsForMonth.some(t => t.payment > 0);
                 if (totalChargeForMonth > 0 && !hasPaymentRecord) {
                     combinedTransactionsForMonth.push({
-                        date: startOfSelectedMonth,
+                        date: startOfMonth(selectedMonth),
                         details: 'Payment Received',
                         charge: 0,
                         payment: totalChargeForMonth,
@@ -178,7 +182,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (openingBalance > 0) {
+            if (paymentStatusForMonth !== 'Pending' && openingBalance > 0) {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
