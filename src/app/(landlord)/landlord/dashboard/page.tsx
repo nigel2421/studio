@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -19,6 +18,7 @@ import { isWithinInterval } from 'date-fns';
 import { generateLandlordStatementPDF, generateTenantStatementPDF } from '@/lib/pdf-generator';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 
 enum LandlordType {
   Investor,
@@ -31,6 +31,7 @@ export default function LandlordDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
     const router = useRouter();
     const { startLoading, stopLoading, isLoading: isGenerating } = useLoading();
+    const { toast } = useToast();
     
     // Data states
     const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -47,6 +48,7 @@ export default function LandlordDashboardPage() {
         waterReadings: any[];
         units: (Unit & { propertyName: string })[];
     } | null>(null);
+    const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
 
     useEffect(() => {
         if (!authLoading && userProfile) {
@@ -131,6 +133,22 @@ export default function LandlordDashboardPage() {
         router.push('/login');
     };
 
+    const handleGenerateClientStatement = (landlord: any, startDate: Date, endDate: Date) => {
+        if (!clientData?.tenantDetails) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate statement without resident details.' });
+            return;
+        }
+        startLoading('Generating Statement...');
+        try {
+            generateTenantStatementPDF(clientData.tenantDetails, clientData.payments, allProperties);
+            setIsStatementDialogOpen(false);
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });
+        } finally {
+            stopLoading();
+        }
+    };
+
     const landlordForStatement: Landlord | null = userProfile?.landlordId 
         ? allLandlords.find(l => l.id === userProfile.landlordId) || null
         : null;
@@ -169,7 +187,12 @@ export default function LandlordDashboardPage() {
                     <p className="text-muted-foreground">Here is an overview of your property portfolio.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* The statement generation logic needs to be inside the specific dashboard */}
+                    {landlordType === LandlordType.Client && (
+                         <Button variant="outline" onClick={() => setIsStatementDialogOpen(true)}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Generate Statement
+                        </Button>
+                    )}
                     <Button onClick={handleSignOut} variant="outline">
                         <LogOut className="mr-2 h-4 w-4" />
                         Sign Out
@@ -188,6 +211,7 @@ export default function LandlordDashboardPage() {
                                 <TableRow>
                                     <TableHead>Property</TableHead>
                                     <TableHead>Unit</TableHead>
+                                    <TableHead>Unit Type</TableHead>
                                     <TableHead className="text-right">Monthly Service Charge</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -196,6 +220,7 @@ export default function LandlordDashboardPage() {
                                     <TableRow key={unit.name}>
                                         <TableCell>{unit.propertyName}</TableCell>
                                         <TableCell>{unit.name}</TableCell>
+                                        <TableCell>{unit.unitType}</TableCell>
                                         <TableCell className="text-right">Ksh {(unit.serviceCharge || 0).toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}
@@ -216,6 +241,16 @@ export default function LandlordDashboardPage() {
             ) : investorData ? (
                 <LandlordDashboardContent {...investorData} />
             ) : null}
+
+            {landlordType === LandlordType.Client && clientData?.tenantDetails && (
+                <StatementOptionsDialog
+                    isOpen={isStatementDialogOpen}
+                    onClose={() => setIsStatementDialogOpen(false)}
+                    landlord={{ id: clientData.tenantDetails.id, name: clientData.tenantDetails.name, email: clientData.tenantDetails.email, phone: clientData.tenantDetails.phone }}
+                    onGenerate={handleGenerateClientStatement}
+                    isGenerating={isGenerating}
+                />
+            )}
         </div>
     );
 }

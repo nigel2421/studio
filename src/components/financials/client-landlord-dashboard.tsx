@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -33,7 +32,6 @@ interface ClientLandlordDashboardProps {
 export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units }: ClientLandlordDashboardProps) {
     const { toast } = useToast();
     const { startLoading, stopLoading, isLoading: isGenerating } = useLoading();
-    const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
     
     const latestWaterReading = waterReadings?.[0];
     const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);
@@ -49,30 +47,10 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
 
     const nextRentDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
 
-    const handleGenerateStatement = (landlord: any, startDate: Date, endDate: Date) => {
-        startLoading('Generating Statement...');
-        try {
-            if (!tenantDetails) {
-                 toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate statement without resident details.' });
-                 return;
-            }
-            generateTenantStatementPDF(tenantDetails, payments, allProperties);
-            setIsStatementDialogOpen(false);
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });
-        } finally {
-            stopLoading();
-        }
-    };
-
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold">Service Charge Overview</h2>
-                <Button variant="outline" onClick={() => setIsStatementDialogOpen(true)}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Generate Statement
-                </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -162,16 +140,6 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     </Table>
                 </CardContent>
             </Card>
-
-            {tenantDetails && (
-                <StatementOptionsDialog
-                    isOpen={isStatementDialogOpen}
-                    onClose={() => setIsStatementDialogOpen(false)}
-                    landlord={{ id: tenantDetails.id, name: tenantDetails.name, email: tenantDetails.email, phone: tenantDetails.phone }}
-                    onGenerate={handleGenerateStatement}
-                    isGenerating={isGenerating}
-                />
-            )}
         </div>
     );
 }
