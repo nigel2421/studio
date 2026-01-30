@@ -1,4 +1,3 @@
-'use server';
 
 import { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
 import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore } from 'date-fns';
@@ -277,7 +276,13 @@ export function processServiceChargeData(
     );
 
     liableUnits.forEach(unit => {
-      let owner: PropertyOwner | Landlord | undefined = ownerByUnitMap.get(`${unit.property.id}-${unit.name}`);
+      let owner: PropertyOwner | Landlord | undefined;
+      
+      const foundOwner = ownerByUnitMap.get(`${unit.property.id}-${unit.name}`);
+      if(foundOwner) {
+          owner = foundOwner;
+      }
+
       if (!owner && unit.landlordId) {
           owner = landlordMap.get(unit.landlordId);
       }
@@ -311,7 +316,7 @@ export function processServiceChargeData(
       let loopDate = firstBillableMonth;
       const startOfToday = startOfMonth(today);
 
-      while (isBefore(startOfMonth(loopDate), startOfToday)) {
+      while (isBefore(loopDate, startOfToday)) {
         const chargeForMonth = unit.serviceCharge || 0;
         if (chargeForMonth > 0) {
           totalBilled += chargeForMonth;
