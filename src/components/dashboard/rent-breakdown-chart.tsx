@@ -15,7 +15,6 @@ interface RentBreakdownChartProps {
 
 export function RentBreakdownChart({ payments, tenants, properties }: RentBreakdownChartProps) {
   const chartData = useMemo(() => {
-    // Create a map for quick property/unit lookup
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
         if (p.units) {
@@ -24,8 +23,9 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
             });
         }
     });
+    
+    const tenantMap = new Map(tenants.map(t => [t.id, t]));
 
-    // Initialize the data structure
     const breakdown: { [key in UnitType]?: { smRent: number, landlordRent: number } } = {};
     unitTypes.forEach(type => {
         breakdown[type] = { smRent: 0, landlordRent: 0 };
@@ -34,7 +34,7 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
     const rentPayments = payments.filter(p => p.status === 'Paid' && p.type === 'Rent');
 
     rentPayments.forEach(payment => {
-        const tenant = tenants.find(t => t.id === payment.tenantId);
+        const tenant = tenantMap.get(payment.tenantId);
         if (!tenant) return;
 
         const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);

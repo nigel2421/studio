@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Users, Building2, Wrench, AlertCircle, Building, Briefcase, BedDouble, UserCog, Home, Percent } from "lucide-react";
-import type { Tenant, Property, MaintenanceRequest, Payment } from "@/lib/types";
+import type { Tenant, Property, MaintenanceRequest, Payment, Unit } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 
 interface DashboardStatsProps {
@@ -55,13 +55,22 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
   const vacantUnits = totalUnits - occupiedUnits;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
+  const tenantMap = new Map(tenants.map(t => [t.id, t]));
+  const unitMap = new Map<string, Unit>();
+  properties.forEach(p => {
+    if (p.units) {
+        p.units.forEach(u => {
+            unitMap.set(`${p.id}-${u.name}`, u);
+        });
+    }
+  });
+
   const totalMgmtFees = payments.reduce((sum, p) => {
     if (p.type === 'Deposit') return sum;
-    const tenant = tenants.find(t => t.id === p.tenantId);
+    const tenant = tenantMap.get(p.tenantId);
     if (!tenant) return sum;
 
-    const property = properties.find(prop => prop.id === tenant.propertyId);
-    const unit = property?.units.find(u => u.name === tenant.unitName);
+    const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
     
     const breakdown = calculateTransactionBreakdown(p, unit, tenant);
     return sum + breakdown.managementFee;
