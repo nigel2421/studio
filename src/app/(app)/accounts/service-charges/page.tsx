@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye } from 'lucide-react';
+import { Loader2, Search, FileSignature, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown } from 'lucide-react';
 import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isBefore, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -37,6 +37,14 @@ interface ServiceChargeAccount {
   paymentForMonth?: string;
 }
 
+interface GroupedServiceChargeAccount {
+  ownerId: string;
+  ownerName: string;
+  units: ServiceChargeAccount[];
+  totalServiceCharge: number;
+  paymentStatus: 'Paid' | 'Pending' | 'N/A';
+}
+
 interface VacantArrearsAccount {
     ownerId: string;
     ownerName: string;
@@ -57,6 +65,9 @@ export default function ServiceChargesPage() {
   const [managedVacantAccounts, setManagedVacantAccounts] = useState<ServiceChargeAccount[]>([]);
   const [arrearsAccounts, setArrearsAccounts] = useState<VacantArrearsAccount[]>([]);
   
+  const [groupedSmAccounts, setGroupedSmAccounts] = useState<GroupedServiceChargeAccount[]>([]);
+  const [groupedMvAccounts, setGroupedMvAccounts] = useState<GroupedServiceChargeAccount[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -119,6 +130,38 @@ export default function ServiceChargesPage() {
   useEffect(() => {
     if(loading) return;
 
+    const groupAccounts = (accounts: ServiceChargeAccount[]): GroupedServiceChargeAccount[] => {
+        const grouped = accounts.reduce((acc, account) => {
+            const key = account.ownerId || `unassigned-${account.propertyName}-${account.unitName}`;
+            if (!acc[key]) {
+                acc[key] = {
+                    ownerId: account.ownerId!,
+                    ownerName: account.ownerName || 'Unassigned',
+                    units: [],
+                    totalServiceCharge: 0,
+                    paymentStatus: 'Paid', // Default
+                };
+            }
+            acc[key].units.push(account);
+            acc[key].totalServiceCharge += account.unitServiceCharge;
+            return acc;
+        }, {} as Record<string, GroupedServiceChargeAccount>);
+
+        return Object.values(grouped).map(group => {
+            const statuses = group.units.map(u => u.paymentStatus);
+            if (statuses.includes('Pending')) {
+                group.paymentStatus = 'Pending';
+            } else if (statuses.every(s => s === 'N/A')) {
+                group.paymentStatus = 'N/A';
+            } else if (statuses.every(s => s === 'Paid' || s === 'N/A')) {
+                group.paymentStatus = 'Paid';
+            } else {
+                group.paymentStatus = 'Pending'; // Default for mixed statuses
+            }
+            return group;
+        });
+    };
+
     // --- Client Occupied Units Logic (formerly Self-managed) ---
     const clientOccupiedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
     allProperties.forEach(p => {
@@ -168,7 +211,7 @@ export default function ServiceChargesPage() {
         if (!isBillable) {
             paymentStatus = 'N/A';
         } else {
-            const paymentInSelectedMonth = tenant ? allPayments
+             const paymentInSelectedMonth = tenant ? allPayments
                 .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
                 .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
 
@@ -200,6 +243,7 @@ export default function ServiceChargesPage() {
         };
     });
     setSelfManagedAccounts(clientOccupiedServiceChargeAccounts);
+    setGroupedSmAccounts(groupAccounts(clientOccupiedServiceChargeAccounts));
 
     // --- Managed Vacant Units Logic ---
     const managedVacantUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
@@ -275,6 +319,7 @@ export default function ServiceChargesPage() {
       };
     });
     setManagedVacantAccounts(managedVacantServiceChargeAccounts);
+    setGroupedMvAccounts(groupAccounts(managedVacantServiceChargeAccounts));
 
 
     // --- Vacant Units in Arrears Logic ---
@@ -537,35 +582,33 @@ export default function ServiceChargesPage() {
 
 
   const filteredSelfManaged = useMemo(() => {
-    let accounts = selfManagedAccounts;
+    let accounts = groupedSmAccounts;
     if (smStatusFilter !== 'all') {
-      accounts = accounts.filter(acc => acc.paymentStatus === smStatusFilter);
+      accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
     }
     if (!searchTerm) return accounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return accounts.filter(acc =>
-        acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
-        acc.unitName.toLowerCase().includes(lowercasedFilter) ||
-        acc.ownerName?.toLowerCase().includes(lowercasedFilter)
+    return accounts.filter(group =>
+        group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
+        group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [selfManagedAccounts, searchTerm, smStatusFilter]);
+  }, [groupedSmAccounts, searchTerm, smStatusFilter]);
   
   const smTotalPages = Math.ceil(filteredSelfManaged.length / smPageSize);
   const paginatedSmAccounts = filteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
 
   const filteredManagedVacant = useMemo(() => {
-    let accounts = managedVacantAccounts;
+    let accounts = groupedMvAccounts;
     if (mvStatusFilter !== 'all') {
-        accounts = accounts.filter(acc => acc.paymentStatus === mvStatusFilter);
+        accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
     }
     if (!searchTerm) return accounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return accounts.filter(acc =>
-        acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
-        acc.unitName.toLowerCase().includes(lowercasedFilter) ||
-        acc.ownerName?.toLowerCase().includes(lowercasedFilter)
+    return accounts.filter(group =>
+        group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
+        group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [managedVacantAccounts, searchTerm, mvStatusFilter]);
+  }, [groupedMvAccounts, searchTerm, mvStatusFilter]);
 
   const mvTotalPages = Math.ceil(filteredManagedVacant.length / mvPageSize);
   const paginatedMvAccounts = filteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
@@ -704,7 +747,7 @@ const ServiceChargeStatusTable = ({
 }: {
     title: string;
     description: string;
-    accounts: ServiceChargeAccount[];
+    accounts: GroupedServiceChargeAccount[];
     onConfirmPayment: (acc: ServiceChargeAccount) => void;
     onViewHistory: (acc: ServiceChargeAccount) => void;
     statusFilter: 'all' | 'Paid' | 'Pending' | 'N/A';
@@ -718,16 +761,17 @@ const ServiceChargeStatusTable = ({
 }) => {
     const { toast } = useToast();
 
-    const handleConfirmClick = (acc: ServiceChargeAccount) => {
-        if (acc.paymentStatus === 'N/A') {
+    const handleConfirmClick = (group: GroupedServiceChargeAccount) => {
+        if (group.paymentStatus === 'N/A') {
             toast({
                 variant: "destructive",
                 title: "Cannot Record Payment",
-                description: "This unit is not yet billable for the selected month.",
+                description: "This owner has no units that are billable for the selected month.",
             });
             return;
         }
-        onConfirmPayment(acc);
+        // Pass the first unit as a representative to get the ownerId
+        onConfirmPayment(group.units[0]);
     };
     
     return (
@@ -753,53 +797,66 @@ const ServiceChargeStatusTable = ({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Property / Unit</TableHead>
                             <TableHead>Owner</TableHead>
-                            <TableHead>Service Charge</TableHead>
+                            <TableHead>Units</TableHead>
+                            <TableHead>Total S. Charge</TableHead>
                             <TableHead>Payment Status</TableHead>
-                            <TableHead>Statement</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {accounts.map(acc => (
-                            <TableRow key={`${acc.propertyId}-${acc.unitName}`}>
+                        {accounts.map(group => (
+                            <TableRow key={group.ownerId}>
+                                <TableCell>{group.ownerName}</TableCell>
                                 <TableCell>
-                                    <div className="font-medium">{acc.propertyName}</div>
-                                    <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
+                                    <div className="flex flex-col gap-2">
+                                        {group.units.map(unit => (
+                                            <div key={unit.unitName} className="text-xs">
+                                                <span className="font-semibold">{unit.unitName}</span> ({unit.propertyName}) - <span className="font-mono">Ksh {unit.unitServiceCharge.toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </TableCell>
-                                <TableCell>{acc.ownerName}</TableCell>
-                                <TableCell>Ksh {acc.unitServiceCharge.toLocaleString()}</TableCell>
+                                <TableCell>Ksh {group.totalServiceCharge.toLocaleString()}</TableCell>
                                 <TableCell>
                                      <Badge variant={
-                                        acc.paymentStatus === 'Paid' ? 'default' :
-                                        acc.paymentStatus === 'Pending' ? 'destructive' :
-                                        acc.paymentStatus === 'N/A' ? 'outline' :
+                                        group.paymentStatus === 'Paid' ? 'default' :
+                                        group.paymentStatus === 'Pending' ? 'destructive' :
+                                        group.paymentStatus === 'N/A' ? 'outline' :
                                         'secondary'
                                     }>
-                                        {acc.paymentStatus}
+                                        {group.paymentStatus}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>
-                                    <Button
-                                        variant="link"
-                                        className="h-auto p-0 text-sm"
-                                        onClick={() => onViewHistory(acc)}
-                                    >
-                                        View Statement
-                                    </Button>
-                                </TableCell>
                                 <TableCell className="text-right">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleConfirmClick(acc)}
-                                        disabled={acc.paymentStatus === 'Paid' || acc.paymentStatus === 'N/A'}
-                                        className="h-8"
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Confirm
-                                    </Button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-8">
+                                                    <Eye className="mr-2 h-4 w-4" /> View
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuLabel>View Statement For</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {group.units.map(unit => (
+                                                     <DropdownMenuItem key={unit.unitName} onSelect={() => onViewHistory(unit)}>
+                                                        Unit {unit.unitName}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleConfirmClick(group)}
+                                            disabled={group.paymentStatus === 'Paid' || group.paymentStatus === 'N/A'}
+                                            className="h-8"
+                                        >
+                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                            Confirm
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -910,16 +967,3 @@ const VacantArrearsTab = ({
 }
 
 
-
-
-    
-
-    
-
-
-
-
-    
-
-
-    
