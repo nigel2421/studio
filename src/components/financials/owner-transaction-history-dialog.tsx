@@ -178,7 +178,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (openingBalance > 0 && paymentStatusForMonth !== 'Pending') {
+            if (openingBalance > 0) {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
