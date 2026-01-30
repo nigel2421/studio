@@ -81,7 +81,7 @@ export type Unit = {
   unitOrientation?: UnitOrientation;
 };
 
-export const agents = ['Susan', 'Beatrice', 'Nelly', 'Dennis', 'Peris', 'Felista', 'Nyambura', 'Faith', 'Martha', 'Thomas', 'Kiragu'] as const;
+export const agents = ['Kuria','Susan', 'Beatrice', 'Nelly', 'Dennis', 'Peris', 'Felista', 'Nyambura', 'Faith', 'Martha', 'Thomas', 'Kiragu'] as const;
 export type Agent = (typeof agents)[number];
 
 export type WaterMeterReading = {

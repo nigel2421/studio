@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,19 +5,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { Landlord } from '@/lib/types';
+import { Landlord, PropertyOwner } from '@/lib/types';
 import { startOfYear } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 
 interface StatementOptionsDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    landlord: Landlord | null;
-    onGenerate: (landlord: Landlord, startDate: Date, endDate: Date) => void;
+    landlord: Landlord | PropertyOwner | null;
+    onGenerate: (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null) => void;
     isGenerating: boolean;
+    paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null;
 }
 
-export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, isGenerating }: StatementOptionsDialogProps) {
+export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, isGenerating, paymentStatusForMonth }: StatementOptionsDialogProps) {
     const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
@@ -28,7 +28,7 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
 
     const handleGenerateClick = () => {
         if (landlord && startDate && endDate) {
-            onGenerate(landlord, startDate, endDate);
+            onGenerate(landlord, startDate, endDate, paymentStatusForMonth);
         }
     };
 

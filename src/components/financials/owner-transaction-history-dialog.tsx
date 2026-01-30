@@ -80,12 +80,15 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
                 let firstBillableMonth: Date;
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                    const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
-                    firstBillableMonth = addMonths(lastBilledDate, 1);
+                    firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
                 } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
                     const handoverDate = new Date(unit.handoverDate);
                     const handoverDay = handoverDate.getDate();
-                    firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 2));
+                     if (handoverDay <= 10) {
+                        firstBillableMonth = startOfMonth(handoverDate);
+                    } else {
+                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                    }
                 } else {
                     return; 
                 }
@@ -143,6 +146,19 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 ...displayTransactions.filter(t => t.payment > 0)
             ];
 
+            if (paymentStatusForMonth === 'Paid') {
+                const totalChargeForMonth = combinedTransactionsForMonth.reduce((sum, t) => sum + t.charge, 0);
+                const hasPaymentRecord = combinedTransactionsForMonth.some(t => t.payment > 0);
+                if (totalChargeForMonth > 0 && !hasPaymentRecord) {
+                    combinedTransactionsForMonth.push({
+                        date: startOfSelectedMonth,
+                        details: 'Payment Received',
+                        charge: 0,
+                        payment: totalChargeForMonth,
+                    });
+                }
+            }
+
             combinedTransactionsForMonth.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
@@ -162,20 +178,15 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (paymentStatusForMonth === 'Paid') {
-                const totalChargeForMonth = combinedTransactionsForMonth.reduce((sum, t) => sum + t.charge, 0);
-                const hasPaymentRecord = combinedTransactionsForMonth.some(t => t.payment > 0);
-                if (totalChargeForMonth > 0 && !hasPaymentRecord) {
-                    runningBalance -= totalChargeForMonth;
-                     ledger.push({
-                        date: startOfSelectedMonth,
-                        transactionType: 'Payment',
-                        details: 'Payment Received',
-                        charge: 0,
-                        payment: totalChargeForMonth,
-                        balance: runningBalance
-                    });
-                }
+            if (openingBalance > 0) {
+                 ledger.unshift({
+                    date: startOfSelectedMonth,
+                    transactionType: 'Opening Balance',
+                    details: 'Balance Brought Forward',
+                    charge: 0,
+                    payment: 0,
+                    balance: openingBalance,
+                });
             }
             
             setTransactions(ledger);
@@ -184,11 +195,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     }, [owner, open, selectedMonth, paymentStatusForMonth, allProperties, allTenants, allPayments]);
 
 
-    const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
+    const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, status: 'Paid' | 'Pending' | 'N/A' | null) => {
         startPdfLoading('Generating Statement...');
         try {
             if ('assignedUnits' in landlord) {
-                 generateOwnerServiceChargeStatementPDF(landlord, allProperties, allTenants, allPayments, startDate, endDate);
+                 generateOwnerServiceChargeStatementPDF(landlord, allProperties, allTenants, allPayments, startDate, endDate, status);
             } else {
                 const landlordAsOwner: PropertyOwner = {
                     ...landlord,
@@ -200,7 +211,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                         return acc;
                     }, [] as {propertyId: string, unitNames: string[]}[])
                 };
-                 generateOwnerServiceChargeStatementPDF(landlordAsOwner, allProperties, allTenants, allPayments, startDate, endDate);
+                 generateOwnerServiceChargeStatementPDF(landlordAsOwner, allProperties, allTenants, allPayments, startDate, endDate, status);
             }
 
             setIsStatementOptionsOpen(false);
@@ -275,6 +286,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 landlord={owner}
                 onGenerate={handleGenerateStatement as any}
                 isGenerating={isPdfGenerating}
+                paymentStatusForMonth={paymentStatusForMonth}
             />
         </>
     );
