@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -96,6 +97,8 @@ export default function ServiceChargesPage() {
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [ownerForHistory, setOwnerForHistory] = useState<PropertyOwner | Landlord | null>(null);
+  const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
+
 
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
 
@@ -436,6 +439,7 @@ export default function ServiceChargesPage() {
     
     if (ownerForDialog) {
         setOwnerForHistory(ownerForDialog);
+        setStatusForHistory(group.paymentStatus);
         setIsHistoryOpen(true);
     } else {
         toast({ variant: 'destructive', title: 'Error', description: 'Owner details not found.' });
@@ -690,6 +694,8 @@ export default function ServiceChargesPage() {
             allProperties={allProperties}
             allTenants={allTenants}
             allPayments={allPayments}
+            selectedMonth={selectedMonth}
+            paymentStatusForMonth={statusForHistory}
         />
       )}
     </div>
