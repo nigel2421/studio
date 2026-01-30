@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Download } from 'lucide-react';
 import { Tenant, Payment, Property, Landlord, PropertyOwner } from '@/lib/types';
-import { format, isWithinInterval, startOfMonth, addMonths, isBefore } from 'date-fns';
+import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter } from 'date-fns';
 import { StatementOptionsDialog } from './statement-options-dialog';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
@@ -40,6 +40,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     useEffect(() => {
         if (owner && open) {
             setIsLoading(true);
+            
             const ownerUnits = allProperties.flatMap(p =>
                 (p.units || [])
                  .filter(u =>
@@ -49,49 +50,28 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                  .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
             );
 
-            const ownerUnitIdentifiers = new Set(ownerUnits.map(u => `${u.propertyId}-${u.name}`));
-            const relevantTenants = allTenants.filter(t => ownerUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-            const relevantTenantIds = relevantTenants.map(t => t.id);
-
-            const serviceChargePayments = allPayments.filter(p =>
-                relevantTenantIds.includes(p.tenantId) &&
-                (p.type === 'ServiceCharge' || p.type === 'Rent')
-            );
-            
             const monthlyCharges = new Map<string, { totalAmount: number; unitNames: string[] }>();
 
-            relevantTenants.forEach(tenant => {
-                const unit = ownerUnits.find(u => u.propertyId === tenant.propertyId && u.name === tenant.unitName);
-                if (!unit) return;
-
+            // Generate charges based on all of the owner's units and their specific handover dates.
+            ownerUnits.forEach(unit => {
                 const monthlyCharge = unit.serviceCharge || 0;
-                if (monthlyCharge <= 0) return;
-
-                // Determine the true start of billing
-                let billingStartDate: Date;
-                const leaseStartDate = new Date(tenant.lease.startDate);
-
-                if (tenant.residentType === 'Homeowner' && unit.handoverDate) {
-                    // For homeowners, billing starts based on handover date
-                    const handoverDate = new Date(unit.handoverDate);
-                    const handoverDay = handoverDate.getDate();
-                    if (handoverDay <= 10) {
-                        billingStartDate = startOfMonth(handoverDate);
-                    } else {
-                        billingStartDate = startOfMonth(addMonths(handoverDate, 1));
-                    }
-                } else {
-                    billingStartDate = startOfMonth(leaseStartDate);
+                if (monthlyCharge <= 0 || unit.handoverStatus !== 'Handed Over' || !unit.handoverDate) {
+                    return;
                 }
 
-                const lastBilledDate = tenant.lease.lastBilledPeriod
-                    ? startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'))
-                    : null;
-                
-                const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
-                
+                const handoverDate = new Date(unit.handoverDate);
+                const handoverDay = handoverDate.getDate();
+                let firstBillableMonth: Date;
+
+                if (handoverDay <= 10) {
+                    firstBillableMonth = startOfMonth(handoverDate);
+                } else {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                }
+
                 let loopDate = firstBillableMonth;
                 const today = new Date();
+                
                 while (loopDate <= today) {
                     const monthKey = format(loopDate, 'yyyy-MM');
                     if (!monthlyCharges.has(monthKey)) {
@@ -99,6 +79,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     }
                     const chargeForMonth = monthlyCharges.get(monthKey)!;
                     chargeForMonth.totalAmount += monthlyCharge;
+
                     if (!chargeForMonth.unitNames.includes(unit.name)) {
                         chargeForMonth.unitNames.push(unit.name);
                     }
@@ -118,6 +99,15 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 };
             });
 
+            const ownerUnitIdentifiers = new Set(ownerUnits.map(u => `${u.propertyId}-${u.name}`));
+            const relevantTenants = allTenants.filter(t => ownerUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+            const relevantTenantIds = relevantTenants.map(t => t.id);
+
+            const serviceChargePayments = allPayments.filter(p =>
+                relevantTenantIds.includes(p.tenantId) &&
+                (p.type === 'ServiceCharge' || p.type === 'Rent')
+            );
+            
             const combined = [
                  ...serviceChargePayments.map(p => ({
                     date: new Date(p.date),
