@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -135,7 +136,8 @@ export const generateOwnerServiceChargeStatementPDF = (
     allTenants: Tenant[],
     allPayments: Payment[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -193,13 +195,14 @@ export const generateOwnerServiceChargeStatementPDF = (
         (p.type === 'ServiceCharge' || p.type === 'Rent')
     );
 
-    const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
+    const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number, rentForMonth?: string }[] = [];
     serviceChargePayments.forEach(p => {
         allHistoricalTransactions.push({
             date: new Date(p.date),
             details: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
             charge: 0,
-            payment: p.amount
+            payment: p.amount,
+            rentForMonth: p.rentForMonth,
         });
     });
 
@@ -237,20 +240,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    
-    allHistoricalTransactions.sort((a, b) => {
-        const dateDiff = a.date.getTime() - b.date.getTime();
-        if (dateDiff !== 0) return dateDiff;
-        if (a.charge > 0 && b.payment > 0) return -1;
-        if (a.payment > 0 && b.charge > 0) return 1;
-        return 0;
-    });
-
-    const tableBody: (string | number)[][] = [];
-    let runningBalance = 0;
-    let totalChargesInPeriod = 0;
-    let totalPaymentsInPeriod = 0;
-
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
 
     // Group charges by month
@@ -264,55 +253,84 @@ export const generateOwnerServiceChargeStatementPDF = (
             acc[monthKey].totalCharge += t.charge;
             const unitMatch = t.details.match(/Unit (.*)/);
             if (unitMatch && unitMatch[1]) {
-                acc[monthKey].unitNames.push(unitMatch[1]);
+                if (!acc[monthKey].unitNames.includes(unitMatch[1])) {
+                     acc[monthKey].unitNames.push(unitMatch[1]);
+                }
             }
             return acc;
         }, {} as Record<string, { date: Date; totalCharge: number; unitNames: string[] }>);
 
     const chargeTransactionsForTable = Object.values(groupedCharges).map(group => ({
         date: group.date,
-        details: `S.Charge for Units: ${group.unitNames.join(', ')}`,
+        month: format(group.date, 'MMM yyyy'),
+        details: `S.Charge for Units: ${group.unitNames.sort().join(', ')}`,
         charge: group.totalCharge,
         payment: 0,
     }));
 
-    const paymentTransactionsForTable = transactionsInPeriod.filter(t => t.payment > 0);
+    const paymentTransactionsForTable = transactionsInPeriod
+        .filter(t => t.payment > 0)
+        .map(t => ({
+            date: t.date,
+            month: t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+            details: t.details,
+            charge: 0,
+            payment: t.payment,
+        }));
+    
+    if (paymentStatusForMonth === 'Paid') {
+        const totalChargesThisMonth = chargeTransactionsForTable.reduce((sum, t) => sum + t.charge, 0);
+        const hasRealPaymentThisMonth = paymentTransactionsForTable.length > 0;
+        if (totalChargesThisMonth > 0 && !hasRealPaymentThisMonth) {
+            paymentTransactionsForTable.push({
+                date: startOfMonth(startDate),
+                month: format(startOfMonth(startDate), 'MMM yyyy'),
+                details: 'Payment Received',
+                charge: 0,
+                payment: totalChargesThisMonth
+            });
+        }
+    }
 
     const allItemsForTable = [...chargeTransactionsForTable, ...paymentTransactionsForTable]
         .sort((a, b) => {
             const dateDiff = a.date.getTime() - b.date.getTime();
             if (dateDiff !== 0) return dateDiff;
-            if (a.charge > 0 && b.payment > 0) return -1; // charges first
+            if (a.charge > 0 && b.payment > 0) return -1;
             if (a.payment > 0 && b.charge > 0) return 1;
             return 0;
         });
+    
+    let runningBalance = 0;
+    let totalChargesInPeriod = 0;
+    let totalPaymentsInPeriod = 0;
 
-    allItemsForTable.forEach(item => {
+    const tableBody: (string | number)[][] = allItemsForTable.map(item => {
         runningBalance += item.charge;
         runningBalance -= item.payment;
-
         totalChargesInPeriod += item.charge;
         totalPaymentsInPeriod += item.payment;
 
-        tableBody.push([
+        return [
             format(item.date, 'dd MMM yyyy'),
+            item.month,
             item.details,
             item.charge > 0 ? formatCurrency(item.charge) : '',
             item.payment > 0 ? formatCurrency(item.payment) : '',
-            formatCurrency(runningBalance > 0 ? runningBalance : 0),
-        ]);
+            formatCurrency(runningBalance),
+        ];
     });
     
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Details', 'Charge', 'Payment', 'Balance']],
+        head: [['Date', 'Month', 'Details', 'Charge', 'Payment', 'Balance']],
         body: tableBody,
         foot: [
              [
-                { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(totalChargesInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(totalPaymentsInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
-                { content: formatCurrency(runningBalance > 0 ? runningBalance : 0), styles: { fontStyle: 'bold', halign: 'right' } }
+                { content: formatCurrency(runningBalance), styles: { fontStyle: 'bold', halign: 'right' } }
             ]
         ],
         theme: 'striped',
@@ -320,10 +338,11 @@ export const generateOwnerServiceChargeStatementPDF = (
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
         columnStyles: {
             0: { cellWidth: 22 },
-            1: { cellWidth: 'auto' },
-            2: { halign: 'right', cellWidth: 25 },
-            3: { halign: 'right', cellWidth: 25 },
-            4: { halign: 'right', cellWidth: 25 },
+            1: { cellWidth: 22 },
+            2: { cellWidth: 'auto' },
+            3: { halign: 'right', cellWidth: 22 },
+            4: { halign: 'right', cellWidth: 22 },
+            5: { halign: 'right', cellWidth: 22 },
         },
     });
     
