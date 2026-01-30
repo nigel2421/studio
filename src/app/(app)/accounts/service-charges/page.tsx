@@ -38,7 +38,8 @@ interface ServiceChargeAccount {
 }
 
 interface GroupedServiceChargeAccount {
-  ownerId: string;
+  groupId: string;
+  ownerId?: string;
   ownerName: string;
   units: ServiceChargeAccount[];
   totalServiceCharge: number;
@@ -138,7 +139,8 @@ export default function ServiceChargesPage() {
             const key = account.ownerId || `unassigned-${account.propertyName}-${account.unitName}`;
             if (!acc[key]) {
                 acc[key] = {
-                    ownerId: account.ownerId!,
+                    groupId: key,
+                    ownerId: account.ownerId,
                     ownerName: account.ownerName || 'Unassigned',
                     units: [],
                     totalServiceCharge: 0,
@@ -778,7 +780,7 @@ const ServiceChargeStatusTable = ({
                     </TableHeader>
                     <TableBody>
                         {accounts.map(group => (
-                            <TableRow key={group.ownerId}>
+                            <TableRow key={group.groupId}>
                                 <TableCell>{group.ownerName}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-2">

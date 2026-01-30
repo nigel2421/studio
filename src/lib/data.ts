@@ -528,32 +528,40 @@ export async function batchProcessPayments(
 ) {
     const tenantRef = doc(db, 'tenants', tenantId);
 
+    // Fetch property data outside the transaction as it's read-only for this operation
+    const tempTenant = await getTenant(tenantId);
+    if (!tempTenant) throw new Error("Tenant not found before transaction.");
+    const property = await getProperty(tempTenant.propertyId);
+    const unit = property?.units.find(u => u.name === tempTenant.unitName);
+
     await runTransaction(db, async (transaction) => {
-        let tenantSnap = await transaction.get(tenantRef);
+        // 1. Transactional read of the tenant document
+        const tenantSnap = await transaction.get(tenantRef);
         if (!tenantSnap.exists()) {
-            throw new Error("Tenant not found");
+            throw new Error("Tenant not found during transaction");
         }
-        let tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
-
-        const property = await getProperty(tenantData.propertyId);
-        const unit = property?.units.find(u => u.name === tenantData.unitName);
-        const reconciliationUpdates = reconcileMonthlyBilling(tenantData, unit, new Date());
         
-        if (Object.keys(reconciliationUpdates).length > 0) {
-            transaction.update(tenantRef, reconciliationUpdates);
-            // Re-read after update to get the latest state for payment processing
-            tenantSnap = await transaction.get(tenantRef);
-            tenantData = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
-        }
+        let workingTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
-        let currentTenantState: Tenant = tenantData;
+        // 2. Perform reconciliation in memory
+        const reconciliationUpdates = reconcileMonthlyBilling(workingTenant, unit, new Date());
         
+        // 3. Apply reconciliation updates to the in-memory tenant object
+        if (reconciliationUpdates.dueBalance !== undefined) workingTenant.dueBalance = reconciliationUpdates.dueBalance;
+        if (reconciliationUpdates.accountBalance !== undefined) workingTenant.accountBalance = reconciliationUpdates.accountBalance;
+        if (reconciliationUpdates['lease.paymentStatus']) workingTenant.lease.paymentStatus = reconciliationUpdates['lease.paymentStatus'];
+        if (reconciliationUpdates['lease.lastBilledPeriod']) workingTenant.lease.lastBilledPeriod = reconciliationUpdates['lease.lastBilledPeriod'];
+        
+        // `workingTenant` is now the most up-to-date state before processing new payments.
+
         for (const entry of paymentEntries) {
-            validatePayment(entry.amount, new Date(entry.date), currentTenantState, entry.type);
+            validatePayment(entry.amount, new Date(entry.date), workingTenant, entry.type);
         }
         
+        // 4. Process all new payments against the in-memory state
         for (const entry of paymentEntries) {
             const paymentDocRef = doc(collection(db, 'payments'));
+            // Write payment document
             transaction.set(paymentDocRef, { 
                 ...entry, 
                 tenantId: tenantId, 
@@ -561,27 +569,36 @@ export async function batchProcessPayments(
                 createdAt: serverTimestamp() 
             });
             
-            const updates = processPayment(currentTenantState, entry.amount, entry.type, new Date(entry.date));
+            // Apply payment logic to the in-memory object
+            const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
             
-            currentTenantState = {
-                ...currentTenantState,
-                dueBalance: updates.dueBalance,
-                accountBalance: updates.accountBalance,
+            workingTenant = {
+                ...workingTenant,
+                dueBalance: paymentProcessingUpdates.dueBalance,
+                accountBalance: paymentProcessingUpdates.accountBalance,
                 lease: {
-                    ...currentTenantState.lease,
-                    paymentStatus: updates['lease.paymentStatus'],
-                    lastPaymentDate: updates['lease.lastPaymentDate'] || currentTenantState.lease.lastPaymentDate,
+                    ...workingTenant.lease,
+                    paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
+                    lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
                 }
             };
         }
         
-        const finalUpdates = {
-            dueBalance: currentTenantState.dueBalance,
-            accountBalance: currentTenantState.accountBalance,
-            'lease.paymentStatus': currentTenantState.lease.paymentStatus,
-            'lease.lastPaymentDate': currentTenantState.lease.lastPaymentDate,
+        // 5. Prepare the final, combined updates for the tenant document
+        const finalUpdates: { [key: string]: any } = {
+            dueBalance: workingTenant.dueBalance,
+            accountBalance: workingTenant.accountBalance,
+            'lease.paymentStatus': workingTenant.lease.paymentStatus,
         };
 
+        if (workingTenant.lease.lastBilledPeriod) {
+            finalUpdates['lease.lastBilledPeriod'] = workingTenant.lease.lastBilledPeriod;
+        }
+        if (workingTenant.lease.lastPaymentDate) {
+            finalUpdates['lease.lastPaymentDate'] = workingTenant.lease.lastPaymentDate;
+        }
+
+        // 6. Perform the single final write to the tenant document
         transaction.update(tenantRef, finalUpdates);
     });
 
