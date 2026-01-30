@@ -111,6 +111,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             });
 
             const startOfSelectedMonth = startOfMonth(selectedMonth);
+            
             let calculatedOpeningBalance = 0;
             allHistoricalTransactions.forEach(t => {
                 if (isBefore(t.date, startOfSelectedMonth)) {
@@ -167,19 +168,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             }
 
-            if (calculatedOpeningBalance > 0) {
-                ledger.push({
-                    date: startOfSelectedMonth,
-                    transactionType: 'Opening Balance',
-                    details: 'Balance Brought Forward',
-                    charge: 0,
-                    payment: 0,
-                    balance: calculatedOpeningBalance,
-                });
-            }
-            
-            runningBalanceForDisplay = calculatedOpeningBalance;
-
             combinedTransactionsForMonth.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
@@ -198,9 +186,9 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     balance: runningBalanceForDisplay
                 });
             });
-            
-            const finalCumulativeBalance = calculatedOpeningBalance + combinedTransactionsForMonth.reduce((acc, t) => acc + t.charge - t.payment, 0);
-            setTotalDueForInvoice(finalCumulativeBalance);
+
+            const finalCumulativeBalanceForDocuments = calculatedOpeningBalance + combinedTransactionsForMonth.reduce((acc, t) => acc + t.charge - t.payment, 0);
+            setTotalDueForInvoice(finalCumulativeBalanceForDocuments);
             
             setTransactions(ledger);
             setIsLoading(false);
