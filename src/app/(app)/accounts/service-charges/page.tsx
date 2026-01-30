@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature } from 'lucide-react';
-import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isBefore, isValid } from 'date-fns';
+import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useLoading } from '@/hooks/useLoading';
@@ -132,7 +132,26 @@ export default function ServiceChargesPage() {
   }, []);
 
   useEffect(() => {
-    if(loading) return;
+    if (loading) return;
+
+    // Create lookup maps for performance
+    const landlordMap = new Map(allLandlords.map(l => [l.id, l]));
+    const ownerByUnitMap = new Map<string, PropertyOwner>();
+    allOwners.forEach(o => {
+      o.assignedUnits?.forEach(au => {
+        au.unitNames.forEach(unitName => {
+          ownerByUnitMap.set(`${au.propertyId}-${unitName}`, o);
+        });
+      });
+    });
+    const tenantMap = new Map(allTenants.map(t => [`${t.propertyId}-${t.unitName}`, t]));
+    const paymentsByTenantMap = new Map<string, Payment[]>();
+    allPayments.forEach(p => {
+      if (!paymentsByTenantMap.has(p.tenantId)) {
+        paymentsByTenantMap.set(p.tenantId, []);
+      }
+      paymentsByTenantMap.get(p.tenantId)!.push(p);
+    });
 
     const groupAccounts = (accounts: ServiceChargeAccount[]): GroupedServiceChargeAccount[] => {
         const grouped = accounts.reduce((acc, account) => {
@@ -181,14 +200,14 @@ export default function ServiceChargesPage() {
         let owner: { id: string; name: string } | undefined;
 
         if (unit.landlordId) {
-            owner = allLandlords.find(l => l.id === unit.landlordId);
+            owner = landlordMap.get(unit.landlordId);
         }
         
         if (!owner) {
-            owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+            owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
         }
 
-        const tenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
+        const tenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
         
         let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
         let paymentAmount: number | undefined;
@@ -216,8 +235,9 @@ export default function ServiceChargesPage() {
         if (!isBillable) {
             paymentStatus = 'N/A';
         } else {
-             const paymentInSelectedMonth = tenant ? allPayments
-                .filter(p => p.tenantId === tenant.id && (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
+             const tenantPayments = tenant ? paymentsByTenantMap.get(tenant.id) || [] : [];
+             const paymentInSelectedMonth = tenant ? tenantPayments
+                .filter(p => (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
                 .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
 
             if (paymentInSelectedMonth) {
@@ -264,14 +284,14 @@ export default function ServiceChargesPage() {
       let owner: { id: string; name: string } | undefined;
 
       if (unit.landlordId) {
-          owner = allLandlords.find(l => l.id === unit.landlordId);
+          owner = landlordMap.get(unit.landlordId);
       }
       
       if (!owner) {
-          owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.propertyId && au.unitNames.includes(unit.name)));
+          owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
       }
 
-      const homeownerTenant = allTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name && t.residentType === 'Homeowner');
+      const homeownerTenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
       let isBillable = false;
@@ -293,12 +313,12 @@ export default function ServiceChargesPage() {
       if (!isBillable) {
         paymentStatus = 'N/A';
       } else {
-        const paymentForMonthExists = homeownerTenant ? allPayments.some(p =>
-            p.tenantId === homeownerTenant.id &&
+        const tenantPayments = homeownerTenant ? paymentsByTenantMap.get(homeownerTenant.id) || [] : [];
+        const paymentForMonthExists = tenantPayments.some(p =>
             p.rentForMonth === format(selectedMonth, 'yyyy-MM') &&
             p.status === 'Paid' &&
             (p.type === 'ServiceCharge')
-        ) : false;
+        );
 
         if (paymentForMonthExists) {
             paymentStatus = 'Paid';
@@ -343,7 +363,7 @@ export default function ServiceChargesPage() {
     );
 
     liableUnits.forEach(unit => {
-      const owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === unit.property.id && au.unitNames.includes(unit.name)));
+      const owner = ownerByUnitMap.get(`${unit.property.id}-${unit.name}`);
       if (!owner) return; 
 
       const handoverDateSource = unit.handoverDate! as any;
@@ -365,10 +385,8 @@ export default function ServiceChargesPage() {
       
       if (isAfter(firstBillableMonth, today)) return; 
 
-      const homeownerTenant = allTenants.find(t => t.propertyId === unit.property.id && t.unitName === unit.name && t.residentType === 'Homeowner');
-      const paymentsForUnit = homeownerTenant 
-        ? allPayments.filter(p => p.tenantId === homeownerTenant.id)
-        : [];
+      const homeownerTenant = tenantMap.get(`${unit.property.id}-${unit.name}`);
+      const paymentsForUnit = homeownerTenant ? paymentsByTenantMap.get(homeownerTenant.id) || [] : [];
       const totalPaid = paymentsForUnit.reduce((sum, p) => sum + p.amount, 0);
 
       let totalBilled = 0;
@@ -932,3 +950,5 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
