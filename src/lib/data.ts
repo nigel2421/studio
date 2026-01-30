@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -256,7 +257,7 @@ export async function addTenant(data: {
     await logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
 
 
-    const appName = 'tenant-creation-app-' + newTenantData.email;
+    const appName = 'tenant-creation-app-' + Date.now();
     let secondaryApp;
     try {
         secondaryApp = getApp(appName);
