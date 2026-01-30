@@ -1,77 +1,112 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, Landlord } from '@/lib/types';
-import { getTenants, getAllPaymentsForReport, getProperties } from '@/lib/data';
+import type { Property, Unit, Tenant, Payment, Landlord, UserProfile } from '@/lib/types';
+import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
+import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
 import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
-import { generateLandlordStatementPDF } from '@/lib/pdf-generator';
+import { generateLandlordStatementPDF, generateTenantStatementPDF } from '@/lib/pdf-generator';
+
+enum LandlordType {
+  Investor,
+  Client,
+  Loading,
+  None
+}
 
 export default function LandlordDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
     const router = useRouter();
-    const [dashboardData, setDashboardData] = useState<{
-        properties: { property: Property, units: Unit[] }[],
-        tenants: Tenant[],
-        payments: Payment[],
-        financialSummary: FinancialSummary,
-    } | null>(null);
-    const [loading, setLoading] = useState(true);
     const { startLoading, stopLoading, isLoading: isGenerating } = useLoading();
-    const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
+    
+    // Data states
+    const [allProperties, setAllProperties] = useState<Property[]>([]);
+    const [allTenants, setAllTenants] = useState<Tenant[]>([]);
+    const [allPayments, setAllPayments] = useState<Payment[]>([]);
+    const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
+    
+    // Derived state
+    const [landlordType, setLandlordType] = useState<LandlordType>(LandlordType.Loading);
+    const [investorData, setInvestorData] = useState<any>(null);
+    const [clientData, setClientData] = useState<any>(null);
 
     useEffect(() => {
-        async function fetchData() {
-            if (userProfile?.role === 'landlord' && userProfile.landlordId) {
-                setLoading(true);
-                const [allTenants, allPayments, allProperties] = await Promise.all([
-                    getTenants(),
-                    getAllPaymentsForReport(), // Use the full report for landlord's view
-                    getProperties(),
-                ]);
+        if (!authLoading && userProfile) {
+            startLoading('Loading your dashboard...');
+            Promise.all([
+                getProperties(),
+                getTenants(),
+                getAllPaymentsForReport(),
+                getLandlords(),
+            ]).then(async ([properties, tenants, payments, landlords]) => {
+                setAllProperties(properties);
+                setAllTenants(tenants);
+                setAllPayments(payments);
+                setAllLandlords(landlords);
 
-                const landlordProperties: { property: Property, units: Unit[] }[] = [];
-                allProperties.forEach(p => {
-                    const units = p.units.filter(u => u.landlordId === userProfile.landlordId);
-                    if (units.length > 0) {
-                        landlordProperties.push({ property: p, units });
+                const currentLandlord = landlords.find(l => l.id === userProfile.landlordId);
+                if (!currentLandlord) {
+                    setLandlordType(LandlordType.None);
+                    stopLoading();
+                    return;
+                }
+
+                // Determine landlord type
+                const landlordUnits = properties.flatMap(p => p.units.filter(u => u.landlordId === currentLandlord.id));
+                const isClientType = landlordUnits.length > 0 && landlordUnits.every(u => u.managementStatus === 'Client Managed');
+
+                if (isClientType) {
+                    setLandlordType(LandlordType.Client);
+                    // Find the associated homeowner-type tenant record for this client
+                    const homeownerTenant = tenants.find(t => t.residentType === 'Homeowner' && t.userId === userProfile.id);
+                    if (homeownerTenant) {
+                        const [tenantPayments, tenantWaterReadings] = await Promise.all([
+                            getTenantPayments(homeownerTenant.id),
+                            getTenantWaterReadings(homeownerTenant.id)
+                        ]);
+                        setClientData({
+                            tenantDetails: homeownerTenant,
+                            payments: tenantPayments,
+                            waterReadings: tenantWaterReadings
+                        });
                     }
-                });
+                } else {
+                    setLandlordType(LandlordType.Investor);
+                    // Prepare data for investor dashboard
+                    const landlordProperties: { property: Property, units: Unit[] }[] = [];
+                    properties.forEach(p => {
+                        const units = p.units.filter(u => u.landlordId === currentLandlord.id);
+                        if (units.length > 0) {
+                            landlordProperties.push({ property: p, units });
+                        }
+                    });
 
-                const ownedUnitIdentifiers = new Set<string>();
-                landlordProperties.forEach(p => {
-                    p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));
-                });
-
-                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                const relevantTenantIds = relevantTenants.map(t => t.id);
-                const relevantPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
-
-                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
-                
-                setDashboardData({
-                    properties: landlordProperties,
-                    tenants: relevantTenants,
-                    payments: relevantPayments,
-                    financialSummary: summary,
-                });
-                setLoading(false);
-            } else if (userProfile) {
-                setLoading(false);
-            }
-        }
-        if (!authLoading) {
-            fetchData();
+                    const ownedUnitIdentifiers = new Set<string>();
+                    landlordProperties.forEach(p => p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`)));
+                    const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                    const relevantTenantIds = relevantTenants.map(t => t.id);
+                    const relevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
+                    const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
+                    
+                    setInvestorData({
+                        properties: landlordProperties,
+                        tenants: relevantTenants,
+                        payments: relevantPayments,
+                        financialSummary: summary,
+                    });
+                }
+                stopLoading();
+            });
         }
     }, [userProfile, authLoading]);
 
@@ -80,76 +115,11 @@ export default function LandlordDashboardPage() {
         router.push('/login');
     };
 
-    const landlordForStatement: Landlord | null = userProfile?.landlordId ? {
-        id: userProfile.landlordId,
-        name: userProfile.name || 'Landlord',
-        email: userProfile.email || '',
-        phone: '', // This info is not available on userProfile directly
-        bankAccount: '' // This info is not available on userProfile directly
-    } : null;
+    const landlordForStatement: Landlord | null = userProfile?.landlordId 
+        ? allLandlords.find(l => l.id === userProfile.landlordId) || null
+        : null;
 
-    const handleGenerateStatement = async (landlord: Landlord, startDate: Date, endDate: Date) => {
-        if (!dashboardData) return;
-        startLoading('Generating Statement...');
-        try {
-          const { properties, tenants, payments } = dashboardData;
-    
-          const ownedUnitIdentifiers = new Set<string>();
-          properties.forEach(p => {
-            p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));
-          });
-    
-          const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-          
-          const relevantPayments = payments.filter(p => 
-              p.type === 'Rent' &&
-              isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
-          );
-    
-          const summary = aggregateFinancials(relevantPayments, relevantTenants, properties);
-          
-          const unitMap = new Map<string, Unit>();
-            properties.forEach(p => {
-                p.units.forEach(u => {
-                    unitMap.set(`${p.property.id}-${u.name}`, u);
-                });
-            });
-    
-          const transactionsForPDF = relevantPayments.map(payment => {
-            const tenant = relevantTenants.find(t => t.id === payment.tenantId);
-            const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-            const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
-            const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-            const breakdown = calculateTransactionBreakdown(payment.amount, unitRent, serviceCharge);
-            return {
-              date: new Date(payment.date).toLocaleDateString(),
-              unit: tenant?.unitName || 'N/A',
-              rentForMonth: payment.rentForMonth,
-              gross: breakdown.gross,
-              serviceCharge: breakdown.serviceChargeDeduction,
-              mgmtFee: breakdown.managementFee,
-              net: breakdown.netToLandlord,
-            };
-          });
-    
-          const unitsForPDF = properties.flatMap(p => p.units.map(u => ({
-            property: p.property.name,
-            unitName: u.name,
-            unitType: u.unitType,
-            status: u.status
-          })));
-          
-          generateLandlordStatementPDF(landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
-          setIsStatementDialogOpen(false); 
-    
-        } catch (error) {
-          console.error("Error generating statement:", error);
-        } finally {
-          stopLoading();
-        }
-    };
-
-    if (authLoading || loading) {
+    if (authLoading || landlordType === LandlordType.Loading) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -157,7 +127,8 @@ export default function LandlordDashboardPage() {
         );
     }
     
-    if (!dashboardData) {
+    if (landlordType === LandlordType.None) {
+        // Render a message for landlords not assigned to any units yet
         return (
             <div className="container mx-auto p-4 md:p-8">
                  <header className="flex items-center justify-between mb-8">
@@ -182,24 +153,24 @@ export default function LandlordDashboardPage() {
                     <p className="text-muted-foreground">Here is an overview of your property portfolio.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => setIsStatementDialogOpen(true)}>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Generate Statement
-                    </Button>
+                    {/* The statement generation logic needs to be inside the specific dashboard */}
                     <Button onClick={handleSignOut} variant="outline">
                         <LogOut className="mr-2 h-4 w-4" />
                         Sign Out
                     </Button>
                 </div>
             </header>
-            <LandlordDashboardContent {...dashboardData} />
-            <StatementOptionsDialog
-                isOpen={isStatementDialogOpen}
-                onClose={() => setIsStatementDialogOpen(false)}
-                landlord={landlordForStatement}
-                onGenerate={handleGenerateStatement}
-                isGenerating={isGenerating}
-            />
+            
+            {landlordType === LandlordType.Client && clientData ? (
+                <ClientLandlordDashboard 
+                    tenantDetails={clientData.tenantDetails} 
+                    payments={clientData.payments} 
+                    waterReadings={clientData.waterReadings}
+                    allProperties={allProperties}
+                />
+            ) : investorData ? (
+                <LandlordDashboardContent {...investorData} />
+            ) : null}
         </div>
     );
 }
