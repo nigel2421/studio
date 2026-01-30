@@ -36,6 +36,7 @@ interface OwnerTransactionHistoryDialogProps {
 
 export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allProperties, allTenants, allPayments, selectedMonth, paymentStatusForMonth }: OwnerTransactionHistoryDialogProps) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [totalDueForInvoice, setTotalDueForInvoice] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isStatementOptionsOpen, setIsStatementOptionsOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
@@ -81,7 +82,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
 
                 let firstBillableMonth: Date;
-                if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
+                if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
                      firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
                 } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
                     const handoverDate = new Date(unit.handoverDate);
@@ -117,7 +118,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             });
 
-            let runningBalance = openingBalance;
+            let runningBalanceForDisplay = 0;
             const ledger: Transaction[] = [];
             
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
@@ -147,15 +148,20 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 ...displayTransactions.filter(t => t.payment > 0)
             ];
 
+            const isSingleMonthStatement = isSameMonth(new Date(), selectedMonth);
             if (paymentStatusForMonth === 'Paid') {
-                const totalChargeForMonth = combinedTransactionsForMonth.reduce((sum, t) => sum + t.charge, 0);
-                const hasPaymentRecord = combinedTransactionsForMonth.some(t => t.payment > 0);
-                if (totalChargeForMonth > 0 && !hasPaymentRecord) {
+                const totalChargesThisMonth = combinedTransactionsForMonth
+                    .filter(t => t.charge > 0)
+                    .reduce((sum, t) => sum + t.charge, 0);
+
+                const hasRealPaymentThisMonth = combinedTransactionsForMonth.some(t => t.payment > 0);
+
+                if (totalChargesThisMonth > 0 && !hasRealPaymentThisMonth) {
                     combinedTransactionsForMonth.push({
                         date: startOfMonth(selectedMonth),
                         details: 'Payment Received',
                         charge: 0,
-                        payment: totalChargeForMonth,
+                        payment: totalChargesThisMonth
                     });
                 }
             }
@@ -167,19 +173,19 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 if (a.payment > 0 && b.charge > 0) return 1;
                 return 0;
             }).forEach(item => {
-                runningBalance += item.charge;
-                runningBalance -= item.payment;
+                runningBalanceForDisplay += item.charge;
+                runningBalanceForDisplay -= item.payment;
                 ledger.push({
                     date: item.date,
                     transactionType: item.charge > 0 ? 'Invoice' : 'Payment',
                     details: item.details,
                     charge: item.charge,
                     payment: item.payment,
-                    balance: runningBalance
+                    balance: runningBalanceForDisplay
                 });
             });
-
-            if (openingBalance > 0 && paymentStatusForMonth !== 'Pending') {
+            
+            if (paymentStatusForMonth !== 'Pending' && openingBalance > 0) {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
@@ -188,7 +194,16 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     payment: 0,
                     balance: openingBalance,
                 });
+                runningBalanceForDisplay += openingBalance;
+                 ledger.forEach((entry, index) => {
+                    if(index > 0) {
+                        entry.balance += openingBalance;
+                    }
+                });
             }
+
+            const finalCumulativeBalance = openingBalance + combinedTransactionsForMonth.reduce((acc, t) => acc + t.charge - t.payment, 0);
+            setTotalDueForInvoice(finalCumulativeBalance);
             
             setTransactions(ledger);
             setIsLoading(false);
@@ -200,12 +215,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     };
 
     const handleConfirmAndSend = async () => {
-        if (!owner || transactions.length === 0) return;
+        if (!owner) return;
     
         setIsSending(true);
         try {
-            const totalDue = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
-            if (totalDue <= 0) {
+            if (totalDueForInvoice <= 0) {
                  toast({ variant: 'default', title: 'No Balance Due', description: `There is no outstanding balance to invoice.` });
                  setIsInvoicePreviewOpen(false);
                  return;
@@ -216,7 +230,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 items: transactions
                     .filter(t => t.charge > 0)
                     .map(t => ({ description: t.details, amount: t.charge })),
-                totalDue: totalDue,
+                totalDue: totalDueForInvoice,
             };
 
             if (!owner.email) {
@@ -343,7 +357,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 items={transactions
                     .filter(t => t.charge > 0)
                     .map(t => ({ description: t.details, amount: t.charge }))}
-                totalDue={transactions.length > 0 ? transactions[transactions.length - 1].balance : 0}
+                totalDue={totalDueForInvoice}
                 onConfirm={handleConfirmAndSend}
                 isSending={isSending}
             />
