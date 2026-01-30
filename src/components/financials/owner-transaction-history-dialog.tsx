@@ -4,13 +4,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, Mail } from 'lucide-react';
 import { Tenant, Payment, Property, Landlord, PropertyOwner, Unit } from '@/lib/types';
 import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter, isSameMonth } from 'date-fns';
 import { StatementOptionsDialog } from './statement-options-dialog';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
 import { useToast } from '@/hooks/use-toast';
+import { performSendServiceChargeInvoice } from '@/app/actions';
 
 interface Transaction {
     date: Date;
@@ -38,6 +39,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const [isStatementOptionsOpen, setIsStatementOptionsOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
     const { toast } = useToast();
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
         if (owner && open && selectedMonth) {
@@ -80,7 +82,15 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
                 let firstBillableMonth: Date;
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '') {
-                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
+                     const lastBilledDate = startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02'));
+                     if (isAfter(lastBilledDate, addMonths(new Date(), -36))) { // Look back max 3 years
+                        firstBillableMonth = addMonths(lastBilledDate, 1);
+                     } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+                        const handoverDate = new Date(unit.handoverDate);
+                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                     } else {
+                        return;
+                     }
                 } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
                     const handoverDate = new Date(unit.handoverDate);
                     const handoverDay = handoverDate.getDate();
@@ -112,15 +122,13 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             let runningBalance = 0;
             const ledger: Transaction[] = [];
 
-            if (paymentStatusForMonth !== 'Pending') {
-                allHistoricalTransactions.forEach(t => {
-                    if (isBefore(t.date, startOfSelectedMonth)) {
-                        openingBalance += t.charge;
-                        openingBalance -= t.payment;
-                    }
-                });
-                runningBalance = openingBalance;
-            }
+            allHistoricalTransactions.forEach(t => {
+                if (isBefore(t.date, startOfSelectedMonth)) {
+                    openingBalance += t.charge;
+                    openingBalance -= t.payment;
+                }
+            });
+            runningBalance = openingBalance;
             
             // 4. Filter for display month and build ledger from the opening balance
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
@@ -182,7 +190,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            if (paymentStatusForMonth !== 'Pending' && openingBalance > 0) {
+            if (openingBalance > 0) {
                  ledger.unshift({
                     date: startOfSelectedMonth,
                     transactionType: 'Opening Balance',
@@ -197,6 +205,44 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             setIsLoading(false);
         }
     }, [owner, open, selectedMonth, paymentStatusForMonth, allProperties, allTenants, allPayments]);
+
+    const handleSendInvoice = async () => {
+        if (!owner || transactions.length === 0) return;
+    
+        setIsSending(true);
+        try {
+            const totalDue = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+            const invoiceDetails = {
+                month: format(selectedMonth, 'MMMM yyyy'),
+                items: transactions
+                    .filter(t => t.charge > 0)
+                    .map(t => ({ description: t.details, amount: t.charge })),
+                totalDue: totalDue,
+            };
+
+            if (!owner.email) {
+                throw new Error("Owner does not have a registered email address.");
+            }
+    
+            const result = await performSendServiceChargeInvoice(
+                owner.id,
+                owner.email,
+                owner.name,
+                invoiceDetails
+            );
+    
+            if (result.success) {
+                toast({ title: 'Invoice Sent', description: `An invoice has been emailed to ${owner.name}.` });
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.error });
+            }
+    
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send invoice.' });
+        } finally {
+            setIsSending(false);
+        }
+    };
 
 
     const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, status: 'Paid' | 'Pending' | 'N/A' | null) => {
@@ -277,6 +323,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                        {paymentStatusForMonth === 'Pending' && (
+                             <Button onClick={handleSendInvoice} disabled={isSending}>
+                                {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                Send Invoice
+                            </Button>
+                        )}
                         <Button onClick={() => setIsStatementOptionsOpen(true)}>
                             <Download className="mr-2 h-4 w-4" />
                             Export PDF

@@ -1,4 +1,3 @@
-
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
 import { logCommunication, getTenant } from '@/lib/data';
@@ -100,5 +99,69 @@ export async function performSendArrearsReminder(tenantId: string, senderId: str
     console.error("Error sending arrears reminder:", error);
     const message = error.message || 'Failed to send reminder.';
     return { success: false, error: message };
+  }
+}
+
+interface InvoiceDetails {
+    month: string;
+    items: { description: string; amount: number }[];
+    totalDue: number;
+}
+
+export async function performSendServiceChargeInvoice(
+  ownerId: string,
+  ownerEmail: string,
+  ownerName: string,
+  invoiceDetails: InvoiceDetails
+) {
+  try {
+    if (!ownerEmail) {
+        throw new Error("Owner does not have a registered email address.");
+    }
+    const subject = `Service Charge Invoice for ${invoiceDetails.month}`;
+    const itemsHtml = invoiceDetails.items.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.description}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Ksh ${item.amount.toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    const body = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+            <p>Dear ${ownerName},</p>
+            <p>Please find your service charge invoice for ${invoiceDetails.month}.</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">Description</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight: bold; background-color: #f2f2f2;">
+                        <td style="padding: 12px; border-top: 2px solid #ddd; text-align: right;">Total Amount Due</td>
+                        <td style="padding: 12px; border-top: 2px solid #ddd; text-align: right;">Ksh ${invoiceDetails.totalDue.toLocaleString()}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p style="margin-top: 25px;">Please remit payment at your earliest convenience.</p>
+            <br/>
+            <p>Thank you,<br/>The Eracov Properties Team</p>
+        </div>
+    `;
+
+    const commDetails = {
+        type: 'automation' as const,
+        subType: 'Service Charge Invoice',
+    };
+
+    return await performSendCustomEmail([ownerEmail], subject, body, 'system', commDetails);
+
+  } catch (error: any) {
+    console.error("Error sending service charge invoice:", error);
+    return { success: false, error: error.message || 'Failed to send invoice.' };
   }
 }
