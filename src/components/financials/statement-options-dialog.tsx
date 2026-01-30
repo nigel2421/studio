@@ -13,12 +13,11 @@ interface StatementOptionsDialogProps {
     isOpen: boolean;
     onClose: () => void;
     landlord: Landlord | PropertyOwner | null;
-    onGenerate: (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null) => void;
+    onGenerate: (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date) => void;
     isGenerating: boolean;
-    paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null;
 }
 
-export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, isGenerating, paymentStatusForMonth }: StatementOptionsDialogProps) {
+export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, isGenerating }: StatementOptionsDialogProps) {
     const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
@@ -28,7 +27,7 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
 
     const handleGenerateClick = () => {
         if (landlord && startDate && endDate) {
-            onGenerate(landlord, startDate, endDate, paymentStatusForMonth);
+            onGenerate(landlord, startDate, endDate);
         }
     };
 

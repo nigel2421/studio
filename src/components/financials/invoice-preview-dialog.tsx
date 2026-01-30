@@ -14,7 +14,6 @@ interface InvoicePreviewDialogProps {
     totalDue: number;
     onConfirm: () => void;
     isSending: boolean;
-    openingBalance?: number;
 }
 
 export function InvoicePreviewDialog({
@@ -26,7 +25,6 @@ export function InvoicePreviewDialog({
     totalDue,
     onConfirm,
     isSending,
-    openingBalance = 0,
 }: InvoicePreviewDialogProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -49,12 +47,6 @@ export function InvoicePreviewDialog({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {openingBalance > 0 && (
-                                    <TableRow>
-                                        <TableCell>Balance Brought Forward</TableCell>
-                                        <TableCell className="text-right">Ksh {openingBalance.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                )}
                                 {items.map((item, index) => (
                                     <TableRow key={index}>
                                         <TableCell>{item.description}</TableCell>

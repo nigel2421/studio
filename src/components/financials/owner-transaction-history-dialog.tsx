@@ -121,7 +121,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             });
             setOpeningBalance(calculatedOpeningBalance > 0 ? calculatedOpeningBalance : 0);
 
-            let runningBalanceForDisplay = 0;
+            let runningBalanceForDisplay = 0; // Simplified for on-screen view
             const ledger: Transaction[] = [];
             
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
@@ -167,6 +167,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     });
                 }
             }
+            
+            const totalChargesForInvoice = combinedTransactionsForMonth
+                .filter(t => t.charge > 0)
+                .reduce((sum, t) => sum + t.charge, 0);
+            setTotalDueForInvoice(totalChargesForInvoice);
 
             combinedTransactionsForMonth.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
@@ -186,9 +191,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     balance: runningBalanceForDisplay
                 });
             });
-
-            const finalCumulativeBalanceForDocuments = calculatedOpeningBalance + combinedTransactionsForMonth.reduce((acc, t) => acc + t.charge - t.payment, 0);
-            setTotalDueForInvoice(finalCumulativeBalanceForDocuments);
             
             setTransactions(ledger);
             setIsLoading(false);
@@ -205,7 +207,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         setIsSending(true);
         try {
             if (totalDueForInvoice <= 0) {
-                 toast({ variant: 'default', title: 'No Balance Due', description: `There is no outstanding balance to invoice.` });
+                 toast({ variant: 'default', title: 'No Balance Due', description: `There is no outstanding balance to invoice for this month.` });
                  setIsInvoicePreviewOpen(false);
                  return;
             }
@@ -243,11 +245,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         }
     };
 
-    const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date, status: 'Paid' | 'Pending' | 'N/A' | null) => {
+    const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
             if ('assignedUnits' in landlord) {
-                 generateOwnerServiceChargeStatementPDF(landlord, allProperties, allTenants, allPayments, startDate, endDate, status);
+                 generateOwnerServiceChargeStatementPDF(landlord, allProperties, allTenants, allPayments, startDate, endDate);
             } else {
                 const landlordAsOwner: PropertyOwner = {
                     ...landlord,
@@ -259,7 +261,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                         return acc;
                     }, [] as {propertyId: string, unitNames: string[]}[])
                 };
-                 generateOwnerServiceChargeStatementPDF(landlordAsOwner, allProperties, allTenants, allPayments, startDate, endDate, status);
+                 generateOwnerServiceChargeStatementPDF(landlordAsOwner, allProperties, allTenants, allPayments, startDate, endDate);
             }
 
             setIsStatementOptionsOpen(false);
@@ -342,7 +344,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 items={transactions
                     .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
                     .map(t => ({ description: t.details, amount: t.charge }))}
-                openingBalance={openingBalance}
                 totalDue={totalDueForInvoice}
                 onConfirm={handleConfirmAndSend}
                 isSending={isSending}
@@ -353,7 +354,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 landlord={owner}
                 onGenerate={handleGenerateStatement as any}
                 isGenerating={isPdfGenerating}
-                paymentStatusForMonth={paymentStatusForMonth}
             />
         </>
     );

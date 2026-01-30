@@ -135,8 +135,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     allTenants: Tenant[],
     allPayments: Payment[],
     startDate: Date,
-    endDate: Date,
-    paymentStatusForMonth?: 'Paid' | 'Pending' | 'N/A' | null
+    endDate: Date
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -235,24 +234,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    const isSingleMonthStatement = isSameMonth(startDate, endDate);
-    if (isSingleMonthStatement && paymentStatusForMonth === 'Paid') {
-        const totalChargesThisMonth = allHistoricalTransactions
-            .filter(t => isSameMonth(t.date, startDate) && t.charge > 0)
-            .reduce((sum, t) => sum + t.charge, 0);
-
-        const hasRealPaymentThisMonth = allHistoricalTransactions
-            .some(t => isSameMonth(t.date, startDate) && t.payment > 0);
-
-        if (totalChargesThisMonth > 0 && !hasRealPaymentThisMonth) {
-            allHistoricalTransactions.push({
-                date: startOfMonth(startDate),
-                details: 'Payment Received',
-                charge: 0,
-                payment: totalChargesThisMonth
-            });
-        }
-    }
     
     allHistoricalTransactions.sort((a, b) => {
         const dateDiff = a.date.getTime() - b.date.getTime();
@@ -262,23 +243,11 @@ export const generateOwnerServiceChargeStatementPDF = (
         return 0;
     });
 
-    let openingBalance = 0;
-    allHistoricalTransactions.forEach(item => {
-        if(isBefore(item.date, startDate)) {
-            openingBalance += item.charge;
-            openingBalance -= item.payment;
-        }
-    });
-
     const tableBody: (string | number)[][] = [];
-    let runningBalance = openingBalance;
+    let runningBalance = 0; // Start from 0 for the period
     let totalChargesInPeriod = 0;
     let totalPaymentsInPeriod = 0;
     
-    if (openingBalance > 0) {
-        tableBody.push(['', 'Balance Brought Forward', '', '', formatCurrency(openingBalance)]);
-    }
-
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
 
     transactionsInPeriod.forEach(item => {
