@@ -1,4 +1,5 @@
 
+
 import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
 import { calculateTransactionBreakdown } from './financial-utils';
 import { Tenant, Agent, Unit, Payment, UnitStatus, OwnershipType, UnitType, ManagementStatus } from './types';
@@ -341,7 +342,7 @@ describe('Financial Logic Functions', () => {
             expect(breakdown.netToLandlord).toBe(16000); // 20000 - 3000 - 1000
         });
 
-        it('should calculate 50% commission for first month on a "Rented for Clients" unit', () => {
+        it('should calculate 50% commission and waive service charge for first month on a "Rented for Clients" unit', () => {
             const tenant = createMockTenant({
                 lease: {
                     rent: 40000,
@@ -361,9 +362,9 @@ describe('Financial Logic Functions', () => {
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
 
             expect(breakdown.gross).toBe(40000);
-            expect(breakdown.serviceChargeDeduction).toBe(5000);
+            expect(breakdown.serviceChargeDeduction).toBe(0);
             expect(breakdown.managementFee).toBe(20000); // 50% of 40000
-            expect(breakdown.netToLandlord).toBe(15000); // 40000 - 5000 - 20000
+            expect(breakdown.netToLandlord).toBe(20000); // 40000 - 0 - 20000
         });
 
         it('should revert to 5% commission on the second month for a "Rented for Clients" unit', () => {

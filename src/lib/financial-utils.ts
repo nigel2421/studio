@@ -11,7 +11,7 @@ import { isSameMonth, parseISO } from 'date-fns';
  * 2. Management Fee:
  *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant (calculated on standard rent).
  *    - Otherwise, it's 5% of the unit's standard rent.
- * 3. Service Charge = The unit's standard service charge.
+ * 3. Service Charge = The unit's standard service charge. This is WAIVED for the first month on a "Rented for Clients" unit.
  * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
  * 
  * @param payment The payment object.
@@ -26,28 +26,25 @@ export function calculateTransactionBreakdown(
     const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
 
-    // Gross amount for the statement line item is the actual payment amount.
     const grossAmount = payment.amount || 0;
     
-    // The service charge is deducted from the gross.
-    const serviceChargeDeduction = serviceCharge;
-
+    let serviceChargeDeduction = serviceCharge;
     let managementFee = 0;
     const standardManagementFeeRate = 0.05;
 
-    // Fee is still calculated on the standard rent, not the payment amount.
-    if (
+    const isFirstMonthForClientRental =
         unit?.managementStatus === 'Rented for Clients' &&
         tenant?.lease?.startDate &&
         payment.rentForMonth &&
-        isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`))
-    ) {
+        isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`));
+
+    if (isFirstMonthForClientRental) {
         managementFee = unitRent * 0.50;
+        serviceChargeDeduction = 0; // Service charge is waived for the first month in this scenario.
     } else {
         managementFee = unitRent * standardManagementFeeRate;
     }
 
-    // Net to landlord is the payment amount minus deductions.
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
 
     return {
