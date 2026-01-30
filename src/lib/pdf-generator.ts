@@ -192,7 +192,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     );
 
     const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
-    allOwnerPayments.forEach(p => {
+    serviceChargePayments.forEach(p => {
         allHistoricalTransactions.push({
             date: new Date(p.date),
             details: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
