@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from './ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { parseFloorFromUnitName } from '@/lib/parseFloorFromUnitName';
 
 type FloorAnalyticsData = {
   rentedSM: number;
@@ -26,25 +27,6 @@ interface UnitAnalyticsProps {
   property: Property;
   tenants: Tenant[];
 }
-
-const parseFloorFromUnitName = (unitName: string): string | null => {
-  // Regex to extract floor number from formats like A101, B1201, C-905, etc.
-  // Assumes the floor number is the digit(s) before the last two digits of the number part.
-  const match = unitName.match(/(\d+)/); // Find the first number sequence
-  if (match && match[1]) {
-    const numberPart = match[1];
-    if (numberPart.length > 2) {
-      // Assumes last two digits are unit number, the rest is floor.
-      return numberPart.slice(0, numberPart.length - 2);
-    }
-    // If number is 1-2 digits, assume it's the floor number itself (e.g. from 'A-9')
-    if (numberPart.length > 0) {
-      return numberPart;
-    }
-  }
-  return null;
-};
-
 
 export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
   const [analytics, setAnalytics] = useState<Record<string, FloorAnalyticsData> | null>(null);
@@ -110,7 +92,7 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
       });
       
       const sortedFloors = new Map([...floors.entries()].sort((a, b) => {
-          return parseInt(a[0]) - parseInt(b[0]);
+          return a[0].localeCompare(b[0], undefined, { numeric: true });
       }));
 
       setAnalytics(Object.fromEntries(sortedFloors));
