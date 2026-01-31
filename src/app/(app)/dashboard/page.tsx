@@ -7,7 +7,7 @@ import { getMaintenanceRequests, getTenants, getProperties, getAllPayments, getA
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2, FileDown, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { MaintenanceRequest, Tenant, Property, Payment, Unit, UnitType, unitTypes, UnitOrientation, unitOrientations } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
@@ -22,6 +22,8 @@ import { isSameMonth } from "date-fns";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { useLoading } from "@/hooks/useLoading";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 export default function DashboardPage() {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -29,6 +31,13 @@ export default function DashboardPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const { startLoading, stopLoading, isLoading } = useLoading();
+
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+
+  const selectedProperty = useMemo(() => {
+      if (!selectedPropertyId) return null;
+      return properties.find(p => p.id === selectedPropertyId) || null;
+  }, [selectedPropertyId, properties]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -231,6 +240,58 @@ export default function DashboardPage() {
       </div>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Detailed Property Analytics</CardTitle>
+          <CardDescription>Select a property to view its detailed occupancy and status breakdown.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Select onValueChange={setSelectedPropertyId}>
+            <SelectTrigger className="w-full sm:w-[300px]">
+              <SelectValue placeholder="Select a property..." />
+            </SelectTrigger>
+            <SelectContent>
+              {properties.map(property => (
+                <SelectItem key={property.id} value={property.id}>
+                  {property.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {selectedProperty ? (
+            <div className="space-y-6 pt-6 border-t">
+                <Tabs defaultValue="status-analytics" className="w-full">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
+                        <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
+                        <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
+                        <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="status-analytics">
+                        <StatusAnalytics property={selectedProperty} />
+                    </TabsContent>
+                    <TabsContent value="occupancy-analytics">
+                        <UnitAnalytics property={selectedProperty} tenants={tenants} />
+                    </TabsContent>
+                    <TabsContent value="orientation-analytics">
+                        <OrientationAnalytics property={selectedProperty} tenants={tenants} />
+                    </TabsContent>
+                </Tabs>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg text-center">
+                <div className="mx-auto bg-muted p-3 rounded-full mb-4 w-fit">
+                    <Building2 className="h-8 w-8 text-secondary-foreground"/>
+                </div>
+                <h3 className="text-xl font-semibold">Select a Property</h3>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                  Choose a property from the dropdown above to see its detailed analytics.
+                </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Recent Maintenance Requests</CardTitle>
@@ -259,55 +320,8 @@ export default function DashboardPage() {
           </ul>
         </CardContent>
       </Card>
-
-      {properties.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Property Analytics</CardTitle>
-            <CardDescription>
-              Detailed analytics for each property in your portfolio.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue={properties.length > 0 ? properties[0].id : ""} className="w-full">
-              <div className="overflow-x-auto pb-2">
-                  <TabsList>
-                    {properties.map(property => (
-                      <TabsTrigger key={property.id} value={property.id} className="whitespace-nowrap">{property.name}</TabsTrigger>
-                    ))}
-                  </TabsList>
-              </div>
-              {properties.map(property => (
-                <TabsContent key={property.id} value={property.id} className="space-y-6">
-                  <Tabs defaultValue="status-analytics" className="w-full">
-                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
-                        <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
-                        <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
-                        <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="status-analytics">
-                        <h3 className="text-lg font-semibold mt-4">Unit Status Analytics</h3>
-                        <p className="text-sm text-muted-foreground">Breakdown of units by handover and management status.</p>
-                        <StatusAnalytics property={property} />
-                    </TabsContent>
-                    <TabsContent value="occupancy-analytics">
-                        <h3 className="text-lg font-semibold mt-4">Occupancy Analytics</h3>
-                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units.</p>
-                        <UnitAnalytics property={property} tenants={tenants} />
-                    </TabsContent>
-                    <TabsContent value="orientation-analytics">
-                        <h3 className="text-lg font-semibold mt-4">Orientation Analytics</h3>
-                        <p className="text-sm text-muted-foreground">Floor-by-floor breakdown of rented vs. vacant units by orientation.</p>
-                        <OrientationAnalytics property={property} tenants={tenants} />
-                    </TabsContent>
-                  </Tabs>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
-
     </div>
   );
 }
+
+    
