@@ -1,7 +1,7 @@
 
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { cacheService } from './cache';
 import {
     Property, Unit, WaterMeterReading, Payment, Tenant,
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
@@ -122,43 +122,36 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
     }
 }
 
-let propertiesCache: Property[] | null = null;
-let lastCacheTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
 export async function getProperties(forceRefresh = false): Promise<Property[]> {
-    const now = Date.now();
-    if (!forceRefresh && propertiesCache && (now - lastCacheTime < CACHE_DURATION)) {
-        return propertiesCache;
+    if (forceRefresh) {
+        cacheService.clear('properties');
     }
 
-    const properties = await getCollection<Property>('properties');
+    return cacheService.getOrFetch('properties', 'all', async () => {
+        const properties = await getCollection<Property>('properties');
 
-    const desiredOrder = [
-        'Midtown Apartments',
-        'Grand Midtown Apartments',
-        'Grand Midtown Annex Apartments',
-    ];
+        const desiredOrder = [
+            'Midtown Apartments',
+            'Grand Midtown Apartments',
+            'Grand Midtown Annex Apartments',
+        ];
 
-    const sortedProperties = properties.sort((a, b) => {
-        const indexA = desiredOrder.indexOf(a.name);
-        const indexB = desiredOrder.indexOf(b.name);
+        return properties.sort((a, b) => {
+            const indexA = desiredOrder.indexOf(a.name);
+            const indexB = desiredOrder.indexOf(b.name);
 
-        if (indexA !== -1 && indexB !== -1) {
-            return indexA - indexB;
-        }
-        if (indexA !== -1) {
-            return -1;
-        }
-        if (indexB !== -1) {
-            return 1;
-        }
-        return a.name.localeCompare(b.name);
-    });
-
-    propertiesCache = sortedProperties;
-    lastCacheTime = Date.now();
-    return sortedProperties;
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+            if (indexA !== -1) {
+                return -1;
+            }
+            if (indexB !== -1) {
+                return 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+    }, 300000); // 5 minutes cache
 }
 
 export async function getTenants(limitCount?: number): Promise<Tenant[]> {
@@ -269,58 +262,57 @@ export async function addTenant(data: {
     const totalInitialCharges = initialDue;
     const taskDescription = `Complete onboarding for ${name} in ${unitName}. An initial balance of Ksh ${totalInitialCharges.toLocaleString()} is pending. (Rent: ${rent}, Sec. Deposit: ${securityDeposit || 0}, Water Deposit: ${waterDeposit || 0})`;
 
-
-    // Create onboarding task
-    await addTask({
-        title: `Onboard: ${name}`,
-        description: taskDescription,
-        status: 'Pending',
-        priority: 'High',
-        category: 'Financial',
-        tenantId: tenantDocRef.id,
-        propertyId,
-        unitName,
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
-    });
-
-    await logActivity(`Created tenant: ${name} (${email})`);
-
-    // Update unit status to 'rented'
-    const updatedUnits = property.units.map(u =>
-        u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
-    );
-    await updateProperty(propertyId, { units: updatedUnits });
-
-    await logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
-
-
-    const appName = 'tenant-creation-app-' + Date.now();
-    let secondaryApp;
-    try {
-        secondaryApp = getApp(appName);
-    } catch (e) {
-        secondaryApp = initializeApp(firebaseConfig, appName);
-    }
-
-    const secondaryAuth = getAuth(secondaryApp);
-    try {
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, phone);
-        const user = userCredential.user;
-
-        await createUserProfile(user.uid, user.email || email, 'tenant', {
-            name: name,
+    // Parallelize task creation, logging, and property update
+    const independentOperations = [
+        addTask({
+            title: `Onboard: ${name}`,
+            description: taskDescription,
+            status: 'Pending',
+            priority: 'High',
+            category: 'Financial',
             tenantId: tenantDocRef.id,
-            propertyId: propertyId
-        });
+            propertyId,
+            unitName,
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+        }),
+        logActivity(`Created tenant: ${name} (${email})`),
+        updateProperty(propertyId, {
+            units: property.units.map(u =>
+                u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
+            )
+        }),
+        logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`)
+    ];
 
-    } catch (error) {
-        console.error("Error creating tenant auth user:", error);
-        throw new Error("Failed to create tenant login credentials.");
-    } finally {
-        if (secondaryApp) {
-            await deleteApp(secondaryApp);
+    // Auth user creation logic
+    const createAuthUser = async () => {
+        const appName = 'tenant-auth-worker';
+        let secondaryApp;
+        try {
+            secondaryApp = getApp(appName);
+        } catch (e) {
+            secondaryApp = initializeApp(firebaseConfig, appName);
         }
-    }
+
+        const secondaryAuth = getAuth(secondaryApp);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, phone);
+            const user = userCredential.user;
+
+            await createUserProfile(user.uid, user.email || email, 'tenant', {
+                name: name,
+                tenantId: tenantDocRef.id,
+                propertyId: propertyId
+            });
+        } finally {
+            // Note: In high-concurrency server-side environments, 
+            // constant deleteApp/initializeApp can be a bottleneck.
+            // We keep the app alive as a worker app for auth operations.
+        }
+    };
+
+    // Run everything in parallel
+    await Promise.all([...independentOperations, createAuthUser()]);
 }
 
 export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
@@ -554,19 +546,26 @@ export async function getPropertyWaterReadings(propertyId: string): Promise<Wate
     if (!property) return [];
     const unitNames = property.units.map(u => u.name);
 
-    const readings: WaterMeterReading[] = [];
-    // Firestore 'in' query is limited to 30 items
+    // chunk into groups of 30 for the 'in' query
+    const chunks = [];
     for (let i = 0; i < unitNames.length; i += 30) {
-        const chunk = unitNames.slice(i, i + 30);
+        chunks.push(unitNames.slice(i, i + 30));
+    }
+
+    const fetchPromises = chunks.map(chunk => {
         const q = query(
             collection(db, 'waterReadings'),
             where('propertyId', '==', propertyId),
             where('unitName', 'in', chunk),
             orderBy('date', 'desc')
         );
-        const querySnapshot = await getDocs(q);
-        readings.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading)));
-    }
+        return getDocs(q);
+    });
+
+    const snapshots = await Promise.all(fetchPromises);
+    const readings: WaterMeterReading[] = snapshots.flatMap(snapshot =>
+        snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading))
+    );
 
     return readings;
 }
