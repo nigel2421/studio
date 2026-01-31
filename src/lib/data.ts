@@ -103,7 +103,7 @@ export async function getProperties(): Promise<Property[]> {
         propertiesData.map(async (prop) => {
             const unitsCol = collection(db, `properties/${prop.id}/units`);
             const unitsSnapshot = await getDocs(unitsCol);
-            const units = unitsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+            const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
             return { ...prop, units: units || [] };
         })
     );
@@ -169,7 +169,7 @@ export async function getProperty(id: string): Promise<Property | null> {
         
         const unitsCol = collection(db, `properties/${id}/units`);
         const unitsSnapshot = await getDocs(unitsCol);
-        const units = unitsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+        const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
         propData.units = units || [];
         
         return propData;
@@ -1371,7 +1371,7 @@ export function listenToProperties(callback: (properties: Property[]) => void): 
             propertiesData.map(async (prop) => {
                 const unitsCol = collection(db, `properties/${prop.id}/units`);
                 const unitsSnapshot = await getDocs(unitsCol);
-                const units = unitsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+                const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
                 return { ...prop, units: units || [] };
             })
         );
