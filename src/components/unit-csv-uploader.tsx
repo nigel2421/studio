@@ -20,6 +20,7 @@ import { Loader2, Upload, FileDown } from 'lucide-react';
 import { bulkUpdateUnitsFromCSV } from '@/lib/data';
 import { useLoading } from '@/hooks/useLoading';
 import { downloadCSV } from '@/lib/utils';
+import { handoverStatuses, managementStatuses, ownershipTypes, unitOrientations, unitStatuses, unitTypes } from '@/lib/types';
 
 interface Props {
   propertyId: string;
