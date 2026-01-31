@@ -1,8 +1,8 @@
 
 
 import { calculateTargetDue, getRecommendedPaymentStatus, processPayment, reconcileMonthlyBilling, validatePayment } from './financial-logic';
-import { calculateTransactionBreakdown } from './financial-utils';
-import { Tenant, Agent, Unit, Payment, UnitStatus, OwnershipType, UnitType, ManagementStatus } from './types';
+import { calculateTransactionBreakdown, aggregateFinancials } from './financial-utils';
+import { Tenant, Agent, Unit, Payment, UnitStatus, OwnershipType, UnitType, ManagementStatus, Property } from './types';
 import { format, startOfMonth } from 'date-fns';
 
 describe('Financial Logic Functions', () => {
@@ -446,6 +446,80 @@ describe('Financial Logic Functions', () => {
             expect(breakdown.serviceChargeDeduction).toBe(3000);
             expect(breakdown.managementFee).toBe(1000); // Fee is based on standard rent
             expect(breakdown.netToLandlord).toBe(6000); // 10000 - 3000 - 1000
+        });
+    });
+
+    describe('aggregateFinancials', () => {
+        const mockUnitSM = createMockUnit({ name: 'A1', ownership: 'SM', rentAmount: 20000, serviceCharge: 3000 });
+        const mockUnitLandlord = createMockUnit({ name: 'B2', ownership: 'Landlord', landlordId: 'l-1', rentAmount: 40000, serviceCharge: 5000 });
+        const mockUnitVacantHandedOver = createMockUnit({ name: 'C3', ownership: 'Landlord', landlordId: 'l-1', status: 'vacant', handoverStatus: 'Handed Over', serviceCharge: 4500 });
+        const mockUnitVacantNotHandedOver = createMockUnit({ name: 'D4', ownership: 'Landlord', landlordId: 'l-1', status: 'vacant', handoverStatus: 'Pending Hand Over', serviceCharge: 4000 });
+    
+        const mockProperty: Property = {
+            id: 'p-1', name: 'Test Prop', address: '123 St', type: 'Residential', imageId: '1',
+            units: [mockUnitSM, mockUnitLandlord, mockUnitVacantHandedOver, mockUnitVacantNotHandedOver]
+        };
+    
+        const mockTenantA1 = createMockTenant({ id: 't-A1', unitName: 'A1', lease: { rent: 20000 } });
+        const mockTenantB2 = createMockTenant({ id: 't-B2', unitName: 'B2', lease: { rent: 40000 } });
+        const mockTenants = [mockTenantA1, mockTenantB2];
+        
+        it('should correctly aggregate financials from multiple payments', () => {
+            const payments = [
+                createMockPayment({ tenantId: 't-A1', amount: 20000 }), // SM unit
+                createMockPayment({ tenantId: 't-B2', amount: 40000 })  // Landlord unit
+            ];
+            
+            // Breakdown A1: gross=20k, sc=3k, fee=1k, net=16k
+            // Breakdown B2: gross=40k, sc=5k, fee=2k, net=33k
+            
+            const summary = aggregateFinancials(payments, mockTenants, [{ property: mockProperty, units: mockProperty.units }]);
+    
+            expect(summary.totalRevenue).toBe(60000); // 20k + 40k
+            expect(summary.totalManagementFees).toBe(3000); // 1k + 2k
+            expect(summary.totalServiceCharges).toBe(8000); // 3k + 5k
+            expect(summary.vacantUnitServiceChargeDeduction).toBe(4500); // Only C3
+            // 16k + 33k - 4.5k = 44.5k
+            expect(summary.totalNetRemittance).toBe(44500); 
+        });
+    
+        it('should handle first-month commission correctly in aggregation', () => {
+             const firstMonthUnit = createMockUnit({ 
+                name: 'F1', 
+                managementStatus: 'Rented for Clients', 
+                rentAmount: 50000, 
+                serviceCharge: 6000 
+            });
+            const firstMonthTenant = createMockTenant({ 
+                id: 't-F1', 
+                unitName: 'F1', 
+                lease: { startDate: '2023-08-01', rent: 50000 } 
+            });
+            const firstMonthPayment = createMockPayment({ 
+                tenantId: 't-F1', 
+                amount: 50000, 
+                rentForMonth: '2023-08' 
+            });
+    
+            // Breakdown F1: gross=50k, sc=0 (waived), fee=25k (50%), net=25k
+    
+            const summary = aggregateFinancials([firstMonthPayment], [firstMonthTenant], [{ property: { ...mockProperty, units: [firstMonthUnit] }, units: [firstMonthUnit] }]);
+            
+            expect(summary.totalRevenue).toBe(50000);
+            expect(summary.totalServiceCharges).toBe(0);
+            expect(summary.totalManagementFees).toBe(25000);
+            expect(summary.vacantUnitServiceChargeDeduction).toBe(0);
+            expect(summary.totalNetRemittance).toBe(25000);
+        });
+    
+        it('should return zero for all fields if there are no payments', () => {
+            const summary = aggregateFinancials([], mockTenants, [{ property: mockProperty, units: mockProperty.units }]);
+            expect(summary.totalRevenue).toBe(0);
+            expect(summary.totalManagementFees).toBe(0);
+            expect(summary.totalServiceCharges).toBe(0);
+            // Vacant deduction is independent of payments
+            expect(summary.vacantUnitServiceChargeDeduction).toBe(4500); 
+            expect(summary.totalNetRemittance).toBe(-4500);
         });
     });
 });
