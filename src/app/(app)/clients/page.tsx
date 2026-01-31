@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -5,11 +6,12 @@ import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getA
 import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, UserCog, PlusCircle, FileSignature } from 'lucide-react';
+import { Edit, UserCog, PlusCircle, FileSignature, Building2, Users } from 'lucide-react';
 import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -18,7 +20,8 @@ export default function ClientsPage() {
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
 
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  
   const [selectedOwner, setSelectedOwner] = useState<PropertyOwner | null>(null);
   const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -57,7 +60,6 @@ export default function ClientsPage() {
   }, [allProperties]);
 
   const unifiedClientOwners = useMemo(() => {
-    // 1. Get clients from the propertyOwners collection
     const clientOnlyPropertyOwners = propertyOwners.filter(owner => {
         if (!owner.assignedUnits || owner.assignedUnits.length === 0) return false;
         return !owner.assignedUnits.some(assignedProp => 
@@ -68,7 +70,6 @@ export default function ClientsPage() {
         );
     });
 
-    // 2. Identify and format clients from the landlords collection
     const landlordUnitsMap = new Map<string, Unit[]>();
     allProperties.forEach(p => {
         if (p.units) {
@@ -113,9 +114,7 @@ export default function ClientsPage() {
         };
     });
 
-    // 3. Combine them
     return [...clientOnlyPropertyOwners, ...formattedClientLandlords];
-
   }, [propertyOwners, allLandlords, allProperties, allUnitsMap]);
   
   const clientProperties = useMemo(() => {
@@ -134,6 +133,32 @@ export default function ClientsPage() {
 
       return allProperties.filter(p => propertyIdsWithClients.has(p.id) && p.units.some(u => u.managementStatus === 'Client Managed'));
   }, [allProperties, unifiedClientOwners]);
+
+  const selectedProperty = useMemo(() => {
+    if (!selectedPropertyId) return null;
+    return allProperties.find(p => p.id === selectedPropertyId);
+  }, [selectedPropertyId, allProperties]);
+
+  const ownersForSelectedProperty = useMemo(() => {
+    if (!selectedPropertyId) return [];
+    return unifiedClientOwners.filter(o => o.assignedUnits?.some(au => au.propertyId === selectedPropertyId));
+  }, [selectedPropertyId, unifiedClientOwners]);
+
+  const unassignedUnits = useMemo(() => {
+    if (!selectedProperty) return [];
+    const assignedUnitNamesForProperty = new Set(
+        ownersForSelectedProperty.flatMap(o => o.assignedUnits?.find(au => au.propertyId === selectedProperty.id)?.unitNames || [])
+    );
+    return selectedProperty.units.filter(u => u.managementStatus === 'Client Managed' && !assignedUnitNamesForProperty.has(u.name));
+  }, [selectedProperty, ownersForSelectedProperty]);
+
+  const totalClientUnits = useMemo(() => {
+    let count = 0;
+    clientProperties.forEach(p => {
+      count += p.units.filter(u => u.managementStatus === 'Client Managed').length;
+    });
+    return count;
+  }, [clientProperties]);
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
@@ -185,129 +210,152 @@ export default function ClientsPage() {
           <p className="text-muted-foreground">Manage contact information for owners who fully manage their own units.</p>
         </div>
       </div>
-
-      <div className="space-y-6">
-          {clientProperties.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {clientProperties.map(property => {
-                const ownersForProperty = unifiedClientOwners.filter(o => o.assignedUnits && o.assignedUnits.some(au => au.propertyId === property.id));
-                const assignedUnitNamesForProperty = new Set(
-                    ownersForProperty.flatMap(o => o.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames || [])
-                );
-                const unassignedUnits = property.units.filter(u => u.managementStatus === 'Client Managed' && !assignedUnitNamesForProperty.has(u.name));
-
-                return (
-                  <Card key={property.id} className="h-full flex flex-col group hover:shadow-lg transition-all duration-300 border-amber-500/10">
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-xl">{property.name}</CardTitle>
-                          <CardDescription>{property.address}</CardDescription>
-                        </div>
-                        <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-colors shrink-0">
-                          <UserCog className="h-6 w-6" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-6 pt-0">
-                      <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
-                        <span>Property Owners</span>
-                        <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full lowercase font-medium">
-                          {property.units.filter(u => u.managementStatus === 'Client Managed').length} total client units
-                        </span>
-                      </div>
-
-                      <div className="space-y-4">
-                        {ownersForProperty.length > 0 ? (
-                          ownersForProperty.map(owner => (
-                            <div key={owner.id} className="p-4 rounded-xl border bg-muted/30 relative group/owner">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <p className="font-bold text-sm">{owner.name}</p>
-                                  <p className="text-xs text-muted-foreground">{owner.email}</p>
-                                  <p className="text-xs text-muted-foreground">{owner.phone}</p>
-                                </div>
-                                <div className="flex items-center">
-                                   <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8 hover:bg-green-500 hover:text-white transition-colors"
-                                      onClick={() => {
-                                        setOwnerForStatement(owner);
-                                        setIsStatementDialogOpen(true);
-                                      }}
-                                  >
-                                      <FileSignature className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
-                                    onClick={() => {
-                                      setSelectedProperty(property);
-                                      setSelectedOwner(owner);
-                                      setIsOwnerDialogOpen(true);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="flex gap-1.5 flex-wrap">
-                                {owner.assignedUnits?.find(au => au.propertyId === property.id)?.unitNames.map(unitName => (
-                                  <span key={unitName} className="px-2 py-0.5 rounded bg-white border text-[10px] font-bold shadow-sm">
-                                    Unit {unitName}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-6 bg-muted/20 rounded-xl border-dashed border-2">
-                            <p className="text-xs text-muted-foreground italic">No owners registered yet.</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {unassignedUnits.length > 0 && (
-                        <div className="space-y-3 pt-2">
-                          <h4 className="text-[10px] font-bold uppercase text-amber-600 tracking-widest flex items-center gap-1.5">
-                            <div className="h-1 w-1 rounded-full bg-amber-500" />
-                            Unassigned Units
-                          </h4>
-                          <div className="p-4 rounded-xl border-dashed border-2 border-amber-500/20 bg-amber-500/5">
-                            <div className="flex gap-1.5 flex-wrap mb-4">
-                              {unassignedUnits.map(u => (
-                                <span key={u.name} className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 text-[10px] font-bold">
-                                  {u.name}
-                                </span>
-                              ))}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500 hover:text-white h-8 text-xs font-semibold"
-                              onClick={() => {
-                                setSelectedProperty(property);
-                                setSelectedOwner(null);
-                                setIsOwnerDialogOpen(true);
-                              }}
-                            >
-                              <PlusCircle className="mr-2 h-3 w-3" />
-                              Assign New Owner
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState message="No properties with client-managed units found." />
-          )}
+      
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Client Properties</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{clientProperties.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Client Units</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalClientUnits}</div>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+            <CardTitle>Select Property</CardTitle>
+            <CardDescription>Choose a property to view its owners and client-managed units.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Select onValueChange={setSelectedPropertyId} value={selectedPropertyId || ''}>
+                <SelectTrigger className="w-full md:w-[300px]">
+                    <SelectValue placeholder="Select a property..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {clientProperties.map(property => (
+                        <SelectItem key={property.id} value={property.id}>
+                            {property.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </CardContent>
+      </Card>
+      
+      {selectedProperty ? (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl">{selectedProperty.name}</CardTitle>
+            <CardDescription>{selectedProperty.address}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2">
+              <span>Property Owners</span>
+              <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full lowercase font-medium">
+                {selectedProperty.units.filter(u => u.managementStatus === 'Client Managed').length} total client units
+              </span>
+            </div>
+            
+            <div className="space-y-4">
+                {ownersForSelectedProperty.length > 0 ? (
+                  ownersForSelectedProperty.map(owner => (
+                    <div key={owner.id} className="p-4 rounded-xl border bg-muted/30 relative group/owner">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-bold text-sm">{owner.name}</p>
+                          <p className="text-xs text-muted-foreground">{owner.email}</p>
+                          <p className="text-xs text-muted-foreground">{owner.phone}</p>
+                        </div>
+                        <div className="flex items-center">
+                           <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:bg-green-500 hover:text-white transition-colors"
+                              onClick={() => {
+                                setOwnerForStatement(owner);
+                                setIsStatementDialogOpen(true);
+                              }}
+                          >
+                              <FileSignature className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
+                            onClick={() => {
+                              setSelectedOwner(owner);
+                              setIsOwnerDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {owner.assignedUnits?.find(au => au.propertyId === selectedProperty?.id)?.unitNames.map(unitName => (
+                          <span key={unitName} className="px-2 py-0.5 rounded bg-white border text-[10px] font-bold shadow-sm">
+                            Unit {unitName}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 bg-muted/20 rounded-xl border-dashed border-2">
+                    <p className="text-xs text-muted-foreground italic">No owners registered for this property yet.</p>
+                  </div>
+                )}
+            </div>
+            
+            {unassignedUnits.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h4 className="text-[10px] font-bold uppercase text-amber-600 tracking-widest flex items-center gap-1.5">
+                  <div className="h-1 w-1 rounded-full bg-amber-500" />
+                  Unassigned Units
+                </h4>
+                <div className="p-4 rounded-xl border-dashed border-2 border-amber-500/20 bg-amber-500/5">
+                  <div className="flex gap-1.5 flex-wrap mb-4">
+                    {unassignedUnits.map(u => (
+                      <span key={u.name} className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 text-[10px] font-bold">
+                        {u.name}
+                      </span>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500 hover:text-white h-8 text-xs font-semibold"
+                    onClick={() => {
+                      setSelectedOwner(null);
+                      setIsOwnerDialogOpen(true);
+                    }}
+                  >
+                    <PlusCircle className="mr-2 h-3 w-3" />
+                    Assign New Owner
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="text-center py-16 border-dashed border-2 rounded-lg bg-muted/20">
+          <UserCog className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-semibold">No Property Selected</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Please select a property from the dropdown above to view its details.</p>
+        </div>
+      )}
 
       {selectedProperty && (
         <ManagePropertyOwnerDialog
@@ -333,11 +381,4 @@ export default function ClientsPage() {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="text-center py-16 border-dashed border-2 rounded-lg bg-muted/20">
-      <h3 className="text-xl font-semibold">Ready to Manage</h3>
-      <p className="text-muted-foreground mt-2">{message}</p>
-    </div>
-  );
-}
+    
