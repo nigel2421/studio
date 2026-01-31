@@ -31,7 +31,7 @@ export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  
+
   // State for Rent tab
   const [rentCurrentPage, setRentCurrentPage] = useState(1);
   const [rentPageSize, setRentPageSize] = useState(10);
@@ -48,9 +48,9 @@ export default function AccountsPage() {
   const fetchAllData = async () => {
     try {
       const [tenantsData, propertiesData, paymentsData] = await Promise.all([
-        getTenants(),
+        getTenants(200), // Sufficient for initial view/search
         getProperties(),
-        getAllPayments()
+        getAllPayments(200)
       ]);
       setTenants(tenantsData);
       setProperties(propertiesData);
@@ -100,7 +100,7 @@ export default function AccountsPage() {
   const serviceChargeArrears = useMemo(() => tenants
     .filter(t => t.residentType === 'Homeowner')
     .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [tenants]);
-  
+
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
   const occupiedUnits = tenants.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
@@ -144,7 +144,7 @@ export default function AccountsPage() {
     setSelectedTenant(tenant);
     setIsHistoryOpen(true);
   };
-  
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
@@ -173,182 +173,182 @@ export default function AccountsPage() {
 
       <Tabs defaultValue="rent">
         <TabsList>
-            <TabsTrigger value="rent">Rent Status</TabsTrigger>
-            <TabsTrigger value="service-charge">Service Charge Status</TabsTrigger>
+          <TabsTrigger value="rent">Rent Status</TabsTrigger>
+          <TabsTrigger value="service-charge">Service Charge Status</TabsTrigger>
         </TabsList>
         <TabsContent value="rent" className="mt-4">
-            <Card>
-                <CardHeader>
-                <CardTitle>Rent Financial Status</CardTitle>
-                <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
-                    <div className="relative w-full sm:w-[300px]">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search tenant, unit or email..."
-                        className="pl-9"
-                        value={rentSearchTerm}
-                        onChange={(e) => setRentSearchTerm(e.target.value)}
-                    />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredRentTenants, 'rent_financial_status.csv')}>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Export CSV
-                    </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Rent Financial Status</CardTitle>
+              <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
+                <div className="relative w-full sm:w-[300px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search tenant, unit or email..."
+                    className="pl-9"
+                    value={rentSearchTerm}
+                    onChange={(e) => setRentSearchTerm(e.target.value)}
+                  />
                 </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Tenant</TableHead>
-                        <TableHead>Property</TableHead>
-                        <TableHead>Rent Amount</TableHead>
-                        <TableHead>Billed For</TableHead>
-                        <TableHead>Excess (Cr)</TableHead>
-                        <TableHead className="text-right">Payment Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredRentTenants, 'rent_financial_status.csv')}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Rent Amount</TableHead>
+                    <TableHead>Billed For</TableHead>
+                    <TableHead>Excess (Cr)</TableHead>
+                    <TableHead className="text-right">Payment Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRentTenants.map((tenant) => (
+                    <TableRow key={tenant.id}>
+                      <TableCell>
+                        <div className="font-medium">{tenant.name}</div>
+                        <div className="text-sm text-muted-foreground">{tenant.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{getPropertyName(tenant.propertyId)}</div>
+                        <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
+                      </TableCell>
+                      <TableCell>
+                        {tenant.lease && typeof tenant.lease.rent === 'number'
+                          ? `Ksh ${tenant.lease.rent.toLocaleString()}`
+                          : 'N/A'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {tenant.lease?.lastBilledPeriod
+                          ? format(new Date(tenant.lease.lastBilledPeriod + '-02'), 'MMMM yyyy')
+                          : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-green-600 font-semibold">
+                        Ksh {(tenant.accountBalance || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
+                          {tenant.lease?.paymentStatus || 'N/A'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewHistory(tenant)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {paginatedRentTenants.map((tenant) => (
-                        <TableRow key={tenant.id}>
-                        <TableCell>
-                            <div className="font-medium">{tenant.name}</div>
-                            <div className="text-sm text-muted-foreground">{tenant.email}</div>
-                        </TableCell>
-                        <TableCell>
-                            <div>{getPropertyName(tenant.propertyId)}</div>
-                            <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
-                        </TableCell>
-                        <TableCell>
-                            {tenant.lease && typeof tenant.lease.rent === 'number'
-                            ? `Ksh ${tenant.lease.rent.toLocaleString()}`
-                            : 'N/A'
-                            }
-                        </TableCell>
-                        <TableCell>
-                            {tenant.lease?.lastBilledPeriod 
-                            ? format(new Date(tenant.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
-                            : 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-green-600 font-semibold">
-                            Ksh {(tenant.accountBalance || 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                            <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
-                            {tenant.lease?.paymentStatus || 'N/A'}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                            <Button variant="ghost" size="sm" onClick={() => handleViewHistory(tenant)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-                </CardContent>
-                <div className="p-4 border-t">
-                <PaginationControls
-                    currentPage={rentCurrentPage}
-                    totalPages={rentTotalPages}
-                    pageSize={rentPageSize}
-                    totalItems={filteredRentTenants.length}
-                    onPageChange={setRentCurrentPage}
-                    onPageSizeChange={setRentPageSize}
-                />
-                </div>
-            </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+            <div className="p-4 border-t">
+              <PaginationControls
+                currentPage={rentCurrentPage}
+                totalPages={rentTotalPages}
+                pageSize={rentPageSize}
+                totalItems={filteredRentTenants.length}
+                onPageChange={setRentCurrentPage}
+                onPageSizeChange={setRentPageSize}
+              />
+            </div>
+          </Card>
         </TabsContent>
         <TabsContent value="service-charge" className="mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Service Charge Financial Status</CardTitle>
-                    <CardDescription>Detailed list of homeowner service charge information.</CardDescription>
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
-                        <div className="relative w-full sm:w-[300px]">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search homeowner, unit or email..."
-                            className="pl-9"
-                            value={scSearchTerm}
-                            onChange={(e) => setScSearchTerm(e.target.value)}
-                        />
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredHomeowners, 'service_charge_status.csv')}>
-                        <DollarSign className="mr-2 h-4 w-4" />
-                        Export CSV
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Homeowner</TableHead>
-                                <TableHead>Property</TableHead>
-                                <TableHead>S/C Amount</TableHead>
-                                <TableHead>Billed For</TableHead>
-                                <TableHead>Excess (Cr)</TableHead>
-                                <TableHead className="text-right">Payment Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {paginatedHomeowners.map((homeowner) => (
-                            <TableRow key={homeowner.id}>
-                                <TableCell>
-                                    <div className="font-medium">{homeowner.name}</div>
-                                    <div className="text-sm text-muted-foreground">{homeowner.email}</div>
-                                </TableCell>
-                                <TableCell>
-                                    <div>{getPropertyName(homeowner.propertyId)}</div>
-                                    <div className="text-sm text-muted-foreground">Unit: {homeowner.unitName}</div>
-                                </TableCell>
-                                <TableCell>
-                                    {homeowner.lease && typeof homeowner.lease.serviceCharge === 'number'
-                                    ? `Ksh ${homeowner.lease.serviceCharge.toLocaleString()}`
-                                    : 'N/A'
-                                    }
-                                </TableCell>
-                                <TableCell>
-                                    {homeowner.lease?.lastBilledPeriod 
-                                    ? format(new Date(homeowner.lease.lastBilledPeriod + '-02'), 'MMMM yyyy') 
-                                    : 'N/A'}
-                                </TableCell>
-                                <TableCell className="text-green-600 font-semibold">
-                                    Ksh {(homeowner.accountBalance || 0).toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Badge variant={getPaymentStatusVariant(homeowner.lease?.paymentStatus)}>
-                                    {homeowner.lease?.paymentStatus || 'N/A'}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="ghost" size="sm" onClick={() => handleViewHistory(homeowner)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-                <div className="p-4 border-t">
-                    <PaginationControls
-                        currentPage={scCurrentPage}
-                        totalPages={scTotalPages}
-                        pageSize={scPageSize}
-                        totalItems={filteredHomeowners.length}
-                        onPageChange={setScCurrentPage}
-                        onPageSizeChange={setScPageSize}
-                    />
+          <Card>
+            <CardHeader>
+              <CardTitle>Service Charge Financial Status</CardTitle>
+              <CardDescription>Detailed list of homeowner service charge information.</CardDescription>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
+                <div className="relative w-full sm:w-[300px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search homeowner, unit or email..."
+                    className="pl-9"
+                    value={scSearchTerm}
+                    onChange={(e) => setScSearchTerm(e.target.value)}
+                  />
                 </div>
-            </Card>
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredHomeowners, 'service_charge_status.csv')}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Homeowner</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>S/C Amount</TableHead>
+                    <TableHead>Billed For</TableHead>
+                    <TableHead>Excess (Cr)</TableHead>
+                    <TableHead className="text-right">Payment Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedHomeowners.map((homeowner) => (
+                    <TableRow key={homeowner.id}>
+                      <TableCell>
+                        <div className="font-medium">{homeowner.name}</div>
+                        <div className="text-sm text-muted-foreground">{homeowner.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{getPropertyName(homeowner.propertyId)}</div>
+                        <div className="text-sm text-muted-foreground">Unit: {homeowner.unitName}</div>
+                      </TableCell>
+                      <TableCell>
+                        {homeowner.lease && typeof homeowner.lease.serviceCharge === 'number'
+                          ? `Ksh ${homeowner.lease.serviceCharge.toLocaleString()}`
+                          : 'N/A'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {homeowner.lease?.lastBilledPeriod
+                          ? format(new Date(homeowner.lease.lastBilledPeriod + '-02'), 'MMMM yyyy')
+                          : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-green-600 font-semibold">
+                        Ksh {(homeowner.accountBalance || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={getPaymentStatusVariant(homeowner.lease?.paymentStatus)}>
+                          {homeowner.lease?.paymentStatus || 'N/A'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewHistory(homeowner)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+            <div className="p-4 border-t">
+              <PaginationControls
+                currentPage={scCurrentPage}
+                totalPages={scTotalPages}
+                pageSize={scPageSize}
+                totalItems={filteredHomeowners.length}
+                onPageChange={setScCurrentPage}
+                onPageSizeChange={setScPageSize}
+              />
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
 

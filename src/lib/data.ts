@@ -12,7 +12,7 @@ import {
     HandoverStatus
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths } from "date-fns";
@@ -22,7 +22,7 @@ const WATER_RATE = 150; // Ksh per unit
 export async function logActivity(action: string, userEmail?: string | null) {
     const user = auth.currentUser;
     // Don't log if user isn't authenticated, unless an email is passed (for server-side logging)
-    if (!user && !userEmail) return; 
+    if (!user && !userEmail) return;
 
     try {
         await addDoc(collection(db, 'logs'), {
@@ -56,7 +56,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
     try {
         const userRef = doc(db, 'users', userId);
         const userSnap = await getDoc(userRef);
-        if(!userSnap.exists()) throw new Error("User not found.");
+        if (!userSnap.exists()) throw new Error("User not found.");
         const userEmail = userSnap.data().email;
 
         await updateDoc(userRef, { role });
@@ -76,10 +76,39 @@ export async function getLogs(): Promise<Log[]> {
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log));
 }
 
-async function getCollection<T>(collectionName: string): Promise<T[]> {
-    const q = query(collection(db, collectionName));
+async function getCollection<T>(collectionName: string, queryConstraints: any[] = []): Promise<T[]> {
+    const q = query(collection(db, collectionName), ...queryConstraints);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+}
+
+export async function getPaginatedCollection<T>(
+    collectionName: string,
+    options: { pageSize: number; lastDocId?: string; sortField?: string; sortOrder?: 'asc' | 'desc'; filters?: any[] }
+): Promise<{ items: T[]; lastDocId: string | null }> {
+    const constraints: any[] = [...(options.filters || [])];
+
+    if (options.sortField) {
+        constraints.push(orderBy(options.sortField, options.sortOrder || 'desc'));
+    }
+
+    if (options.lastDocId) {
+        const lastDocRef = doc(db, collectionName, options.lastDocId);
+        const lastDocSnap = await getDoc(lastDocRef);
+        if (lastDocSnap.exists()) {
+            constraints.push(startAfter(lastDocSnap));
+        }
+    }
+
+    constraints.push(limit(options.pageSize));
+
+    const q = query(collection(db, collectionName), ...constraints);
+    const querySnapshot = await getDocs(q);
+
+    const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+    const lastDocId = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1].id : null;
+
+    return { items, lastDocId };
 }
 
 async function getDocument<T>(collectionName: string, id: string): Promise<T | null> {
@@ -93,9 +122,18 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
     }
 }
 
-export async function getProperties(): Promise<Property[]> {
+let propertiesCache: Property[] | null = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export async function getProperties(forceRefresh = false): Promise<Property[]> {
+    const now = Date.now();
+    if (!forceRefresh && propertiesCache && (now - lastCacheTime < CACHE_DURATION)) {
+        return propertiesCache;
+    }
+
     const properties = await getCollection<Property>('properties');
-    
+
     const desiredOrder = [
         'Midtown Apartments',
         'Grand Midtown Apartments',
@@ -118,12 +156,15 @@ export async function getProperties(): Promise<Property[]> {
         return a.name.localeCompare(b.name);
     });
 
+    propertiesCache = sortedProperties;
+    lastCacheTime = Date.now();
     return sortedProperties;
 }
 
-export async function getTenants(): Promise<Tenant[]> {
-    const tenants = await getCollection<Tenant>('tenants');
-    return tenants;
+export async function getTenants(limitCount?: number): Promise<Tenant[]> {
+    const constraints: any[] = [];
+    if (limitCount) constraints.push(limit(limitCount));
+    return getCollection<Tenant>('tenants', constraints);
 }
 
 export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
@@ -135,7 +176,7 @@ export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const q = query(
-        collection(db, 'maintenanceRequests'), 
+        collection(db, 'maintenanceRequests'),
         where('createdAt', '>=', ninetyDaysAgo),
         orderBy('createdAt', 'desc')
     );
@@ -245,11 +286,11 @@ export async function addTenant(data: {
     await logActivity(`Created tenant: ${name} (${email})`);
 
     // Update unit status to 'rented'
-    const updatedUnits = property.units.map(u => 
+    const updatedUnits = property.units.map(u =>
         u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
     );
     await updateProperty(propertyId, { units: updatedUnits });
-    
+
     await logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
 
 
@@ -287,7 +328,7 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
         ...property,
         imageId: `property-${Math.floor(Math.random() * 3) + 1}`,
     };
-    
+
     await addDoc(collection(db, "properties"), newPropertyData);
     await logActivity(`Added new property: ${property.name}`);
 }
@@ -313,7 +354,7 @@ export async function archiveTenant(tenantId: string): Promise<void> {
         const propertySnap = await getDoc(propertyRef);
         if (propertySnap.exists()) {
             const propertyData = propertySnap.data() as Property;
-            const updatedUnits = propertyData.units.map(u => 
+            const updatedUnits = propertyData.units.map(u =>
                 u.name === tenant.unitName ? { ...u, status: 'vacant' } : u
             );
             await updateDoc(propertyRef, { units: updatedUnits });
@@ -337,7 +378,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
         const oldPropSnap = await getDoc(oldPropRef);
         if (oldPropSnap.exists()) {
             const oldPropData = oldPropSnap.data() as Property;
-            const updatedOldUnits = oldPropData.units.map(u => 
+            const updatedOldUnits = oldPropData.units.map(u =>
                 u.name === oldTenant.unitName ? { ...u, status: 'vacant' } : u
             );
             await updateDoc(oldPropRef, { units: updatedOldUnits });
@@ -349,7 +390,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
             const newPropSnap = await getDoc(newPropRef);
             if (newPropSnap.exists()) {
                 const newPropData = newPropSnap.data() as Property;
-                const updatedNewUnits = newPropData.units.map(u => 
+                const updatedNewUnits = newPropData.units.map(u =>
                     u.name === tenantData.unitName ? { ...u, status: 'rented' } : u
                 );
                 await updateDoc(newPropRef, { units: updatedNewUnits });
@@ -466,10 +507,10 @@ export async function addWaterMeterReading(data: {
             paymentStatus: initialUpdates['lease.paymentStatus'],
         }
     };
-    
+
     const property = await getProperty(originalTenant.propertyId);
     const unit = property?.units.find(u => u.name === originalTenant.unitName);
-    
+
     // 4. Run reconciliation on this new transient state
     const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, new Date());
 
@@ -512,7 +553,7 @@ export async function getPropertyWaterReadings(propertyId: string): Promise<Wate
     const property = await getProperty(propertyId);
     if (!property) return [];
     const unitNames = property.units.map(u => u.name);
-    
+
     const readings: WaterMeterReading[] = [];
     // Firestore 'in' query is limited to 30 items
     for (let i = 0; i < unitNames.length; i += 30) {
@@ -526,7 +567,7 @@ export async function getPropertyWaterReadings(propertyId: string): Promise<Wate
         const querySnapshot = await getDocs(q);
         readings.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading)));
     }
-    
+
     return readings;
 }
 
@@ -559,38 +600,38 @@ export async function batchProcessPayments(
         if (!tenantSnap.exists()) {
             throw new Error("Tenant not found during transaction");
         }
-        
+
         let workingTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
         // 2. Perform reconciliation in memory
         const reconciliationUpdates = reconcileMonthlyBilling(workingTenant, unit, new Date());
-        
+
         // 3. Apply reconciliation updates to the in-memory tenant object
         if (reconciliationUpdates.dueBalance !== undefined) workingTenant.dueBalance = reconciliationUpdates.dueBalance;
         if (reconciliationUpdates.accountBalance !== undefined) workingTenant.accountBalance = reconciliationUpdates.accountBalance;
         if (reconciliationUpdates['lease.paymentStatus']) workingTenant.lease.paymentStatus = reconciliationUpdates['lease.paymentStatus'];
         if (reconciliationUpdates['lease.lastBilledPeriod']) workingTenant.lease.lastBilledPeriod = reconciliationUpdates['lease.lastBilledPeriod'];
-        
+
         // `workingTenant` is now the most up-to-date state before processing new payments.
 
         for (const entry of paymentEntries) {
             validatePayment(entry.amount, new Date(entry.date), workingTenant, entry.type);
         }
-        
+
         // 4. Process all new payments against the in-memory state
         for (const entry of paymentEntries) {
             const paymentDocRef = doc(collection(db, 'payments'));
             // Write payment document
-            transaction.set(paymentDocRef, { 
-                ...entry, 
-                tenantId: tenantId, 
-                status: 'Paid', 
-                createdAt: serverTimestamp() 
+            transaction.set(paymentDocRef, {
+                ...entry,
+                tenantId: tenantId,
+                status: 'Paid',
+                createdAt: serverTimestamp()
             });
-            
+
             // Apply payment logic to the in-memory object
             const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
-            
+
             workingTenant = {
                 ...workingTenant,
                 dueBalance: paymentProcessingUpdates.dueBalance,
@@ -602,7 +643,7 @@ export async function batchProcessPayments(
                 }
             };
         }
-        
+
         // 5. Prepare the final, combined updates for the tenant document
         const finalUpdates: { [key: string]: any } = {
             dueBalance: workingTenant.dueBalance,
@@ -635,7 +676,7 @@ export async function batchProcessPayments(
     if (tenant) {
         const property = await getProperty(tenant.propertyId);
         for (const entry of paymentEntries) {
-             if (entry.type !== 'Adjustment') { 
+            if (entry.type !== 'Adjustment') {
                 try {
                     await sendPaymentReceipt({
                         tenantId: tenant.id,
@@ -675,7 +716,7 @@ export async function updatePayment(
     editorId: string
 ) {
     const paymentRef = doc(db, 'payments', paymentId);
-    
+
     await runTransaction(db, async (transaction) => {
         const paymentSnap = await transaction.get(paymentRef);
         if (!paymentSnap.exists()) {
@@ -716,7 +757,7 @@ export async function forceRecalculateTenantBalance(tenantId: string) {
     const allProperties = await getProperties();
 
     const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties);
-    
+
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, {
         dueBalance: finalDueBalance,
@@ -751,8 +792,8 @@ export async function runMonthlyReconciliation(): Promise<void> {
 }
 
 export async function bulkUpdateUnitsFromCSV(
-  propertyId: string, 
-  data: Record<string, string>[]
+    propertyId: string,
+    data: Record<string, string>[]
 ): Promise<{ updatedCount: number; createdCount: number; errors: string[] }> {
     const errors: string[] = [];
     let updatedCount = 0;
@@ -768,24 +809,24 @@ export async function bulkUpdateUnitsFromCSV(
 
     for (const [index, row] of data.entries()) {
         const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge } = row;
-        
+
         if (!UnitName) {
             continue;
         }
 
         let unitData: Partial<Unit> = {};
-        
+
         if (Status !== undefined && Status.trim() !== '') {
-             if (!unitStatuses.includes(Status as any)) { errors.push(`Row ${index + 2}: Invalid Status "${Status}".`); continue; }
-             unitData.status = Status as UnitStatus;
+            if (!unitStatuses.includes(Status as any)) { errors.push(`Row ${index + 2}: Invalid Status "${Status}".`); continue; }
+            unitData.status = Status as UnitStatus;
         }
         if (Ownership !== undefined && Ownership.trim() !== '') {
-             if (!ownershipTypes.includes(Ownership as any)) { errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`); continue; }
-             unitData.ownership = Ownership as OwnershipType;
+            if (!ownershipTypes.includes(Ownership as any)) { errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`); continue; }
+            unitData.ownership = Ownership as OwnershipType;
         }
         if (UnitType !== undefined && UnitType.trim() !== '') {
-             if (!unitTypes.includes(UnitType as any)) { errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`); continue; }
-             unitData.unitType = UnitType as UnitType;
+            if (!unitTypes.includes(UnitType as any)) { errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`); continue; }
+            unitData.unitType = UnitType as UnitType;
         }
         if (UnitOrientation !== undefined && UnitOrientation.trim() !== '') {
             if (!unitOrientations.includes(UnitOrientation as any)) { errors.push(`Row ${index + 2}: Invalid UnitOrientation "${UnitOrientation}".`); continue; }
@@ -799,7 +840,7 @@ export async function bulkUpdateUnitsFromCSV(
             if (!handoverStatuses.includes(HandoverStatus as any)) { errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}".`); continue; }
             unitData.handoverStatus = HandoverStatus as HandoverStatus;
             if (HandoverStatus === 'Handed Over' && !HandoverDate && (!unitsMap.has(UnitName) || !unitsMap.get(UnitName)!.handoverDate)) {
-                 unitData.handoverDate = new Date().toISOString().split('T')[0];
+                unitData.handoverDate = new Date().toISOString().split('T')[0];
             }
         }
         if (HandoverDate !== undefined && HandoverDate.trim() !== '') {
@@ -833,7 +874,7 @@ export async function bulkUpdateUnitsFromCSV(
             createdCount++;
         }
     }
-    
+
     if (errors.length > 0) {
         return { updatedCount: 0, createdCount: 0, errors };
     }
@@ -892,7 +933,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                                         sourceData: {
                                             id: `sc-stmt-${u.name}-${Date.now()}`,
                                             tenantId: 'vacant',
-                                            propertyId: p.id,
+                                            propertyId: p.name, // Using name as ID here as per existing pattern or actual ID
                                             unitName: u.name,
                                             period: currentPeriod,
                                             amount: scAmount,
@@ -974,7 +1015,12 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
 
         if (tenant) {
             // 1. Fetch Payments (Rent Receipts)
-            const paymentsQuery = query(collection(db, 'payments'), where('tenantId', '==', tenant.id));
+            const paymentsQuery = query(
+                collection(db, 'payments'),
+                where('tenantId', '==', tenant.id),
+                orderBy('date', 'desc'),
+                limit(20)
+            );
             const paymentsSnapshot = await getDocs(paymentsQuery);
             const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 
@@ -989,7 +1035,12 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
             })));
 
             // 2. Fetch Water Meter Readings (Water Bills)
-            const waterQuery = query(collection(db, 'waterReadings'), where('tenantId', '==', tenant.id));
+            const waterQuery = query(
+                collection(db, 'waterReadings'),
+                where('tenantId', '==', tenant.id),
+                orderBy('date', 'desc'),
+                limit(10)
+            );
             const waterSnapshot = await getDocs(waterQuery);
             const readings = waterSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 
@@ -1098,7 +1149,7 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
         let needsUpdate = false;
         const newUnits = prop.units.map(unit => {
             if (unit.ownership !== 'Landlord') return unit;
-            
+
             const shouldBeAssigned = assignedUnitNames.includes(unit.name);
             const isAssigned = unit.landlordId === landlord.id;
 
@@ -1186,7 +1237,7 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
         // Handover after the 10th. Billing starts next month.
         firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
     }
-    
+
     // The last billed period is the month *before* the first billable month.
     const lastBilledPeriodDate = addMonths(firstBillableMonthDate, -1);
     const lastBilledPeriod = format(lastBilledPeriodDate, 'yyyy-MM');
@@ -1306,7 +1357,7 @@ export async function getAllPaymentsForReport(): Promise<Payment[]> {
     return getCollection<Payment>('payments');
 }
 
-export async function getAllPayments(): Promise<Payment[]> {
+export async function getAllPayments(limitCount: number = 50): Promise<Payment[]> {
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
@@ -1314,7 +1365,8 @@ export async function getAllPayments(): Promise<Payment[]> {
     const q = query(
         collection(db, 'payments'),
         where('date', '>=', dateStr),
-        orderBy('date', 'desc')
+        orderBy('date', 'desc'),
+        limit(limitCount)
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
@@ -1352,7 +1404,7 @@ export function listenToProperties(callback: (properties: Property[]) => void): 
     const q = query(collection(db, 'properties'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-        
+
         const desiredOrder = [
             'Midtown Apartments',
             'Grand Midtown Apartments',
@@ -1421,8 +1473,8 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
         const tasks = querySnapshot.docs.map(doc => {
             const data = doc.data();
             const createdAt = data.createdAt;
-            return { 
-                id: doc.id, 
+            return {
+                id: doc.id,
                 ...data,
                 createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : createdAt
             } as Task;
@@ -1434,4 +1486,4 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     return unsubscribe;
 }
 
-    
+

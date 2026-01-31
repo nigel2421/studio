@@ -35,22 +35,22 @@ export default function DashboardPage() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   const selectedProperty = useMemo(() => {
-      if (!selectedPropertyId) return null;
-      return properties.find(p => p.id === selectedPropertyId) || null;
+    if (!selectedPropertyId) return null;
+    return properties.find(p => p.id === selectedPropertyId) || null;
   }, [selectedPropertyId, properties]);
 
   useEffect(() => {
     const fetchData = async () => {
       const [
-        maintenanceData, 
-        tenantsData, 
-        propertiesData, 
+        maintenanceData,
+        tenantsData,
+        propertiesData,
         paymentsData
       ] = await Promise.all([
         getMaintenanceRequests(),
-        getTenants(),
+        getTenants(100), // Limit to recent tenants for quick dashboard load
         getProperties(),
-        getAllPayments()
+        getAllPayments(100) // Limit to 100 recent payments
       ]);
 
       setMaintenanceRequests(maintenanceData);
@@ -61,12 +61,12 @@ export default function DashboardPage() {
 
     fetchData();
   }, []);
-  
+
   const handleExportPDF = async () => {
     startLoading('Generating full report...');
     try {
       const { generateDashboardReportPDF } = await import('@/lib/pdf-generator');
-      
+
       const [
         allPaymentsForReport,
         allMaintenanceForReport,
@@ -86,7 +86,7 @@ export default function DashboardPage() {
         .filter(t => (t.dueBalance || 0) > 0)
         .reduce((sum, t) => sum + (t.dueBalance || 0), 0);
       const totalUnits = allPropertiesForReport.reduce((sum, p) => sum + (p.units?.length || 0), 0);
-      
+
       const occupiedUnits = (() => {
         const occupiedUnitIdentifiers = new Set<string>();
         allTenantsForReport.forEach(tenant => {
@@ -106,15 +106,15 @@ export default function DashboardPage() {
 
       const vacantUnits = totalUnits - occupiedUnits;
       const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
-      
+
       const totalMgmtFees = allPaymentsForReport.reduce((sum, p) => {
-          if (p.type === 'Deposit') return sum;
-          const tenant = allTenantsForReport.find(t => t.id === p.tenantId);
-          if (!tenant) return sum;
-          const property = allPropertiesForReport.find(prop => prop.id === tenant.propertyId);
-          const unit = property?.units.find(u => u.name === tenant.unitName);
-          const breakdown = calculateTransactionBreakdown(p, unit, tenant);
-          return sum + breakdown.managementFee;
+        if (p.type === 'Deposit') return sum;
+        const tenant = allTenantsForReport.find(t => t.id === p.tenantId);
+        if (!tenant) return sum;
+        const property = allPropertiesForReport.find(prop => prop.id === tenant.propertyId);
+        const unit = property?.units.find(u => u.name === tenant.unitName);
+        const breakdown = calculateTransactionBreakdown(p, unit, tenant);
+        return sum + breakdown.managementFee;
       }, 0);
 
       const statsForPDF = [
@@ -136,43 +136,43 @@ export default function DashboardPage() {
         { name: 'Collected This Month', amount: collectedThisMonth },
         { name: 'Total Outstanding', amount: totalOutstanding },
       ];
-      
+
       const rentBreakdownForPDF = (() => {
-          const unitMap = new Map<string, Unit>();
-          allPropertiesForReport.forEach(p => {
-              if (p.units) {
-                  p.units.forEach(u => {
-                      unitMap.set(`${p.id}-${u.name}`, u);
-                  });
-              }
-          });
-          const breakdown: { [key in UnitType]?: { smRent: number, landlordRent: number } } = {};
-          unitTypes.forEach(type => {
-              breakdown[type] = { smRent: 0, landlordRent: 0 };
-          });
-          const rentPayments = allPaymentsForReport.filter(p => p.status === 'Paid' && p.type === 'Rent');
-          rentPayments.forEach(payment => {
-              const tenant = allTenantsForReport.find(t => t.id === payment.tenantId);
-              if (!tenant) return;
-              const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-              if (!unit || !unit.unitType) return;
-              if (breakdown[unit.unitType]) {
-                  if (unit.ownership === 'SM') {
-                      breakdown[unit.unitType]!.smRent += payment.amount;
-                  } else if (unit.ownership === 'Landlord') {
-                      breakdown[unit.unitType]!.landlordRent += payment.amount;
-                  }
-              }
-          });
-          return unitTypes.map(type => ({
-            unitType: type,
-            ...breakdown[type]
-          })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
+        const unitMap = new Map<string, Unit>();
+        allPropertiesForReport.forEach(p => {
+          if (p.units) {
+            p.units.forEach(u => {
+              unitMap.set(`${p.id}-${u.name}`, u);
+            });
+          }
+        });
+        const breakdown: { [key in UnitType]?: { smRent: number, landlordRent: number } } = {};
+        unitTypes.forEach(type => {
+          breakdown[type] = { smRent: 0, landlordRent: 0 };
+        });
+        const rentPayments = allPaymentsForReport.filter(p => p.status === 'Paid' && p.type === 'Rent');
+        rentPayments.forEach(payment => {
+          const tenant = allTenantsForReport.find(t => t.id === payment.tenantId);
+          if (!tenant) return;
+          const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+          if (!unit || !unit.unitType) return;
+          if (breakdown[unit.unitType]) {
+            if (unit.ownership === 'SM') {
+              breakdown[unit.unitType]!.smRent += payment.amount;
+            } else if (unit.ownership === 'Landlord') {
+              breakdown[unit.unitType]!.landlordRent += payment.amount;
+            }
+          }
+        });
+        return unitTypes.map(type => ({
+          unitType: type,
+          ...breakdown[type]
+        })).filter(d => (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
       })();
-      
+
       const maintenanceBreakdownForPDF = (['New', 'In Progress', 'Completed'] as const).map(status => ({
-          status,
-          count: allMaintenanceForReport.filter(r => r.status === status).length
+        status,
+        count: allMaintenanceForReport.filter(r => r.status === status).length
       }));
 
       const orientationCounts: { [key in UnitOrientation]?: number } = {};
@@ -189,12 +189,12 @@ export default function DashboardPage() {
         name: orientation.toLowerCase().replace(/_/g, ' '),
         value: orientationCounts[orientation] || 0,
       })).filter(d => d.value > 0);
-      
+
       generateDashboardReportPDF(statsForPDF, financialDataForPDF, rentBreakdownForPDF, maintenanceBreakdownForPDF, orientationBreakdownForPDF);
     } catch (error) {
-        console.error("Error generating PDF report:", error);
+      console.error("Error generating PDF report:", error);
     } finally {
-        stopLoading();
+      stopLoading();
     }
   }
 
@@ -212,17 +212,17 @@ export default function DashboardPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Welcome, Property Manager</h2>
           <p className="text-sm text-muted-foreground">Here's a summary of your properties today.</p>
         </div>
-         <Button variant="outline" onClick={handleExportPDF} disabled={isLoading}>
+        <Button variant="outline" onClick={handleExportPDF} disabled={isLoading}>
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
           Export PDF Report
         </Button>
       </div>
 
-      <DashboardStats 
-        tenants={tenants} 
-        properties={properties} 
-        maintenanceRequests={maintenanceRequests} 
-        payments={payments} 
+      <DashboardStats
+        tenants={tenants}
+        properties={properties}
+        maintenanceRequests={maintenanceRequests}
+        payments={payments}
       />
 
       <div className="grid gap-8 md:grid-cols-2">
@@ -230,11 +230,11 @@ export default function DashboardPage() {
         <OccupancyOverviewChart properties={properties} tenants={tenants} />
       </div>
 
-       <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
         <OrientationOverviewChart properties={properties} />
       </div>
-      
+
       <div className="grid gap-8">
         <RentBreakdownChart payments={payments} tenants={tenants} properties={properties} />
       </div>
@@ -260,32 +260,32 @@ export default function DashboardPage() {
 
           {selectedProperty ? (
             <div className="space-y-6 pt-6 border-t">
-                <Tabs defaultValue="status-analytics" className="w-full">
-                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
-                        <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
-                        <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
-                        <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="status-analytics">
-                        <StatusAnalytics property={selectedProperty} />
-                    </TabsContent>
-                    <TabsContent value="occupancy-analytics">
-                        <UnitAnalytics property={selectedProperty} tenants={tenants} />
-                    </TabsContent>
-                    <TabsContent value="orientation-analytics">
-                        <OrientationAnalytics property={selectedProperty} tenants={tenants} />
-                    </TabsContent>
-                </Tabs>
+              <Tabs defaultValue="status-analytics" className="w-full">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
+                  <TabsTrigger value="status-analytics">Unit Status</TabsTrigger>
+                  <TabsTrigger value="occupancy-analytics">Occupancy</TabsTrigger>
+                  <TabsTrigger value="orientation-analytics">Orientation</TabsTrigger>
+                </TabsList>
+                <TabsContent value="status-analytics">
+                  <StatusAnalytics property={selectedProperty} />
+                </TabsContent>
+                <TabsContent value="occupancy-analytics">
+                  <UnitAnalytics property={selectedProperty} tenants={tenants} />
+                </TabsContent>
+                <TabsContent value="orientation-analytics">
+                  <OrientationAnalytics property={selectedProperty} tenants={tenants} />
+                </TabsContent>
+              </Tabs>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg text-center">
-                <div className="mx-auto bg-muted p-3 rounded-full mb-4 w-fit">
-                    <Building2 className="h-8 w-8 text-secondary-foreground"/>
-                </div>
-                <h3 className="text-xl font-semibold">Select a Property</h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                  Choose a property from the dropdown above to see its detailed analytics.
-                </p>
+              <div className="mx-auto bg-muted p-3 rounded-full mb-4 w-fit">
+                <Building2 className="h-8 w-8 text-secondary-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold">Select a Property</h3>
+              <p className="text-muted-foreground mt-2 max-w-md">
+                Choose a property from the dropdown above to see its detailed analytics.
+              </p>
             </div>
           )}
         </CardContent>
@@ -324,4 +324,4 @@ export default function DashboardPage() {
   );
 }
 
-    
+

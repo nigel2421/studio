@@ -7,8 +7,15 @@
 export const parseFloorFromUnitName = (unitName: string): string | null => {
     if (!unitName) return null;
 
-    // Case 1: Handle formats like 'A-101', 'GF-01', 'Block A-101'
-    let match = unitName.match(/^(.+?)-/);
+    // Case 1: Handle formats like 'A-101', 'GF-01', 'Block A-101', 'gma-annex-404'
+    // We look for the last dash that is followed by a number (and optional letters)
+    let match = unitName.match(/^(.+)-(\d+.*)$/);
+    if (match && match[1]) {
+        return match[1].trim().toUpperCase();
+    }
+
+    // Fallback for Case 1: if there's only one dash and it's not followed by a number as the start of the part
+    match = unitName.match(/^(.+?)-/);
     if (match && match[1]) {
         return match[1].trim().toUpperCase();
     }
@@ -24,7 +31,7 @@ export const parseFloorFromUnitName = (unitName: string): string | null => {
     if (match && match[1] && match[1].length > 2) {
         return match[1].slice(0, -2);
     }
-    
+
     // Fallback for names that might just be the floor, like 'GMA' if there are no numbers
     // or if the name doesn't fit other patterns (e.g. 'Penthouse')
     if (!/\d/.test(unitName)) {
