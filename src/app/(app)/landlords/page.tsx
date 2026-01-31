@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPay
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
-import { Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2 } from 'lucide-react';
+import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
@@ -16,7 +17,7 @@ import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { PaginationControls } from '@/components/ui/pagination-controls';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -32,7 +33,6 @@ export default function LandlordsPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [selectedLandlord, setSelectedLandlord] = useState<Landlord | null>(null);
   const { toast } = useToast();
@@ -41,9 +41,7 @@ export default function LandlordsPage() {
   const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
-  const [showAllUnassigned, setShowAllUnassigned] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -66,6 +64,23 @@ export default function LandlordsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const landlordManagedProperties = useMemo(() => {
+    const propertyIds = new Set<string>();
+    properties.forEach(p => {
+      if (p.units.some(u => u.ownership === 'Landlord' && u.managementStatus !== 'Client Managed')) {
+        propertyIds.add(p.id);
+      }
+      if (p.units.some(u => u.ownership === 'SM')) {
+        propertyIds.add(p.id);
+      }
+    });
+    return properties.filter(p => propertyIds.has(p.id));
+  }, [properties]);
+  
+  const selectedProperty = useMemo(() => {
+    return properties.find(p => p.id === selectedPropertyId) || null;
+  }, [selectedPropertyId, properties]);
 
   const { landlordUnitsMap, unassignedLandlordUnits, clientOnlyLandlordIds } = useMemo(() => {
     const map = new Map<string, (Unit & { propertyName: string; propertyId: string })[]>();
@@ -106,6 +121,45 @@ export default function LandlordsPage() {
 
     return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned, clientOnlyLandlordIds: clientIds };
   }, [properties]);
+
+  const landlordsForSelectedProperty = useMemo(() => {
+    if (!selectedPropertyId) return [];
+
+    const landlordIdsInProperty = new Set<string>();
+    const property = properties.find(p => p.id === selectedPropertyId);
+    if(property){
+        property.units.forEach(unit => {
+            if (unit.landlordId) {
+                landlordIdsInProperty.add(unit.landlordId);
+            }
+        });
+    }
+    
+    const smUnitsInProperty = property?.units.some(u => u.ownership === 'SM');
+    if (smUnitsInProperty) {
+      landlordIdsInProperty.add(SOIL_MERCHANTS_LANDLORD.id);
+    }
+
+    return landlords.filter(l => landlordIdsInProperty.has(l.id));
+  }, [selectedPropertyId, properties, landlords]);
+
+  const totalInvestorLandlords = useMemo(() => {
+    return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id && !clientOnlyLandlordIds.has(l.id)).length;
+  }, [landlords, clientOnlyLandlordIds]);
+
+  const totalManagedUnits = useMemo(() => {
+    let count = 0;
+    properties.forEach(p => {
+        count += p.units.filter(u => u.ownership === 'Landlord' && u.managementStatus !== 'Client Managed').length;
+        count += p.units.filter(u => u.ownership === 'SM').length;
+    });
+    return count;
+  }, [properties]);
+  
+  const unassignedUnitsForSelectedProperty = useMemo(() => {
+      if (!selectedPropertyId) return [];
+      return unassignedLandlordUnits.filter(u => u.propertyId === selectedPropertyId);
+  }, [unassignedLandlordUnits, selectedPropertyId]);
 
   const handleOpenDialog = (landlord: Landlord | null) => {
     if (landlord?.id === SOIL_MERCHANTS_LANDLORD.id) {
@@ -215,16 +269,6 @@ export default function LandlordsPage() {
     }
   };
   
-  const filteredLandlords = landlords
-    .filter(l => !clientOnlyLandlordIds.has(l.id))
-    .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  const totalPages = Math.ceil(filteredLandlords.length / pageSize);
-  const paginatedLandlords = filteredLandlords.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -233,15 +277,6 @@ export default function LandlordsPage() {
           <p className="text-muted-foreground">Manage landlords whose units are managed by Eracov.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search landlords..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
           <Button onClick={() => handleOpenDialog(null)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Landlord
@@ -250,100 +285,138 @@ export default function LandlordsPage() {
         </div>
       </div>
 
-      {unassignedLandlordUnits.length > 0 && (
-        <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardHeader>
-            <CardTitle className="text-amber-700">Unassigned Landlord Units</CardTitle>
-            <CardDescription className="text-amber-600">
-              These units are owned by landlords but are not yet assigned to a landlord profile.
-            </CardDescription>
+       <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Investor Landlords</CardTitle>
+            <Users2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {(showAllUnassigned ? unassignedLandlordUnits : unassignedLandlordUnits.slice(0, 18)).map((unit, index) => (
-                <div key={index} className="px-3 py-1 text-xs font-semibold rounded-full bg-white border shadow-sm">
-                  {unit.propertyName}: Unit {unit.name}
-                </div>
-              ))}
-            </div>
-            {unassignedLandlordUnits.length > 18 && (
-              <div className="mt-4">
-                <Button variant="link" className="p-0 h-auto text-xs text-amber-700 hover:text-amber-800" onClick={() => setShowAllUnassigned(!showAllUnassigned)}>
-                  {showAllUnassigned ? 'Show Less' : `... and ${unassignedLandlordUnits.length - 18} more`}
-                </Button>
-              </div>
-            )}
+            <div className="text-2xl font-bold">{totalInvestorLandlords}</div>
           </CardContent>
         </Card>
-      )}
-
-      {isLoading && landlords.length === 0 ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Managed Units</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalManagedUnits}</div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Select Property</CardTitle>
+            <CardDescription>Choose a property to view its associated landlords and unassigned units.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Select onValueChange={setSelectedPropertyId} value={selectedPropertyId || ''}>
+                <SelectTrigger className="w-full md:w-[300px]">
+                    <SelectValue placeholder="Select a property..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {landlordManagedProperties.map(property => (
+                        <SelectItem key={property.id} value={property.id}>
+                            {property.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </CardContent>
+      </Card>
+      
+      {selectedPropertyId ? (
         <>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {paginatedLandlords.map((landlord) => {
-              const assignedUnits = landlordUnitsMap.get(landlord.id) || [];
-              const unitsToShow = assignedUnits.slice(0, 9);
-              const hiddenUnitCount = assignedUnits.length - unitsToShow.length;
-
-              return (
-                <Card key={landlord.id} className="flex flex-col">
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {unassignedUnitsForSelectedProperty.length > 0 && (
+                <Card className="border-amber-500/20 bg-amber-500/5">
                   <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{landlord.name}</CardTitle>
-                        <CardDescription>{landlord.email}</CardDescription>
-                        <CardDescription>{landlord.phone}</CardDescription>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
-                        <Edit className="h-4 w-4 mr-2" /> Edit
-                      </Button>
-                    </div>
+                    <CardTitle className="text-amber-700">Unassigned Landlord Units</CardTitle>
+                    <CardDescription className="text-amber-600">
+                      These units in {selectedProperty?.name} are not yet assigned to a landlord profile.
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-grow">
-                    {assignedUnits.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 pt-4 border-t">
-                        {unitsToShow.map((unit, index) => (
-                          <Badge variant="secondary" key={index} className="font-normal">
-                            {unit.propertyName}: Unit {unit.name}
-                          </Badge>
-                        ))}
-                        {hiddenUnitCount > 0 && (
-                            <Badge variant="outline">
-                                +{hiddenUnitCount} more
-                            </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned yet.</p>
-                    )}
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {unassignedUnitsForSelectedProperty.map((unit, index) => (
+                        <div key={index} className="px-3 py-1 text-xs font-semibold rounded-full bg-white border shadow-sm">
+                          Unit {unit.name}
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
-                  <CardFooter>
-                      <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
-                          <FileDown className="mr-2 h-4 w-4" />
-                          Generate Statement
-                      </Button>
-                  </CardFooter>
                 </Card>
-              )
-            })}
-          </div>
-          {totalPages > 1 && (
-            <div className="mt-6">
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalItems={filteredLandlords.length}
-                  onPageChange={setCurrentPage}
-                  onPageSizeChange={setPageSize}
-                />
+              )}
+
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {landlordsForSelectedProperty.map((landlord) => {
+                  const assignedUnits = (landlordUnitsMap.get(landlord.id) || []).filter(u => u.propertyId === selectedPropertyId);
+                  const unitsToShow = assignedUnits.slice(0, 9);
+                  const hiddenUnitCount = assignedUnits.length - unitsToShow.length;
+
+                  return (
+                    <Card key={landlord.id} className="flex flex-col">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle>{landlord.name}</CardTitle>
+                            <CardDescription>{landlord.email}</CardDescription>
+                            <CardDescription>{landlord.phone}</CardDescription>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
+                            <Edit className="h-4 w-4 mr-2" /> Edit
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        {assignedUnits.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 pt-4 border-t">
+                            {unitsToShow.map((unit, index) => (
+                              <Badge variant="secondary" key={index} className="font-normal">
+                                Unit {unit.name}
+                              </Badge>
+                            ))}
+                            {hiddenUnitCount > 0 && (
+                                <Badge variant="outline">
+                                    +{hiddenUnitCount} more
+                                </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned in this property.</p>
+                        )}
+                      </CardContent>
+                      <CardFooter>
+                          <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
+                              <FileDown className="mr-2 h-4 w-4" />
+                              Generate Statement
+                          </Button>
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
+                 {landlordsForSelectedProperty.length === 0 && !isLoading && (
+                    <div className="md:col-span-3 text-center py-10">
+                        <p className="text-muted-foreground">No landlords found for {selectedProperty?.name}.</p>
+                    </div>
+                 )}
+              </div>
             </div>
           )}
         </>
+      ) : (
+        <div className="text-center py-16 border-dashed border-2 rounded-lg bg-muted/20">
+          <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-semibold">No Property Selected</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Please select a property from the dropdown above to view its details.</p>
+        </div>
       )}
 
       {isManageDialogOpen && (
@@ -367,3 +440,5 @@ export default function LandlordsPage() {
     </div>
   );
 }
+
+    
