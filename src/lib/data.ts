@@ -404,7 +404,7 @@ export async function createUserProfile(userId: string, email: string, role: Use
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
     const userProfileRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(docSnap.ref);
+    const docSnap = await getDoc(userProfileRef);
     if (docSnap.exists()) {
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
