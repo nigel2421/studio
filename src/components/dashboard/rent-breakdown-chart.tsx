@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -52,11 +51,11 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
     return unitTypes.map(type => ({
       unitType: type,
       ...breakdown[type]
-    })).filter(d => d.unitType === 'Studio' || (d.smRent ?? 0) > 0 || (d.landlordRent ?? 0) > 0);
+    }));
 
   }, [payments, tenants, properties]);
 
-  if (chartData.length === 0) {
+  if (chartData.reduce((sum, d) => sum + (d.smRent ?? 0) + (d.landlordRent ?? 0), 0) === 0) {
       return (
         <Card>
             <CardHeader>
