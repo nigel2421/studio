@@ -6,25 +6,14 @@
  */
 export const parseFloorFromUnitName = (unitName: string): string | null => {
     if (!unitName) return null;
-
-    // Handles 'A-101' -> 'A', 'GF-01' -> 'GF'
-    const hyphenMatch = unitName.match(/^([A-Za-z0-9]+)-/);
-    if (hyphenMatch) {
-        return hyphenMatch[1].toUpperCase();
+    // Simple logic: returns the first character if it's a letter (e.g., 'A' from 'A101')
+    const match = unitName.match(/^[A-Za-z]+/);
+    if (match) {
+        return match[0].toUpperCase();
     }
-
-    // Handles 'A101' -> 'A', 'GF01' -> 'GF'
-    const alphaPrefixMatch = unitName.match(/^([A-Za-z]+)\d+/);
-    if (alphaPrefixMatch) {
-        return alphaPrefixMatch[1].toUpperCase();
+    // Tries to get the floor from a numeric name like '1405' -> '14'
+    if (/^\d{3,}/.test(unitName)) {
+        return unitName.slice(0, -2);
     }
-
-    // Handles '1405' -> '14' (for purely numeric names with 3+ digits)
-    const numericMatch = unitName.match(/^(\d{3,})/);
-    if (numericMatch) {
-        const numPart = numericMatch[1];
-        return numPart.substring(0, numPart.length - 2);
-    }
-
-    return null; // No floor pattern detected
+    return null;
 };

@@ -78,11 +78,6 @@ service cloud.firestore {
     match /properties/{propertyId} {
       allow read: if isAdmin() || isAgent();
       allow write: if isAdmin() || isAgent();
-      
-      match /units/{unitId} {
-        allow read: if isAdmin() || isAgent();
-        allow write: if isAdmin() || isAgent();
-      }
     }
   }
 }

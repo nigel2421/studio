@@ -94,19 +94,7 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
 }
 
 export async function getProperties(): Promise<Property[]> {
-    const propertiesCol = collection(db, 'properties');
-    const propertiesSnapshot = await getDocs(propertiesCol);
-    
-    const propertiesData = propertiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-
-    const propertiesWithUnits = await Promise.all(
-        propertiesData.map(async (prop) => {
-            const unitsCol = collection(db, `properties/${prop.id}/units`);
-            const unitsSnapshot = await getDocs(unitsCol);
-            const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
-            return { ...prop, units: units || [] };
-        })
-    );
+    const properties = await getCollection<Property>('properties');
     
     const desiredOrder = [
         'Midtown Apartments',
@@ -114,7 +102,7 @@ export async function getProperties(): Promise<Property[]> {
         'Grand Midtown Annex Apartments',
     ];
 
-    const sortedProperties = propertiesWithUnits.sort((a, b) => {
+    const sortedProperties = properties.sort((a, b) => {
         const indexA = desiredOrder.indexOf(a.name);
         const indexB = desiredOrder.indexOf(b.name);
 
@@ -162,19 +150,7 @@ export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceR
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
-    const docRef = doc(db, 'properties', id);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        const propData = { id: docSnap.id, ...docSnap.data() } as Property;
-        
-        const unitsCol = collection(db, `properties/${id}/units`);
-        const unitsSnapshot = await getDocs(unitsCol);
-        const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
-        propData.units = units || [];
-        
-        return propData;
-    }
-    return null;
+    return getDocument<Property>('properties', id);
 }
 
 export async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
@@ -269,8 +245,10 @@ export async function addTenant(data: {
     await logActivity(`Created tenant: ${name} (${email})`);
 
     // Update unit status to 'rented'
-    const unitRef = doc(db, `properties/${propertyId}/units`, unitName);
-    await updateDoc(unitRef, { status: 'rented' });
+    const updatedUnits = property.units.map(u => 
+        u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
+    );
+    await updateProperty(propertyId, { units: updatedUnits });
     
     await logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
 
@@ -305,53 +283,18 @@ export async function addTenant(data: {
 }
 
 export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
-    const newDocRef = doc(collection(db, "properties"));
-    const { units, ...propertyData } = property;
     const newPropertyData = {
-        name: property.name,
-        address: property.address,
-        type: property.type,
+        ...property,
         imageId: `property-${Math.floor(Math.random() * 3) + 1}`,
     };
     
-    const batch = writeBatch(db);
-    batch.set(newDocRef, newPropertyData);
-
-    if (units && units.length > 0) {
-        units.forEach(unit => {
-            const unitRef = doc(db, `properties/${newDocRef.id}/units`, unit.name);
-            batch.set(unitRef, unit); 
-        });
-    }
-
-    await batch.commit();
+    await addDoc(collection(db, "properties"), newPropertyData);
     await logActivity(`Added new property: ${property.name}`);
 }
 
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
     const propertyRef = doc(db, 'properties', propertyId);
-    const { units, ...propertyData } = data;
-
-    const batch = writeBatch(db);
-    
-    if (Object.keys(propertyData).length > 0) {
-        batch.update(propertyRef, propertyData);
-    }
-    
-    if (units) {
-        const unitsColRef = collection(db, `properties/${propertyId}/units`);
-        const existingUnitsSnap = await getDocs(unitsColRef);
-        existingUnitsSnap.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        
-        units.forEach(unit => {
-            const unitRef = doc(db, `properties/${propertyId}/units`, unit.name);
-            batch.set(unitRef, unit);
-        });
-    }
-
-    await batch.commit();
+    await updateDoc(propertyRef, data);
     await logActivity(`Updated property: ID ${propertyId}`);
 }
 
@@ -366,8 +309,16 @@ export async function archiveTenant(tenantId: string): Promise<void> {
         batch.delete(tenantRef);
         await batch.commit();
 
-        const unitRef = doc(db, `properties/${tenant.propertyId}/units`, tenant.unitName);
-        await updateDoc(unitRef, { status: 'vacant' });
+        const propertyRef = doc(db, 'properties', tenant.propertyId);
+        const propertySnap = await getDoc(propertyRef);
+        if (propertySnap.exists()) {
+            const propertyData = propertySnap.data() as Property;
+            const updatedUnits = propertyData.units.map(u => 
+                u.name === tenant.unitName ? { ...u, status: 'vacant' } : u
+            );
+            await updateDoc(propertyRef, { units: updatedUnits });
+        }
+
 
         await logActivity(`Archived resident: ${tenant.name}`);
     }
@@ -382,13 +333,27 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
 
     if (oldTenant && (oldTenant.propertyId !== tenantData.propertyId || oldTenant.unitName !== tenantData.unitName)) {
         // Mark old unit as vacant
-        const oldUnitRef = doc(db, `properties/${oldTenant.propertyId}/units`, oldTenant.unitName);
-        await updateDoc(oldUnitRef, { status: 'vacant' });
+        const oldPropRef = doc(db, 'properties', oldTenant.propertyId);
+        const oldPropSnap = await getDoc(oldPropRef);
+        if (oldPropSnap.exists()) {
+            const oldPropData = oldPropSnap.data() as Property;
+            const updatedOldUnits = oldPropData.units.map(u => 
+                u.name === oldTenant.unitName ? { ...u, status: 'vacant' } : u
+            );
+            await updateDoc(oldPropRef, { units: updatedOldUnits });
+        }
 
         // Mark new unit as rented
         if (tenantData.propertyId && tenantData.unitName) {
-            const newUnitRef = doc(db, `properties/${tenantData.propertyId}/units`, tenantData.unitName);
-            await updateDoc(newUnitRef, { status: 'rented' });
+            const newPropRef = doc(db, 'properties', tenantData.propertyId);
+            const newPropSnap = await getDoc(newPropRef);
+            if (newPropSnap.exists()) {
+                const newPropData = newPropSnap.data() as Property;
+                const updatedNewUnits = newPropData.units.map(u => 
+                    u.name === tenantData.unitName ? { ...u, status: 'rented' } : u
+                );
+                await updateDoc(newPropRef, { units: updatedNewUnits });
+            }
         }
     }
 }
@@ -544,13 +509,25 @@ export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
 }
 
 export async function getPropertyWaterReadings(propertyId: string): Promise<WaterMeterReading[]> {
-    const q = query(
-        collection(db, 'waterReadings'),
-        where('propertyId', '==', propertyId),
-        orderBy('date', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    const property = await getProperty(propertyId);
+    if (!property) return [];
+    const unitNames = property.units.map(u => u.name);
+    
+    const readings: WaterMeterReading[] = [];
+    // Firestore 'in' query is limited to 30 items
+    for (let i = 0; i < unitNames.length; i += 30) {
+        const chunk = unitNames.slice(i, i + 30);
+        const q = query(
+            collection(db, 'waterReadings'),
+            where('propertyId', '==', propertyId),
+            where('unitName', 'in', chunk),
+            orderBy('date', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        readings.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading)));
+    }
+    
+    return readings;
 }
 
 export async function getPropertyMaintenanceRequests(propertyId: string): Promise<MaintenanceRequest[]> {
@@ -787,7 +764,7 @@ export async function bulkUpdateUnitsFromCSV(
     }
 
     const unitsMap = new Map(property.units.map(u => [u.name, u]));
-    const batch = writeBatch(db);
+    const updatedUnits = [...property.units];
 
     for (const [index, row] of data.entries()) {
         const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge } = row;
@@ -840,10 +817,9 @@ export async function bulkUpdateUnitsFromCSV(
             unitData.serviceCharge = charge;
         }
 
-        const unitRef = doc(db, `properties/${propertyId}/units`, UnitName);
-
-        if (unitsMap.has(UnitName)) {
-            batch.update(unitRef, unitData);
+        const unitIndex = updatedUnits.findIndex(u => u.name === UnitName);
+        if (unitIndex !== -1) {
+            updatedUnits[unitIndex] = { ...updatedUnits[unitIndex], ...unitData };
             updatedCount++;
         } else {
             const newUnit: Unit = {
@@ -853,7 +829,7 @@ export async function bulkUpdateUnitsFromCSV(
                 unitType: (unitData.unitType || 'Studio') as UnitType,
                 ...unitData,
             };
-            batch.set(unitRef, newUnit);
+            updatedUnits.push(newUnit);
             createdCount++;
         }
     }
@@ -863,7 +839,7 @@ export async function bulkUpdateUnitsFromCSV(
     }
 
     if (updatedCount > 0 || createdCount > 0) {
-        await batch.commit();
+        await updateProperty(propertyId, { units: updatedUnits });
         await logActivity(`Bulk processed ${updatedCount} updates and ${createdCount} creations for property ${property.name} via CSV.`);
     }
 
@@ -1119,21 +1095,31 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
 
     const properties = await getProperties();
     for (const prop of properties) {
-        for (const unit of prop.units) {
-            if (unit.ownership !== 'Landlord') continue;
-
-            const unitRef = doc(db, `properties/${prop.id}/units`, unit.name);
+        let needsUpdate = false;
+        const newUnits = prop.units.map(unit => {
+            if (unit.ownership !== 'Landlord') return unit;
             
-            if (assignedUnitNames.includes(unit.name)) {
-                if (unit.landlordId !== landlord.id) {
-                    batch.update(unitRef, { landlordId: landlord.id });
-                }
-            } 
-            else if (unit.landlordId === landlord.id) {
-                batch.update(unitRef, { landlordId: deleteField() });
+            const shouldBeAssigned = assignedUnitNames.includes(unit.name);
+            const isAssigned = unit.landlordId === landlord.id;
+
+            if (shouldBeAssigned && !isAssigned) {
+                needsUpdate = true;
+                return { ...unit, landlordId: landlord.id };
             }
+            if (!shouldBeAssigned && isAssigned) {
+                needsUpdate = true;
+                const { landlordId, ...rest } = unit; // Remove landlordId
+                return rest as Unit;
+            }
+            return unit;
+        });
+
+        if (needsUpdate) {
+            const propRef = doc(db, 'properties', prop.id);
+            batch.update(propRef, { units: newUnits });
         }
     }
+
 
     await batch.commit();
     await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
@@ -1364,17 +1350,8 @@ export async function getTasks(): Promise<Task[]> {
 // Real-time listener functions
 export function listenToProperties(callback: (properties: Property[]) => void): () => void {
     const q = query(collection(db, 'properties'));
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        const propertiesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-        
-        const propertiesWithUnits = await Promise.all(
-            propertiesData.map(async (prop) => {
-                const unitsCol = collection(db, `properties/${prop.id}/units`);
-                const unitsSnapshot = await getDocs(unitsCol);
-                const units = unitsSnapshot.docs.map(doc => (doc.data() as Unit));
-                return { ...prop, units: units || [] };
-            })
-        );
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
         
         const desiredOrder = [
             'Midtown Apartments',
@@ -1382,7 +1359,7 @@ export function listenToProperties(callback: (properties: Property[]) => void): 
             'Grand Midtown Annex Apartments',
         ];
 
-        const sortedProperties = propertiesWithUnits.sort((a, b) => {
+        const sortedProperties = properties.sort((a, b) => {
             const indexA = desiredOrder.indexOf(a.name);
             const indexB = desiredOrder.indexOf(b.name);
 
