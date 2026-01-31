@@ -77,7 +77,7 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} stackOffset="sign">
+          <BarChart data={chartData}>
             <XAxis
               dataKey="unitType"
               stroke="#888888"
@@ -97,8 +97,8 @@ export function RentBreakdownChart({ payments, tenants, properties }: RentBreakd
                 cursor={{fill: 'hsl(var(--muted))'}}
              />
             <Legend wrapperStyle={{ fontSize: '12px' }} />
-            <Bar dataKey="smRent" name="SM Units" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="landlordRent" name="Landlord Units" stackId="a" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="smRent" name="SM Units" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="landlordRent" name="Landlord Units" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
