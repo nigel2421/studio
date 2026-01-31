@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Landlord, Property, Unit } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { useLoading } from '@/hooks/useLoading';
@@ -35,6 +34,7 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
   const [phone, setPhone] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const { isLoading, startLoading, stopLoading } = useLoading();
   
   const allLandlordOwnedUnits = useMemo(() => {
@@ -46,25 +46,40 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
   }, [properties]);
   
   useEffect(() => {
-    if (landlord) {
-      setName(landlord.name || '');
-      setEmail(landlord.email || '');
-      setPhone(landlord.phone || '');
-      setBankAccount(landlord.bankAccount || '');
-      // Pre-select units already assigned to this landlord
-      const currentlyAssigned = allLandlordOwnedUnits
-        .filter(u => u.landlordId === landlord.id)
-        .map(u => u.name);
-      setSelectedUnits(currentlyAssigned);
-    } else {
-      // Reset for new landlord
-      setName('');
-      setEmail('');
-      setPhone('');
-      setBankAccount('');
-      setSelectedUnits([]);
+    if (isOpen) {
+      if (landlord) {
+        setName(landlord.name || '');
+        setEmail(landlord.email || '');
+        setPhone(landlord.phone || '');
+        setBankAccount(landlord.bankAccount || '');
+        // Pre-select units already assigned to this landlord
+        const currentlyAssigned = allLandlordOwnedUnits
+          .filter(u => u.landlordId === landlord.id)
+          .map(u => u.name);
+        setSelectedUnits(currentlyAssigned);
+      } else {
+        // Reset for new landlord
+        setName('');
+        setEmail('');
+        setPhone('');
+        setBankAccount('');
+        setSelectedUnits([]);
+      }
+      setUnitSearchTerm('');
     }
-  }, [landlord, allLandlordOwnedUnits]);
+  }, [landlord, isOpen, allLandlordOwnedUnits]);
+
+  const filteredUnits = useMemo(() => {
+    if (!unitSearchTerm) {
+        return allLandlordOwnedUnits;
+    }
+    const lowercasedFilter = unitSearchTerm.toLowerCase();
+    return allLandlordOwnedUnits.filter(unit =>
+        unit.name.toLowerCase().includes(lowercasedFilter) ||
+        unit.propertyName.toLowerCase().includes(lowercasedFilter)
+    );
+  }, [allLandlordOwnedUnits, unitSearchTerm]);
+
 
   const handleUnitToggle = (unitName: string) => {
     setSelectedUnits(prev =>
@@ -123,11 +138,20 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
               <Label htmlFor="bank-account">Bank Account Details</Label>
               <Input id="bank-account" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-4">
               <Label>Assign Landlord Units</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Search units or properties..."
+                    className="pl-9"
+                    value={unitSearchTerm}
+                    onChange={(e) => setUnitSearchTerm(e.target.value)}
+                />
+              </div>
               <ScrollArea className="h-40 rounded-md border p-4">
                 <div className="space-y-2">
-                  {allLandlordOwnedUnits.map(unit => {
+                  {filteredUnits.map(unit => {
                     const isAssignedToOther = !!(unit.landlordId && landlord?.id !== unit.landlordId);
                     const otherLandlord = isAssignedToOther ? allLandlords.find(l => l.id === unit.landlordId) : null;
                     
