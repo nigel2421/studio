@@ -473,10 +473,10 @@ describe('Financial Logic Functions', () => {
             const summary = aggregateFinancials(payments, mockTenants, [{ property: mockProperty, units: mockProperty.units }]);
     
             expect(summary.totalRevenue).toBe(60000);
-            expect(summary.totalManagementFees).toBe(3000);
-            expect(summary.totalServiceCharges).toBe(8000);
-            expect(summary.vacantUnitServiceChargeDeduction).toBe(4500);
-            expect(summary.totalNetRemittance).toBe(44500); 
+            expect(summary.totalManagementFees).toBe(3000); // 1k (5% of 20k) + 2k (5% of 40k)
+            expect(summary.totalServiceCharges).toBe(8000); // 3k + 5k
+            expect(summary.vacantUnitServiceChargeDeduction).toBe(4500); // Only C3
+            expect(summary.totalNetRemittance).toBe(44500); // 60k - 8k - 3k - 4.5k
         });
     
         it('should handle first-month commission correctly in aggregation', () => {
@@ -484,7 +484,8 @@ describe('Financial Logic Functions', () => {
                 name: 'F1', 
                 managementStatus: 'Rented for Clients', 
                 rentAmount: 50000, 
-                serviceCharge: 6000 
+                serviceCharge: 6000,
+                propertyId: 'prop-1',
             });
             const firstMonthTenant = createMockTenant({ 
                 id: 't-F1', 
@@ -502,7 +503,7 @@ describe('Financial Logic Functions', () => {
             
             expect(summary.totalRevenue).toBe(50000);
             expect(summary.totalServiceCharges).toBe(0);
-            expect(summary.totalManagementFees).toBe(25000);
+            expect(summary.totalManagementFees).toBe(25000); // 50% commission
             expect(summary.vacantUnitServiceChargeDeduction).toBe(0);
             expect(summary.totalNetRemittance).toBe(25000);
         });
