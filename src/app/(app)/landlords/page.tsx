@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -18,6 +17,7 @@ import { StatementOptionsDialog } from '@/components/financials/statement-option
 import { isWithinInterval } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -43,6 +43,11 @@ export default function LandlordsPage() {
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
+  // New state for pagination and unassigned units view
+  const [showAllUnassigned, setShowAllUnassigned] = useState(false);
+  const [landlordCurrentPage, setLandlordCurrentPage] = useState(1);
+  const [landlordPageSize, setLandlordPageSize] = useState(6);
+
   const fetchData = () => {
     startLoading('Loading property data...');
     Promise.all([
@@ -64,6 +69,11 @@ export default function LandlordsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Reset pagination when property changes
+  useEffect(() => {
+    setLandlordCurrentPage(1);
+  }, [selectedPropertyId]);
 
   const landlordManagedProperties = useMemo(() => {
     const propertyIds = new Set<string>();
@@ -160,6 +170,22 @@ export default function LandlordsPage() {
       if (!selectedPropertyId) return [];
       return unassignedLandlordUnits.filter(u => u.propertyId === selectedPropertyId);
   }, [unassignedLandlordUnits, selectedPropertyId]);
+
+  const paginatedLandlords = useMemo(() => {
+    const start = (landlordCurrentPage - 1) * landlordPageSize;
+    return landlordsForSelectedProperty.slice(start, start + landlordPageSize);
+  }, [landlordsForSelectedProperty, landlordCurrentPage, landlordPageSize]);
+
+  const landlordTotalPages = Math.ceil(landlordsForSelectedProperty.length / landlordPageSize);
+
+  const unassignedUnitsToShow = useMemo(() => {
+      const PREVIEW_COUNT = 14;
+      if (showAllUnassigned || unassignedUnitsForSelectedProperty.length <= PREVIEW_COUNT) {
+          return unassignedUnitsForSelectedProperty;
+      }
+      return unassignedUnitsForSelectedProperty.slice(0, PREVIEW_COUNT);
+  }, [unassignedUnitsForSelectedProperty, showAllUnassigned]);
+
 
   const handleOpenDialog = (landlord: Landlord | null) => {
     if (landlord?.id === SOIL_MERCHANTS_LANDLORD.id) {
@@ -344,69 +370,92 @@ export default function LandlordsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {unassignedUnitsForSelectedProperty.map((unit, index) => (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {unassignedUnitsToShow.map((unit, index) => (
                         <div key={index} className="px-3 py-1 text-xs font-semibold rounded-full bg-white border shadow-sm">
                           Unit {unit.name}
                         </div>
                       ))}
+                       {unassignedUnitsForSelectedProperty.length > unassignedUnitsToShow.length && (
+                          <Button variant="link" className="text-amber-700 h-auto p-1 text-xs" onClick={() => setShowAllUnassigned(true)}>
+                              ...and {unassignedUnitsForSelectedProperty.length - unassignedUnitsToShow.length} more
+                          </Button>
+                       )}
+                       {showAllUnassigned && unassignedUnitsForSelectedProperty.length > 14 && (
+                           <Button variant="link" className="text-amber-700 h-auto p-1 text-xs" onClick={() => setShowAllUnassigned(false)}>
+                               Show Less
+                           </Button>
+                       )}
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {landlordsForSelectedProperty.map((landlord) => {
-                  const assignedUnits = (landlordUnitsMap.get(landlord.id) || []).filter(u => u.propertyId === selectedPropertyId);
-                  const unitsToShow = assignedUnits.slice(0, 9);
-                  const hiddenUnitCount = assignedUnits.length - unitsToShow.length;
+              <div className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {paginatedLandlords.map((landlord) => {
+                    const assignedUnits = (landlordUnitsMap.get(landlord.id) || []).filter(u => u.propertyId === selectedPropertyId);
+                    const unitsToShow = assignedUnits.slice(0, 9);
+                    const hiddenUnitCount = assignedUnits.length - unitsToShow.length;
 
-                  return (
-                    <Card key={landlord.id} className="flex flex-col">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle>{landlord.name}</CardTitle>
-                            <CardDescription>{landlord.email}</CardDescription>
-                            <CardDescription>{landlord.phone}</CardDescription>
+                    return (
+                      <Card key={landlord.id} className="flex flex-col">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle>{landlord.name}</CardTitle>
+                              <CardDescription>{landlord.email}</CardDescription>
+                              <CardDescription>{landlord.phone}</CardDescription>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
-                            <Edit className="h-4 w-4 mr-2" /> Edit
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex-grow">
-                        {assignedUnits.length > 0 ? (
-                          <div className="flex flex-wrap gap-2 pt-4 border-t">
-                            {unitsToShow.map((unit, index) => (
-                              <Badge variant="secondary" key={index} className="font-normal">
-                                Unit {unit.name}
-                              </Badge>
-                            ))}
-                            {hiddenUnitCount > 0 && (
-                                <Badge variant="outline">
-                                    +{hiddenUnitCount} more
+                        </CardHeader>
+                        <CardContent className="flex-grow">
+                          {assignedUnits.length > 0 ? (
+                            <div className="flex flex-wrap gap-2 pt-4 border-t">
+                              {unitsToShow.map((unit, index) => (
+                                <Badge variant="secondary" key={index} className="font-normal">
+                                  Unit {unit.name}
                                 </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned in this property.</p>
-                        )}
-                      </CardContent>
-                      <CardFooter>
-                          <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
-                              <FileDown className="mr-2 h-4 w-4" />
-                              Generate Statement
-                          </Button>
-                      </CardFooter>
-                    </Card>
-                  )
-                })}
-                 {landlordsForSelectedProperty.length === 0 && !isLoading && (
-                    <div className="md:col-span-3 text-center py-10">
-                        <p className="text-muted-foreground">No landlords found for {selectedProperty?.name}.</p>
-                    </div>
-                 )}
+                              ))}
+                              {hiddenUnitCount > 0 && (
+                                  <Badge variant="outline">
+                                      +{hiddenUnitCount} more
+                                  </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4 border-t">No units assigned in this property.</p>
+                          )}
+                        </CardContent>
+                        <CardFooter>
+                            <Button className="w-full" variant="outline" onClick={() => { setLandlordForStatement(landlord); setIsStatementDialogOpen(true); }}>
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Generate Statement
+                            </Button>
+                        </CardFooter>
+                      </Card>
+                    )
+                  })}
+                  {landlordsForSelectedProperty.length === 0 && !isLoading && (
+                      <div className="md:col-span-3 text-center py-10">
+                          <p className="text-muted-foreground">No landlords found for {selectedProperty?.name}.</p>
+                      </div>
+                  )}
+                </div>
+
+                {landlordTotalPages > 1 && (
+                  <PaginationControls
+                    currentPage={landlordCurrentPage}
+                    totalPages={landlordTotalPages}
+                    pageSize={landlordPageSize}
+                    totalItems={landlordsForSelectedProperty.length}
+                    onPageChange={setLandlordCurrentPage}
+                    onPageSizeChange={setLandlordPageSize}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -440,5 +489,3 @@ export default function LandlordsPage() {
     </div>
   );
 }
-
-    
