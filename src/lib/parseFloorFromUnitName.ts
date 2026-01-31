@@ -6,14 +6,37 @@
  */
 export const parseFloorFromUnitName = (unitName: string): string | null => {
     if (!unitName) return null;
-    // Simple logic: returns the first character if it's a letter (e.g., 'A' from 'A101')
-    const match = unitName.match(/^[A-Za-z]+/);
-    if (match) {
-        return match[0].toUpperCase();
+
+    // Case 1: Handle formats like 'A-101', 'GF-01', 'Block A-101'
+    let match = unitName.match(/^(.+?)-/);
+    if (match && match[1]) {
+        return match[1].trim().toUpperCase();
     }
-    // Tries to get the floor from a numeric name like '1405' -> '14'
-    if (/^\d{3,}/.test(unitName)) {
-        return unitName.slice(0, -2);
+
+    // Case 2: Handle formats like 'A101', 'GF101' (letters followed by numbers)
+    match = unitName.match(/^([a-zA-Z\s]+)(\d+.*)/);
+    if (match && match[1]) {
+        return match[1].trim().toUpperCase();
     }
+
+    // Case 3: Handle numeric formats like '1405' -> '14'
+    match = unitName.match(/^(\d{3,})$/);
+    if (match && match[1] && match[1].length > 2) {
+        return match[1].slice(0, -2);
+    }
+    
+    // Fallback for names that might just be the floor, like 'GMA' if there are no numbers
+    // or if the name doesn't fit other patterns (e.g. 'Penthouse')
+    if (!/\d/.test(unitName)) {
+        return unitName.toUpperCase();
+    }
+
+    // Fallback for any other pattern not yet caught e.g. GMA101
+    const letterPrefix = unitName.match(/^[A-Za-z]+/);
+    if (letterPrefix) {
+        return letterPrefix[0].toUpperCase();
+    }
+
+    // If all else fails, return null
     return null;
 };

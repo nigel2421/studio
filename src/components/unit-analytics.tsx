@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from './ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { parseFloorFromUnitName } from '@/lib/parseFloorFromUnitName';
 
 type FloorAnalyticsData = {
@@ -74,20 +74,26 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
 
         floorData.totalUnits++;
 
-        const tenant = tenants.find(t => t.propertyId === property.id && t.unitName === unit.name);
-
-        if (tenant) {
-          if (tenant.residentType === 'Homeowner') {
+        // Logic now primarily relies on the unit's own status field for accuracy
+        switch (unit.status) {
+          case 'vacant':
+            floorData.vacant++;
+            break;
+          case 'client occupied':
             floorData.clientOccupied++;
-          } else { // residentType is 'Tenant'
+            break;
+          case 'rented':
+          case 'airbnb': // Treat Airbnb as a rented category for this analysis
             if (unit.ownership === 'SM') {
               floorData.rentedSM++;
             } else if (unit.ownership === 'Landlord') {
               floorData.rentedLandlord++;
             }
-          }
-        } else if (unit.status === 'vacant') {
-            floorData.vacant++;
+            break;
+          default:
+            // This case handles any units that might not have a status or have an unknown one.
+            // You could log this or handle it as a separate category if needed.
+            break;
         }
       });
       
