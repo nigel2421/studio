@@ -1,5 +1,5 @@
 import { calculateTransactionBreakdown, aggregateFinancials } from './financial-utils';
-import { Tenant, Unit, Payment, Property } from './types';
+import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
 
 // Helper to create mock data with simplified inputs
@@ -11,33 +11,43 @@ const createMockUnit = (overrides: Partial<Unit>): Unit => ({
     ...overrides,
 });
 
-const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Tenant['lease']> }): Tenant => {
-  const { lease: leaseOverrides, ...otherOverrides } = overrides;
-  return {
-    id: 'test-tenant',
-    name: 'Test Tenant',
-    email: 'test@tenant.com',
-    phone: '123',
-    idNumber: '123',
-    propertyId: 'prop-1',
-    unitName: 'Test Unit',
-    agent: 'Susan',
-    status: 'active',
-    residentType: 'Tenant',
-    securityDeposit: 0,
-    waterDeposit: 0,
-    accountBalance: 0,
-    dueBalance: 0,
-    ...otherOverrides,
-    lease: {
-      startDate: '2023-01-01',
-      endDate: '2024-01-01',
-      rent: 20000,
-      paymentStatus: 'Paid',
-      ...leaseOverrides,
-    },
-  };
+const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> }): Tenant => {
+    const defaultLease: Lease = {
+        startDate: '2023-01-01',
+        endDate: '2024-01-01',
+        rent: 20000,
+        paymentStatus: 'Paid',
+    };
+
+    const defaultTenant: Omit<Tenant, 'lease'> = {
+        id: 'test-tenant',
+        name: 'Test Tenant',
+        email: 'test@tenant.com',
+        phone: '123',
+        idNumber: '123',
+        propertyId: 'prop-1',
+        unitName: 'Test Unit',
+        agent: 'Susan',
+        status: 'active',
+        residentType: 'Tenant',
+        securityDeposit: 0,
+        waterDeposit: 0,
+        accountBalance: 0,
+        dueBalance: 0,
+    };
+
+    const { lease: leaseOverrides, ...otherOverrides } = overrides;
+
+    return {
+        ...defaultTenant,
+        ...otherOverrides,
+        lease: {
+            ...defaultLease,
+            ...leaseOverrides,
+        },
+    };
 };
+
 
 const createMockPayment = (overrides: Partial<Payment>): Payment => ({
     id: 'test-payment',
