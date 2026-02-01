@@ -1,4 +1,3 @@
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
@@ -1484,5 +1483,3 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     });
     return unsubscribe;
 }
-
-

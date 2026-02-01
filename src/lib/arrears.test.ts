@@ -1,4 +1,3 @@
-
 import { getTenantsInArrears, getLandlordArrearsBreakdown } from './arrears';
 import { getTenants, getProperties } from './data';
 import { Tenant, Property, Unit } from './types';
