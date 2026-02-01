@@ -11,7 +11,9 @@ const createMockUnit = (overrides: Partial<Unit>): Unit => ({
     ...overrides,
 });
 
-const createMockTenant = (overrides: Partial<Tenant> & { lease: Partial<Tenant['lease']> }): Tenant => ({
+const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Tenant['lease']> }): Tenant => {
+  const { lease: leaseOverrides, ...otherOverrides } = overrides;
+  return {
     id: 'test-tenant',
     name: 'Test Tenant',
     email: 'test@tenant.com',
@@ -26,15 +28,16 @@ const createMockTenant = (overrides: Partial<Tenant> & { lease: Partial<Tenant['
     waterDeposit: 0,
     accountBalance: 0,
     dueBalance: 0,
+    ...otherOverrides,
     lease: {
-        startDate: '2023-01-01',
-        endDate: '2024-01-01',
-        rent: 20000,
-        paymentStatus: 'Paid',
-        ...overrides.lease,
+      startDate: '2023-01-01',
+      endDate: '2024-01-01',
+      rent: 20000,
+      paymentStatus: 'Paid',
+      ...leaseOverrides,
     },
-    ...overrides,
-});
+  };
+};
 
 const createMockPayment = (overrides: Partial<Payment>): Payment => ({
     id: 'test-payment',
