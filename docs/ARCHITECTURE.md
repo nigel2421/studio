@@ -7,7 +7,7 @@ This document provides a high-level overview of the architecture for the Eracov 
 *   **Server-Centric**: Leverages Next.js App Router with Server Components by default to minimize client-side JavaScript and improve performance.
 *   **Component-Based UI**: Built with React and a set of reusable, aesthetically pleasing components from ShadCN/UI.
 *   **Scalable Backend**: Uses Firebase's suite of services (Firestore, Authentication, Cloud Functions) for a robust and scalable backend infrastructure.
-*   **Role-Based Access Control (RBAC)**: A clear separation of concerns and features based on user roles (Admin, Agent, Landlord, Tenant).
+*   **Role-Based Access Control (RBAC)**: A clear separation of concerns and features based on user roles (Admin, Agent, Landlord, Tenant, Investment Consultant).
 
 ## Technology Stack
 
@@ -16,6 +16,7 @@ This document provides a high-level overview of the architecture for the Eracov 
 *   **Database**: Cloud Firestore, a NoSQL document database.
 *   **Authentication**: Firebase Authentication for email/password logins.
 *   **AI**: Genkit for integrating generative AI features.
+*   **PDF Generation**: `jspdf` and `jspdf-autotable` for client-side document creation.
 *   **Deployment**: Firebase App Hosting.
 
 ## System Components
@@ -25,19 +26,20 @@ This document provides a high-level overview of the architecture for the Eracov 
 *   **Directory**: `src/app`
 *   **Description**: The main user-facing application. It's structured using the Next.js App Router.
 *   **Routing Groups**:
-    *   `(app)`: Contains all routes for the main administrative dashboard (Admins, Agents).
+    *   `(app)`: Contains all routes for the main administrative dashboard (Admins, Agents, Investment Consultants).
     *   `(landlord)`: The dedicated portal for property owners to view their financial summaries.
     *   `(tenant)`: The self-service portal for tenants to view payments and submit maintenance requests.
     *   `login`: The public-facing login page.
 *   **State Management**: Primarily uses React's built-in state management (e.g., `useState`, `useEffect`, `useContext`) for local and shared state. The `useAuth` hook provides global access to user and profile information.
-*   **Data Fetching**: Data is fetched from Firestore using a data access layer defined in `src/lib/data.ts`. This layer abstracts the direct Firestore queries. Real-time updates are handled via Firestore's `onSnapshot` listeners.
+*   **Data Fetching**: Data is fetched from Firestore using a data access layer defined in `src/lib/data.ts`. This layer abstracts the direct Firestore queries. Real-time updates are handled via Firestore's `onSnapshot` listeners where necessary (e.g., Tasks).
+*   **Document Generation**: PDF documents (receipts, statements) are generated on the client-side using the `jspdf` library. The logic is encapsulated in `src/lib/pdf-generator.ts`.
 
 ### 2. Backend (Firebase Cloud Functions)
 
 *   **Directory**: `src/functions`
 *   **Description**: Handles server-side logic that cannot be done on the client, such as sending emails or performing scheduled tasks.
 *   **Key Functions**:
-    *   `sendCustomEmail`: A callable function to send bulk announcements.
+    *   `sendCustomEmail`: A callable function to send bulk announcements to tenants, landlords, or other groups.
     *   `sendPaymentReceipt`: A callable function triggered after a payment is made to email a receipt to the tenant.
     *   `checkAndSendLeaseReminders`: A callable function that automates sending payment reminders and overdue notices, and applies late fees.
 
@@ -51,7 +53,8 @@ This document provides a high-level overview of the architecture for the Eracov 
     *   `payments`: A log of all financial transactions (rent, deposits, adjustments).
     *   `maintenanceRequests`: A collection of all issues reported by tenants.
     *   `logs`: An audit trail of important system actions.
-    *   `communications`: A record of all sent emails and notifications.
+    *   `communications`: A record of all sent emails and notifications from the Communications Center.
+    *   `tasks`: A list of internal tasks for property managers, such as onboarding follow-ups.
 
 ### 4. Authentication (Firebase Auth)
 
@@ -61,4 +64,5 @@ This document provides a high-level overview of the architecture for the Eracov 
     2.  Firebase Auth verifies credentials and creates a session.
     3.  The `useAuth` hook detects the authenticated user.
     4.  It then fetches the corresponding user profile from the `users` collection in Firestore to determine their role and other details.
-    5.  The `AuthWrapper` component performs role-based redirects, ensuring users can only access the parts of the application they are authorized to see.
+    5.  The `AuthWrapper` component performs role-based redirects. It ensures unauthenticated users are sent to `/login`, and redirects logged-in users to their designated dashboard if they try to access the login page.
+    6.  The individual layouts (e.g., `(app)/layout.tsx`, `(landlord)/layout.tsx`) and sidebar components enforce page-level access, hiding links and preventing direct navigation to unauthorized areas based on the user's role. For example, an `investment-consultant` will not see links to `Users` or `Logs` and will be redirected if they try to access those URLs.
