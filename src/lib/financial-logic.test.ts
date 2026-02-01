@@ -2,21 +2,19 @@ import { calculateTransactionBreakdown, aggregateFinancials } from './financial-
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
 
-// Helper to create mock data with simplified inputs
-const createMockUnit = (overrides: Partial<Unit>): Unit => ({
-    name: 'Test Unit',
-    status: 'rented',
-    ownership: 'Landlord',
-    unitType: 'One Bedroom',
-    ...overrides,
-});
+// Define a more specific type for the overrides to help TypeScript
+type MockTenantOverrides = Omit<Partial<Tenant>, 'lease'> & {
+    lease?: Partial<Lease>;
+};
 
-const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> }): Tenant => {
+// Helper to create mock data with simplified inputs
+const createMockTenant = (overrides: MockTenantOverrides = {}): Tenant => {
     const defaultLease: Lease = {
         startDate: '2023-01-01',
         endDate: '2024-01-01',
         rent: 20000,
         paymentStatus: 'Paid',
+        lastBilledPeriod: '2023-12',
     };
 
     const defaultTenant: Omit<Tenant, 'lease'> = {
@@ -36,17 +34,27 @@ const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> 
         dueBalance: 0,
     };
 
-    const { lease: leaseOverrides, ...otherOverrides } = overrides;
+    // Separate lease overrides from other tenant property overrides
+    const { lease: leaseOverrides, ...tenantOverrides } = overrides;
 
     return {
-        ...defaultTenant,
-        ...otherOverrides,
+        ...defaultTenant, // Apply default tenant properties
+        ...tenantOverrides, // Apply specific tenant property overrides
         lease: {
-            ...defaultLease,
-            ...leaseOverrides,
+            ...defaultLease, // Apply default lease properties
+            ...leaseOverrides, // Apply specific lease property overrides
         },
     };
 };
+
+
+const createMockUnit = (overrides: Partial<Unit>): Unit => ({
+    name: 'Test Unit',
+    status: 'rented',
+    ownership: 'Landlord',
+    unitType: 'One Bedroom',
+    ...overrides,
+});
 
 
 const createMockPayment = (overrides: Partial<Payment>): Payment => ({
@@ -161,8 +169,8 @@ describe('Financial Logic', () => {
                 managementStatus: 'Rented for Clients', 
                 rentAmount: 50000, 
                 serviceCharge: 6000,
-                propertyId: 'prop-1',
-            });
+             });
+             (firstMonthUnit as any).propertyId = 'prop-1'; // Add propertyId for map key
             const firstMonthTenant = createMockTenant({ 
                 id: 't-F1', 
                 unitName: 'F1',
