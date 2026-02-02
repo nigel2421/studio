@@ -36,6 +36,7 @@ interface OwnerTransactionHistoryDialogProps {
 
 export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allProperties, allTenants, allPayments, selectedMonth, paymentStatusForMonth }: OwnerTransactionHistoryDialogProps) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [invoiceItems, setInvoiceItems] = useState<{ description: string; amount: number }[]>([]);
     const [totalDueForInvoice, setTotalDueForInvoice] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isStatementOptionsOpen, setIsStatementOptionsOpen] = useState(false);
@@ -82,11 +83,9 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             
                 let firstBillableMonth: Date | null = null;
             
-                // Priority 1: Use the last billed period from an existing tenant record.
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
                 } 
-                // Priority 2: Use handover date or lease start date if status is Handed Over.
                 else if (unit.handoverStatus === 'Handed Over') {
                     const dateToUse = unit.handoverDate || tenant?.lease.startDate;
                     if (dateToUse) {
@@ -102,7 +101,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     }
                 }
             
-                // If a valid start date was found, generate the historical charges.
                 if (firstBillableMonth) {
                     let loopDate = firstBillableMonth;
                     const endOfPeriod = endOfMonth(selectedMonth);
@@ -116,8 +114,6 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                         loopDate = addMonths(loopDate, 1);
                     }
                 }
-                // If no start date can be determined, the unit is skipped to prevent incorrect billing.
-                // This indicates a data issue (e.g., unit handed over with no date and no tenant record).
             });
             
             const endOfSelectedMonth = endOfMonth(selectedMonth);
@@ -169,12 +165,24 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 };
             });
             
-            const totalChargesForInvoice = chargeItems
-                .filter(c => isSameMonth(c.date, selectedMonth))
-                .reduce((sum, item) => sum + item.charge, 0);
-
-            setTotalDueForInvoice(totalChargesForInvoice);
             setTransactions(ledger);
+
+            const finalBalance = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+            let lastZeroBalanceIndex = -1;
+            for (let i = ledger.length - 1; i >= 0; i--) {
+                if (ledger[i].balance <= 0) {
+                    lastZeroBalanceIndex = i;
+                    break;
+                }
+            }
+            const outstandingCharges = ledger
+                .slice(lastZeroBalanceIndex + 1)
+                .filter(entry => entry.charge > 0)
+                .map(entry => ({ description: entry.details, amount: entry.charge }));
+
+            setInvoiceItems(outstandingCharges);
+            setTotalDueForInvoice(finalBalance);
+
             setIsLoading(false);
         }
     }, [owner, open, selectedMonth, paymentStatusForMonth, allProperties, allTenants, allPayments]);
@@ -196,9 +204,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
             const invoiceDetails = {
                 month: format(selectedMonth, 'MMMM yyyy'),
-                items: transactions
-                    .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
-                    .map(t => ({ description: t.details, amount: t.charge })),
+                items: invoiceItems,
                 totalDue: totalDueForInvoice,
             };
 
@@ -323,9 +329,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 onClose={() => setIsInvoicePreviewOpen(false)}
                 ownerName={owner.name}
                 month={format(selectedMonth, 'MMMM yyyy')}
-                items={transactions
-                    .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
-                    .map(t => ({ description: t.details, amount: t.charge }))}
+                items={invoiceItems}
                 totalDue={totalDueForInvoice}
                 onConfirm={handleConfirmAndSend}
                 isSending={isSending}
