@@ -90,6 +90,27 @@ export function AppSidebar() {
       setOpenMobile(false);
     }
   }
+  
+  const visibleNavItems = navItems.filter(item => {
+    if (isAgent) {
+        const agentHidden = ['/documents', '/accounts', '/accounts/arrears', '/accounts/service-charges'];
+        if (agentHidden.includes(item.href)) return false;
+    }
+    if (isInvestmentConsultant) {
+        const allowedRoutes = ['/dashboard', '/properties', '/tenants', '/documents'];
+        if (!allowedRoutes.includes(item.href)) return false;
+    }
+    return true;
+  });
+
+  const visibleOtherItems = otherItems.filter(item => {
+      if (isInvestmentConsultant) {
+          const allowedRoutes = ['/clients', '/landlords'];
+          if (!allowedRoutes.includes(item.href)) return false;
+      }
+      return true;
+  });
+
 
   return (
     <Sidebar>
@@ -114,10 +135,7 @@ export function AppSidebar() {
 
       <SidebarContent className="flex-1">
         <SidebarMenu>
-          {navItems.map((item) => {
-            if (isAgent && (item.href === '/documents' || item.href === '/accounts')) return null;
-            if (isInvestmentConsultant && item.href === '/documents') return null;
-            return (
+          {visibleNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
                   <SidebarMenuButton
@@ -129,14 +147,12 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-            );
-          })}
+          ))}
 
 
           <Separator className="my-2" />
-          {otherItems.map((item) => {
-            if (isInvestmentConsultant && item.href === '/communications') return null;
-            return (
+          
+          {visibleOtherItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
                   <SidebarMenuButton
@@ -148,8 +164,8 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-            );
-          })}
+          ))}
+          
           {isAdmin && (
             <>
               <SidebarMenuItem>
