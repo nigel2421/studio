@@ -136,7 +136,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
             const chargeItems = Object.values(groupedCharges).map(group => ({
                 date: group.date,
-                details: `S.Charge for Units: ${Array.from(group.unitNames).sort().join(', ')}`,
+                details: `Service Charge for ${format(group.date, 'MMMM yyyy')}`,
                 charge: group.totalCharge,
                 payment: 0,
             }));
@@ -203,7 +203,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             }
 
             const invoiceDetails = {
-                month: format(selectedMonth, 'MMMM yyyy'),
+                month: 'Outstanding Service Charges',
                 items: invoiceItems,
                 totalDue: totalDueForInvoice,
             };
@@ -216,7 +216,8 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 owner.id,
                 owner.email,
                 owner.name,
-                invoiceDetails
+                invoiceDetails,
+                owner
             );
     
             if (result.success) {

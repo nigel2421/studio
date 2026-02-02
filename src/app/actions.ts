@@ -1,11 +1,20 @@
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
 import { logCommunication, getTenant } from '@/lib/data';
-import { Communication } from '@/lib/types';
+import { Communication, Landlord, PropertyOwner } from '@/lib/types';
+import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 
-export async function performSendCustomEmail(recipients: string[], subject: string, body: string, senderId: string, commDetails: Partial<Omit<Communication, 'id'>> = {}) {
+
+export async function performSendCustomEmail(
+    recipients: string[],
+    subject: string,
+    body: string,
+    senderId: string,
+    commDetails: Partial<Omit<Communication, 'id'>> = {},
+    attachment?: { content: string; filename: string }
+) {
   try {
-    const result = await sendCustomEmail({ recipients, subject, body });
+    const result = await sendCustomEmail({ recipients, subject, body, attachment });
 
     // Log the communication after successful sending
     const htmlBody = body.replace(/\n/g, '<br>');
@@ -112,42 +121,26 @@ export async function performSendServiceChargeInvoice(
   ownerId: string,
   ownerEmail: string,
   ownerName: string,
-  invoiceDetails: InvoiceDetails
+  invoiceDetails: InvoiceDetails,
+  owner: PropertyOwner | Landlord
 ) {
   try {
     if (!ownerEmail) {
         throw new Error("Owner does not have a registered email address.");
     }
-    const subject = `Service Charge Invoice for ${invoiceDetails.month}`;
-    const itemsHtml = invoiceDetails.items.map(item => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.description}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Ksh ${item.amount.toLocaleString()}</td>
-      </tr>
-    `).join('');
 
+    const pdfBase64 = generateArrearsServiceChargeInvoicePDF(owner, invoiceDetails);
+
+    const subject = `Service Charge Invoice: ${invoiceDetails.month}`;
     const body = `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
             <p>Dear ${ownerName},</p>
-            <p>Please find your service charge invoice for ${invoiceDetails.month}.</p>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">Description</th>
-                        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: right;">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${itemsHtml}
-                </tbody>
-                <tfoot>
-                    <tr style="font-weight: bold; background-color: #f2f2f2;">
-                        <td style="padding: 12px; border-top: 2px solid #ddd; text-align: right;">Total Amount Due</td>
-                        <td style="padding: 12px; border-top: 2px solid #ddd; text-align: right;">Ksh ${invoiceDetails.totalDue.toLocaleString()}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <p style="margin-top: 25px;">Please remit payment at your earliest convenience.</p>
+            <p>Please find your service charge invoice for your outstanding balance attached to this email.</p>
+            <p>A summary of the invoice is below:</p>
+            <ul>
+                ${invoiceDetails.items.map(item => `<li>${item.description}: Ksh ${item.amount.toLocaleString()}</li>`).join('')}
+            </ul>
+            <p><b>Total Amount Due: Ksh ${invoiceDetails.totalDue.toLocaleString()}</b></p>
             <br/>
             <p>Thank you,<br/>The Eracov Properties Team</p>
         </div>
@@ -157,8 +150,13 @@ export async function performSendServiceChargeInvoice(
         type: 'automation' as const,
         subType: 'Service Charge Invoice',
     };
+    
+    const attachment = {
+        content: pdfBase64,
+        filename: `invoice_${ownerName.replace(/ /g, '_')}_${invoiceDetails.month.replace(/ /g, '_')}.pdf`
+    };
 
-    return await performSendCustomEmail([ownerEmail], subject, body, 'system', commDetails);
+    return await performSendCustomEmail([ownerEmail], subject, body, 'system', commDetails, attachment);
 
   } catch (error: any) {
     console.error("Error sending service charge invoice:", error);

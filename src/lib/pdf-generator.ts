@@ -766,3 +766,51 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`invoice_vacant_sc_${owner.name.replace(/ /g, '_')}_${unit.name}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
+interface ArrearsInvoiceDetails {
+    month: string;
+    items: { description: string; amount: number }[];
+    totalDue: number;
+}
+
+export const generateArrearsServiceChargeInvoicePDF = (
+    owner: PropertyOwner | Landlord,
+    invoiceDetails: ArrearsInvoiceDetails
+): string => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    addHeader(doc, 'Service Charge Invoice');
+    
+    // Owner Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(owner.name, 196, 48, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(owner.email, 196, 54, { align: 'right' });
+    doc.text(`Invoice Date: ${dateStr}`, 196, 60, { align: 'right' });
+    doc.text(`For: ${invoiceDetails.month}`, 196, 66, { align: 'right' });
+    
+    let yPos = 80;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Description', 'Amount']],
+        body: invoiceDetails.items.map(item => [item.description, formatCurrency(item.amount)]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        foot: [[{ content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(invoiceDetails.totalDue)]],
+        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
+        columnStyles: {
+            1: { halign: 'right' }
+        },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.setTextColor(40);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Please remit payment at your earliest convenience.', 14, yPos);
+
+    return doc.output('datauristring').split(',')[1];
+};

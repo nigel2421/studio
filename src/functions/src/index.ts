@@ -117,7 +117,7 @@ export const sendPaymentReceipt = onCall({
 export const sendCustomEmail = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 }, async (request) => {
-    const { recipients, subject, body } = request.data;
+    const { recipients, subject, body, attachment } = request.data;
 
     // Validate essential data
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0 || !subject || !body) {
@@ -128,7 +128,7 @@ export const sendCustomEmail = onCall({
     const transporter = createTransporter();
 
     const sendPromises = recipients.map(email => {
-        const mailOptions = {
+        const mailOptions: any = {
             from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
             to: email,
             subject: subject,
@@ -148,6 +148,16 @@ export const sendCustomEmail = onCall({
                 </div>
             `,
         };
+        
+        if (attachment && attachment.content && attachment.filename) {
+            mailOptions.attachments = [{
+                filename: attachment.filename,
+                content: attachment.content,
+                encoding: 'base64',
+                contentType: 'application/pdf'
+            }];
+        }
+
         return transporter.sendMail(mailOptions);
     });
 
@@ -166,14 +176,17 @@ export const checkAndSendLeaseReminders = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
 }, async (request) => {
     const tenantsRef = db.collection('tenants');
-    const tenantsSnapshot = await tenantsRef.where('status', '==', 'active').get();
+    const propertiesRef = db.collection('properties');
+
+    const [tenantsSnapshot, propertiesSnap] = await Promise.all([
+        tenantsRef.where('status', '==', 'active').get(),
+        propertiesRef.get()
+    ]);
 
     if (tenantsSnapshot.empty) {
         return { success: true, message: "No active tenants found to process." };
     }
 
-    const propertiesRef = db.collection('properties');
-    const propertiesSnap = await propertiesRef.get();
     const propertiesMap = new Map(propertiesSnap.docs.map(doc => [doc.id, doc.data()]));
 
     const transporter = createTransporter();
