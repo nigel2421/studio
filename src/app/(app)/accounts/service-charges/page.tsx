@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -64,6 +63,8 @@ export default function ServiceChargesPage() {
   const [isOwnerPaymentDialogOpen, setIsOwnerPaymentDialogOpen] = useState(false);
   const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | Landlord | null>(null);
   const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
+  const [totalBalanceForDialog, setTotalBalanceForDialog] = useState(0);
+
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [ownerForHistory, setOwnerForHistory] = useState<PropertyOwner | Landlord | null>(null);
@@ -153,17 +154,101 @@ export default function ServiceChargesPage() {
 
         if (!owner) throw new Error("Owner not found");
         
+        // --- START: Calculate total balance from transaction history ---
+        const ownerUnits: Unit[] = allProperties.flatMap(p =>
+            (p.units || []).filter(u => {
+                const isDirectlyAssigned = u.landlordId === owner.id;
+                const ownerWithAssignedUnits = owner as PropertyOwner;
+                const isAssignedViaOwnerObject = ownerWithAssignedUnits.assignedUnits?.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
+                return isDirectlyAssigned || isAssignedViaOwnerObject;
+            }).map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+        );
+
+        const relevantTenants = allTenants.filter(t =>
+            t.residentType === 'Homeowner' &&
+            ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName)
+        );
+        const relevantTenantIds = relevantTenants.map(t => t.id);
+        const allOwnerPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
+
+        const allHistoricalTransactions: { date: Date, charge: number, payment: number }[] = [];
+
+        allOwnerPayments.forEach(p => {
+            allHistoricalTransactions.push({
+                date: new Date(p.date),
+                charge: 0,
+                payment: p.amount
+            });
+        });
+
+        ownerUnits.forEach(unit => {
+            const monthlyCharge = unit.serviceCharge || 0;
+            if (monthlyCharge <= 0) return;
+
+            const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
+
+            let firstBillableMonth: Date | null = null;
+            
+            if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
+                firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
+            } else if (unit.handoverStatus === 'Handed Over') {
+                const dateToUse = unit.handoverDate || tenant?.lease.startDate;
+                if (dateToUse) {
+                    const effectiveDate = new Date(dateToUse);
+                    if(isValid(effectiveDate)) {
+                        const handoverDay = effectiveDate.getDate();
+                        if (handoverDay <= 10) {
+                            firstBillableMonth = startOfMonth(effectiveDate);
+                        } else {
+                            firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
+                        }
+                    }
+                }
+            }
+
+            if (firstBillableMonth) {
+                let loopDate = firstBillableMonth;
+                const endOfPeriod = new Date(); // Calculate up to today
+                while (loopDate <= endOfPeriod) {
+                    allHistoricalTransactions.push({
+                        date: loopDate,
+                        charge: monthlyCharge,
+                        payment: 0,
+                    });
+                    loopDate = addMonths(loopDate, 1);
+                }
+            }
+        });
+
+        const combinedItems = [...allHistoricalTransactions].sort((a, b) => {
+            const dateDiff = a.date.getTime() - b.date.getTime();
+            if (dateDiff !== 0) return dateDiff;
+            if (a.charge > 0 && b.payment > 0) return -1;
+            if (a.payment > 0 && b.charge > 0) return 1;
+            return 0;
+        });
+
+        let runningBalance = 0;
+        combinedItems.forEach(item => {
+            runningBalance += item.charge;
+            runningBalance -= item.payment;
+        });
+        const totalBalanceDue = runningBalance > 0 ? runningBalance : 0;
+        // --- END: Calculate total balance ---
+        
         const sourceAccounts = source === 'client-occupied' ? selfManagedAccounts : managedVacantAccounts;
 
         const ownerAccounts = sourceAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
-        if (ownerAccounts.length === 0) {
-            toast({ title: "No Pending Charges", description: "This owner has no pending service charges for the selected month." });
+        
+        if (totalBalanceDue <= 0) {
+            toast({ title: "No Pending Charges", description: "This owner has no outstanding balance." });
             stopLoading();
             return;
         }
 
         setOwnerForPayment(owner);
         setAccountsForPayment(ownerAccounts);
+        setTotalBalanceForDialog(totalBalanceDue);
         setIsOwnerPaymentDialogOpen(true);
 
     } catch (error) {
@@ -388,6 +473,7 @@ export default function ServiceChargesPage() {
           onClose={() => setIsOwnerPaymentDialogOpen(false)}
           ownerName={ownerForPayment.name}
           accounts={accountsForPayment}
+          totalBalanceDue={totalBalanceForDialog}
           onConfirm={handleConfirmOwnerPayment}
           isSaving={isSaving}
         />
@@ -636,7 +722,5 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
-
-    
 
     

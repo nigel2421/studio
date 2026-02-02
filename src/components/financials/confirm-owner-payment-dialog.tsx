@@ -22,6 +22,7 @@ interface ConfirmOwnerPaymentDialogProps {
     accounts: AccountInfo[];
     onConfirm: (paymentData: { amount: number; date: Date; notes: string; forMonth: string }) => void;
     isSaving: boolean;
+    totalBalanceDue: number;
 }
 
 const monthOptions = Array.from({ length: 18 }, (_, i) => {
@@ -41,19 +42,19 @@ export function ConfirmOwnerPaymentDialog({
     accounts,
     onConfirm,
     isSaving,
+    totalBalanceDue,
 }: ConfirmOwnerPaymentDialogProps) {
-    const totalDue = useMemo(() => accounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0), [accounts]);
     const [amount, setAmount] = useState<string>('');
     const [date, setDate] = useState<Date>(new Date());
     const [forMonth, setForMonth] = useState<string>('');
 
     useEffect(() => {
         if (isOpen) {
-            setAmount(totalDue.toString());
+            setAmount(totalBalanceDue.toString());
             setDate(new Date());
             setForMonth(format(new Date(), 'yyyy-MM'));
         }
-    }, [isOpen, totalDue]);
+    }, [isOpen, totalBalanceDue]);
 
     const handleSubmit = () => {
         if (Number(amount) > 0 && forMonth) {
@@ -67,14 +68,14 @@ export function ConfirmOwnerPaymentDialog({
                 <DialogHeader>
                     <DialogTitle>Confirm Payment for {ownerName}</DialogTitle>
                     <DialogDescription>
-                        A total of {accounts.length} unit(s) have pending service charges.
+                        A total of {accounts.length} unit(s) have pending service charges for the selected month.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="p-4 rounded-lg bg-muted border">
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-medium text-muted-foreground">Total Amount Due</span>
-                            <span className="text-lg font-bold">Ksh {totalDue.toLocaleString()}</span>
+                            <span className="text-lg font-bold">Ksh {totalBalanceDue.toLocaleString()}</span>
                         </div>
                     </div>
                      <div className="grid grid-cols-2 gap-4">
@@ -118,3 +119,5 @@ export function ConfirmOwnerPaymentDialog({
         </Dialog>
     );
 }
+
+    
