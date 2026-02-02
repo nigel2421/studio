@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Download, Mail } from 'lucide-react';
 import { Tenant, Payment, Property, Landlord, PropertyOwner, Unit } from '@/lib/types';
-import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter, isSameMonth } from 'date-fns';
+import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter, isSameMonth, endOfMonth } from 'date-fns';
 import { StatementOptionsDialog } from './statement-options-dialog';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
@@ -110,80 +110,33 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             });
 
-            const startOfSelectedMonth = startOfMonth(selectedMonth);
-            
-            let calculatedOpeningBalance = 0;
-            allHistoricalTransactions.forEach(t => {
-                if (isBefore(t.date, startOfSelectedMonth)) {
-                    calculatedOpeningBalance += t.charge;
-                    calculatedOpeningBalance -= t.payment;
-                }
-            });
-            const openingBalanceValue = calculatedOpeningBalance > 0 ? calculatedOpeningBalance : 0;
-            setOpeningBalance(openingBalanceValue);
-
-            let runningBalanceForDisplay = openingBalanceValue;
-            const ledger: Transaction[] = [];
-
-            if (openingBalanceValue > 0) {
-                ledger.push({
-                    date: startOfSelectedMonth,
-                    transactionType: 'Opening Balance',
-                    details: 'Balance Brought Forward',
-                    charge: 0,
-                    payment: 0,
-                    balance: openingBalanceValue,
-                });
-            }
-            
-            const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
+            const endOfSelectedMonth = endOfMonth(selectedMonth);
+            const displayTransactions = allHistoricalTransactions.filter(t => !isAfter(t.date, endOfSelectedMonth));
             
             const groupedCharges = displayTransactions
                 .filter(t => t.charge > 0)
                 .reduce((acc, t) => {
-                    const dateKey = format(t.date, 'yyyy-MM-dd');
-                    if (!acc[dateKey]) {
-                        acc[dateKey] = { date: t.date, totalCharge: 0, units: [] };
+                    const monthKey = format(t.date, 'yyyy-MM');
+                    if (!acc[monthKey]) {
+                        acc[monthKey] = { date: t.date, totalCharge: 0, units: new Set<string>() };
                     }
-                    acc[dateKey].totalCharge += t.charge;
+                    acc[monthKey].totalCharge += t.charge;
                     const unitMatch = t.details.match(/Unit (.*)/);
-                    if (unitMatch && unitMatch[1] && !acc[dateKey].units.includes(unitMatch[1])) {
-                        acc[dateKey].units.push(unitMatch[1]);
+                    if (unitMatch && unitMatch[1]) {
+                        acc[monthKey].units.add(unitMatch[1]);
                     }
                     return acc;
-                }, {} as Record<string, { date: Date; totalCharge: number; units: string[] }>);
+                }, {} as Record<string, { date: Date; totalCharge: number; units: Set<string> }>);
 
             const combinedTransactionsForMonth = [
                 ...Object.values(groupedCharges).map(group => ({
                     date: group.date,
-                    details: `S.Charge for Units: ${group.units.sort().join(', ')}`,
+                    details: `S.Charge for Units: ${Array.from(group.units).sort().join(', ')}`,
                     charge: group.totalCharge,
                     payment: 0,
                 })),
                 ...displayTransactions.filter(t => t.payment > 0)
             ];
-
-            if (paymentStatusForMonth === 'Paid') {
-                const totalChargesThisMonth = combinedTransactionsForMonth
-                    .filter(t => t.charge > 0)
-                    .reduce((sum, t) => sum + t.charge, 0);
-
-                const hasRealPaymentThisMonth = combinedTransactionsForMonth.some(t => t.payment > 0);
-
-                if (totalChargesThisMonth > 0 && !hasRealPaymentThisMonth) {
-                    combinedTransactionsForMonth.push({
-                        date: startOfMonth(selectedMonth),
-                        details: 'Payment Received',
-                        charge: 0,
-                        payment: totalChargesThisMonth
-                    });
-                }
-            }
-            
-            const totalChargesForInvoice = combinedTransactionsForMonth
-                .filter(t => t.charge > 0)
-                .reduce((sum, t) => sum + t.charge, 0);
-            setTotalDueForInvoice(totalChargesForInvoice);
 
             combinedTransactionsForMonth.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
@@ -191,7 +144,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 if (a.charge > 0 && b.payment > 0) return -1;
                 if (a.payment > 0 && b.charge > 0) return 1;
                 return 0;
-            }).forEach(item => {
+            });
+
+            let runningBalanceForDisplay = 0;
+            const ledger: Transaction[] = [];
+
+            combinedTransactionsForMonth.forEach(item => {
                 runningBalanceForDisplay += item.charge;
                 runningBalanceForDisplay -= item.payment;
                 ledger.push({
@@ -203,7 +161,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     balance: runningBalanceForDisplay
                 });
             });
-            
+
+            const totalChargesForInvoice = combinedTransactionsForMonth
+                .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
+                .reduce((sum, t) => sum + t.charge, 0);
+            setTotalDueForInvoice(totalChargesForInvoice);
             setTransactions(ledger);
             setIsLoading(false);
         }
@@ -295,7 +257,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     <DialogHeader>
                         <DialogTitle>Transaction History for {owner.name}</DialogTitle>
                         <DialogDescription>
-                           Statement for {selectedMonth && format(selectedMonth, 'MMMM yyyy')}
+                           Statement as of {selectedMonth && format(selectedMonth, 'MMMM yyyy')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex-1 overflow-y-auto border rounded-md">
