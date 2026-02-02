@@ -130,7 +130,12 @@ describe('Data Logic in `data.ts`', () => {
             ];
             
             mockGetDoc.mockResolvedValue({ exists: () => true, data: () => mockLandlord });
-            mockGetDocs.mockResolvedValue({ docs: mockProperties.map(p => ({ id: p.id, data: () => p }))});
+            mockGetDocs.mockImplementation(async (q: any) => {
+                if (q._query.path.segments[0] === 'properties') {
+                    return { docs: mockProperties.map(p => ({ id: p.id, data: () => p }))};
+                }
+                return { docs: [] };
+            });
 
             const batch = createMockBatch();
 
