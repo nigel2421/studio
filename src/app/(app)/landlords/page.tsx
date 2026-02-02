@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -137,21 +138,31 @@ export default function LandlordsPage() {
 
     const landlordIdsInProperty = new Set<string>();
     const property = properties.find(p => p.id === selectedPropertyId);
-    if(property){
-        property.units.forEach(unit => {
-            if (unit.landlordId) {
-                landlordIdsInProperty.add(unit.landlordId);
-            }
-        });
+    if (property) {
+      property.units.forEach(unit => {
+        if (unit.landlordId) {
+          landlordIdsInProperty.add(unit.landlordId);
+        }
+      });
     }
-    
+
     const smUnitsInProperty = property?.units.some(u => u.ownership === 'SM');
     if (smUnitsInProperty) {
       landlordIdsInProperty.add(SOIL_MERCHANTS_LANDLORD.id);
     }
 
-    return landlords.filter(l => landlordIdsInProperty.has(l.id));
-  }, [selectedPropertyId, properties, landlords]);
+    return landlords.filter(l => {
+      // Only include landlords that have units in the selected property
+      if (!landlordIdsInProperty.has(l.id)) {
+        return false;
+      }
+      // Exclude landlords that ONLY have client-managed units
+      if (clientOnlyLandlordIds.has(l.id)) {
+        return false;
+      }
+      return true;
+    });
+  }, [selectedPropertyId, properties, landlords, clientOnlyLandlordIds]);
 
   const totalInvestorLandlords = useMemo(() => {
     return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id && !clientOnlyLandlordIds.has(l.id)).length;
