@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -48,14 +47,6 @@ export function TenantSidebar() {
     router.push('/login');
   };
 
-  const handleMoveOutNotice = () => {
-    toast({
-      title: "Move-Out Notice Submitted",
-      description: "Your one-month notice to vacate has been received and sent to the property manager.",
-      duration: 5000,
-    });
-  };
-
   const handleLinkClick = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -102,11 +93,6 @@ export function TenantSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className='px-2 space-y-2'>
-            <Button variant="destructive" className="w-full" onClick={handleMoveOutNotice}>
-            Submit Move Out Notice
-            </Button>
-        </div>
         <Separator className="my-2" />
         <SidebarMenu>
           <SidebarMenuItem>

@@ -1,14 +1,14 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import type { Tenant, Payment } from '@/lib/types';
-import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle } from 'lucide-react';
+import type { Tenant, Payment, Property } from '@/lib/types';
+import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
-import { getTenantPayments } from '@/lib/data';
+import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
+import { generateLedger } from '@/lib/financial-logic';
 import {
     Table,
     TableBody,
@@ -22,23 +22,46 @@ import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { getTenantWaterReadings } from '@/lib/data';
 
 
 export default function TenantDashboardPage() {
-    const { userProfile } = useAuth();
+    const { userProfile, isLoading: authIsLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const tenantDetails = userProfile?.tenantDetails;
+    
     const [payments, setPayments] = useState<Payment[]>([]);
     const [waterReadings, setWaterReadings] = useState<any[]>([]);
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [ledger, setLedger] = useState<{ finalDueBalance: number, finalAccountBalance: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (userProfile?.tenantId) {
-            getTenantPayments(userProfile.tenantId).then(setPayments);
-            getTenantWaterReadings(userProfile.tenantId).then(setWaterReadings);
+        if (!authIsLoading && userProfile?.tenantId) {
+            setIsLoading(true);
+            Promise.all([
+                getTenantPayments(userProfile.tenantId),
+                getTenantWaterReadings(userProfile.tenantId),
+                getProperties()
+            ]).then(([paymentData, waterData, propertiesData]) => {
+                setPayments(paymentData);
+                setWaterReadings(waterData);
+                setProperties(propertiesData);
+                if(tenantDetails) {
+                    const { finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
+                    setLedger({ finalDueBalance, finalAccountBalance });
+                }
+                setIsLoading(false);
+            }).catch(err => {
+                console.error("Error fetching tenant dashboard data:", err);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not load dashboard data.' });
+                setIsLoading(false);
+            });
+        } else if (!authIsLoading) {
+            setIsLoading(false);
         }
-    }, [userProfile]);
+    }, [userProfile, authIsLoading, tenantDetails, toast]);
+
 
     const latestWaterReading = waterReadings?.[0];
 
@@ -65,6 +88,14 @@ export default function TenantDashboardPage() {
     };
 
     const nextRentDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
+
+    if (isLoading || authIsLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
 
     return (
         <div className="space-y-8">
@@ -122,22 +153,13 @@ export default function TenantDashboardPage() {
                                 )}
                             </CardContent>
                         </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Rent Start Date</CardTitle>
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{format(parseISO(tenantDetails.lease.startDate), 'yyyy-MM-dd')}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
+                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Due Balance</CardTitle>
                                 <AlertCircle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails.dueBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-red-600">Ksh {(ledger?.finalDueBalance || 0).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                             </CardContent>
                         </Card>
@@ -147,8 +169,17 @@ export default function TenantDashboardPage() {
                                 <PlusCircle className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails.accountBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-green-600">Ksh {(ledger?.finalAccountBalance || 0).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Rent Start Date</CardTitle>
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{format(parseISO(tenantDetails.lease.startDate), 'yyyy-MM-dd')}</div>
                             </CardContent>
                         </Card>
                         <Card>
