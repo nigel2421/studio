@@ -1,5 +1,6 @@
 // Import all exports from data.ts to allow spying
 import * as data from './data';
+import { cacheService } from './cache'; // Import the cache service
 
 // Import types for mock data
 import { Landlord, Property, PropertyOwner, UserProfile, Unit } from './types';
@@ -26,8 +27,9 @@ const mockGetDoc = getDoc as jest.Mock;
 describe('Data Logic in `data.ts`', () => {
 
     beforeEach(() => {
-        // Clear all mocks before each test
+        // Clear all mocks and the data cache before each test
         jest.clearAllMocks();
+        cacheService.clear();
     });
 
     // Test suite for the dynamic role assignment in getUsers
