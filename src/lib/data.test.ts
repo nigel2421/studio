@@ -17,7 +17,10 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 // Import the mocked functions so we can manipulate them
-import { getDoc, writeBatch } from 'firebase/firestore';
+import { getDoc, writeBatch, getDocs } from 'firebase/firestore';
+
+const mockGetDocs = getDocs as jest.Mock;
+const mockGetDoc = getDoc as jest.Mock;
 
 // --- Test Suite ---
 describe('Data Logic in `data.ts`', () => {
@@ -36,11 +39,14 @@ describe('Data Logic in `data.ts`', () => {
             const mockInvestorUnit: Unit = { name: 'A1', ownership: 'Landlord', status: 'rented', landlordId: 'landlord-1', managementStatus: 'Rented for Clients', unitType: 'Studio' };
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockInvestorUnit] };
             
-            // Spy on and mock the return values of functions called by getUsers
-            jest.spyOn(data, 'getCollection').mockResolvedValue([mockUser] as any);
-            jest.spyOn(data, 'getProperties').mockResolvedValue([mockProperty]);
-            jest.spyOn(data, 'getLandlords').mockResolvedValue([mockLandlord]);
-            jest.spyOn(data, 'getPropertyOwners').mockResolvedValue([]);
+            mockGetDocs.mockImplementation(async (q: any) => {
+                const path = q._query.path.segments[0];
+                if (path === 'users') return { docs: [{ id: 'user-1', data: () => mockUser }] };
+                if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
+                if (path === 'landlords') return { docs: [{ id: 'landlord-1', data: () => mockLandlord }] };
+                if (path === 'propertyOwners') return { docs: [] };
+                return { docs: [] };
+            });
 
             // Act
             const users = await data.getUsers();
@@ -57,10 +63,14 @@ describe('Data Logic in `data.ts`', () => {
             const mockClientUnit: Unit = { name: 'B1', ownership: 'Landlord', status: 'client occupied', managementStatus: 'Client Managed', unitType: 'Studio' };
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockClientUnit] };
     
-            jest.spyOn(data, 'getCollection').mockResolvedValue([mockUser] as any);
-            jest.spyOn(data, 'getProperties').mockResolvedValue([mockProperty]);
-            jest.spyOn(data, 'getLandlords').mockResolvedValue([]);
-            jest.spyOn(data, 'getPropertyOwners').mockResolvedValue([mockOwner]);
+            mockGetDocs.mockImplementation(async (q: any) => {
+                const path = q._query.path.segments[0];
+                if (path === 'users') return { docs: [{ id: 'user-2', data: () => mockUser }] };
+                if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
+                if (path === 'landlords') return { docs: [] };
+                if (path === 'propertyOwners') return { docs: [{ id: 'owner-1', data: () => mockOwner }] };
+                return { docs: [] };
+            });
     
             // Act
             const users = await data.getUsers();
@@ -78,10 +88,14 @@ describe('Data Logic in `data.ts`', () => {
             const mockClientUnit: Unit = { name: 'B1', ownership: 'Landlord', landlordId: 'owner-2', status: 'client occupied', managementStatus: 'Client Managed', unitType: 'Studio' };
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockInvestorUnit, mockClientUnit] };
 
-            jest.spyOn(data, 'getCollection').mockResolvedValue([mockUser] as any);
-            jest.spyOn(data, 'getProperties').mockResolvedValue([mockProperty]);
-            jest.spyOn(data, 'getLandlords').mockResolvedValue([mockOwner]);
-            jest.spyOn(data, 'getPropertyOwners').mockResolvedValue([]);
+            mockGetDocs.mockImplementation(async (q: any) => {
+                const path = q._query.path.segments[0];
+                if (path === 'users') return { docs: [{ id: 'user-3', data: () => mockUser }] };
+                if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
+                if (path === 'landlords') return { docs: [{ id: 'owner-2', data: () => mockOwner }] };
+                if (path === 'propertyOwners') return { docs: [] };
+                return { docs: [] };
+            });
 
             // Act
             const users = await data.getUsers();
@@ -115,8 +129,9 @@ describe('Data Logic in `data.ts`', () => {
                 { id: 'prop-2', name: 'Prop 2', address: '', type: '', imageId: '', units: [{ name: 'B2', landlordId: landlordId, status: 'rented', ownership: 'Landlord', unitType: 'Studio' }] },
             ];
             
-            jest.spyOn(data, 'getLandlord').mockResolvedValue(mockLandlord);
-            jest.spyOn(data, 'getProperties').mockResolvedValue(mockProperties);
+            mockGetDoc.mockResolvedValue({ exists: () => true, data: () => mockLandlord });
+            mockGetDocs.mockResolvedValue({ docs: mockProperties.map(p => ({ id: p.id, data: () => p }))});
+
             const batch = createMockBatch();
 
             // Act
@@ -142,7 +157,7 @@ describe('Data Logic in `data.ts`', () => {
                 assignedUnits: [{ propertyId: 'prop-1', unitNames: ['U1'] }]
             };
 
-            jest.spyOn(data, 'getPropertyOwner').mockResolvedValue(mockOwner);
+            mockGetDoc.mockResolvedValue({ exists: () => true, data: () => mockOwner });
             const batch = createMockBatch();
 
             // Act
