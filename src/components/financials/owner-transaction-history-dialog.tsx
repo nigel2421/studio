@@ -97,8 +97,8 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
 
                 let loopDate = firstBillableMonth;
-                const today = new Date();
-                while (startOfMonth(loopDate) <= startOfMonth(today)) {
+                const endOfPeriod = endOfMonth(selectedMonth);
+                while (loopDate <= endOfPeriod) {
                     allHistoricalTransactions.push({
                         date: loopDate,
                         details: `S.Charge for Unit ${unit.name}`,
@@ -108,37 +108,78 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     loopDate = addMonths(loopDate, 1);
                 }
             });
-
-            const endOfSelectedMonth = endOfMonth(selectedMonth);
-            const displayTransactions = allHistoricalTransactions.filter(t => !isAfter(t.date, endOfSelectedMonth));
             
-            displayTransactions.sort((a, b) => {
+            allHistoricalTransactions.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
                 if (a.charge > 0 && b.payment > 0) return -1;
                 if (a.payment > 0 && b.charge > 0) return 1;
                 return 0;
             });
+            
+            const startOfSelectedMonth = startOfMonth(selectedMonth);
+            const openingBalanceTransactions = allHistoricalTransactions.filter(t => isBefore(t.date, startOfSelectedMonth));
+            const balanceBroughtForward = openingBalanceTransactions.reduce((acc, t) => acc + t.charge - t.payment, 0);
 
-            let runningBalanceForDisplay = 0;
+            const transactionsForMonth = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
+            
+            const chargeItems = transactionsForMonth.filter(t => t.charge > 0);
+            const paymentItems = transactionsForMonth.filter(t => t.payment > 0);
+            
+            const combinedMonthlyCharge = chargeItems.reduce((acc, item) => {
+                const key = format(item.date, 'yyyy-MM');
+                if (!acc[key]) {
+                    acc[key] = { date: item.date, charge: 0, details: [] as string[] };
+                }
+                acc[key].charge += item.charge;
+                acc[key].details.push(item.details.replace('S.Charge for ', ''));
+                return acc;
+            }, {} as Record<string, { date: Date; charge: number; details: string[] }>);
+
+            const displayItems: { date: Date, details: string, charge: number, payment: number }[] = [];
+
+            if (balanceBroughtForward > 0) {
+                displayItems.push({
+                    date: startOfSelectedMonth,
+                    details: 'Balance Brought Forward',
+                    charge: balanceBroughtForward,
+                    payment: 0,
+                });
+            }
+
+            Object.values(combinedMonthlyCharge).forEach(item => {
+                displayItems.push({
+                    date: item.date,
+                    details: `S.Charge for Units: ${item.details.join(', ')}`,
+                    charge: item.charge,
+                    payment: 0,
+                });
+            });
+
+            paymentItems.forEach(item => {
+                displayItems.push(item);
+            });
+
+            displayItems.sort((a,b) => a.date.getTime() - b.date.getTime());
+
+
+            let runningBalance = 0;
             const ledger: Transaction[] = [];
 
-            displayTransactions.forEach(item => {
-                runningBalanceForDisplay += item.charge;
-                runningBalanceForDisplay -= item.payment;
+            displayItems.forEach(item => {
+                runningBalance += item.charge;
+                runningBalance -= item.payment;
                 ledger.push({
                     date: item.date,
                     transactionType: item.charge > 0 ? 'Invoice' : 'Payment',
                     details: item.details,
                     charge: item.charge,
                     payment: item.payment,
-                    balance: runningBalanceForDisplay
+                    balance: runningBalance
                 });
             });
-
-            const totalChargesForInvoice = displayTransactions
-                .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
-                .reduce((sum, t) => sum + t.charge, 0);
+            
+            const totalChargesForInvoice = chargeItems.reduce((sum, t) => sum + t.charge, 0);
             setTotalDueForInvoice(totalChargesForInvoice);
             setTransactions(ledger);
             setIsLoading(false);
