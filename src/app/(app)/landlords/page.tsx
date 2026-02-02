@@ -515,8 +515,8 @@ export default function LandlordsPage() {
       <StatementOptionsDialog
         isOpen={isStatementDialogOpen}
         onClose={() => setIsStatementDialogOpen(false)}
-        landlord={landlordForStatement}
-        onGenerate={handleGenerateStatement}
+        entity={landlordForStatement}
+        onGenerate={(entity, start, end) => handleGenerateStatement(entity as Landlord, start, end)}
         isGenerating={isLoading}
       />
       <DeleteConfirmationDialog

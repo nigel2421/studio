@@ -439,8 +439,8 @@ export default function ClientsPage() {
         <StatementOptionsDialog
             isOpen={isStatementDialogOpen}
             onClose={() => setIsStatementDialogOpen(false)}
-            landlord={ownerForStatement}
-            onGenerate={handleGenerateStatement as any}
+            entity={ownerForStatement}
+            onGenerate={(entity, start, end) => handleGenerateStatement(entity as PropertyOwner, start, end)}
             isGenerating={isLoading}
         />
       )}

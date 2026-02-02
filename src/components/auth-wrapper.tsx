@@ -12,7 +12,7 @@ const ADMIN_AGENT_ROUTES = [
     '/water-meter/add'
 ];
 const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/documents', '/clients', '/landlords'];
-const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance', '/tenant/documents'];
+const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance'];
 const LANDLORD_ROUTES = ['/landlord/dashboard'];
 const HOMEOWNER_ROUTES = ['/owner/dashboard'];
 

@@ -12,22 +12,22 @@ import { DatePicker } from '@/components/ui/date-picker';
 interface StatementOptionsDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    landlord: Landlord | PropertyOwner | null;
-    onGenerate: (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date) => void;
+    entity: { name: string } | null;
+    onGenerate: (entity: { name: string }, startDate: Date, endDate: Date) => void;
     isGenerating: boolean;
 }
 
-export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, isGenerating }: StatementOptionsDialogProps) {
+export function StatementOptionsDialog({ isOpen, onClose, entity, onGenerate, isGenerating }: StatementOptionsDialogProps) {
     const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
-    if (!landlord) {
+    if (!entity) {
         return null;
     }
 
     const handleGenerateClick = () => {
-        if (landlord && startDate && endDate) {
-            onGenerate(landlord, startDate, endDate);
+        if (entity && startDate && endDate) {
+            onGenerate(entity, startDate, endDate);
         }
     };
 
@@ -35,7 +35,7 @@ export function StatementOptionsDialog({ isOpen, onClose, landlord, onGenerate, 
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Generate Statement for {landlord.name}</DialogTitle>
+                    <DialogTitle>Generate Statement for {entity.name}</DialogTitle>
                     <DialogDescription>
                         Select the date range for the financial statement.
                     </DialogDescription>
