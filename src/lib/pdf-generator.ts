@@ -218,19 +218,19 @@ export const generateOwnerServiceChargeStatementPDF = (
 
         if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
             firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-        } else {
-            const dateToUseForBilling = unit.handoverDate || tenant?.lease.startDate;
-            if (unit.handoverStatus === 'Handed Over' && dateToUseForBilling) {
-                const effectiveDate = new Date(dateToUseForBilling);
-                if (isValid(effectiveDate)) {
-                    const handoverDay = effectiveDate.getDate();
-                    if (handoverDay <= 10) {
-                        firstBillableMonth = startOfMonth(effectiveDate);
-                    } else {
-                        firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
-                    }
-                }
+        }
+        else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+            const effectiveDate = new Date(unit.handoverDate);
+            if (isValid(effectiveDate)) {
+                const handoverDay = effectiveDate.getDate();
+                firstBillableMonth = handoverDay <= 10 ? startOfMonth(effectiveDate) : startOfMonth(addMonths(effectiveDate, 1));
             }
+        }
+        else if (tenant?.lease.startDate) {
+             const effectiveDate = new Date(tenant.lease.startDate);
+             if (isValid(effectiveDate)) {
+                 firstBillableMonth = startOfMonth(effectiveDate);
+             }
         }
 
         if (!firstBillableMonth) return;
@@ -271,20 +271,29 @@ export const generateOwnerServiceChargeStatementPDF = (
     const chargeTransactionsForTable = Object.values(groupedCharges).map(group => ({
         date: group.date,
         month: format(group.date, 'MMM yyyy'),
-        details: `S.Charge for Units: ${group.unitNames.sort().join(', ')}`,
+        details: `Service Charge for ${format(group.date, 'MMMM yyyy')}`,
         charge: group.totalCharge,
         payment: 0,
     }));
 
-    const paymentTransactionsForTable = transactionsInPeriod
+    const groupedPdfPayments = transactionsInPeriod
         .filter(t => t.payment > 0)
-        .map(t => ({
-            date: t.date,
-            month: t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-            details: t.details,
-            charge: 0,
-            payment: t.payment,
-        }));
+        .reduce((acc, t) => {
+            const dateKey = format(t.date, 'yyyy-MM-dd');
+            if (!acc[dateKey]) {
+                acc[dateKey] = { date: t.date, totalPayment: 0 };
+            }
+            acc[dateKey].totalPayment += t.payment;
+            return acc;
+        }, {} as Record<string, { date: Date; totalPayment: number }>);
+    
+    const paymentTransactionsForTable = Object.values(groupedPdfPayments).map(group => ({
+        date: group.date,
+        month: 'N/A',
+        details: 'Payment Received',
+        charge: 0,
+        payment: group.totalPayment,
+    }));
     
     const allItemsForTable = [
         ...chargeTransactionsForTable, 

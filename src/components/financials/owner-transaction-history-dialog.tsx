@@ -80,24 +80,23 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 if (monthlyCharge <= 0) return;
             
                 const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-            
                 let firstBillableMonth: Date | null = null;
-            
+
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-                } else {
-                    const dateToUseForBilling = unit.handoverDate || tenant?.lease.startDate;
-                    if (unit.handoverStatus === 'Handed Over' && dateToUseForBilling) {
-                        const effectiveDate = new Date(dateToUseForBilling);
-                        if (isValid(effectiveDate)) {
-                            const handoverDay = effectiveDate.getDate();
-                            if (handoverDay <= 10) {
-                                firstBillableMonth = startOfMonth(effectiveDate);
-                            } else {
-                                firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
-                            }
-                        }
+                }
+                else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+                    const effectiveDate = new Date(unit.handoverDate);
+                    if (isValid(effectiveDate)) {
+                        const handoverDay = effectiveDate.getDate();
+                        firstBillableMonth = handoverDay <= 10 ? startOfMonth(effectiveDate) : startOfMonth(addMonths(effectiveDate, 1));
                     }
+                }
+                else if (tenant?.lease.startDate) {
+                     const effectiveDate = new Date(tenant.lease.startDate);
+                     if (isValid(effectiveDate)) {
+                         firstBillableMonth = startOfMonth(effectiveDate);
+                     }
                 }
             
                 if (firstBillableMonth) {
@@ -140,7 +139,23 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 payment: 0,
             }));
 
-            const paymentItems = transactionsToProcess.filter(t => t.payment > 0);
+            const groupedPayments = transactionsToProcess
+                .filter(t => t.payment > 0)
+                .reduce((acc, t) => {
+                    const dateKey = format(t.date, 'yyyy-MM-dd');
+                    if (!acc[dateKey]) {
+                        acc[dateKey] = { date: t.date, totalPayment: 0 };
+                    }
+                    acc[dateKey].totalPayment += t.payment;
+                    return acc;
+                }, {} as Record<string, { date: Date; totalPayment: number }>);
+            
+            const paymentItems = Object.values(groupedPayments).map(group => ({
+                date: group.date,
+                details: 'Payment Received',
+                charge: 0,
+                payment: group.totalPayment,
+            }));
 
             const combinedItems = [...chargeItems, ...paymentItems].sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
