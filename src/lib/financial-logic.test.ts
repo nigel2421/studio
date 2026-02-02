@@ -1,3 +1,4 @@
+
 import { calculateTransactionBreakdown, aggregateFinancials } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -65,6 +66,8 @@ const createMockPayment = (overrides: Partial<Payment>): Payment => ({
     type: 'Rent',
     status: 'Paid',
     createdAt: new Date(),
+    paymentMethod: 'M-Pesa',
+    transactionId: 'TEST12345',
     ...overrides,
 });
 
@@ -202,3 +205,5 @@ describe('Financial Logic', () => {
         });
     });
 });
+
+    

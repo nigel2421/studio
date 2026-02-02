@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -247,16 +248,16 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         }
     };
 
-    const handleGenerateStatement = async (landlord: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
+    const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
-            if ('assignedUnits' in landlord) {
-                 generateOwnerServiceChargeStatementPDF(landlord, allProperties, allTenants, allPayments, startDate, endDate);
+            if ('assignedUnits' in entity) {
+                 generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, startDate, endDate);
             } else {
                 const landlordAsOwner: PropertyOwner = {
-                    ...landlord,
+                    ...entity,
                     assignedUnits: allProperties.reduce((acc, p) => {
-                        const unitsForLandlord = (p.units || []).filter(u => u.landlordId === landlord.id).map(u => u.name);
+                        const unitsForLandlord = (p.units || []).filter(u => u.landlordId === entity.id).map(u => u.name);
                         if (unitsForLandlord.length > 0) {
                             acc.push({propertyId: p.id, unitNames: unitsForLandlord});
                         }
@@ -351,10 +352,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             <StatementOptionsDialog
                 isOpen={isStatementOptionsOpen}
                 onClose={() => setIsStatementOptionsOpen(false)}
-                landlord={owner}
+                entity={owner}
                 onGenerate={handleGenerateStatement as any}
                 isGenerating={isPdfGenerating}
             />
         </>
     );
 }
+
+    

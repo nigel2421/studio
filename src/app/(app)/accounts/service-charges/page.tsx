@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -311,6 +312,8 @@ export default function ServiceChargesPage() {
                     rentForMonth: paymentData.forMonth,
                     status: 'Paid',
                     type: 'ServiceCharge',
+                    paymentMethod: 'Bank Transfer',
+                    transactionId: `OWNER_PAY_${Date.now()}`
                 }));
 
                 remainingAmount -= amountToApply;
@@ -722,5 +725,7 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     

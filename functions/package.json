@@ -1,3 +1,4 @@
+
 {
   "name": "functions",
   "description": "Cloud Functions for Firebase",
@@ -12,7 +13,7 @@
   "engines": {
     "node": "24"
   },
-  "main": "index.js",
+  "main": "lib/index.js",
   "dependencies": {
     "@genkit-ai/firebase": "^1.28.0",
     "firebase-admin": "^13.6.0",
@@ -27,3 +28,5 @@
   },
   "private": true
 }
+
+    

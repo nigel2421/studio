@@ -1,3 +1,4 @@
+
 import { processServiceChargeData, groupAccounts } from './service-charge';
 import type { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
 import { startOfMonth, addMonths, format, parseISO, isValid } from 'date-fns';
@@ -71,6 +72,8 @@ const createMockPayment = (tenantId: string, amount: number, type: Payment['type
     type,
     status: 'Paid',
     rentForMonth,
+    paymentMethod: 'M-Pesa',
+    transactionId: `TRANS${Math.random()}`,
     createdAt: new Date(),
 });
 
@@ -175,3 +178,5 @@ describe('Service Charge Logic', () => {
         expect(bobGroup?.paymentStatus).toBe('Pending'); // Because B201 is pending
     });
 });
+
+    
