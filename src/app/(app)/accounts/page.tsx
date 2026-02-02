@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -127,15 +128,53 @@ export default function AccountsPage() {
     rentCurrentPage * rentPageSize
   );
 
-  // Filtering for Service Charge tab
-  const filteredHomeowners = homeowners.filter(t =>
-    t.name.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
-    t.unitName.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
-    t.email.toLowerCase().includes(scSearchTerm.toLowerCase())
+  // Grouping logic for Service Charge tab
+  const groupedHomeowners = useMemo(() => {
+    const homeownersByEmail = new Map<string, {
+        name: string;
+        email: string;
+        units: { propertyId: string; unitName: string }[];
+        totalDueBalance: number;
+        totalAccountBalance: number;
+        representativeTenant: Tenant;
+    }>();
+
+    homeowners.forEach(h => {
+        if (!homeownersByEmail.has(h.email)) {
+            homeownersByEmail.set(h.email, {
+                name: h.name,
+                email: h.email,
+                units: [],
+                totalDueBalance: 0,
+                totalAccountBalance: 0,
+                representativeTenant: h,
+            });
+        }
+        const entry = homeownersByEmail.get(h.email)!;
+        entry.units.push({ propertyId: h.propertyId, unitName: h.unitName });
+        entry.totalDueBalance += h.dueBalance || 0;
+        entry.totalAccountBalance += h.accountBalance || 0;
+
+        const currentRepStatus = entry.representativeTenant.lease.paymentStatus;
+        if (h.lease.paymentStatus === 'Overdue') {
+            entry.representativeTenant = h;
+        } else if (h.lease.paymentStatus === 'Pending' && currentRepStatus !== 'Overdue') {
+            entry.representativeTenant = h;
+        }
+    });
+
+    return Array.from(homeownersByEmail.values());
+  }, [homeowners]);
+
+  // Filtering for Service Charge tab (updated)
+  const filteredGroupedHomeowners = groupedHomeowners.filter(g =>
+    g.name.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
+    g.email.toLowerCase().includes(scSearchTerm.toLowerCase()) ||
+    g.units.some(u => u.unitName.toLowerCase().includes(scSearchTerm.toLowerCase()))
   );
 
-  const scTotalPages = Math.ceil(filteredHomeowners.length / scPageSize);
-  const paginatedHomeowners = filteredHomeowners.slice(
+  const scTotalPages = Math.ceil(filteredGroupedHomeowners.length / scPageSize);
+  const paginatedGroupedHomeowners = filteredGroupedHomeowners.slice(
     (scCurrentPage - 1) * scPageSize,
     scCurrentPage * scPageSize
   );
@@ -267,7 +306,7 @@ export default function AccountsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Service Charge Financial Status</CardTitle>
-              <CardDescription>Detailed list of homeowner service charge information.</CardDescription>
+              <CardDescription>Consolidated view of homeowner service charge accounts.</CardDescription>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
                 <div className="relative w-full sm:w-[300px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -278,7 +317,7 @@ export default function AccountsPage() {
                     onChange={(e) => setScSearchTerm(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredHomeowners, 'service_charge_status.csv')}>
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredGroupedHomeowners, 'service_charge_status.csv')}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   Export CSV
                 </Button>
@@ -289,46 +328,41 @@ export default function AccountsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Homeowner</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>S/C Amount</TableHead>
-                    <TableHead>Billed For</TableHead>
-                    <TableHead>Excess (Cr)</TableHead>
-                    <TableHead className="text-right">Payment Status</TableHead>
+                    <TableHead>Properties / Units</TableHead>
+                    <TableHead>Total Balance (Due)</TableHead>
+                    <TableHead>Excess (Credit)</TableHead>
+                    <TableHead className="text-right">Overall Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedHomeowners.map((homeowner) => (
-                    <TableRow key={homeowner.id}>
+                  {paginatedGroupedHomeowners.map((homeownerGroup) => (
+                    <TableRow key={homeownerGroup.email}>
                       <TableCell>
-                        <div className="font-medium">{homeowner.name}</div>
-                        <div className="text-sm text-muted-foreground">{homeowner.email}</div>
+                        <div className="font-medium">{homeownerGroup.name}</div>
+                        <div className="text-sm text-muted-foreground">{homeownerGroup.email}</div>
                       </TableCell>
                       <TableCell>
-                        <div>{getPropertyName(homeowner.propertyId)}</div>
-                        <div className="text-sm text-muted-foreground">Unit: {homeowner.unitName}</div>
+                        {homeownerGroup.units.map(unit => (
+                            <div key={unit.unitName} className="text-xs">
+                                <span className="font-semibold">{getPropertyName(unit.propertyId)}</span>
+                                <span className="text-muted-foreground"> - Unit {unit.unitName}</span>
+                            </div>
+                        ))}
                       </TableCell>
-                      <TableCell>
-                        {homeowner.lease && typeof homeowner.lease.serviceCharge === 'number'
-                          ? `Ksh ${homeowner.lease.serviceCharge.toLocaleString()}`
-                          : 'N/A'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {homeowner.lease?.lastBilledPeriod
-                          ? format(new Date(homeowner.lease.lastBilledPeriod + '-02'), 'MMMM yyyy')
-                          : 'N/A'}
+                      <TableCell className="font-semibold text-destructive">
+                        Ksh {homeownerGroup.totalDueBalance.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-green-600 font-semibold">
-                        Ksh {(homeowner.accountBalance || 0).toLocaleString()}
+                        Ksh {homeownerGroup.totalAccountBalance.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={getPaymentStatusVariant(homeowner.lease?.paymentStatus)}>
-                          {homeowner.lease?.paymentStatus || 'N/A'}
+                        <Badge variant={homeownerGroup.totalDueBalance > 0 ? 'destructive' : 'default'}>
+                            {homeownerGroup.totalDueBalance > 0 ? 'Pending' : 'Paid'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => handleViewHistory(homeowner)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewHistory(homeownerGroup.representativeTenant)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View
                         </Button>
@@ -343,7 +377,7 @@ export default function AccountsPage() {
                 currentPage={scCurrentPage}
                 totalPages={scTotalPages}
                 pageSize={scPageSize}
-                totalItems={filteredHomeowners.length}
+                totalItems={filteredGroupedHomeowners.length}
                 onPageChange={setScCurrentPage}
                 onPageSizeChange={setScPageSize}
               />
