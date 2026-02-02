@@ -36,7 +36,6 @@ interface OwnerTransactionHistoryDialogProps {
 
 export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allProperties, allTenants, allPayments, selectedMonth, paymentStatusForMonth }: OwnerTransactionHistoryDialogProps) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [openingBalance, setOpeningBalance] = useState(0);
     const [totalDueForInvoice, setTotalDueForInvoice] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isStatementOptionsOpen, setIsStatementOptionsOpen] = useState(false);
@@ -109,7 +108,34 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 }
             });
             
-            allHistoricalTransactions.sort((a, b) => {
+            const endOfSelectedMonth = endOfMonth(selectedMonth);
+            const transactionsToProcess = allHistoricalTransactions.filter(t => t.date <= endOfSelectedMonth);
+
+            const groupedCharges = transactionsToProcess
+                .filter(t => t.charge > 0)
+                .reduce((acc, t) => {
+                    const monthKey = format(t.date, 'yyyy-MM');
+                    if (!acc[monthKey]) {
+                        acc[monthKey] = { date: t.date, totalCharge: 0, unitNames: new Set<string>() };
+                    }
+                    acc[monthKey].totalCharge += t.charge;
+                    const unitMatch = t.details.match(/Unit (.*)/);
+                    if (unitMatch && unitMatch[1]) {
+                        acc[monthKey].unitNames.add(unitMatch[1]);
+                    }
+                    return acc;
+                }, {} as Record<string, { date: Date; totalCharge: number; unitNames: Set<string> }>);
+
+            const chargeItems = Object.values(groupedCharges).map(group => ({
+                date: group.date,
+                details: `S.Charge for Units: ${Array.from(group.unitNames).sort().join(', ')}`,
+                charge: group.totalCharge,
+                payment: 0,
+            }));
+
+            const paymentItems = transactionsToProcess.filter(t => t.payment > 0);
+
+            const combinedItems = [...chargeItems, ...paymentItems].sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
                 if (a.charge > 0 && b.payment > 0) return -1;
@@ -117,69 +143,24 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 return 0;
             });
             
-            const startOfSelectedMonth = startOfMonth(selectedMonth);
-            const openingBalanceTransactions = allHistoricalTransactions.filter(t => isBefore(t.date, startOfSelectedMonth));
-            const balanceBroughtForward = openingBalanceTransactions.reduce((acc, t) => acc + t.charge - t.payment, 0);
-
-            const transactionsForMonth = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
-            
-            const chargeItems = transactionsForMonth.filter(t => t.charge > 0);
-            const paymentItems = transactionsForMonth.filter(t => t.payment > 0);
-            
-            const combinedMonthlyCharge = chargeItems.reduce((acc, item) => {
-                const key = format(item.date, 'yyyy-MM');
-                if (!acc[key]) {
-                    acc[key] = { date: item.date, charge: 0, details: [] as string[] };
-                }
-                acc[key].charge += item.charge;
-                acc[key].details.push(item.details.replace('S.Charge for ', ''));
-                return acc;
-            }, {} as Record<string, { date: Date; charge: number; details: string[] }>);
-
-            const displayItems: { date: Date, details: string, charge: number, payment: number }[] = [];
-
-            if (balanceBroughtForward > 0) {
-                displayItems.push({
-                    date: startOfSelectedMonth,
-                    details: 'Balance Brought Forward',
-                    charge: balanceBroughtForward,
-                    payment: 0,
-                });
-            }
-
-            Object.values(combinedMonthlyCharge).forEach(item => {
-                displayItems.push({
-                    date: item.date,
-                    details: `S.Charge for Units: ${item.details.join(', ')}`,
-                    charge: item.charge,
-                    payment: 0,
-                });
-            });
-
-            paymentItems.forEach(item => {
-                displayItems.push(item);
-            });
-
-            displayItems.sort((a,b) => a.date.getTime() - b.date.getTime());
-
-
             let runningBalance = 0;
-            const ledger: Transaction[] = [];
-
-            displayItems.forEach(item => {
+            const ledger: Transaction[] = combinedItems.map(item => {
                 runningBalance += item.charge;
                 runningBalance -= item.payment;
-                ledger.push({
+                return {
                     date: item.date,
                     transactionType: item.charge > 0 ? 'Invoice' : 'Payment',
                     details: item.details,
                     charge: item.charge,
                     payment: item.payment,
                     balance: runningBalance
-                });
+                };
             });
             
-            const totalChargesForInvoice = chargeItems.reduce((sum, t) => sum + t.charge, 0);
+            const totalChargesForInvoice = chargeItems
+                .filter(c => isSameMonth(c.date, selectedMonth))
+                .reduce((sum, item) => sum + item.charge, 0);
+
             setTotalDueForInvoice(totalChargesForInvoice);
             setTransactions(ledger);
             setIsLoading(false);
