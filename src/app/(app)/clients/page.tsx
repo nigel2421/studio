@@ -113,8 +113,11 @@ export default function ClientsPage() {
             assignedUnits,
         };
     });
+    
+    const allClients = [...clientOnlyPropertyOwners, ...formattedClientLandlords];
+    const uniqueClients = Array.from(new Map(allClients.map(client => [client.id, client])).values());
 
-    return [...clientOnlyPropertyOwners, ...formattedClientLandlords];
+    return uniqueClients;
   }, [propertyOwners, allLandlords, allProperties, allUnitsMap]);
   
   const clientProperties = useMemo(() => {
