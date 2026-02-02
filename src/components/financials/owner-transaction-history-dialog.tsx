@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Download, Mail } from 'lucide-react';
 import { Tenant, Payment, Property, Landlord, PropertyOwner, Unit } from '@/lib/types';
-import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter, isSameMonth, endOfMonth } from 'date-fns';
+import { format, isWithinInterval, startOfMonth, addMonths, isBefore, isAfter, isSameMonth, endOfMonth, isValid } from 'date-fns';
 import { StatementOptionsDialog } from './statement-options-dialog';
 import { generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
@@ -77,35 +77,47 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             ownerUnits.forEach(unit => {
                 const monthlyCharge = unit.serviceCharge || 0;
                 if (monthlyCharge <= 0) return;
-
+            
                 const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-
-                let firstBillableMonth: Date;
+            
+                let firstBillableMonth: Date | null = null;
+            
+                // Priority 1: Use the last billed period from an existing tenant record.
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
-                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-                } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-                    const handoverDate = new Date(unit.handoverDate);
-                    const handoverDay = handoverDate.getDate();
-                     if (handoverDay <= 10) {
-                        firstBillableMonth = startOfMonth(handoverDate);
-                    } else {
-                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                    firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
+                } 
+                // Priority 2: Use handover date or lease start date if status is Handed Over.
+                else if (unit.handoverStatus === 'Handed Over') {
+                    const dateToUse = unit.handoverDate || tenant?.lease.startDate;
+                    if (dateToUse) {
+                        const effectiveDate = new Date(dateToUse);
+                        if(isValid(effectiveDate)) {
+                            const handoverDay = effectiveDate.getDate();
+                            if (handoverDay <= 10) {
+                                firstBillableMonth = startOfMonth(effectiveDate);
+                            } else {
+                                firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
+                            }
+                        }
                     }
-                } else {
-                    return; 
                 }
-
-                let loopDate = firstBillableMonth;
-                const endOfPeriod = endOfMonth(selectedMonth);
-                while (loopDate <= endOfPeriod) {
-                    allHistoricalTransactions.push({
-                        date: loopDate,
-                        details: `S.Charge for Unit ${unit.name}`,
-                        charge: monthlyCharge,
-                        payment: 0,
-                    });
-                    loopDate = addMonths(loopDate, 1);
+            
+                // If a valid start date was found, generate the historical charges.
+                if (firstBillableMonth) {
+                    let loopDate = firstBillableMonth;
+                    const endOfPeriod = endOfMonth(selectedMonth);
+                    while (loopDate <= endOfPeriod) {
+                        allHistoricalTransactions.push({
+                            date: loopDate,
+                            details: `S.Charge for Unit ${unit.name}`,
+                            charge: monthlyCharge,
+                            payment: 0,
+                        });
+                        loopDate = addMonths(loopDate, 1);
+                    }
                 }
+                // If no start date can be determined, the unit is skipped to prevent incorrect billing.
+                // This indicates a data issue (e.g., unit handed over with no date and no tenant record).
             });
             
             const endOfSelectedMonth = endOfMonth(selectedMonth);
