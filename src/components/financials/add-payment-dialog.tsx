@@ -18,6 +18,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
+const paymentMethods: Payment['paymentMethod'][] = ['M-Pesa', 'Bank Transfer', 'Card', 'Cash'];
+
 
 interface PaymentEntry {
   id: number;
@@ -26,6 +28,8 @@ interface PaymentEntry {
   date: Date;
   notes: string;
   rentForMonth: string;
+  paymentMethod?: Payment['paymentMethod'];
+  transactionId?: string;
 }
 
 interface AddPaymentDialogProps {
@@ -159,6 +163,8 @@ export function AddPaymentDialog({
             date: new Date(),
             notes: '',
             rentForMonth: rentForMonthDefault,
+            paymentMethod: 'M-Pesa',
+            transactionId: '',
         };
         setPaymentEntries([initialEntry]);
 
@@ -208,6 +214,8 @@ export function AddPaymentDialog({
         date: new Date(),
         notes: '',
         rentForMonth: format(new Date(), 'yyyy-MM'),
+        paymentMethod: 'M-Pesa',
+        transactionId: '',
     };
     setPaymentEntries(prev => [...prev, newEntry]);
   };
@@ -246,6 +254,8 @@ export function AddPaymentDialog({
         notes: e.notes,
         rentForMonth: e.rentForMonth,
         type: e.type,
+        paymentMethod: e.paymentMethod,
+        transactionId: e.transactionId,
       }));
 
       await batchProcessPayments(finalTenantId, paymentsToBatch, taskId);
@@ -353,47 +363,66 @@ export function AddPaymentDialog({
               </div>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry) => (
-                  <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end p-3 border rounded-lg relative">
+                  <div key={entry.id} className="p-3 border rounded-lg relative space-y-4">
                      {paymentEntries.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeEntry(entry.id)} className="absolute -top-1 -right-1 h-6 w-6 z-10">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeEntry(entry.id)} className="absolute top-1 right-1 h-6 w-6 z-10">
                             <X className="h-4 w-4 text-muted-foreground" />
                         </Button>
                      )}
-                     <div className="space-y-1">
-                      <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
-                      <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`amount-${entry.id}`} className="text-xs">
-                        {entry.type === 'Adjustment' ? 'Amount (+/-)' : 'Amount (Ksh)'}
-                      </Label>
-                      <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">For Month</Label>
-                      <Select
-                          value={entry.rentForMonth}
-                          onValueChange={(value) => handleEntryChange(entry.id, 'rentForMonth', value)}
-                      >
-                          <SelectTrigger id={`rent-for-${entry.id}`} className="h-10">
-                              <SelectValue placeholder="Select month" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {monthOptions.map(option => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                  </SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
-                      <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes</Label>
-                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} placeholder={entry.type === 'Adjustment' ? 'Reason for adjustment' : 'Optional notes'}/>
+                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
+                          <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`amount-${entry.id}`} className="text-xs">
+                            {entry.type === 'Adjustment' ? 'Amount (+/-)' : 'Amount (Ksh)'}
+                          </Label>
+                          <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor={`payment-method-${entry.id}`} className="text-xs">Method</Label>
+                            <Select value={entry.paymentMethod} onValueChange={(value) => handleEntryChange(entry.id, 'paymentMethod', value as Payment['paymentMethod'])}>
+                                <SelectTrigger id={`payment-method-${entry.id}`}>
+                                    <SelectValue placeholder="Method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
+                          <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">For Month</Label>
+                          <Select
+                              value={entry.rentForMonth}
+                              onValueChange={(value) => handleEntryChange(entry.id, 'rentForMonth', value)}
+                          >
+                              <SelectTrigger id={`rent-for-${entry.id}`} className="h-10">
+                                  <SelectValue placeholder="Select month" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {monthOptions.map(option => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                      </SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor={`transaction-id-${entry.id}`} className="text-xs">Transaction ID (Optional)</Label>
+                            <Input id={`transaction-id-${entry.id}`} value={entry.transactionId || ''} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} placeholder="e.g. UAE6G3OSE9"/>
+                        </div>
+                     </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes (Optional)</Label>
+                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} placeholder={entry.type === 'Adjustment' ? 'Reason for adjustment' : 'e.g. part payment'}/>
                     </div>
                   </div>
                 ))}

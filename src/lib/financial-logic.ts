@@ -256,10 +256,15 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
     // --- COMBINE WITH PAYMENTS ---
     const allPaymentsAndAdjustments = allTenantPayments.map(p => {
         const isAdjustment = p.type === 'Adjustment';
+        let details = p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`;
+        if (p.paymentMethod) {
+            details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
+        }
+
         return {
             id: p.id,
             date: new Date(p.date),
-            description: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+            description: details,
             charge: isAdjustment && p.amount > 0 ? p.amount : 0,
             payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
         };

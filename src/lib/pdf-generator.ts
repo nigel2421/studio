@@ -55,12 +55,27 @@ const generateRentReceipt = (doc: jsPDF, document: FinancialDocument) => {
     doc.setFontSize(10);
     doc.setTextColor(0);
 
-    doc.text(`Receipt No: #${payment.id.substring(0, 8).toUpperCase()}`, 14, 50);
-    doc.text(`Date: ${dateStr}`, 14, 56);
-    doc.text(`Status: ${document.status}`, 14, 62);
+    let yPos = 50;
+    doc.text(`Receipt No: #${payment.id.substring(0, 8).toUpperCase()}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Date: ${dateStr}`, 14, yPos);
+    yPos += 6;
+
+    if (payment.paymentMethod) {
+        doc.text(`Payment Method: ${payment.paymentMethod}`, 14, yPos);
+        yPos += 6;
+    }
+    if (payment.transactionId) {
+        doc.text(`Transaction ID: ${payment.transactionId}`, 14, yPos);
+        yPos += 6;
+    }
+
+    doc.text(`Status: ${document.status}`, 14, yPos);
+    yPos += 8;
+
 
     autoTable(doc, {
-        startY: 70,
+        startY: yPos,
         head: [['Description', 'Amount']],
         body: [
             ['Rent Payment', formatCurrency(payment.amount)],

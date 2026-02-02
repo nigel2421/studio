@@ -639,7 +639,15 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
 
 export async function batchProcessPayments(
     tenantId: string,
-    paymentEntries: { amount: number, date: string, notes?: string, rentForMonth?: string, type: Payment['type'] }[],
+    paymentEntries: {
+        amount: number,
+        date: string,
+        notes?: string,
+        rentForMonth?: string,
+        type: Payment['type'],
+        paymentMethod?: Payment['paymentMethod'],
+        transactionId?: string,
+    }[],
     taskId?: string
 ) {
     const tenantRef = doc(db, 'tenants', tenantId);
@@ -743,6 +751,8 @@ export async function batchProcessPayments(
                         propertyName: property?.name || 'N/A',
                         unitName: tenant.unitName,
                         notes: entry.notes,
+                        paymentMethod: entry.paymentMethod,
+                        transactionId: entry.transactionId,
                     });
                     await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
                 } catch (error) {
@@ -761,6 +771,8 @@ export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>,
         notes,
         rentForMonth,
         type,
+        paymentMethod: paymentData.paymentMethod,
+        transactionId: paymentData.transactionId,
     }];
     await batchProcessPayments(tenantId, entries, taskId);
 }
