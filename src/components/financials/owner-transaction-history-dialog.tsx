@@ -50,12 +50,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             setIsLoading(true);
 
             const ownerUnits: Unit[] = allProperties.flatMap(p =>
-                (p.units || [])
-                    .filter(u =>
-                        ('assignedUnits' in owner && owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name))) ||
-                        (!('assignedUnits' in owner) && u.landlordId === owner.id)
-                    )
-                    .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+                (p.units || []).filter(u => {
+                    const isDirectlyAssigned = u.landlordId === owner.id;
+                    const isAssignedViaOwnerObject = 'assignedUnits' in owner && owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
+                    return isDirectlyAssigned || isAssignedViaOwnerObject;
+                }).map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
 
             const allHistoricalTransactions: { date: Date, details: string, charge: number, payment: number }[] = [];
