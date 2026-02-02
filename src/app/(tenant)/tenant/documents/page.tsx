@@ -6,32 +6,27 @@ import { getFinancialDocuments } from '@/lib/data';
 import { FinancialDocument } from '@/lib/types';
 import { DocumentList } from '@/components/financials/document-list';
 import { useToast } from '@/hooks/use-toast';
-import { useLoading } from '@/hooks/useLoading';
-import { FileText, Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
-export default function DocumentsPage() {
+export default function TenantDocumentsPage() {
     const { user, userProfile, isLoading: authLoading } = useAuth();
     const [documents, setDocuments] = useState<FinancialDocument[]>([]);
     const { toast } = useToast();
-    const { startLoading, stopLoading } = useLoading();
 
     useEffect(() => {
         async function fetchData() {
             if (user && userProfile) {
-                // startLoading('Fetching your financial records...');
                 try {
                     const docs = await getFinancialDocuments(user.uid, userProfile.role);
                     setDocuments(docs);
                 } catch (error) {
                     console.error("Failed to fetch documents:", error);
                     toast({ variant: 'destructive', title: 'Error', description: 'Failed to load your documents.' });
-                } finally {
-                    // stopLoading();
                 }
             }
         }
 
-        if (!authLoading) {
+        if (!authLoading && userProfile) {
             fetchData();
         }
     }, [user, userProfile, authLoading, toast]);
@@ -67,12 +62,11 @@ export default function DocumentsPage() {
                         Access and download your invoices, receipts, and statements.
                     </p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">
+                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">
                     <FileText className="h-4 w-4" />
                     <span>{documents.length} Records Available</span>
                 </div>
             </div>
-
             <div className="bg-white rounded-xl shadow-sm border p-1 md:p-6 min-h-[60vh]">
                 <DocumentList documents={documents} onDownload={handleDownload} />
             </div>

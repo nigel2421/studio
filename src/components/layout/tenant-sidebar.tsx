@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Wrench,
   LogOut,
+  FileText,
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
   { href: '/tenant/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/tenant/documents', icon: FileText, label: 'My Documents' },
   { href: '/tenant/maintenance', icon: Wrench, label: 'Maintenance' },
 ];
 

@@ -154,8 +154,8 @@ export const generateOwnerServiceChargeStatementPDF = (
     doc.setFont('helvetica', 'bold');
     doc.text('Your Units:', 14, yPosHeader);
     yPosHeader += 6;
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     ownerUnits.forEach(unit => {
         const unitDetails = `- ${unit.name} (${unit.unitType}): Service Charge ${formatCurrency(unit.serviceCharge || 0)}/mo`;
         doc.text(unitDetails, 14, yPosHeader);
