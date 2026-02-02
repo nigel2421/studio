@@ -216,10 +216,8 @@ export const generateOwnerServiceChargeStatementPDF = (
 
         let firstBillableMonth: Date | null = null;
 
-        if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
-            firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-        }
-        else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
+        // Priority: Handover Date > Lease Start Date. Ignore lastBilledPeriod for historical accuracy.
+        if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
             const effectiveDate = new Date(unit.handoverDate);
             if (isValid(effectiveDate)) {
                 const handoverDay = effectiveDate.getDate();
@@ -301,6 +299,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     ].sort((a, b) => {
             const dateDiff = a.date.getTime() - b.date.getTime();
             if (dateDiff !== 0) return dateDiff;
+            // Prioritize charges over payments on the same day
             if (a.charge > 0 && b.payment > 0) return -1;
             if (a.payment > 0 && b.charge > 0) return 1;
             return 0;
