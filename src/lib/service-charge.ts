@@ -128,7 +128,6 @@ export function processServiceChargeData(
         let paymentForMonth: string | undefined;
 
         let isBillable = false;
-        let firstBillableMonth: Date | null = null;
         if (unit.handoverDate) {
             const handoverDateSource = unit.handoverDate as any;
             const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
@@ -137,7 +136,7 @@ export function processServiceChargeData(
             
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
                 if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
                     isBillable = true;
                 }
@@ -159,11 +158,7 @@ export function processServiceChargeData(
                 paymentAmount = paymentInSelectedMonth.amount;
                 paymentForMonth = paymentInSelectedMonth.rentForMonth;
             } else {
-                if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
-                    paymentStatus = 'Paid';
-                } else {
-                    paymentStatus = 'Pending';
-                }
+                paymentStatus = 'Pending';
             }
         }
 
@@ -207,7 +202,6 @@ export function processServiceChargeData(
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
       let isBillable = false;
-      let firstBillableMonth: Date | null = null;
       if (unit.handoverDate) {
         const handoverDateSource = unit.handoverDate as any;
         const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
@@ -215,7 +209,7 @@ export function processServiceChargeData(
             : parseISO(handoverDateSource);
         if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
-          firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
           if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
             isBillable = true;
           }
@@ -238,11 +232,7 @@ export function processServiceChargeData(
         if (paymentForMonthExists) {
             paymentStatus = 'Paid';
         } else {
-            if (firstBillableMonth && isSameMonth(startOfMonth(selectedMonth), firstBillableMonth)) {
-                paymentStatus = 'Paid';
-            } else {
-                paymentStatus = 'Pending';
-            }
+            paymentStatus = 'Pending';
         }
       }
 
