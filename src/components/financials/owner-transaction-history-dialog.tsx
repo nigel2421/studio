@@ -112,32 +112,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             const endOfSelectedMonth = endOfMonth(selectedMonth);
             const displayTransactions = allHistoricalTransactions.filter(t => !isAfter(t.date, endOfSelectedMonth));
             
-            const groupedCharges = displayTransactions
-                .filter(t => t.charge > 0)
-                .reduce((acc, t) => {
-                    const monthKey = format(t.date, 'yyyy-MM');
-                    if (!acc[monthKey]) {
-                        acc[monthKey] = { date: t.date, totalCharge: 0, units: new Set<string>() };
-                    }
-                    acc[monthKey].totalCharge += t.charge;
-                    const unitMatch = t.details.match(/Unit (.*)/);
-                    if (unitMatch && unitMatch[1]) {
-                        acc[monthKey].units.add(unitMatch[1]);
-                    }
-                    return acc;
-                }, {} as Record<string, { date: Date; totalCharge: number; units: Set<string> }>);
-
-            const combinedTransactionsForMonth = [
-                ...Object.values(groupedCharges).map(group => ({
-                    date: group.date,
-                    details: `S.Charge for Units: ${Array.from(group.units).sort().join(', ')}`,
-                    charge: group.totalCharge,
-                    payment: 0,
-                })),
-                ...displayTransactions.filter(t => t.payment > 0)
-            ];
-
-            combinedTransactionsForMonth.sort((a, b) => {
+            displayTransactions.sort((a, b) => {
                 const dateDiff = a.date.getTime() - b.date.getTime();
                 if (dateDiff !== 0) return dateDiff;
                 if (a.charge > 0 && b.payment > 0) return -1;
@@ -148,7 +123,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             let runningBalanceForDisplay = 0;
             const ledger: Transaction[] = [];
 
-            combinedTransactionsForMonth.forEach(item => {
+            displayTransactions.forEach(item => {
                 runningBalanceForDisplay += item.charge;
                 runningBalanceForDisplay -= item.payment;
                 ledger.push({
@@ -161,7 +136,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 });
             });
 
-            const totalChargesForInvoice = combinedTransactionsForMonth
+            const totalChargesForInvoice = displayTransactions
                 .filter(t => t.charge > 0 && isSameMonth(t.date, selectedMonth))
                 .reduce((sum, t) => sum + t.charge, 0);
             setTotalDueForInvoice(totalChargesForInvoice);
