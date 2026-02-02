@@ -80,13 +80,22 @@ export default function LandlordsPage() {
     setLandlordCurrentPage(1);
   }, [selectedPropertyId]);
 
+  const investorLandlordIds = useMemo(() => {
+    const ids = new Set<string>();
+    properties.forEach(p => {
+        p.units.forEach(u => {
+            if(u.landlordId && u.ownership === 'Landlord' && (u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb')) {
+                ids.add(u.landlordId);
+            }
+        });
+    });
+    return ids;
+  }, [properties]);
+
   const landlordManagedProperties = useMemo(() => {
     const propertyIds = new Set<string>();
     properties.forEach(p => {
-      if (p.units.some(u => u.ownership === 'Landlord' && u.managementStatus !== 'Client Managed')) {
-        propertyIds.add(p.id);
-      }
-      if (p.units.some(u => u.ownership === 'SM')) {
+      if (p.units.some(u => u.ownership === 'SM' || u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Airbnb')) {
         propertyIds.add(p.id);
       }
     });
@@ -97,12 +106,11 @@ export default function LandlordsPage() {
     return properties.find(p => p.id === selectedPropertyId) || null;
   }, [selectedPropertyId, properties]);
 
-  const { landlordUnitsMap, unassignedLandlordUnits, clientOnlyLandlordIds } = useMemo(() => {
+  const { landlordUnitsMap, unassignedLandlordUnits } = useMemo(() => {
     const map = new Map<string, (Unit & { propertyName: string; propertyId: string })[]>();
     const unassigned: (Unit & { propertyName: string; propertyId: string })[] = [];
-    const clientIds = new Set<string>();
 
-    if (!properties || properties.length === 0) return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned, clientOnlyLandlordIds: clientIds };
+    if (!properties || properties.length === 0) return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned };
 
     properties.forEach(p => {
       if (p.units) {
@@ -118,24 +126,19 @@ export default function LandlordsPage() {
             }
             map.get(SOIL_MERCHANTS_LANDLORD.id)!.push({ ...u, propertyName: p.name, propertyId: p.id });
           }
-           else if (u.ownership === 'Landlord' && !u.landlordId) {
+           else if (u.ownership === 'Landlord' && !u.landlordId && u.managementStatus !== 'Client Managed') {
             unassigned.push({ ...u, propertyName: p.name, propertyId: p.id });
           }
         });
       }
     });
     
-    for (const [landlordId, units] of map.entries()) {
-        if (landlordId !== SOIL_MERCHANTS_LANDLORD.id) {
-            const isClientOnly = units.every(u => u.managementStatus === 'Client Managed');
-            if (isClientOnly) {
-                clientIds.add(landlordId);
-            }
-        }
-    }
-
-    return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned, clientOnlyLandlordIds: clientIds };
+    return { landlordUnitsMap: map, unassignedLandlordUnits: unassigned };
   }, [properties]);
+  
+  const investorLandlords = useMemo(() => {
+      return landlords.filter(l => investorLandlordIds.has(l.id) || l.id === SOIL_MERCHANTS_LANDLORD.id);
+  }, [landlords, investorLandlordIds]);
 
   const landlordsForSelectedProperty = useMemo(() => {
     if (!selectedPropertyId) return [];
@@ -144,39 +147,26 @@ export default function LandlordsPage() {
     const property = properties.find(p => p.id === selectedPropertyId);
     if (property) {
       property.units.forEach(unit => {
-        if (unit.landlordId) {
+        if (unit.landlordId && investorLandlordIds.has(unit.landlordId)) {
           landlordIdsInProperty.add(unit.landlordId);
+        }
+        if (unit.ownership === 'SM') {
+            landlordIdsInProperty.add(SOIL_MERCHANTS_LANDLORD.id);
         }
       });
     }
-
-    const smUnitsInProperty = property?.units.some(u => u.ownership === 'SM');
-    if (smUnitsInProperty) {
-      landlordIdsInProperty.add(SOIL_MERCHANTS_LANDLORD.id);
-    }
-
-    return landlords.filter(l => {
-      // Only include landlords that have units in the selected property
-      if (!landlordIdsInProperty.has(l.id)) {
-        return false;
-      }
-      // Exclude landlords that ONLY have client-managed units
-      if (clientOnlyLandlordIds.has(l.id)) {
-        return false;
-      }
-      return true;
-    });
-  }, [selectedPropertyId, properties, landlords, clientOnlyLandlordIds]);
+    
+    return investorLandlords.filter(l => landlordIdsInProperty.has(l.id));
+  }, [selectedPropertyId, properties, investorLandlords, investorLandlordIds]);
 
   const totalInvestorLandlords = useMemo(() => {
-    return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id && !clientOnlyLandlordIds.has(l.id)).length;
-  }, [landlords, clientOnlyLandlordIds]);
+    return investorLandlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
+  }, [investorLandlords]);
 
   const totalManagedUnits = useMemo(() => {
     let count = 0;
     properties.forEach(p => {
-        count += p.units.filter(u => u.ownership === 'Landlord' && u.managementStatus !== 'Client Managed').length;
-        count += p.units.filter(u => u.ownership === 'SM').length;
+        count += p.units.filter(u => u.ownership === 'SM' || u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Airbnb').length;
     });
     return count;
   }, [properties]);

@@ -63,38 +63,68 @@ export default function ClientsPage() {
     return map;
   }, [allProperties]);
 
-  const unifiedClientOwners = useMemo(() => {
-    const clientOnlyPropertyOwners = propertyOwners.filter(owner => {
-        if (!owner.assignedUnits || owner.assignedUnits.length === 0) return false;
-        return !owner.assignedUnits.some(assignedProp => 
-            assignedProp.unitNames.some(unitName => {
-                const unit = allUnitsMap.get(`${assignedProp.propertyId}-${unitName}`);
-                return unit && unit.managementStatus !== 'Client Managed';
-            })
-        );
-    });
+  // Determine which owners are investors vs. clients
+  const { investorLandlordIds, clientOwnerIds } = useMemo(() => {
+    const investorIds = new Set<string>();
+    const clientIds = new Set<string>();
 
-    const landlordUnitsMap = new Map<string, Unit[]>();
+    const allCombinedOwners: (Landlord | PropertyOwner)[] = [...allLandlords, ...propertyOwners];
+    const ownerUnits = new Map<string, Unit[]>();
+
+    // Map all units to their owner
     allProperties.forEach(p => {
-        if (p.units) {
-            p.units.forEach(u => {
-                if (u.landlordId) {
-                    if (!landlordUnitsMap.has(u.landlordId)) {
-                        landlordUnitsMap.set(u.landlordId, []);
-                    }
-                    landlordUnitsMap.get(u.landlordId)!.push({ ...u, propertyId: p.id });
+        p.units.forEach(u => {
+            if (u.landlordId) {
+                if (!ownerUnits.has(u.landlordId)) ownerUnits.set(u.landlordId, []);
+                ownerUnits.get(u.landlordId)!.push(u);
+            }
+        });
+    });
+    propertyOwners.forEach(po => {
+        po.assignedUnits.forEach(au => {
+            au.unitNames.forEach(un => {
+                const unit = allUnitsMap.get(`${au.propertyId}-${un}`);
+                if (unit) {
+                    if (!ownerUnits.has(po.id)) ownerUnits.set(po.id, []);
+                    ownerUnits.get(po.id)!.push(unit);
                 }
             });
+        });
+    });
+
+    for (const owner of allCombinedOwners) {
+        const units = ownerUnits.get(owner.id);
+        if (!units || units.length === 0) continue;
+
+        const isInvestor = units.some(u => u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb');
+        const isClient = units.some(u => u.managementStatus === 'Client Managed');
+
+        if (isInvestor) {
+            investorIds.add(owner.id);
+        } else if (isClient) {
+            clientIds.add(owner.id);
         }
-    });
+    }
+    
+    return { investorLandlordIds: investorIds, clientOwnerIds: clientIds };
+}, [allProperties, allLandlords, propertyOwners, allUnitsMap]);
 
-    const clientLandlords = allLandlords.filter(landlord => {
-        const units = landlordUnitsMap.get(landlord.id);
-        if (!units || units.length === 0) return false;
-        return units.every(u => u.managementStatus === 'Client Managed');
-    });
 
-    const formattedClientLandlords: PropertyOwner[] = clientLandlords.map(landlord => {
+  const unifiedClientOwners = useMemo(() => {
+    const allClientsAsPropertyOwner: PropertyOwner[] = [
+      ...propertyOwners,
+      ...allLandlords.map(landlord => {
+        const landlordUnitsMap = new Map<string, Unit[]>();
+        allProperties.forEach(p => {
+            if (p.units) {
+                p.units.forEach(u => {
+                    if (u.landlordId === landlord.id) {
+                        if (!landlordUnitsMap.has(u.landlordId)) landlordUnitsMap.set(u.landlordId, []);
+                        landlordUnitsMap.get(u.landlordId)!.push({ ...u, propertyId: p.id });
+                    }
+                });
+            }
+        });
         const units = landlordUnitsMap.get(landlord.id) || [];
         const assignedUnits = units.reduce((acc, unit) => {
             if (!unit.propertyId) return acc;
@@ -116,13 +146,13 @@ export default function ClientsPage() {
             userId: landlord.userId,
             assignedUnits,
         };
-    });
+      })
+    ];
     
-    const allClients = [...clientOnlyPropertyOwners, ...formattedClientLandlords];
-    const uniqueClients = Array.from(new Map(allClients.map(client => [client.id, client])).values());
+    const uniqueClients = Array.from(new Map(allClientsAsPropertyOwner.map(client => [client.id, client])).values());
 
-    return uniqueClients;
-  }, [propertyOwners, allLandlords, allProperties, allUnitsMap]);
+    return uniqueClients.filter(c => clientOwnerIds.has(c.id));
+  }, [propertyOwners, allLandlords, allProperties, clientOwnerIds]);
   
   const clientProperties = useMemo(() => {
       const propertyIdsWithClients = new Set<string>();
@@ -131,13 +161,6 @@ export default function ClientsPage() {
               owner.assignedUnits.forEach(au => propertyIdsWithClients.add(au.propertyId));
           }
       });
-
-      allProperties.forEach(p => {
-          if (p.units.some(u => u.managementStatus === 'Client Managed')) {
-               propertyIdsWithClients.add(p.id);
-          }
-      });
-
       return allProperties.filter(p => propertyIdsWithClients.has(p.id) && p.units.some(u => u.managementStatus === 'Client Managed'));
   }, [allProperties, unifiedClientOwners]);
 
