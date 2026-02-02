@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -61,7 +62,7 @@ export default function ServiceChargesPage() {
   const { toast } = useToast();
 
   const [isOwnerPaymentDialogOpen, setIsOwnerPaymentDialogOpen] = useState(false);
-  const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | null>(null);
+  const [ownerForPayment, setOwnerForPayment] = useState<PropertyOwner | Landlord | null>(null);
   const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -127,17 +128,7 @@ export default function ServiceChargesPage() {
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
     let ownerForDialog: PropertyOwner | Landlord | undefined;
-
-    let ownerFromPropertyOwners = allOwners.find(o => o.id === group.ownerId);
-
-    if (ownerFromPropertyOwners) {
-        ownerForDialog = ownerFromPropertyOwners;
-    } else {
-        const landlordFromLandlords = allLandlords.find(l => l.id === group.ownerId);
-        if (landlordFromLandlords) {
-            ownerForDialog = landlordFromLandlords
-        }
-    }
+    ownerForDialog = allOwners.find(o => o.id === group.ownerId) || allLandlords.find(l => l.id === group.ownerId);
     
     if (ownerForDialog) {
         setOwnerForHistory(ownerForDialog);
@@ -156,7 +147,10 @@ export default function ServiceChargesPage() {
 
     startLoading('Preparing consolidated payment...');
     try {
-        const owner = allOwners.find(o => o.id === account.ownerId);
+        const owner: PropertyOwner | Landlord | undefined = 
+            allOwners.find(o => o.id === account.ownerId) ||
+            allLandlords.find(l => l.id === account.ownerId);
+
         if (!owner) throw new Error("Owner not found");
         
         const sourceAccounts = source === 'client-occupied' ? selfManagedAccounts : managedVacantAccounts;
@@ -164,6 +158,7 @@ export default function ServiceChargesPage() {
         const ownerAccounts = sourceAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
         if (ownerAccounts.length === 0) {
             toast({ title: "No Pending Charges", description: "This owner has no pending service charges for the selected month." });
+            stopLoading();
             return;
         }
 
@@ -193,7 +188,16 @@ export default function ServiceChargesPage() {
             const property = allProperties.find(p => p.id === acc.propertyId);
             const unit = property?.units.find(u => u.name === acc.unitName);
             if (property && unit && ownerForPayment) {
-                return await findOrCreateHomeownerTenant(ownerForPayment, unit, property.id);
+                 const ownerAsPropertyOwner: PropertyOwner = {
+                    id: ownerForPayment.id,
+                    name: ownerForPayment.name,
+                    email: ownerForPayment.email,
+                    phone: ownerForPayment.phone,
+                    userId: ownerForPayment.userId,
+                    bankAccount: 'bankAccount' in ownerForPayment ? ownerForPayment.bankAccount : undefined,
+                    assignedUnits: 'assignedUnits' in ownerForPayment ? ownerForPayment.assignedUnits : [],
+                };
+                return await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
             }
             return null;
         });
@@ -632,5 +636,7 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     
