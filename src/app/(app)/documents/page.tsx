@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { FileText, Download } from 'lucide-react';
 
-export default function DocumentsPage() {
+export default function ReceiptsPage() {
     const { user, userProfile, isLoading: authLoading } = useAuth();
     const [documents, setDocuments] = useState<FinancialDocument[]>([]);
     const { toast } = useToast();
@@ -62,9 +62,9 @@ export default function DocumentsPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">My Documents</h2>
+                    <h2 className="text-3xl font-bold tracking-tight">Receipts</h2>
                     <p className="text-muted-foreground">
-                        Access and download your invoices, receipts, and statements.
+                        Access and download your financial receipts and statements.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">

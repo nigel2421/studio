@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
-const paymentMethods: Payment['paymentMethod'][] = ['M-Pesa', 'Bank Transfer', 'Card', 'Cash'];
+const paymentMethods: Payment['paymentMethod'][] = ['M-Pesa', 'Bank Transfer', 'Card'];
 
 
 interface PaymentEntry {
@@ -28,8 +28,8 @@ interface PaymentEntry {
   date: Date;
   notes: string;
   rentForMonth: string;
-  paymentMethod?: Payment['paymentMethod'];
-  transactionId?: string;
+  paymentMethod: Payment['paymentMethod'];
+  transactionId: string;
 }
 
 interface AddPaymentDialogProps {
@@ -236,6 +236,11 @@ export function AddPaymentDialog({
       toast({ variant: 'destructive', title: 'Missing Tenant', description: 'Please select a valid unit with an assigned tenant.' });
       return;
     }
+    
+    if (paymentEntries.some(e => !e.transactionId && e.type !== 'Adjustment')) {
+        toast({ variant: 'destructive', title: 'Missing Transaction ID', description: 'Please provide a transaction ID for all payments.' });
+        return;
+    }
 
     const validEntries = paymentEntries.filter(e => e.amount && (e.type === 'Adjustment' ? e.amount !== '0' : Number(e.amount) > 0));
 
@@ -416,8 +421,8 @@ export function AddPaymentDialog({
                           </Select>
                         </div>
                          <div className="space-y-1">
-                            <Label htmlFor={`transaction-id-${entry.id}`} className="text-xs">Transaction ID (Optional)</Label>
-                            <Input id={`transaction-id-${entry.id}`} value={entry.transactionId || ''} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} placeholder="e.g. UAE6G3OSE9"/>
+                            <Label htmlFor={`transaction-id-${entry.id}`} className="text-xs">Transaction ID</Label>
+                            <Input id={`transaction-id-${entry.id}`} value={entry.transactionId || ''} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} placeholder="e.g. UAE6G3OSE9" required/>
                         </div>
                      </div>
                       <div className="space-y-1">

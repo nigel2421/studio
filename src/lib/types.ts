@@ -5,6 +5,7 @@
 
 
 
+
 export type Property = {
   id: string;
   name: string;
@@ -133,8 +134,8 @@ export type Payment = {
   notes?: string;
   rentForMonth?: string;
   // Optional fields for more detailed tracking
-  paymentMethod?: 'Cash' | 'M-Pesa' | 'Bank Transfer' | 'Card';
-  transactionId?: string; // e.g., M-Pesa transaction code
+  paymentMethod: 'M-Pesa' | 'Bank Transfer' | 'Card';
+  transactionId: string; // e.g., M-Pesa transaction code
   createdAt: Date;
   reference?: string;
   editHistory?: {
