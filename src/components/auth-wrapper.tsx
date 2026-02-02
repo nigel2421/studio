@@ -80,7 +80,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       }
       
       // If user is not on a route they are allowed to see, redirect them.
-      if (allowedRoutes.length > 0 && !isPathAllowed(pathname, allowedRoutes)) {
+      if (pathname && allowedRoutes.length > 0 && !isPathAllowed(pathname, allowedRoutes)) {
           console.warn(`Redirecting user with role '${role}' from unallowed path '${pathname}' to '${targetDashboard}'`);
           router.push(targetDashboard);
           return;

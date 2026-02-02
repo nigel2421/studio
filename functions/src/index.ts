@@ -9,7 +9,7 @@
  */
 
 import {setGlobalOptions} from "firebase-functions";
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, CallableRequest} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as nodemailer from "nodemailer";
 import {defineString} from "firebase-functions/params";
@@ -53,7 +53,7 @@ const createTransporter = () => {
 // Callable function to send a payment receipt
 export const sendPaymentReceipt = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
-}, async (request) => {
+}, async (request: CallableRequest) => {
     const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes, tenantId } = request.data;
 
     // Validate essential data
@@ -116,8 +116,8 @@ export const sendPaymentReceipt = onCall({
 // Callable function to send a custom email announcement
 export const sendCustomEmail = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
-}, async (request) => {
-    const { recipients, subject, body } = request.data;
+}, async (request: CallableRequest) => {
+    const { recipients, subject, body, attachment } = request.data;
 
     // Validate essential data
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0 || !subject || !body) {
@@ -128,7 +128,7 @@ export const sendCustomEmail = onCall({
     const transporter = createTransporter();
 
     const sendPromises = recipients.map(email => {
-        const mailOptions = {
+        const mailOptions: any = {
             from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
             to: email,
             subject: subject,
@@ -148,6 +148,16 @@ export const sendCustomEmail = onCall({
                 </div>
             `,
         };
+        
+        if (attachment && attachment.content && attachment.filename) {
+            mailOptions.attachments = [{
+                filename: attachment.filename,
+                content: attachment.content,
+                encoding: 'base64',
+                contentType: 'application/pdf'
+            }];
+        }
+
         return transporter.sendMail(mailOptions);
     });
 
@@ -164,7 +174,7 @@ export const sendCustomEmail = onCall({
 
 export const checkAndSendLeaseReminders = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
-}, async (request) => {
+}, async (request: CallableRequest) => {
     const tenantsRef = db.collection('tenants');
     const propertiesRef = db.collection('properties');
 
