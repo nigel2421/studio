@@ -130,7 +130,7 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
 };
 
 export const generateOwnerServiceChargeStatementPDF = (
-    owner: PropertyOwner,
+    owner: PropertyOwner | Landlord,
     allProperties: Property[],
     allTenants: Tenant[],
     allPayments: Payment[],
@@ -161,7 +161,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const ownerUnits = allProperties.flatMap(p => 
         p.units
-         .filter(u => owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)))
+         .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
          .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
     );
     
@@ -182,7 +182,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     serviceChargePayments.forEach(p => {
         allHistoricalTransactions.push({
             date: new Date(p.date),
-            details: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+            details: p.notes || `Payment Received`,
             charge: 0,
             payment: p.amount,
             rentForMonth: p.rentForMonth,
@@ -218,7 +218,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         while (startOfMonth(loopDate) <= startOfMonth(today)) {
             allHistoricalTransactions.push({
                 date: loopDate,
-                details: `S.Charge for Unit ${unit.name}`,
+                details: `Service Charge`,
                 charge: monthlyCharge,
                 payment: 0,
             });
@@ -226,55 +226,9 @@ export const generateOwnerServiceChargeStatementPDF = (
         }
     });
 
-    const transactionsBeforePeriod = allHistoricalTransactions.filter(item => isBefore(item.date, startDate));
-    let openingBalance = 0;
-    transactionsBeforePeriod.forEach(item => {
-        openingBalance += item.charge;
-        openingBalance -= item.payment;
-    });
-
     const transactionsInPeriod = allHistoricalTransactions.filter(item => isWithinInterval(item.date, { start: startDate, end: endDate }));
     
-    const groupedCharges = transactionsInPeriod
-        .filter(t => t.charge > 0)
-        .reduce((acc, t) => {
-            const monthKey = format(t.date, 'yyyy-MM');
-            if (!acc[monthKey]) {
-                acc[monthKey] = { date: t.date, totalCharge: 0 };
-            }
-            acc[monthKey].totalCharge += t.charge;
-            return acc;
-        }, {} as Record<string, { date: Date; totalCharge: number }>);
-
-    const chargeTransactionsForTable = Object.values(groupedCharges).map(group => ({
-        date: group.date,
-        details: `Service Charge for ${format(group.date, 'MMMM yyyy')}`,
-        charge: group.totalCharge,
-        payment: 0,
-    }));
-    
-    const groupedPdfPayments = transactionsInPeriod
-        .filter(t => t.payment > 0)
-        .reduce((acc, t) => {
-            const dateKey = format(t.date, 'yyyy-MM-dd');
-            if (!acc[dateKey]) {
-                acc[dateKey] = { date: t.date, totalPayment: 0 };
-            }
-            acc[dateKey].totalPayment += t.payment;
-            return acc;
-        }, {} as Record<string, { date: Date; totalPayment: number }>);
-
-    const paymentTransactionsForTable = Object.values(groupedPdfPayments).map(group => ({
-        date: group.date,
-        details: 'Payment Received',
-        charge: 0,
-        payment: group.totalPayment,
-    }));
-    
-    const allItemsForTable = [
-        ...chargeTransactionsForTable, 
-        ...paymentTransactionsForTable
-    ].sort((a, b) => {
+    const allItemsForTable = transactionsInPeriod.sort((a, b) => {
         const dateDiff = a.date.getTime() - b.date.getTime();
         if (dateDiff !== 0) return dateDiff;
         if (a.charge > 0 && b.payment > 0) return -1;
@@ -282,25 +236,25 @@ export const generateOwnerServiceChargeStatementPDF = (
         return 0;
     });
     
-    let runningBalance = openingBalance;
-    let totalChargesInPeriod = 0;
-    let totalPaymentsInPeriod = 0;
+    let runningBalance = 0;
 
-    const tableBody: (any)[][] = [[
-        { content: format(startDate, 'dd MMM yyyy'), styles: { fontStyle: 'italic' } },
-        { content: 'Balance Brought Forward', colSpan: 3, styles: { fontStyle: 'italic' } },
-        { content: formatCurrency(openingBalance), styles: { fontStyle: 'italic', halign: 'right' } }
-    ]];
+    const tableBody: (any)[][] = [];
 
     allItemsForTable.forEach(item => {
         runningBalance += item.charge;
         runningBalance -= item.payment;
-        totalChargesInPeriod += item.charge;
-        totalPaymentsInPeriod += item.payment;
+
+        let forMonthDisplay = '';
+        if (item.charge > 0) {
+            forMonthDisplay = format(item.date, 'MMMM yyyy');
+        } else if (item.payment > 0 && item.rentForMonth) {
+            forMonthDisplay = format(new Date(item.rentForMonth + '-02'), 'MMMM yyyy');
+        }
 
         tableBody.push([
             format(item.date, 'dd MMM yyyy'),
             item.details,
+            forMonthDisplay,
             item.charge > 0 ? formatCurrency(item.charge) : '',
             item.payment > 0 ? formatCurrency(item.payment) : '',
             formatCurrency(runningBalance),
@@ -309,17 +263,11 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Details', 'Charge', 'Payment', 'Balance']],
+        head: [['Date', 'Details', 'For Month', 'Charge', 'Payment', 'Balance']],
         body: tableBody,
         foot: [
             [
-                { content: 'Totals for Period', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
-                { content: formatCurrency(totalChargesInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
-                { content: formatCurrency(totalPaymentsInPeriod), styles: { fontStyle: 'bold', halign: 'right' } },
-                ''
-            ],
-            [
-                { content: 'Closing Balance', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: 'Closing Balance', colSpan: 5, styles: { fontStyle: 'bold', halign: 'right' } },
                 { content: formatCurrency(runningBalance), styles: { fontStyle: 'bold', halign: 'right' } }
             ]
         ],
@@ -329,9 +277,10 @@ export const generateOwnerServiceChargeStatementPDF = (
         columnStyles: {
             0: { cellWidth: 25 },
             1: { cellWidth: 'auto' },
-            2: { halign: 'right', cellWidth: 30 },
+            2: { cellWidth: 30 },
             3: { halign: 'right', cellWidth: 30 },
             4: { halign: 'right', cellWidth: 30 },
+            5: { halign: 'right', cellWidth: 30 },
         },
     });
     
@@ -704,7 +653,11 @@ export const generateVacantServiceChargeInvoicePDF = (
     totalDue: number
 ) => {
     const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
 
     addHeader(doc, 'Service Charge Invoice');
     
