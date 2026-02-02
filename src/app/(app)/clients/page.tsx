@@ -206,9 +206,19 @@ export default function ClientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Property Owners (Clients)</h2>
-          <p className="text-muted-foreground">Manage contact information for owners who fully manage their own units.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Client Self Managed Units</h2>
+          <p className="text-muted-foreground">Manage contact information for owners who self-manage their units.</p>
         </div>
+        <Button
+            onClick={() => {
+              setSelectedOwner(null);
+              setIsOwnerDialogOpen(true);
+            }}
+            disabled={!selectedPropertyId}
+        >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Owner
+        </Button>
       </div>
       
       <div className="grid gap-6 md:grid-cols-3">
@@ -380,5 +390,3 @@ export default function ClientsPage() {
     </div>
   );
 }
-
-    

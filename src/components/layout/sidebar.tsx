@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -60,7 +61,7 @@ const navItems = [
 ];
 
 const otherItems = [
-  { href: '/clients', icon: Briefcase, label: 'Client Properties' },
+  { href: '/clients', icon: Briefcase, label: 'Client Self Managed Units' },
   { href: '/landlords', icon: Users, label: 'Landlords' },
   { href: '/airbnb', icon: BedDouble, label: 'Airbnb' },
   { href: '/communications', icon: Mail, label: 'Communications' },
