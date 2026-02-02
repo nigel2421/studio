@@ -1,9 +1,11 @@
+
 'use client';
 
 import { Property, Unit, UnitType, unitTypes, ManagementStatus, managementStatuses, HandoverStatus, handoverStatuses } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMemo, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { parseFloorFromUnitName } from '@/lib/parseFloorFromUnitName';
 
 interface StatusAnalyticsProps {
     property: Property;
@@ -19,8 +21,6 @@ const normalizeManagementStatus = (status?: string): ManagementStatus | undefine
     switch (status) {
         case 'Renting Mngd by Eracov for SM':
             return 'Rented for Soil Merchants';
-        case 'Renting Mngd by Eracov for Client':
-            return 'Rented for Clients';
         case 'Client Self Fully Managed':
             return 'Client Managed';
         case 'Reserved for Airbnb': // This was removed but might still be in the DB
