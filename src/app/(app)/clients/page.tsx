@@ -2,16 +2,17 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments, getLandlords } from '@/lib/data';
+import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments, getLandlords, deletePropertyOwner } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, UserCog, PlusCircle, FileSignature, Building2, Users } from 'lucide-react';
+import { Edit, UserCog, PlusCircle, FileSignature, Building2, Users, Trash } from 'lucide-react';
 import { ManagePropertyOwnerDialog } from '@/components/manage-property-owner-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -29,6 +30,9 @@ export default function ClientsPage() {
 
   const [isStatementDialogOpen, setIsStatementDialogOpen] = useState(false);
   const [ownerForStatement, setOwnerForStatement] = useState<PropertyOwner | null>(null);
+
+  const [ownerToDelete, setOwnerToDelete] = useState<PropertyOwner | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const fetchData = async () => {
     const [props, owners, tenants, payments, landlords] = await Promise.all([
@@ -186,6 +190,22 @@ export default function ClientsPage() {
     }
   }
 
+  const handleDeleteOwner = async () => {
+    if (!ownerToDelete) return;
+    startLoading(`Deleting ${ownerToDelete.name}...`);
+    try {
+      await deletePropertyOwner(ownerToDelete.id);
+      toast({ title: "Owner Deleted", description: `${ownerToDelete.name} has been removed.`});
+      fetchData();
+      setIsDeleteDialogOpen(false);
+      setOwnerToDelete(null);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to delete owner.' });
+    } finally {
+      stopLoading();
+    }
+  }
+
   const handleGenerateStatement = async (owner: PropertyOwner, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
@@ -313,6 +333,17 @@ export default function ClientsPage() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:bg-red-500 hover:text-white transition-colors"
+                            onClick={() => {
+                                setOwnerToDelete(owner);
+                                setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-wrap">
@@ -390,6 +421,14 @@ export default function ClientsPage() {
             isGenerating={isLoading}
         />
       )}
+       <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteOwner}
+        isLoading={isLoading}
+        itemName={ownerToDelete?.name || ''}
+        itemType="property owner"
+      />
     </div>
   );
 }

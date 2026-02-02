@@ -1174,7 +1174,6 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
 }
 
-
 export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount: string }[]): Promise<{ added: number; skipped: number }> {
     const landlordsRef = collection(db, 'landlords');
     const batch = writeBatch(db);
@@ -1289,6 +1288,74 @@ export async function getPropertyOwners(): Promise<PropertyOwner[]> {
 
 export async function getPropertyOwner(ownerId: string): Promise<PropertyOwner | null> {
     return getDocument<PropertyOwner>('propertyOwners', ownerId);
+}
+
+export async function deletePropertyOwner(ownerId: string): Promise<void> {
+    const owner = await getPropertyOwner(ownerId);
+    if (!owner) {
+        throw new Error("Property Owner not found.");
+    }
+
+    const batch = writeBatch(db);
+
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    batch.delete(ownerRef);
+
+    if (owner.userId) {
+        const userRef = doc(db, 'users', owner.userId);
+        batch.update(userRef, {
+            propertyOwnerId: deleteField(),
+            role: 'viewer' 
+        });
+    }
+
+    await batch.commit();
+    await logActivity(`Deleted property owner: ${owner.name} (${owner.email})`);
+}
+
+export async function deleteLandlord(landlordId: string): Promise<void> {
+    if (landlordId === 'soil_merchants_internal') {
+        throw new Error("Cannot delete the internal Soil Merchants profile.");
+    }
+    
+    const landlord = await getLandlord(landlordId);
+    if (!landlord) {
+        throw new Error("Landlord not found.");
+    }
+
+    const batch = writeBatch(db);
+    const properties = await getProperties();
+
+    for (const prop of properties) {
+        let needsUpdate = false;
+        const newUnits = prop.units.map(unit => {
+            if (unit.landlordId === landlordId) {
+                needsUpdate = true;
+                const { landlordId: _, ...rest } = unit;
+                return rest as Unit;
+            }
+            return unit;
+        });
+
+        if (needsUpdate) {
+            const propRef = doc(db, 'properties', prop.id);
+            batch.update(propRef, { units: newUnits });
+        }
+    }
+    
+    const landlordRef = doc(db, 'landlords', landlordId);
+    batch.delete(landlordRef);
+
+    if (landlord.userId) {
+        const userRef = doc(db, 'users', landlord.userId);
+        batch.update(userRef, {
+            landlordId: deleteField(),
+            role: 'viewer'
+        });
+    }
+
+    await batch.commit();
+    await logActivity(`Deleted landlord: ${landlord.name} (${landlord.email})`);
 }
 
 export async function updatePropertyOwner(

@@ -2,11 +2,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPayments } from '@/lib/data';
+import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPayments, deleteLandlord } from '@/lib/data';
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
-import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2 } from 'lucide-react';
+import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
@@ -19,6 +19,7 @@ import { isWithinInterval } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -43,6 +44,9 @@ export default function LandlordsPage() {
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+
+  const [landlordToDelete, setLandlordToDelete] = useState<Landlord | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // New state for pagination and unassigned units view
   const [showAllUnassigned, setShowAllUnassigned] = useState(false);
@@ -229,6 +233,22 @@ export default function LandlordsPage() {
     }
   };
 
+  const handleDeleteLandlord = async () => {
+    if (!landlordToDelete) return;
+    startLoading(`Deleting ${landlordToDelete.name}...`);
+    try {
+      await deleteLandlord(landlordToDelete.id);
+      toast({ title: 'Landlord Deleted', description: `${landlordToDelete.name} has been removed.` });
+      fetchData();
+      setIsDeleteDialogOpen(false);
+      setLandlordToDelete(null);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to delete landlord.' });
+    } finally {
+      stopLoading();
+    }
+  }
+
   const handleGenerateStatement = async (landlord: Landlord, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
@@ -412,15 +432,27 @@ export default function LandlordsPage() {
                     return (
                       <Card key={landlord.id} className="flex flex-col">
                         <CardHeader>
-                          <div className="flex justify-between items-start">
+                           <div className="flex justify-between items-start">
                             <div>
                               <CardTitle>{landlord.name}</CardTitle>
                               <CardDescription>{landlord.email}</CardDescription>
                               <CardDescription>{landlord.phone}</CardDescription>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
-                              <Edit className="h-4 w-4 mr-2" /> Edit
-                            </Button>
+                            <div className="flex items-center">
+                                <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
+                                    <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => {
+                                    if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
+                                        toast({ variant: 'destructive', title: 'Action Not Allowed', description: 'The internal Soil Merchants profile cannot be deleted.' });
+                                        return;
+                                    }
+                                    setLandlordToDelete(landlord);
+                                    setIsDeleteDialogOpen(true);
+                                }}>
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="flex-grow">
@@ -496,6 +528,14 @@ export default function LandlordsPage() {
         landlord={landlordForStatement}
         onGenerate={handleGenerateStatement}
         isGenerating={isLoading}
+      />
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteLandlord}
+        isLoading={isLoading}
+        itemName={landlordToDelete?.name || ''}
+        itemType="landlord"
       />
     </div>
   );
