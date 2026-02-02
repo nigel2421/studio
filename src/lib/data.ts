@@ -48,7 +48,65 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
 }
 
 export async function getUsers(): Promise<UserProfile[]> {
-    return getCollection<UserProfile>('users');
+    const [users, properties, landlords, propertyOwners] = await Promise.all([
+        getCollection<UserProfile>('users'),
+        getProperties(),
+        getLandlords(),
+        getPropertyOwners(),
+    ]);
+
+    const investorIds = new Set<string>();
+    const clientIds = new Set<string>();
+
+    const allCombinedOwners: (Landlord | PropertyOwner)[] = [...landlords, ...propertyOwners];
+
+    for (const owner of allCombinedOwners) {
+        let unitsOfOwner: Unit[] = [];
+        
+        // Find units associated with this owner
+        properties.forEach(p => {
+            p.units.forEach(u => {
+                let isOwned = false;
+                // Check if owned via landlordId
+                if (u.landlordId === owner.id) {
+                    isOwned = true;
+                }
+                // Check if owned via assignedUnits (for PropertyOwners)
+                if ('assignedUnits' in owner && (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name))) {
+                    isOwned = true;
+                }
+                if (isOwned) {
+                    unitsOfOwner.push(u);
+                }
+            });
+        });
+        
+        unitsOfOwner = [...new Map(unitsOfOwner.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
+
+        if (unitsOfOwner.length === 0) continue;
+
+        const isInvestor = unitsOfOwner.some(u => u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb');
+        const isClient = unitsOfOwner.some(u => u.managementStatus === 'Client Managed');
+
+        if (isClient && !isInvestor) {
+            clientIds.add(owner.id);
+        } else if (isInvestor) {
+            investorIds.add(owner.id);
+        }
+    }
+
+    return users.map(user => {
+        const ownerId = user.landlordId || user.propertyOwnerId;
+        if (ownerId) {
+            if (clientIds.has(ownerId)) {
+                return { ...user, role: 'homeowner' };
+            }
+            if (investorIds.has(ownerId)) {
+                 return { ...user, role: 'landlord' };
+            }
+        }
+        return user;
+    });
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
