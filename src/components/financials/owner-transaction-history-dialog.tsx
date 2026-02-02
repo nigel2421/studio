@@ -119,10 +119,22 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     calculatedOpeningBalance -= t.payment;
                 }
             });
-            setOpeningBalance(calculatedOpeningBalance > 0 ? calculatedOpeningBalance : 0);
+            const openingBalanceValue = calculatedOpeningBalance > 0 ? calculatedOpeningBalance : 0;
+            setOpeningBalance(openingBalanceValue);
 
-            let runningBalanceForDisplay = 0; // Simplified for on-screen view
+            let runningBalanceForDisplay = openingBalanceValue;
             const ledger: Transaction[] = [];
+
+            if (openingBalanceValue > 0) {
+                ledger.push({
+                    date: startOfSelectedMonth,
+                    transactionType: 'Opening Balance',
+                    details: 'Balance Brought Forward',
+                    charge: 0,
+                    payment: 0,
+                    balance: openingBalanceValue,
+                });
+            }
             
             const displayTransactions = allHistoricalTransactions.filter(t => isSameMonth(t.date, selectedMonth));
             
