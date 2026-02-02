@@ -85,12 +85,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             
                 if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
                     firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-                } 
-                else if (unit.handoverStatus === 'Handed Over') {
-                    const dateToUse = unit.handoverDate || tenant?.lease.startDate;
-                    if (dateToUse) {
-                        const effectiveDate = new Date(dateToUse);
-                        if(isValid(effectiveDate)) {
+                } else {
+                    const dateToUseForBilling = unit.handoverDate || tenant?.lease.startDate;
+                    if (unit.handoverStatus === 'Handed Over' && dateToUseForBilling) {
+                        const effectiveDate = new Date(dateToUseForBilling);
+                        if (isValid(effectiveDate)) {
                             const handoverDay = effectiveDate.getDate();
                             if (handoverDay <= 10) {
                                 firstBillableMonth = startOfMonth(effectiveDate);

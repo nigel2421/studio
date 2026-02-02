@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary, calculateTransactionBreakdown } from '@/lib/financial-utils';
-import { format, startOfMonth, addMonths, addDays, isWithinInterval, isBefore, isAfter, isSameMonth } from 'date-fns';
+import { format, startOfMonth, addMonths, addDays, isWithinInterval, isBefore, isAfter, isSameMonth, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
 // Helper to add company header
@@ -214,20 +214,26 @@ export const generateOwnerServiceChargeStatementPDF = (
 
         const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
 
-        let firstBillableMonth: Date;
+        let firstBillableMonth: Date | null = null;
+
         if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
             firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-        } else if (unit.handoverStatus === 'Handed Over' && unit.handoverDate) {
-            const handoverDate = new Date(unit.handoverDate);
-            const handoverDay = handoverDate.getDate();
-             if (handoverDay <= 10) {
-                firstBillableMonth = startOfMonth(handoverDate);
-            } else {
-                firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-            }
         } else {
-            return; 
+            const dateToUseForBilling = unit.handoverDate || tenant?.lease.startDate;
+            if (unit.handoverStatus === 'Handed Over' && dateToUseForBilling) {
+                const effectiveDate = new Date(dateToUseForBilling);
+                if (isValid(effectiveDate)) {
+                    const handoverDay = effectiveDate.getDate();
+                    if (handoverDay <= 10) {
+                        firstBillableMonth = startOfMonth(effectiveDate);
+                    } else {
+                        firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
+                    }
+                }
+            }
         }
+
+        if (!firstBillableMonth) return;
 
         let loopDate = firstBillableMonth;
         const today = new Date();
@@ -778,7 +784,11 @@ export const generateArrearsServiceChargeInvoicePDF = (
     invoiceDetails: ArrearsInvoiceDetails
 ): string => {
     const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
 
     addHeader(doc, 'Service Charge Invoice');
     
