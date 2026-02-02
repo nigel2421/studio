@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature } from 'lucide-react';
+import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature, PlusCircle } from 'lucide-react';
 import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -521,8 +520,8 @@ const ServiceChargeStatusTable = ({
                                             disabled={group.paymentStatus === 'Paid' || group.paymentStatus === 'N/A'}
                                             className="h-8"
                                         >
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Confirm
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Record Payment
                                         </Button>
                                     </div>
                                 </TableCell>
