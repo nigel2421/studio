@@ -1,6 +1,6 @@
 
 import { processServiceChargeData, groupAccounts } from './service-charge';
-import type { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
+import type { Property, PropertyOwner, Tenant, Payment, Landlord, Unit, UnitType } from './types';
 import { startOfMonth, addMonths, format, parseISO, isValid } from 'date-fns';
 
 // Helper to create mock data, ensuring consistency
@@ -80,43 +80,87 @@ const createMockPayment = (tenantId: string, amount: number, type: Payment['type
 
 describe('Service Charge Logic', () => {
 
-    const today = new Date();
-    const thisMonth = startOfMonth(today);
-    const lastMonth = startOfMonth(addMonths(today, -1));
-    const twoMonthsAgo = startOfMonth(addMonths(today, -2));
+    // To make tests reliable, let's fix "today" to a specific date, e.g., March 15, 2024
+    const runDate = parseISO('2024-03-15'); 
+    const march2024 = startOfMonth(runDate);
+    const feb2024 = startOfMonth(addMonths(runDate, -1));
+    const jan2024 = startOfMonth(addMonths(runDate, -2));
+    
+    const march2024Formatted = format(march2024, 'yyyy-MM');
+    const feb2024Formatted = format(feb2024, 'yyyy-MM');
 
-    const thisMonthFormatted = format(thisMonth, 'yyyy-MM');
-    const lastMonthFormatted = format(lastMonth, 'yyyy-MM');
+    describe('processServiceChargeData with Handover Logic', () => {
+        it('should correctly identify a unit as "Pending" when billable (handover > 10th)', () => {
+            // Handover Feb 11th. March is waived. April is first billable month.
+            const april2024 = addMonths(march2024, 1);
+            const mockUnits = [ createMockUnit('A1', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500, handoverDate: '2024-02-11' }) ];
+            const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+            const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['A1']}]) ];
+            const mockTenants = [ createMockHomeownerTenant('tenant-A1', 'prop-1', 'A1', 2500, march2024Formatted) ];
+            
+            // Run for April
+            const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], [], april2024);
+            
+            expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+            expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('Pending');
+        });
 
+        it('should correctly identify a unit as "N/A" when month is waived (handover > 10th)', () => {
+            // Handover Feb 11th. March is waived. Check for March.
+            const mockUnits = [ createMockUnit('B1', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500, handoverDate: '2024-02-11' }) ];
+            const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+            const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['B1']}]) ];
+            const mockTenants = [ createMockHomeownerTenant('tenant-B1', 'prop-1', 'B1', 2500, feb2024Formatted) ];
+            
+             // Run for March
+            const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], [], march2024);
+            
+            expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+            expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('N/A');
+        });
 
-    test('should identify client occupied units and determine payment status', () => {
-        // Test-specific data
-        const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['A101']}]) ];
-        const mockUnits = [ createMockUnit('A101', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500 }) ];
-        const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
-        const mockTenants = [ createMockHomeownerTenant('tenant-A101', 'prop-1', 'A101', 2500, lastMonthFormatted) ];
-        
-        const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], [], thisMonth);
-        
-        expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
-        const account = clientOccupiedServiceChargeAccounts[0];
-        expect(account.unitName).toBe('A101');
-        expect(account.ownerName).toBe('Alice');
-        expect(account.paymentStatus).toBe('Pending'); // No payment was mocked for this month
+         it('should correctly identify a unit as "Pending" when billable (handover <= 10th)', () => {
+            // Handover March 10th. March is waived. April is first billable month.
+            const april2024 = addMonths(march2024, 1);
+            const mockUnits = [ createMockUnit('C1', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500, handoverDate: '2024-03-10' }) ];
+            const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+            const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['C1']}]) ];
+            const mockTenants = [ createMockHomeownerTenant('tenant-C1', 'prop-1', 'C1', 2500, march2024Formatted) ];
+            
+             // Run for April
+            const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], [], april2024);
+            
+            expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+            expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('Pending');
+        });
+
+        it('should correctly identify a unit as "N/A" when month is waived (handover <= 10th)', () => {
+            // Handover March 10th. March is waived. Check for March.
+            const mockUnits = [ createMockUnit('D1', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500, handoverDate: '2024-03-10' }) ];
+            const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+            const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['D1']}]) ];
+            const mockTenants = [ createMockHomeownerTenant('tenant-D1', 'prop-1', 'D1', 2500, feb2024Formatted) ];
+            
+            // Run for March
+            const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, [], [], march2024);
+            
+            expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+            expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('N/A');
+        });
     });
 
     test('should identify managed vacant units and determine payment status', () => {
         // Test-specific data
         const mockOwners = [ createMockOwner('owner-2', 'Bob', [{ propertyId: 'prop-1', unitNames: ['B201', 'B202']}]) ];
         const mockUnits = [
-            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
-            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
+            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(jan2024, 'yyyy-MM-dd') }),
+            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(jan2024, 'yyyy-MM-dd') }),
         ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
-        const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, lastMonthFormatted) ];
-        const mockPayments = [ createMockPayment('tenant-B202', 3000, 'ServiceCharge', format(thisMonth, 'yyyy-MM-dd'), thisMonthFormatted) ];
+        const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, feb2024Formatted) ];
+        const mockPayments = [ createMockPayment('tenant-B202', 3000, 'ServiceCharge', format(march2024, 'yyyy-MM-dd'), march2024Formatted) ];
         
-        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], thisMonth);
+        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], march2024);
 
         expect(managedVacantServiceChargeAccounts).toHaveLength(2);
         
@@ -131,8 +175,8 @@ describe('Service Charge Logic', () => {
         expect(paidAccount?.paymentStatus).toBe('Paid');
     });
 
-    test('should calculate arrears for vacant, handed-over units', () => {
-        const twoMonthsAgo = startOfMonth(addMonths(new Date(), -2));
+    test('should calculate arrears for vacant, handed-over units correctly', () => {
+        const handoverDate = '2024-01-11'; // After 10th, so Feb is waived, March is first billable
         const mockLandlords = [ createMockLandlord('landlord-1', 'Charlie') ];
         const mockUnits = [ 
             createMockUnit('C301', { 
@@ -140,35 +184,35 @@ describe('Service Charge Logic', () => {
                 status: 'vacant', 
                 managementStatus: 'Rented for Clients', 
                 handoverStatus: 'Handed Over', 
-                handoverDate: format(twoMonthsAgo, 'yyyy-MM-05'),
+                handoverDate: handoverDate,
                 serviceCharge: 1500, 
                 landlordId: 'landlord-1' 
             }) 
         ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+        const may2024 = parseISO('2024-05-15');
 
-        // Pass `thisMonth` to check arrears up to the beginning of the current month
-        const { vacantArrears } = processServiceChargeData(mockProperties, [], [], [], mockLandlords, thisMonth);
+        // Check arrears as of May 2024. Billable months are March, April, May.
+        const { vacantArrears } = processServiceChargeData(mockProperties, [], [], [], mockLandlords, may2024);
         
         expect(vacantArrears).toHaveLength(1);
         const arrearsAccount = vacantArrears[0];
         expect(arrearsAccount.unitName).toBe('C301');
-        // If handed over 2 months ago (e.g. May 5th, and it's now July), arrears are for May and June.
-        expect(arrearsAccount.monthsInArrears).toBe(2); 
-        expect(arrearsAccount.totalDue).toBe(3000);
+        expect(arrearsAccount.monthsInArrears).toBe(3); 
+        expect(arrearsAccount.totalDue).toBe(4500); // 1500 * 3
     });
 
     test('should correctly group multiple accounts for one owner', () => {
         const mockOwners = [ createMockOwner('owner-2', 'Bob', [{ propertyId: 'prop-1', unitNames: ['B201', 'B202']}]) ];
         const mockUnits = [
-            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
-            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(twoMonthsAgo, 'yyyy-MM-dd') }),
+            createMockUnit('B201', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(jan2024, 'yyyy-MM-dd') }),
+            createMockUnit('B202', { status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', serviceCharge: 3000, handoverDate: format(jan2024, 'yyyy-MM-dd') }),
         ];
         const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
-        const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, lastMonthFormatted) ];
-        const mockPayments = [ createMockPayment('tenant-B202', 3000, 'ServiceCharge', format(thisMonth, 'yyyy-MM-dd'), thisMonthFormatted) ];
+        const mockTenants = [ createMockHomeownerTenant('tenant-B202', 'prop-1', 'B202', 3000, feb2024Formatted) ];
+        const mockPayments = [ createMockPayment('tenant-B202', 3000, 'ServiceCharge', format(march2024, 'yyyy-MM-dd'), march2024Formatted) ];
         
-        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], thisMonth);
+        const { managedVacantServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], march2024);
         const grouped = groupAccounts(managedVacantServiceChargeAccounts);
 
         const bobGroup = grouped.find(g => g.ownerName === 'Bob');

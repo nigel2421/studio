@@ -106,6 +106,27 @@ describe('Data Logic in `data.ts`', () => {
             expect(users).toHaveLength(1);
             expect(users[0].role).toBe('landlord');
         });
+
+        it('should not change the role for a user not linked to any properties', async () => {
+            // Arrange
+            const mockUser: UserProfile = { id: 'user-4', email: 'unlinked@test.com', role: 'viewer' };
+            
+            mockGetDocs.mockImplementation(async (q: any) => {
+                const path = q._query.path.segments[0];
+                if (path === 'users') return { docs: [{ id: 'user-4', data: () => mockUser }] };
+                if (path === 'properties') return { docs: [] };
+                if (path === 'landlords') return { docs: [] };
+                if (path === 'propertyOwners') return { docs: [] };
+                return { docs: [] };
+            });
+    
+            // Act
+            const users = await data.getUsers();
+            
+            // Assert
+            expect(users).toHaveLength(1);
+            expect(users[0].role).toBe('viewer');
+        });
     });
 
     describe('Data Deletion Functions', () => {
