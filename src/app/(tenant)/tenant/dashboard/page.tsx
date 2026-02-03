@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import type { Tenant, Payment, Property } from '@/lib/types';
-import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2 } from 'lucide-react';
+import type { Tenant, Payment, Property, LedgerEntry } from '@/lib/types';
+import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2, FileDown } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
 import { generateLedger } from '@/lib/financial-logic';
@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { generateTenantStatementPDF } from '@/lib/pdf-generator';
 
 
 export default function TenantDashboardPage() {
@@ -33,7 +34,8 @@ export default function TenantDashboardPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [waterReadings, setWaterReadings] = useState<any[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [ledger, setLedger] = useState<{ finalDueBalance: number, finalAccountBalance: number } | null>(null);
+    const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+    const [balances, setBalances] = useState({ due: 0, credit: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -48,8 +50,9 @@ export default function TenantDashboardPage() {
                 setWaterReadings(waterData);
                 setProperties(propertiesData);
                 if(tenantDetails) {
-                    const { finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
-                    setLedger({ finalDueBalance, finalAccountBalance });
+                    const { ledger: generatedLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
+                    setLedger(generatedLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setBalances({ due: finalDueBalance, credit: finalAccountBalance });
                 }
                 setIsLoading(false);
             }).catch(err => {
@@ -68,6 +71,18 @@ export default function TenantDashboardPage() {
     const handleSignOut = async () => {
         await signOut(auth);
         router.push('/login');
+    };
+
+    const handleGenerateStatement = async () => {
+        if (!tenantDetails) return;
+        toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
+        try {
+            // We can reuse the payments and properties already in state
+            generateTenantStatementPDF(tenantDetails, payments, properties);
+        } catch(e) {
+            console.error("Error generating PDF:", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate your statement.' });
+        }
     };
 
     const handleMoveOutNotice = () => {
@@ -110,10 +125,16 @@ export default function TenantDashboardPage() {
                         <p className="text-muted-foreground">Here is an overview of your account.</p>
                     )}
                 </div>
-                <Button onClick={handleSignOut} variant="outline">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                </Button>
+                <div className="flex items-center gap-2">
+                     <Button onClick={handleGenerateStatement} variant="outline">
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Statement
+                    </Button>
+                    <Button onClick={handleSignOut} variant="outline">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                    </Button>
+                </div>
             </header>
 
             {tenantDetails && (
@@ -159,7 +180,7 @@ export default function TenantDashboardPage() {
                                 <AlertCircle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-red-600">Ksh {(ledger?.finalDueBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-red-600">Ksh {(balances.due).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                             </CardContent>
                         </Card>
@@ -169,17 +190,8 @@ export default function TenantDashboardPage() {
                                 <PlusCircle className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-green-600">Ksh {(ledger?.finalAccountBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-green-600">Ksh {(balances.credit).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Rent Start Date</CardTitle>
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{format(parseISO(tenantDetails.lease.startDate), 'yyyy-MM-dd')}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -199,29 +211,42 @@ export default function TenantDashboardPage() {
             )}
             <Card>
                 <CardHeader>
-                    <CardTitle>Payment History</CardTitle>
+                    <CardTitle>Transaction History</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Amount Paid</TableHead>
-                                <TableHead>Rent For</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="text-right">Charge</TableHead>
+                                <TableHead className="text-right">Payment</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {payments.length > 0 ? (
-                                payments.map(payment => (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{format(new Date(payment.date), 'PPP')}</TableCell>
-                                        <TableCell>Ksh {payment.amount.toLocaleString()}</TableCell>
-                                        <TableCell>{payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMMM yyyy') : 'N/A'}</TableCell>
+                            {ledger.length > 0 ? (
+                                ledger.map((entry, index) => (
+                                    <TableRow key={`${entry.id}-${index}`}>
+                                        <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
+                                        <TableCell>{entry.description}</TableCell>
+                                        <TableCell className="text-right text-red-600">
+                                            {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right text-green-600">
+                                            {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold">
+                                             {entry.balance < 0
+                                                ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                                : `Ksh ${entry.balance.toLocaleString()}`
+                                            }
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center">No payment history found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center">No transaction history found.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

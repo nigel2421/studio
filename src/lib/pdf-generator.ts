@@ -229,7 +229,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         head: [['Date', 'For Month', 'Details', 'Charge', 'Payment', 'Balance']],
         body: tableBody,
         foot: [[
-            { content: 'Totals for Period', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'Totals for Period', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalPayments), styles: { fontStyle: 'bold', halign: 'right' } },
             '', // Balance column in totals is not typically summed
@@ -453,7 +453,7 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         head: [['Date', 'For Month', 'Description', chargeColumnTitle, 'Payment', 'Balance']],
         body: tableBodyData,
         foot: [[
-            { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalPayments), styles: { fontStyle: 'bold', halign: 'right' } },
             '' // Empty cell for balance column in footer
