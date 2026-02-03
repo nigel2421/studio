@@ -8,7 +8,6 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-import {setGlobalOptions} from "firebase-functions/v1";
 import {onCall, HttpsError, CallableRequest} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as nodemailer from "nodemailer";
@@ -25,12 +24,6 @@ const emailHost = defineString("EMAIL_HOST");
 const emailPort = defineString("EMAIL_PORT");
 const emailUser = defineString("EMAIL_USER");
 const emailPass = defineString("EMAIL_PASS");
-
-setGlobalOptions({ 
-    minInstances: 1,
-    maxInstances: 10,
-    secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
-});
 
 // A function to create and configure the email transporter
 const createTransporter = () => {
@@ -53,6 +46,8 @@ const createTransporter = () => {
 // Callable function to send a payment receipt
 export const sendPaymentReceipt = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    minInstances: 1,
+    maxInstances: 10,
 }, async (request: CallableRequest) => {
     const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes, tenantId } = request.data;
 
@@ -116,6 +111,8 @@ export const sendPaymentReceipt = onCall({
 // Callable function to send a custom email announcement
 export const sendCustomEmail = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    minInstances: 1,
+    maxInstances: 10,
 }, async (request: CallableRequest) => {
     const { recipients, subject, body, attachment } = request.data;
 
@@ -174,6 +171,8 @@ export const sendCustomEmail = onCall({
 
 export const checkAndSendLeaseReminders = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    minInstances: 1,
+    maxInstances: 10,
 }, async (request: CallableRequest) => {
     const tenantsRef = db.collection('tenants');
     const propertiesRef = db.collection('properties');
@@ -299,5 +298,3 @@ export const checkAndSendLeaseReminders = onCall({
 
     return { success: true, message: message };
 });
-
-    
