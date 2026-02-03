@@ -61,7 +61,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             
             const relevantTenants = allTenants.filter(t => 
                 t.residentType === 'Homeowner' &&
-                ownerUnits.some(u => u.propertyId === t.propertyId && t.unitName === t.unitName)
+                ownerUnits.some(u => u.propertyId === t.propertyId && u.unitName === t.unitName)
             );
             const relevantTenantIds = relevantTenants.map(t => t.id);
             const allOwnerPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
@@ -69,7 +69,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             allOwnerPayments.forEach(p => {
                 allHistoricalTransactions.push({
                     date: new Date(p.date),
-                    details: p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`,
+                    details: p.notes || `Payment Received`,
                     charge: 0,
                     payment: p.amount
                 });
