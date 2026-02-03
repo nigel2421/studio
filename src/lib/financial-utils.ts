@@ -77,7 +77,7 @@ export function calculateTransactionBreakdown(
 }
 
 export interface FinancialSummary {
-    totalRevenue: number;
+    totalRent: number;
     totalManagementFees: number;
     totalServiceCharges: number;
     totalNetRemittance: number;
@@ -87,7 +87,7 @@ export interface FinancialSummary {
 
 export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
     const summary: FinancialSummary = {
-        totalRevenue: 0,
+        totalRent: 0,
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalNetRemittance: 0,
@@ -111,7 +111,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         
         const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
 
-        summary.totalRevenue += breakdown.gross;
+        summary.totalRent += breakdown.gross;
         summary.totalServiceCharges += breakdown.serviceChargeDeduction;
         summary.totalManagementFees += breakdown.managementFee;
         summary.totalNetRemittance += breakdown.netToLandlord;

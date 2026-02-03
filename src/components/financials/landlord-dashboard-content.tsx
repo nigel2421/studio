@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download } from 'lucide-react';
 import { Payment, Property, Tenant, Unit } from '@/lib/types';
@@ -38,7 +38,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
 
         sortedPayments.forEach(payment => {
             const tenant = tenants.find(t => t.id === payment.tenantId);
-            if (!tenant) return;
+            if (!tenant || payment.type === 'Deposit') return;
 
             const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
             const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
@@ -46,10 +46,11 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             if (payment.type === 'Rent' && unitRent > 0 && payment.amount > unitRent * 1.1) {
                 let remainingAmount = payment.amount;
                 let monthIndex = 0;
-                const paymentStartDate = parseISO(tenant.lease.startDate);
+                
+                const leaseStartDate = parseISO(tenant.lease.startDate);
 
                 while (remainingAmount >= unitRent) {
-                    const currentMonth = addMonths(paymentStartDate, monthIndex);
+                    const currentMonth = addMonths(leaseStartDate, monthIndex);
                     const monthString = format(currentMonth, 'yyyy-MM');
                     const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
                     const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
@@ -68,7 +69,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 }
 
                 if (remainingAmount > 1) { // Handle partial remainder
-                    const nextMonth = addMonths(paymentStartDate, monthIndex);
+                    const nextMonth = addMonths(leaseStartDate, monthIndex);
                     const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
                     const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
 
@@ -94,8 +95,23 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             }
         });
 
-        return transactions;
+        return transactions.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [payments, tenants, unitMap]);
+
+    const transactionTotals = useMemo(() => {
+        return displayTransactions.reduce((acc, t) => {
+            acc.gross += t.gross;
+            acc.serviceChargeDeduction += t.serviceChargeDeduction;
+            acc.managementFee += t.managementFee;
+            acc.netToLandlord += t.netToLandlord;
+            return acc;
+        }, {
+            gross: 0,
+            serviceChargeDeduction: 0,
+            managementFee: 0,
+            netToLandlord: 0,
+        });
+    }, [displayTransactions]);
 
 
     const handleExport = () => {
@@ -121,11 +137,11 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium">Total Revenue (Gross)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Rent (Gross)</CardTitle>
                         <Banknote className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {financialSummary.totalRevenue.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">Ksh {transactionTotals.gross.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Total gross rent from payments</p>
                     </CardContent>
                 </Card>
@@ -135,7 +151,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {financialSummary.totalServiceCharges.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">Ksh {transactionTotals.serviceChargeDeduction.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Deducted from occupied units</p>
                     </CardContent>
                 </Card>
@@ -155,7 +171,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {financialSummary.totalManagementFees.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">Ksh {transactionTotals.managementFee.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">5% agency fee on rent</p>
                     </CardContent>
                 </Card>
@@ -165,7 +181,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <Wallet className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-primary">Ksh {financialSummary.totalNetRemittance.toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-primary">Ksh {(transactionTotals.netToLandlord - (financialSummary.vacantUnitServiceChargeDeduction || 0)).toLocaleString()}</div>
                         <p className="text-xs text-primary/80">Available for payout</p>
                     </CardContent>
                 </Card>
@@ -192,7 +208,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {displayTransactions.slice(0, 10).map((transaction) => (
+                            {displayTransactions.map((transaction) => (
                                     <TableRow key={transaction.id}>
                                         <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
                                         <TableCell>
@@ -207,6 +223,15 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                     </TableRow>
                                 ))}
                         </TableBody>
+                         <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={3} className="font-bold text-right">Totals</TableCell>
+                                <TableCell className="text-right font-bold">Ksh {transactionTotals.gross.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold text-muted-foreground">- {transactionTotals.serviceChargeDeduction.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold text-muted-foreground">- {transactionTotals.managementFee.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold">Ksh {transactionTotals.netToLandlord.toLocaleString()}</TableCell>
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                 </CardContent>
             </Card>
