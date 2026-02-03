@@ -10,12 +10,13 @@ import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
-import { FinancialSummary, aggregateFinancials } from '@/lib/financial-utils';
+import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
-import { generateTenantStatementPDF, generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
+import { generateTenantStatementPDF, generateOwnerServiceChargeStatementPDF, generateLandlordStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
+import { isWithinInterval } from 'date-fns';
 
 export default function UniversalOwnerDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
@@ -105,6 +106,7 @@ export default function UniversalOwnerDashboardPage() {
                 const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
 
                 setViewData({
+                    owner,
                     properties: landlordProperties,
                     tenants: relevantTenants,
                     payments: relevantPayments,
@@ -145,8 +147,46 @@ export default function UniversalOwnerDashboardPage() {
         try {
             if (dashboardType === 'homeowner') {
                 await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), startDate, endDate);
-            } else {
-                // Landlord logic would go here if needed from this component
+            } else if (dashboardType === 'landlord') {
+                const landlordProperties = viewData.properties;
+                const allTenants = viewData.tenants;
+
+                const relevantPayments = viewData.payments.filter((p: Payment) => 
+                    isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
+                );
+
+                const summary = aggregateFinancials(relevantPayments, allTenants, landlordProperties);
+                
+                const unitMap = new Map<string, Unit>();
+                landlordProperties.forEach((p: { property: Property, units: Unit[] }) => {
+                    p.units.forEach(u => {
+                        unitMap.set(`${p.property.id}-${u.name}`, u);
+                    });
+                });
+
+                const transactionsForPDF = relevantPayments.map((payment: Payment) => {
+                    const tenant = allTenants.find((t: Tenant) => t.id === payment.tenantId);
+                    const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
+                    const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+                    return {
+                        date: new Date(payment.date).toLocaleDateString(),
+                        unit: tenant?.unitName || 'N/A',
+                        rentForMonth: payment.rentForMonth,
+                        gross: breakdown.gross,
+                        serviceCharge: breakdown.serviceChargeDeduction,
+                        mgmtFee: breakdown.managementFee,
+                        net: breakdown.netToLandlord,
+                    };
+                });
+
+                const unitsForPDF = landlordProperties.flatMap((p: { property: Property, units: Unit[] }) => p.units.map(u => ({
+                    property: p.property.name,
+                    unitName: u.name,
+                    unitType: u.unitType,
+                    status: u.status
+                })));
+
+                generateLandlordStatementPDF(entity as Landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
             }
             setIsStatementOpen(false);
         } catch (error) {
@@ -177,12 +217,10 @@ export default function UniversalOwnerDashboardPage() {
                     <p className="text-muted-foreground">{headerDescription}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {dashboardType === 'homeowner' && (
-                        <Button onClick={() => setIsStatementOpen(true)} variant="outline">
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Download Statement
-                        </Button>
-                    )}
+                    <Button onClick={() => setIsStatementOpen(true)} variant="outline">
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Statement
+                    </Button>
                     <Button onClick={handleSignOut} variant="outline">
                         <LogOut className="mr-2 h-4 w-4" />
                         Sign Out
@@ -199,7 +237,7 @@ export default function UniversalOwnerDashboardPage() {
                 </div>
             )}
 
-            {viewData?.owner && dashboardType === 'homeowner' && (
+            {viewData?.owner && (
                 <StatementOptionsDialog
                     isOpen={isStatementOpen}
                     onClose={() => setIsStatementOpen(false)}

@@ -10,8 +10,8 @@ import { isSameMonth, parseISO } from 'date-fns';
  * 1. Gross Amount = The actual payment amount made.
  * 2. Management Fee:
  *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant (calculated on standard rent).
- *    - Otherwise, it's 5% of the unit's standard rent.
- * 3. Service Charge = The unit's standard service charge. This is WAIVED for the first month on a "Rented for Clients" unit.
+ *    - Otherwise, it's 5% of the unit's standard rent. For lump-sum payments, this is pro-rated.
+ * 3. Service Charge = The unit's standard service charge. This is WAIVED for the first month on a "Rented for Clients" unit. For lump-sum payments, this is pro-rated.
  * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
  * 
  * @param payment The payment object.
@@ -25,7 +25,6 @@ export function calculateTransactionBreakdown(
 ) {
     const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
-
     const grossAmount = payment.amount || 0;
     
     let serviceChargeDeduction = serviceCharge;
@@ -42,16 +41,24 @@ export function calculateTransactionBreakdown(
         managementFee = unitRent * 0.50;
         serviceChargeDeduction = 0; // Service charge is waived for the first month in this scenario.
     } else {
-        managementFee = unitRent * standardManagementFeeRate;
+        // Handle standard fees, pro-rating for lump-sum payments
+        if (unitRent > 0 && payment.type === 'Rent') {
+            const rentRatio = grossAmount / unitRent;
+            managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
+            serviceChargeDeduction = serviceCharge * rentRatio;
+        } else {
+            // Fallback for non-rent payments or zero rent
+            managementFee = unitRent * standardManagementFeeRate;
+        }
     }
 
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
 
     return {
         gross: grossAmount,
-        serviceChargeDeduction: serviceChargeDeduction,
-        managementFee: managementFee,
-        netToLandlord: netToLandlord,
+        serviceChargeDeduction: Math.round(serviceChargeDeduction),
+        managementFee: Math.round(managementFee),
+        netToLandlord: Math.round(netToLandlord),
     };
 }
 
