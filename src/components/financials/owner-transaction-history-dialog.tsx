@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -62,7 +61,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             
             const relevantTenants = allTenants.filter(t => 
                 t.residentType === 'Homeowner' &&
-                ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName)
+                ownerUnits.some(u => u.propertyId === t.propertyId && t.unitName === t.unitName)
             );
             const relevantTenantIds = relevantTenants.map(t => t.id);
             const allOwnerPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
@@ -88,7 +87,9 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     const effectiveDate = new Date(unit.handoverDate);
                     if (isValid(effectiveDate)) {
                         const handoverDay = effectiveDate.getDate();
-                        firstBillableMonth = handoverDay <= 10 ? startOfMonth(effectiveDate) : startOfMonth(addMonths(effectiveDate, 1));
+                        // Handover on/before 10th waives current month, billing starts next.
+                        // Handover after 10th waives next month, billing starts month after.
+                        firstBillableMonth = handoverDay <= 10 ? startOfMonth(addMonths(effectiveDate, 1)) : startOfMonth(addMonths(effectiveDate, 2));
                     }
                 }
                 else if (tenant?.lease.startDate) {

@@ -109,15 +109,15 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     const leaseStartDate = new Date(tenant.lease.startDate);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-        // For homeowners, billing starts based on handover date
+        // For homeowners, billing starts based on handover date, including the waiver period.
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
         if (handoverDay <= 10) {
-            // Handover on or before the 10th. Billing starts this month.
-            billingStartDate = startOfMonth(handoverDate);
-        } else {
-            // Handover after the 10th. Billing starts next month.
+            // Handover on or before the 10th. This month is waived. Billing starts NEXT month.
             billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+        } else {
+            // Handover after the 10th. Next month is waived. Billing starts the month AFTER next.
+            billingStartDate = startOfMonth(addMonths(handoverDate, 2));
         }
     } else {
         billingStartDate = startOfMonth(leaseStartDate);
@@ -245,9 +245,9 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
             const handoverDate = new Date(unit.handoverDate);
             const handoverDay = handoverDate.getDate();
             if (handoverDay <= 10) {
-                billingStartDate = startOfMonth(handoverDate);
-            } else {
                 billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+            } else {
+                billingStartDate = startOfMonth(addMonths(handoverDate, 2));
             }
         } else {
             billingStartDate = startOfMonth(leaseStartDate);
@@ -264,7 +264,7 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
     // --- COMBINE WITH PAYMENTS ---
     const allPaymentsAndAdjustments = allTenantPayments.map(p => {
         const isAdjustment = p.type === 'Adjustment';
-        let details = p.notes || `Payment - ${p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : p.type}`;
+        let details = p.notes || `Payment Received`;
         if (p.paymentMethod) {
             details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
         }

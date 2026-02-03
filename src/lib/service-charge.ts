@@ -1,4 +1,3 @@
-
 import { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
 import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore } from 'date-fns';
 
@@ -136,7 +135,7 @@ export function processServiceChargeData(
             
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(addMonths(handoverDate, 1)) : startOfMonth(addMonths(handoverDate, 2));
                 if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
                     isBillable = true;
                 }
@@ -209,7 +208,7 @@ export function processServiceChargeData(
             : parseISO(handoverDateSource);
         if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
-          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(addMonths(handoverDate, 1)) : startOfMonth(addMonths(handoverDate, 2));
           if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
             isBillable = true;
           }
@@ -288,9 +287,9 @@ export function processServiceChargeData(
       let firstBillableMonth: Date;
 
       if (handoverDay <= 10) {
-        firstBillableMonth = startOfMonth(handoverDate);
-      } else {
         firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+      } else {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
       }
       
       const today = selectedMonth;
