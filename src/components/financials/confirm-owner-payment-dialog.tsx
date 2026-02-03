@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -9,6 +10,7 @@ import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Payment, paymentMethods } from '@/lib/types';
 
 interface AccountInfo {
     unitName: string;
@@ -20,7 +22,7 @@ interface ConfirmOwnerPaymentDialogProps {
     onClose: () => void;
     ownerName: string;
     accounts: AccountInfo[];
-    onConfirm: (paymentData: { amount: number; date: Date; notes: string; forMonth: string }) => void;
+    onConfirm: (paymentData: { amount: number; date: Date; notes: string; forMonth: string; paymentMethod: Payment['paymentMethod']; transactionId: string; }) => void;
     isSaving: boolean;
     totalBalanceDue: number;
 }
@@ -47,18 +49,22 @@ export function ConfirmOwnerPaymentDialog({
     const [amount, setAmount] = useState<string>('');
     const [date, setDate] = useState<Date>(new Date());
     const [forMonth, setForMonth] = useState<string>('');
+    const [paymentMethod, setPaymentMethod] = useState<Payment['paymentMethod']>('M-Pesa');
+    const [transactionId, setTransactionId] = useState('');
 
     useEffect(() => {
         if (isOpen) {
             setAmount(totalBalanceDue.toString());
             setDate(new Date());
             setForMonth(format(new Date(), 'yyyy-MM'));
+            setPaymentMethod('M-Pesa');
+            setTransactionId('');
         }
     }, [isOpen, totalBalanceDue]);
 
     const handleSubmit = () => {
-        if (Number(amount) > 0 && forMonth) {
-            onConfirm({ amount: Number(amount), date, notes: '', forMonth });
+        if (Number(amount) > 0 && forMonth && transactionId) {
+            onConfirm({ amount: Number(amount), date, notes: '', forMonth, paymentMethod, transactionId });
         }
     };
 
@@ -107,10 +113,34 @@ export function ConfirmOwnerPaymentDialog({
                             </SelectContent>
                         </Select>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="payment-method">Payment Method</Label>
+                            <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as Payment['paymentMethod'])}>
+                                <SelectTrigger id="payment-method">
+                                    <SelectValue placeholder="Select method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.map(method => (
+                                        <SelectItem key={method} value={method}>{method}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="transaction-id">Transaction ID</Label>
+                            <Input
+                                id="transaction-id"
+                                value={transactionId}
+                                onChange={(e) => setTransactionId(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSaving || !amount || !forMonth}>
+                    <Button onClick={handleSubmit} disabled={isSaving || !amount || !forMonth || !transactionId}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Record Payment
                     </Button>
@@ -119,5 +149,7 @@ export function ConfirmOwnerPaymentDialog({
         </Dialog>
     );
 }
+
+    
 
     

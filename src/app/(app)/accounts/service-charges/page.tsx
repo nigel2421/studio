@@ -260,7 +260,7 @@ export default function ServiceChargesPage() {
     }
   };
 
-  const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string, forMonth: string }) => {
+  const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string, forMonth: string; paymentMethod: Payment['paymentMethod'], transactionId: string }) => {
     if (!ownerForPayment || accountsForPayment.length === 0) return;
 
     startLoading(`Recording payment for ${ownerForPayment.name}...`);
@@ -308,12 +308,12 @@ export default function ServiceChargesPage() {
                     tenantId: tenant.id,
                     amount: amountToApply,
                     date: format(paymentData.date, 'yyyy-MM-dd'),
-                    notes: '',
+                    notes: paymentData.notes,
                     rentForMonth: paymentData.forMonth,
                     status: 'Paid',
                     type: 'ServiceCharge',
-                    paymentMethod: 'Bank Transfer',
-                    transactionId: `OWNER_PAY_${Date.now()}`
+                    paymentMethod: paymentData.paymentMethod,
+                    transactionId: paymentData.transactionId,
                 }));
 
                 remainingAmount -= amountToApply;
@@ -725,6 +725,8 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     
 
