@@ -164,7 +164,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                                     {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right font-bold">
-                                                    Ksh {entry.balance.toLocaleString()}
+                                                    {entry.balance < 0
+                                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                                        : `Ksh ${entry.balance.toLocaleString()}`
+                                                    }
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {!entry.id.startsWith('charge-') && (

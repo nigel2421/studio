@@ -287,36 +287,20 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
     });
     
     // --- CALCULATE RUNNING BALANCE ---
-    let dueBalance = 0;
-    let accountBalance = 0;
+    let runningBalance = 0;
 
     const ledgerWithBalance: LedgerEntry[] = combined.map(item => {
-        dueBalance += item.charge;
-        if (accountBalance > 0 && dueBalance > 0) {
-            if (accountBalance >= dueBalance) {
-                accountBalance -= dueBalance;
-                dueBalance = 0;
-            } else {
-                dueBalance -= accountBalance;
-                accountBalance = 0;
-            }
-        }
-        let paymentAmount = item.payment;
-        if (paymentAmount > 0) {
-            if (paymentAmount >= dueBalance) {
-                paymentAmount -= dueBalance;
-                dueBalance = 0;
-                accountBalance += paymentAmount;
-            } else {
-                dueBalance -= paymentAmount;
-            }
-        }
-        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: dueBalance };
+        runningBalance += item.charge;
+        runningBalance -= item.payment;
+        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance };
     });
+    
+    const finalDueBalance = Math.max(0, runningBalance);
+    const finalAccountBalance = Math.max(0, -runningBalance);
     
     return {
         ledger: ledgerWithBalance,
-        finalDueBalance: dueBalance,
-        finalAccountBalance: accountBalance
+        finalDueBalance,
+        finalAccountBalance,
     };
 }

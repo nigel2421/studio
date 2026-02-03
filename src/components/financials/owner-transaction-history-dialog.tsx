@@ -313,7 +313,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                             <TableCell>{t.details}</TableCell>
                                             <TableCell className="text-right">{t.charge > 0 ? `Ksh ${t.charge.toLocaleString()}` : '-'}</TableCell>
                                             <TableCell className="text-right text-green-600">{t.payment > 0 ? `Ksh ${t.payment.toLocaleString()}` : '-'}</TableCell>
-                                            <TableCell className="text-right font-bold">{`Ksh ${t.balance > 0 ? t.balance.toLocaleString() : '0.00'}`}</TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                {t.balance < 0
+                                                    ? <span className="text-green-600">Ksh {Math.abs(t.balance).toLocaleString()} Cr</span>
+                                                    : `Ksh ${t.balance.toLocaleString()}`
+                                                }
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
