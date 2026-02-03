@@ -1,4 +1,4 @@
-import { Tenant, Payment, Unit, LedgerEntry, Property } from './types';
+import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
 /**
@@ -111,11 +111,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
-        if (handoverDay <= 10) {
-            billingStartDate = startOfMonth(handoverDate);
-        } else {
-            billingStartDate = startOfMonth(addMonths(handoverDate, 1));
-        }
+        // Handover on/before 10th bills same month, after 10th bills next month.
+        billingStartDate = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
     } else {
         billingStartDate = startOfMonth(leaseStartDate);
     }
@@ -216,13 +213,42 @@ export function validatePayment(
     }
 }
 
-export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], properties: Property[]): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
-    const property = properties.find(p => p.id === tenant.propertyId);
+export function generateLedger(
+    tenant: Tenant, 
+    allTenantPayments: Payment[], 
+    properties: Property[],
+    owner?: PropertyOwner | Landlord | null
+): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
     
-    // For homeowners, find all units associated with them.
-    const units = tenant.residentType === 'Homeowner' 
-        ? properties.flatMap(p => p.units.filter(u => u.name === tenant.unitName && p.id === tenant.propertyId)) // Simplification: assuming homeowner tenant maps to one property/unit, but can be expanded
-        : [property?.units.find(u => u.name === tenant.unitName)].filter(Boolean) as Unit[];
+    let ownerUnits: (Unit & { propertyId: string; propertyName: string; })[] = [];
+
+    if (tenant.residentType === 'Homeowner' && owner) {
+        // Find all units belonging to this owner
+        ownerUnits = properties.flatMap(p =>
+            p.units
+              .filter(u => {
+                  // Check if the unit is assigned to the owner, works for both Landlord and PropertyOwner
+                  if ('assignedUnits' in owner && owner.assignedUnits) { // It's a PropertyOwner
+                      return owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
+                  }
+                  if ('bankAccount' in owner) { // It's a Landlord
+                      return u.landlordId === owner.id;
+                  }
+                  return false;
+              })
+              .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+        );
+        // De-duplicate units in case of multiple assignment paths
+        ownerUnits = [...new Map(ownerUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
+    } else {
+        // Fallback to single tenant logic if no owner is provided or if it's a regular tenant
+        const property = properties.find(p => p.id === tenant.propertyId);
+        const unit = property?.units.find(u => u.name === tenant.unitName);
+        if (unit && property) {
+            ownerUnits = [{ ...unit, propertyId: property.id, propertyName: property.name }];
+        }
+    }
+
 
     // --- GENERATE ALL CHARGES ---
     let allCharges: { id: string, date: Date, description: string, charge: number, payment: number }[] = [];
@@ -240,21 +266,21 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
 
     const monthlyChargesMap = new Map<string, { charge: number; unitNames: string[] }>();
 
-    units.forEach(unit => {
+    ownerUnits.forEach(unit => {
         const monthlyCharge = tenant.residentType === 'Homeowner' 
-            ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
+            ? (unit?.serviceCharge || 0) 
             : (tenant.lease.rent || 0);
 
         if (monthlyCharge > 0) {
             let billingStartDate: Date;
-            const leaseStartDate = new Date(tenant.lease.startDate);
 
             if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
                 const handoverDate = new Date(unit.handoverDate);
                 const handoverDay = handoverDate.getDate();
+                // Handover on/before 10th bills same month, after 10th bills next month.
                 billingStartDate = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
             } else {
-                billingStartDate = startOfMonth(leaseStartDate);
+                billingStartDate = startOfMonth(new Date(tenant.lease.startDate));
             }
 
             let loopDate = billingStartDate;

@@ -14,7 +14,7 @@ import { FinancialSummary, aggregateFinancials } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
-import { generateTenantStatementPDF } from '@/lib/pdf-generator';
+import { generateTenantStatementPDF, generateOwnerServiceChargeStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
 
 export default function UniversalOwnerDashboardPage() {
@@ -55,15 +55,21 @@ export default function UniversalOwnerDashboardPage() {
 
             const owner = allLandlords.find(l => l.id === effectiveOwnerId) || allPropertyOwners.find(o => o.id === effectiveOwnerId);
 
+            if (!owner) {
+                setLoading(false);
+                setDashboardType(null);
+                return;
+            }
+
             const ownedUnits: Unit[] = allProperties.flatMap(p =>
                 (p.units || []).filter(u => {
                     if (isAdmin && effectiveOwnerId === 'soil_merchants_internal') {
                         return u.ownership === 'SM';
                     }
-                    if (owner && 'assignedUnits' in owner) { 
+                    if ('assignedUnits' in owner && owner.assignedUnits) { 
                         return (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
                     }
-                    if (owner && 'phone' in owner) { 
+                    if ('bankAccount' in owner) { 
                         return u.landlordId === effectiveOwnerId;
                     }
                     return false;
@@ -106,12 +112,13 @@ export default function UniversalOwnerDashboardPage() {
                 });
             } else if (isClient) {
                 setDashboardType('homeowner');
-                const homeownerTenantProfile = allTenants.find(t => t.userId === userProfile.id || t.id === userProfile.tenantId);
+                const homeownerTenantProfile = allTenants.find(t => t.userId === userProfile.id || t.email === userProfile.email && t.residentType === 'Homeowner');
                 const [paymentData, waterData] = await Promise.all([
                     getTenantPayments(homeownerTenantProfile?.id || ''),
                     getTenantWaterReadings(homeownerTenantProfile?.id || ''),
                 ]);
                 setViewData({
+                    owner: owner,
                     tenantDetails: homeownerTenantProfile,
                     payments: paymentData,
                     waterReadings: waterData,
@@ -132,13 +139,15 @@ export default function UniversalOwnerDashboardPage() {
         await signOut(auth);
         router.push('/login');
     };
-
-    const handleGenerateStatement = async (entity: Tenant, startDate: Date, endDate: Date) => {
+    
+    const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
-            const allPayments = await getTenantPayments(entity.id);
-            const allProperties = await getProperties();
-            generateTenantStatementPDF(entity, allPayments, allProperties);
+            if (dashboardType === 'homeowner') {
+                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), startDate, endDate);
+            } else {
+                // Landlord logic would go here if needed from this component
+            }
             setIsStatementOpen(false);
         } catch (error) {
             console.error("Error generating statement", error);
@@ -190,11 +199,11 @@ export default function UniversalOwnerDashboardPage() {
                 </div>
             )}
 
-            {viewData?.tenantDetails && dashboardType === 'homeowner' && (
+            {viewData?.owner && dashboardType === 'homeowner' && (
                 <StatementOptionsDialog
                     isOpen={isStatementOpen}
                     onClose={() => setIsStatementOpen(false)}
-                    entity={viewData.tenantDetails}
+                    entity={viewData.owner}
                     onGenerate={handleGenerateStatement as any}
                     isGenerating={isPdfGenerating}
                 />

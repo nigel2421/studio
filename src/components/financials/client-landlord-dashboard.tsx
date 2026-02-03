@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Tenant, Payment, Property, Unit, LedgerEntry } from '@/lib/types';
+import type { Tenant, Payment, Property, Unit, LedgerEntry, PropertyOwner, Landlord } from '@/lib/types';
 import { DollarSign, Calendar, Droplets, PlusCircle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -22,16 +22,17 @@ interface ClientLandlordDashboardProps {
     waterReadings: any[];
     allProperties: Property[];
     units: (Unit & { propertyName: string })[];
+    owner: PropertyOwner | Landlord | null;
 }
 
-export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units }: ClientLandlordDashboardProps) {
+export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner }: ClientLandlordDashboardProps) {
     
     const { ledger, finalDueBalance, finalAccountBalance } = useMemo(() => {
         if (!tenantDetails) {
             return { ledger: [], finalDueBalance: 0, finalAccountBalance: 0 };
         }
-        return generateLedger(tenantDetails, payments, allProperties);
-    }, [tenantDetails, payments, allProperties]);
+        return generateLedger(tenantDetails, payments, allProperties, owner);
+    }, [tenantDetails, payments, allProperties, owner]);
 
     const latestWaterReading = waterReadings?.[0];
     const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);

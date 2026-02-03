@@ -245,6 +245,7 @@ export async function getProperty(id: string): Promise<Property | null> {
 }
 
 export async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
+    if (!tenantId) return [];
     const readingsQuery = query(
         collection(db, 'waterReadings'),
         where('tenantId', '==', tenantId),
@@ -290,6 +291,23 @@ export async function addTenant(data: {
     }
 
     const initialDue = rent + (securityDeposit || 0) + (waterDeposit || 0);
+    
+    // For homeowners, service charge billing start date is determined by handover date
+    let lastBilledPeriod = format(new Date(leaseStartDate), 'yyyy-MM');
+    if (residentType === 'Homeowner' && unit.handoverDate) {
+        const handoverDate = new Date(unit.handoverDate);
+        const handoverDay = handoverDate.getDate();
+        // If handover is after the 10th, the first billable month is the next one.
+        // So, the last "billed" period is the handover month itself.
+        if (handoverDay > 10) {
+            lastBilledPeriod = format(handoverDate, 'yyyy-MM');
+        } else {
+        // If handover is on/before the 10th, the first billable month is the handover month.
+        // So, the last "billed" period is the month before.
+            lastBilledPeriod = format(addMonths(handoverDate, -1), 'yyyy-MM');
+        }
+    }
+
 
     const newTenantData = {
         name,
@@ -307,7 +325,7 @@ export async function addTenant(data: {
             rent: rent,
             serviceCharge: unit.serviceCharge || 0,
             paymentStatus: 'Pending' as const,
-            lastBilledPeriod: format(new Date(leaseStartDate), 'yyyy-MM'),
+            lastBilledPeriod: lastBilledPeriod,
         },
         securityDeposit: securityDeposit || 0,
         waterDeposit: waterDeposit || 0,
@@ -595,6 +613,7 @@ export async function getPaymentHistory(tenantId: string, options?: { startDate?
 }
 
 export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
+    if (!tenantId) return [];
     return getPaymentHistory(tenantId);
 }
 
@@ -1296,15 +1315,14 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
     const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
     const handoverDay = handoverDate.getDate();
 
-    let firstBillableMonthDate: Date;
-    if (handoverDay <= 10) {
-        firstBillableMonthDate = startOfMonth(handoverDate);
+    let lastBilledPeriodDate: Date;
+    if (handoverDay > 10) {
+        // First bill is next month, so last billed is this month
+        lastBilledPeriodDate = startOfMonth(handoverDate);
     } else {
-        firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
+        // First bill is this month, so last billed is month before
+        lastBilledPeriodDate = addMonths(startOfMonth(handoverDate), -1);
     }
-
-    // The last billed period is the month *before* the first billable month.
-    const lastBilledPeriodDate = addMonths(firstBillableMonthDate, -1);
     const lastBilledPeriod = format(lastBilledPeriodDate, 'yyyy-MM');
 
     const newTenantData = {

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -39,9 +38,14 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
     const associatedTenant = useMemo(() => {
         if (!owner) return null;
+        // Prioritize finding by userId if available
+        if (owner.userId) {
+            const tenantByUserId = allTenants.find(t => t.residentType === 'Homeowner' && t.userId === owner.userId);
+            if(tenantByUserId) return tenantByUserId;
+        }
+        // Fallback to email
         return allTenants.find(t => 
-            t.residentType === 'Homeowner' && 
-            (t.userId === owner.userId || t.email === owner.email)
+            t.residentType === 'Homeowner' && t.email === owner.email
         );
     }, [owner, allTenants]);
     
@@ -49,13 +53,19 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         if (owner && open && associatedTenant) {
             setIsLoading(true);
             const tenantPayments = allPayments.filter(p => p.tenantId === associatedTenant.id);
-            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(associatedTenant, tenantPayments, allProperties);
+            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(associatedTenant, tenantPayments, allProperties, owner);
             
             const sortedLedger = generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             
             setLedger(sortedLedger);
             setFinalDueBalance(dueBalance);
             setIsLoading(false);
+        } else if (owner && open && !associatedTenant) {
+            // Handle case where a homeowner exists but has no matching proxy 'tenant' record yet
+            setLedger([]);
+            setFinalDueBalance(0);
+            setIsLoading(false);
+            console.warn(`No associated homeowner tenant record found for owner ${owner.name}.`);
         }
     }, [owner, open, associatedTenant, allPayments, allProperties]);
     
@@ -75,7 +85,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         try {
             const invoiceDetails = {
                 month: 'Outstanding Service Charges',
-                items: ledger.filter(i => i.charge > 0 && i.date <= format(selectedMonth, 'yyyy-MM-dd')).map(i => ({ description: i.description, amount: i.charge })),
+                items: ledger.filter(i => i.charge > 0 && new Date(i.date) <= selectedMonth).map(i => ({ description: i.description, amount: i.charge })),
                 totalDue: finalDueBalance,
             };
 
