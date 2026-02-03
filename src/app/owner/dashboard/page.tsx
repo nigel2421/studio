@@ -1,43 +1,70 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, WaterMeterReading, PropertyOwner } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { Property, Tenant, Payment } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Home, Users, Wallet, DollarSign, Calendar, Droplets, LogOut, Building, AlertCircle, PlusCircle } from 'lucide-react';
-import { getTenants, getTenantPayments, getAllPayments, getProperties, getPropertyOwner } from '@/lib/data';
+import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
+import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
+import { generateLedger } from '@/lib/financial-logic';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
-import { FinancialSummary, aggregateFinancials } from '@/lib/financial-utils';
-import { Loader2 } from 'lucide-react';
 
-// This component is for owners who are also residents, showing their personal bills.
-function ResidentOwnerDashboard() {
-    const { userProfile } = useAuth();
-    const router = useRouter();
-    const [payments, setPayments] = useState<Payment[]>([]);
 
+function HomeownerDashboard() {
+    const { userProfile, isLoading: authIsLoading } = useAuth();
+    const { toast } = useToast();
     const tenantDetails = userProfile?.tenantDetails;
-    const waterReadingHistory = tenantDetails?.waterReadings || [];
-    const latestWaterReading = waterReadingHistory[0];
     
-    useEffect(() => {
-        if (userProfile?.tenantId) {
-            getTenantPayments(userProfile.tenantId).then(allPayments => {
-                const serviceChargePayments = allPayments.filter(p => p.type === 'ServiceCharge' || p.type === 'Rent'); // Homeowner rent is service charge
-                setPayments(serviceChargePayments);
-            });
-        }
-    }, [userProfile]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [waterReadings, setWaterReadings] = useState<any[]>([]);
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [ledger, setLedger] = useState<{ finalDueBalance: number, finalAccountBalance: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const getPaymentStatusVariant = (status?: Tenant['lease']['paymentStatus']) => {
+    useEffect(() => {
+        if (!authIsLoading && userProfile?.tenantId) {
+            setIsLoading(true);
+            Promise.all([
+                getTenantPayments(userProfile.tenantId),
+                getTenantWaterReadings(userProfile.tenantId),
+                getProperties()
+            ]).then(([paymentData, waterData, propertiesData]) => {
+                setPayments(paymentData);
+                setWaterReadings(waterData);
+                setProperties(propertiesData);
+                if(tenantDetails) {
+                    const { finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
+                    setLedger({ finalDueBalance, finalAccountBalance });
+                }
+                setIsLoading(false);
+            }).catch(err => {
+                console.error("Error fetching homeowner dashboard data:", err);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not load dashboard data.' });
+                setIsLoading(false);
+            });
+        } else if (!authIsLoading) {
+            setIsLoading(false);
+        }
+    }, [userProfile, authIsLoading, tenantDetails, toast]);
+
+
+    const latestWaterReading = waterReadings?.[0];
+
+    const getPaymentStatusVariant = (status: Tenant['lease']['paymentStatus']) => {
         switch (status) {
             case 'Paid': return 'default';
             case 'Pending': return 'secondary';
@@ -45,37 +72,25 @@ function ResidentOwnerDashboard() {
             default: return 'outline';
         }
     };
-    
-    const nextDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
 
+    const nextRentDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
+
+    if (isLoading || authIsLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
+    
     return (
-        <div className="space-y-8">
+         <div className="space-y-8">
              <div>
                 <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Homeowner'}</h1>
                 <p className="text-muted-foreground">Here is an overview of your resident account.</p>
             </div>
             
-            {tenantDetails && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Unit Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                             <Building className="h-4 w-4 text-muted-foreground" />
-                             <strong>Property:</strong>
-                             <span>{userProfile?.propertyOwnerDetails?.properties.find(p => p.property.id === tenantDetails.propertyId)?.property.name || tenantDetails.propertyId}</span>
-                        </div>
-                         <div className="flex items-center gap-2">
-                             <Home className="h-4 w-4 text-muted-foreground" />
-                             <strong>Unit:</strong>
-                             <span>{tenantDetails.unitName}</span>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {tenantDetails && (
+            {tenantDetails ? (
                 <div>
                     <h2 className="text-2xl font-semibold mb-4">Financial Overview</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -118,7 +133,7 @@ function ResidentOwnerDashboard() {
                                 <AlertCircle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails.dueBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-red-600">Ksh {(ledger?.finalDueBalance || 0).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                             </CardContent>
                         </Card>
@@ -128,18 +143,22 @@ function ResidentOwnerDashboard() {
                                 <PlusCircle className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails.accountBalance || 0).toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-green-600">Ksh {(ledger?.finalAccountBalance || 0).toLocaleString()}</div>
                                 <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                             </CardContent>
                         </Card>
                     </div>
+                </div>
+            ) : (
+                <div className="text-center py-10 border rounded-lg">
+                    <h2 className="text-xl font-semibold">No Property Information Found</h2>
+                    <p className="text-muted-foreground mt-2">Your account is not yet linked to a specific unit. Please contact management.</p>
                 </div>
             )}
              <div className="grid gap-8 md:grid-cols-2">
                 <Card>
                     <CardHeader>
                         <CardTitle>Payment History</CardTitle>
-                        <CardDescription>Your last 5 service charge transactions.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -173,7 +192,6 @@ function ResidentOwnerDashboard() {
                  <Card>
                     <CardHeader>
                         <CardTitle>Water Usage Details</CardTitle>
-                        <CardDescription>History of monthly meter readings.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -185,8 +203,8 @@ function ResidentOwnerDashboard() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {waterReadingHistory.length > 0 ? (
-                                    waterReadingHistory.map(reading => (
+                                {waterReadings.length > 0 ? (
+                                    waterReadings.map(reading => (
                                         <TableRow key={reading.id}>
                                             <TableCell>{format(new Date(reading.date), 'PPP')}</TableCell>
                                             <TableCell>{reading.consumption} units</TableCell>
@@ -207,88 +225,8 @@ function ResidentOwnerDashboard() {
     );
 }
 
-// This component is for investor owners, showing portfolio financial summary.
-function InvestorDashboard() {
-    const { userProfile } = useAuth();
-    const [dashboardData, setDashboardData] = useState<{
-        properties: { property: Property, units: Unit[] }[],
-        tenants: Tenant[],
-        payments: Payment[],
-        financialSummary: FinancialSummary,
-    } | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchData() {
-            if (userProfile?.role === 'homeowner' && userProfile.propertyOwnerId) {
-                setLoading(true);
-                const [allTenants, allPayments, allProperties, owner] = await Promise.all([
-                    getTenants(),
-                    getAllPayments(),
-                    getProperties(),
-                    getPropertyOwner(userProfile.propertyOwnerId)
-                ]);
-
-                // This logic is moved from getUserProfile
-                let ownerProperties: { property: Property; units: Unit[]; }[] = [];
-                if (owner) {
-                    owner.assignedUnits.forEach(assigned => {
-                        const property = allProperties.find(p => p.id === assigned.propertyId);
-                        if (property) {
-                            const units = property.units.filter(u => assigned.unitNames.includes(u.name));
-                            ownerProperties.push({ property, units });
-                        }
-                    });
-                }
-                
-                const ownedUnitIdentifiers = new Set<string>();
-                ownerProperties.forEach(p => {
-                    p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));
-                });
-
-                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                const relevantTenantIds = relevantTenants.map(t => t.id);
-                const relevantPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
-
-                const summary = aggregateFinancials(relevantPayments, relevantTenants, ownerProperties);
-                
-                setDashboardData({
-                    properties: ownerProperties,
-                    tenants: relevantTenants,
-                    payments: relevantPayments,
-                    financialSummary: summary,
-                });
-                setLoading(false);
-            } else if (userProfile) {
-                // Not an investor owner or data is missing, stop loading
-                setLoading(false);
-            }
-        }
-        fetchData();
-    }, [userProfile]);
-
-    if (loading) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
-
-    if (!dashboardData) {
-        return (
-            <div>
-                <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
-                <p className="mt-4 text-muted-foreground">You are not currently assigned to any properties as an investor. Please contact management.</p>
-            </div>
-        );
-    }
-
-    return <LandlordDashboardContent {...dashboardData} />;
-}
-
 export default function OwnerDashboardPage() {
-    const { userProfile, isLoading } = useAuth();
+    const { isLoading } = useAuth();
     const router = useRouter();
     
     const handleSignOut = async () => {
@@ -304,9 +242,6 @@ export default function OwnerDashboardPage() {
         );
     }
 
-    // This is the crucial check. If the user has tenantDetails, they are a resident.
-    const isResident = !!userProfile?.tenantDetails;
-
     return (
         <div className="space-y-6">
             <header className="flex items-center justify-between">
@@ -319,7 +254,7 @@ export default function OwnerDashboardPage() {
                 </Button>
             </header>
             
-            {isResident ? <ResidentOwnerDashboard /> : <InvestorDashboard />}
+            <HomeownerDashboard />
         </div>
     );
 }

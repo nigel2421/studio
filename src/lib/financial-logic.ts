@@ -239,11 +239,19 @@ export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], pro
     }
     
     if (monthlyCharge > 0) {
-        const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : null;
-        
-        const billingStartDate = tenant.residentType === 'Homeowner' && handoverDate
-            ? startOfMonth(addMonths(handoverDate, 1))
-            : startOfMonth(leaseStartDate);
+        let billingStartDate: Date;
+
+        if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
+            const handoverDate = new Date(unit.handoverDate);
+            const handoverDay = handoverDate.getDate();
+            if (handoverDay <= 10) {
+                billingStartDate = startOfMonth(handoverDate);
+            } else {
+                billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+            }
+        } else {
+            billingStartDate = startOfMonth(leaseStartDate);
+        }
 
         let loopDate = billingStartDate;
         const today = new Date();
