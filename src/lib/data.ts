@@ -1298,11 +1298,9 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
 
     let firstBillableMonthDate: Date;
     if (handoverDay <= 10) {
-        // Handover on or before the 10th. This month is waived. Billing starts NEXT month.
-        firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
+        firstBillableMonthDate = startOfMonth(handoverDate);
     } else {
-        // Handover after the 10th. Next month is waived. Billing starts the month AFTER next.
-        firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 2));
+        firstBillableMonthDate = startOfMonth(addMonths(handoverDate, 1));
     }
 
     // The last billed period is the month *before* the first billable month.

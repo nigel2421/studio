@@ -135,7 +135,7 @@ export function processServiceChargeData(
             
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(addMonths(handoverDate, 1)) : startOfMonth(addMonths(handoverDate, 2));
+                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
                 if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
                     isBillable = true;
                 }
@@ -208,7 +208,7 @@ export function processServiceChargeData(
             : parseISO(handoverDateSource);
         if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
-          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(addMonths(handoverDate, 1)) : startOfMonth(addMonths(handoverDate, 2));
+          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
           if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
             isBillable = true;
           }
@@ -287,9 +287,9 @@ export function processServiceChargeData(
       let firstBillableMonth: Date;
 
       if (handoverDay <= 10) {
-        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+        firstBillableMonth = startOfMonth(handoverDate);
       } else {
-        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
       }
       
       const today = selectedMonth;
