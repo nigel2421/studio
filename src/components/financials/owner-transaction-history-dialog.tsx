@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -157,6 +158,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Date</TableHead>
+                                        <TableHead>For Month</TableHead>
                                         <TableHead>Details</TableHead>
                                         <TableHead className="text-right">Charge</TableHead>
                                         <TableHead className="text-right">Payment</TableHead>
@@ -167,6 +169,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                     {ledger.map((t, index) => (
                                         <TableRow key={`${t.id}-${index}`}>
                                             <TableCell>{format(new Date(t.date), 'dd MMM yyyy')}</TableCell>
+                                            <TableCell>{t.forMonth}</TableCell>
                                             <TableCell>{t.description}</TableCell>
                                             <TableCell className="text-right text-red-600">{t.charge > 0 ? `Ksh ${t.charge.toLocaleString()}` : '-'}</TableCell>
                                             <TableCell className="text-right text-green-600">{t.payment > 0 ? `Ksh ${t.payment.toLocaleString()}` : '-'}</TableCell>

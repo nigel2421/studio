@@ -1,3 +1,4 @@
+
 import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
 
@@ -112,8 +113,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
         
-        // Handover before/on 10th waives that month, billing starts next month.
-        // Handover after 10th waives next month, billing starts month after.
+        // Handover on/before 10th waives that month, billing starts next month
+        // Handover after 10th waives next month, billing starts month after
         if (handoverDay <= 10) {
             billingStartDate = startOfMonth(addMonths(handoverDate, 1));
         } else {
@@ -248,16 +249,16 @@ export function generateLedger(
 
 
     // --- GENERATE ALL CHARGES ---
-    let allCharges: { id: string, date: Date, description: string, charge: number, payment: number }[] = [];
+    let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string }[] = [];
 
     // Initial charges (Deposits) - only for Tenants
     if (tenant.residentType === 'Tenant') {
         const leaseStartDate = new Date(tenant.lease.startDate);
         if (tenant.securityDeposit && tenant.securityDeposit > 0) {
-            allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0 });
+            allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
         }
         if (tenant.waterDeposit && tenant.waterDeposit > 0) {
-            allCharges.push({ id: 'charge-water-deposit', date: leaseStartDate, description: 'Water Deposit', charge: tenant.waterDeposit, payment: 0 });
+            allCharges.push({ id: 'charge-water-deposit', date: leaseStartDate, description: 'Water Deposit', charge: tenant.waterDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
         }
     }
 
@@ -311,6 +312,7 @@ export function generateLedger(
             description: description,
             charge: value.charge,
             payment: 0,
+            forMonth: format(chargeDate, 'MMM yyyy'),
         });
     });
 
@@ -328,6 +330,7 @@ export function generateLedger(
             description: details,
             charge: isAdjustment && p.amount > 0 ? p.amount : 0,
             payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
+            forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : undefined
         };
     });
 
@@ -345,7 +348,7 @@ export function generateLedger(
     const ledgerWithBalance: LedgerEntry[] = combined.map(item => {
         runningBalance += item.charge;
         runningBalance -= item.payment;
-        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance };
+        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance, forMonth: item.forMonth };
     });
     
     const finalDueBalance = Math.max(0, runningBalance);

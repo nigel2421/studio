@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -210,6 +211,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const tableBody = periodLedger.map(item => [
         item.date,
+        item.forMonth || '',
         item.description,
         item.charge > 0 ? formatCurrency(item.charge) : '',
         item.payment > 0 ? formatCurrency(item.payment) : '',
@@ -227,13 +229,10 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     autoTable(doc, {
         startY: yPosHeader + 10,
-        head: [['Date', 'Details', 'Charge', 'Payment', 'Balance']],
-        body: [
-            [{content: 'Opening Balance', colSpan: 4, styles: {fontStyle: 'italic'}}, formatCurrency(openingBalance)],
-            ...tableBody
-        ],
+        head: [['Date', 'For Month', 'Details', 'Charge', 'Payment', 'Balance']],
+        body: tableBody,
         foot: [[
-            { content: 'Totals for Period', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'Totals for Period', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalPayments), styles: { fontStyle: 'bold', halign: 'right' } },
             '', // Balance column in totals is not typically summed
@@ -243,10 +242,11 @@ export const generateOwnerServiceChargeStatementPDF = (
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
         columnStyles: {
             0: { cellWidth: 25 },
-            1: { cellWidth: 'auto' },
-            2: { halign: 'right', cellWidth: 25 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 'auto' },
             3: { halign: 'right', cellWidth: 25 },
-            4: { halign: 'right', cellWidth: 30 },
+            4: { halign: 'right', cellWidth: 25 },
+            5: { halign: 'right', cellWidth: 30 },
         },
         didDrawPage: (data) => {
             // Final Balance Footer

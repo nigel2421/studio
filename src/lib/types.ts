@@ -284,4 +284,5 @@ export interface LedgerEntry {
     charge: number;
     payment: number;
     balance: number;
+    forMonth?: string;
 }
