@@ -10,7 +10,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { downloadCSV } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, parseISO, addMonths } from 'date-fns';
+import { format, parseISO, addMonths, differenceInDays } from 'date-fns';
 
 interface LandlordDashboardContentProps {
     properties: { property: Property, units: Unit[] }[];
@@ -34,19 +34,46 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
 
     const displayTransactions = useMemo(() => {
         const transactions: any[] = [];
-        const sortedPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Process payments chronologically to build up the transaction list in order
+        const sortedPayments = [...payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         sortedPayments.forEach(payment => {
             const tenant = tenants.find(t => t.id === payment.tenantId);
-            if (!tenant || payment.type === 'Deposit') return;
+            // Exclude pure deposit payments from landlord statements
+            if (!tenant || payment.type === 'Deposit') {
+                return;
+            }
 
             const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
             const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
 
-            if (payment.type === 'Rent' && unitRent > 0 && payment.amount > unitRent * 1.1) {
-                let remainingAmount = payment.amount;
+            // Check if this payment is likely an initial lump sum covering rent and deposits.
+            const isInitialLumpSum =
+                payment.type === 'Rent' &&
+                tenant.lease.startDate &&
+                unitRent > 0 &&
+                Math.abs(differenceInDays(parseISO(payment.date), parseISO(tenant.lease.startDate))) < 45 && // Allow ~1.5 month window
+                payment.amount > unitRent * 1.5;
+
+            let amountToApportionAsRent = payment.amount;
+
+            if (isInitialLumpSum) {
+                const totalDeposits = (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
+                // If payment seems to cover deposits, subtract them to find the rent portion
+                if (payment.amount >= totalDeposits) {
+                    amountToApportionAsRent = payment.amount - totalDeposits;
+                } else {
+                    // Payment is less than total deposits, so no rent portion for landlord
+                    amountToApportionAsRent = 0;
+                }
+            }
+
+            if (amountToApportionAsRent <= 0) return; // Nothing to show landlord
+
+            // Unroll lump-sum rent payments month by month
+            if (unitRent > 0 && amountToApportionAsRent > unitRent * 1.1) {
+                let remainingAmount = amountToApportionAsRent;
                 let monthIndex = 0;
-                
                 const leaseStartDate = parseISO(tenant.lease.startDate);
 
                 while (remainingAmount >= unitRent) {
@@ -68,7 +95,8 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     monthIndex++;
                 }
 
-                if (remainingAmount > 1) { // Handle partial remainder
+                // Handle any partial remainder as the last rent portion
+                if (remainingAmount > 1) {
                     const nextMonth = addMonths(leaseStartDate, monthIndex);
                     const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
                     const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
@@ -83,7 +111,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     });
                 }
             } else {
-                const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+                // Handle single rent payments or smaller payments
+                const paymentForBreakdown = { ...payment, amount: amountToApportionAsRent };
+                const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
                 transactions.push({
                     id: payment.id,
                     date: payment.date,
@@ -94,8 +124,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 });
             }
         });
-
-        return transactions.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Since payments are processed chronologically, the transactions array will be in order.
+        return transactions;
     }, [payments, tenants, unitMap]);
 
     const transactionTotals = useMemo(() => {
