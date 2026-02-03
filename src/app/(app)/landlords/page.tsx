@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPayments, deleteLandlord } from '@/lib/data';
+import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPaymentsForReport, deleteLandlord } from '@/lib/data';
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
@@ -59,7 +59,7 @@ export default function LandlordsPage() {
       getLandlords(),
       getProperties(),
       getTenants(),
-      getAllPayments()
+      getAllPaymentsForReport()
     ]).then(([landlordData, propertyData, tenantData, paymentData]) => {
       setLandlords([SOIL_MERCHANTS_LANDLORD, ...landlordData]);
       setProperties(propertyData);
