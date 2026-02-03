@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 export type Property = {
   id: string;
   name: string;
@@ -117,6 +110,8 @@ export type Task = {
 
 export type PaymentStatus = 'Paid' | 'Pending' | 'Failed';
 
+export const paymentMethods = ['M-Pesa', 'Bank Transfer', 'Card'] as const;
+
 /**
  * Represents a single financial transaction.
  * This can be a payment from a tenant, or a debit/credit adjustment from management.
@@ -134,7 +129,7 @@ export type Payment = {
   notes?: string;
   rentForMonth?: string;
   // Optional fields for more detailed tracking
-  paymentMethod: 'M-Pesa' | 'Bank Transfer' | 'Card';
+  paymentMethod: (typeof paymentMethods)[number];
   transactionId: string; // e.g., M-Pesa transaction code
   createdAt: Date;
   reference?: string;

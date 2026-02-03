@@ -205,5 +205,3 @@ describe('Financial Logic', () => {
         });
     });
 });
-
-    

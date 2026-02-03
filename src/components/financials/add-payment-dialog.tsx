@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { batchProcessPayments } from '@/lib/data';
-import type { Tenant, Property, Payment, Unit } from '@/lib/types';
+import { type Tenant, type Property, type Payment, type Unit, paymentMethods } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -18,8 +19,6 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
-const paymentMethods: Payment['paymentMethod'][] = ['M-Pesa', 'Bank Transfer', 'Card'];
-
 
 interface PaymentEntry {
   id: number;

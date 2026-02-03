@@ -178,5 +178,3 @@ describe('Service Charge Logic', () => {
         expect(bobGroup?.paymentStatus).toBe('Pending'); // Because B201 is pending
     });
 });
-
-    

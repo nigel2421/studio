@@ -359,5 +359,3 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         </>
     );
 }
-
-    
