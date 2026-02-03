@@ -305,7 +305,7 @@ export function processServiceChargeData(
       let loopDate = firstBillableMonth;
       const startOfToday = startOfMonth(today);
 
-      while (isBefore(loopDate, startOfToday)) {
+      while (isBefore(loopDate, startOfToday) || isSameMonth(loopDate, startOfToday)) {
         const chargeForMonth = unit.serviceCharge || 0;
         if (chargeForMonth > 0) {
           totalBilled += chargeForMonth;

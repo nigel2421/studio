@@ -196,7 +196,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 .map(entry => ({ description: entry.details, amount: entry.charge }));
 
             setInvoiceItems(outstandingCharges);
-            setTotalDueForInvoice(finalBalance);
+            setTotalDueForInvoice(finalBalance > 0 ? finalBalance : 0);
 
             setIsLoading(false);
         }
