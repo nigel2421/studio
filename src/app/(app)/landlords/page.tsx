@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
+import { aggregateFinancials, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
 import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { isWithinInterval } from 'date-fns';
@@ -270,33 +270,22 @@ export default function LandlordsPage() {
       
       const relevantPayments = payments.filter(p => 
           relevantTenantIds.includes(p.tenantId) && 
-          p.type === 'Rent' &&
           isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
       );
 
       const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
       
-      const unitMap = new Map<string, Unit>();
-        landlordProperties.forEach(p => {
-            p.units.forEach(u => {
-                unitMap.set(`${p.property.id}-${u.name}`, u);
-            });
-        });
-
-      const transactionsForPDF = relevantPayments.map(payment => {
-        const tenant = relevantTenants.find(t => t.id === payment.tenantId);
-        const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-        const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
-        return {
-          date: new Date(payment.date).toLocaleDateString(),
-          unit: tenant?.unitName || 'N/A',
-          rentForMonth: payment.rentForMonth,
-          gross: breakdown.gross,
-          serviceCharge: breakdown.serviceChargeDeduction,
-          mgmtFee: breakdown.managementFee,
-          net: breakdown.netToLandlord,
-        };
-      });
+      const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties);
+      
+      const transactionsForPDF = displayTransactions.map(t => ({
+        date: new Date(t.date).toLocaleDateString(),
+        unit: t.unitName,
+        rentForMonth: t.forMonth,
+        gross: t.gross,
+        serviceCharge: t.serviceChargeDeduction,
+        mgmtFee: t.managementFee,
+        net: t.netToLandlord,
+      }));
 
       const unitsForPDF = landlordProperties.flatMap(p => p.units.map(u => ({
         property: p.property.name,
