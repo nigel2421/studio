@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +10,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { downloadCSV } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from 'date-fns';
+import { format, parseISO, addMonths } from 'date-fns';
 
 interface LandlordDashboardContentProps {
     properties: { property: Property, units: Unit[] }[];
@@ -34,29 +32,82 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
         return map;
     }, [properties]);
 
-    const getUnitTypeForTenant = (tenant: Tenant | undefined): string => {
-        if (!tenant) return 'N/A';
-        const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-        return unit?.unitType || 'N/A';
-    };
+    const displayTransactions = useMemo(() => {
+        const transactions: any[] = [];
+        const sortedPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        sortedPayments.forEach(payment => {
+            const tenant = tenants.find(t => t.id === payment.tenantId);
+            if (!tenant) return;
+
+            const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+            const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+
+            if (payment.type === 'Rent' && unitRent > 0 && payment.amount > unitRent * 1.1) {
+                let remainingAmount = payment.amount;
+                let monthIndex = 0;
+                const paymentStartDate = payment.rentForMonth ? parseISO(`${payment.rentForMonth}-01`) : parseISO(tenant.lease.startDate);
+
+                while (remainingAmount >= unitRent) {
+                    const currentMonth = addMonths(paymentStartDate, monthIndex);
+                    const monthString = format(currentMonth, 'yyyy-MM');
+                    const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
+                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                    
+                    transactions.push({
+                        id: `${payment.id}-${monthIndex}`,
+                        date: payment.date,
+                        unitName: tenant.unitName,
+                        unitType: unit?.unitType || 'N/A',
+                        forMonth: format(currentMonth, 'MMM yyyy'),
+                        ...breakdown,
+                    });
+                    
+                    remainingAmount -= unitRent;
+                    monthIndex++;
+                }
+
+                if (remainingAmount > 1) { // Handle partial remainder
+                    const nextMonth = addMonths(paymentStartDate, monthIndex);
+                    const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
+                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+
+                    transactions.push({
+                        id: `${payment.id}-rem`,
+                        date: payment.date,
+                        unitName: tenant.unitName,
+                        unitType: unit?.unitType || 'N/A',
+                        forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
+                        ...breakdown,
+                    });
+                }
+            } else {
+                const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
+                transactions.push({
+                    id: payment.id,
+                    date: payment.date,
+                    unitName: tenant.unitName,
+                    unitType: unit?.unitType || 'N/A',
+                    forMonth: payment.rentForMonth ? format(parseISO(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+                    ...breakdown,
+                });
+            }
+        });
+
+        return transactions;
+    }, [payments, tenants, unitMap]);
+
 
     const handleExport = () => {
-        const data = payments.map(p => {
-            const t = tenants.find(t => t.id === p.tenantId);
-            const unit = t ? unitMap.get(`${t.propertyId}-${t.unitName}`) : undefined;
-            const breakdown = calculateTransactionBreakdown(p, unit, t);
-
-            return {
-                Date: new Date(p.date).toLocaleDateString(),
-                Unit: t?.unitName || 'Unknown',
-                "For_Month": p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-                "Gross Amount": breakdown.gross,
-                "Service Charge Deduction": breakdown.serviceChargeDeduction,
-                "Management Fee": breakdown.managementFee,
-                "Net Payout": breakdown.netToLandlord,
-                Notes: p.notes || ''
-            };
-        });
+        const data = displayTransactions.map(t => ({
+            Date: new Date(t.date).toLocaleDateString(),
+            Unit: t.unitName || 'Unknown',
+            For_Month: t.forMonth,
+            "Gross Amount": t.gross,
+            "Service Charge Deduction": t.serviceChargeDeduction,
+            "Management Fee": t.managementFee,
+            "Net Payout": t.netToLandlord,
+        }));
         downloadCSV(data, 'landlord_financial_statement.csv');
     };
 
@@ -141,27 +192,20 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {payments.slice(0, 10).map((payment) => {
-                                const tenant = tenants.find(t => t.id === payment.tenantId);
-                                const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-                                const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
-                                const unitType = getUnitTypeForTenant(tenant);
-
-                                return (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
+                            {displayTransactions.slice(0, 10).map((transaction) => (
+                                    <TableRow key={transaction.id}>
+                                        <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
                                         <TableCell>
-                                            <div className="font-medium">{tenant?.unitName}</div>
-                                            <div className="text-xs text-muted-foreground">{unitType}</div>
+                                            <div className="font-medium">{transaction.unitName}</div>
+                                            <div className="text-xs text-muted-foreground">{transaction.unitType}</div>
                                         </TableCell>
-                                        <TableCell>{payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A'}</TableCell>
-                                        <TableCell className="text-right">Ksh {breakdown.gross.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right text-muted-foreground">- {breakdown.serviceChargeDeduction.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right text-muted-foreground">- {breakdown.managementFee.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right font-bold">Ksh {breakdown.netToLandlord.toLocaleString()}</TableCell>
+                                        <TableCell>{transaction.forMonth}</TableCell>
+                                        <TableCell className="text-right">Ksh {transaction.gross.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">- {transaction.serviceChargeDeduction.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">- {transaction.managementFee.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold">Ksh {transaction.netToLandlord.toLocaleString()}</TableCell>
                                     </TableRow>
-                                );
-                            })}
+                                ))}
                         </TableBody>
                     </Table>
                 </CardContent>
