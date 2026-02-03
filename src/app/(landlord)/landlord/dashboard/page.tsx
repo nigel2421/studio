@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, Landlord, UserProfile } from '@/lib/types';
-import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings } from '@/lib/data';
+import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner } from '@/lib/types';
+import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -17,76 +17,108 @@ export default function UniversalOwnerDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
     const router = useRouter();
     
-    // State for both dashboards
-    const [landlordData, setLandlordData] = useState<any>(null);
-    const [homeownerData, setHomeownerData] = useState<any>(null);
+    const [dashboardType, setDashboardType] = useState<'landlord' | 'homeowner' | null>(null);
+    const [viewData, setViewData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && userProfile) {
-            setLoading(true);
-            if ((userProfile.role === 'landlord' || userProfile.role === 'admin') && (userProfile.landlordId || userProfile.email === 'nigel2421@gmail.com')) {
-                Promise.all([
-                    getProperties(),
-                    getTenants(),
-                    getAllPaymentsForReport(),
-                ]).then(async ([properties, tenants, payments]) => {
+        if (authLoading || !userProfile) return;
 
-                    const landlordId = userProfile.landlordId || 'soil_merchants_internal';
-                    if (!landlordId) {
-                        setLoading(false);
-                        return;
+        setLoading(true);
+
+        const ownerId = userProfile.landlordId || userProfile.propertyOwnerId;
+        const isAdmin = userProfile.role === 'admin';
+        const adminId = userProfile.email === 'nigel2421@gmail.com' ? 'soil_merchants_internal' : ownerId;
+        const effectiveOwnerId = isAdmin ? adminId : ownerId;
+
+        if (!effectiveOwnerId) {
+            setLoading(false);
+            setDashboardType(null);
+            return;
+        }
+
+        async function fetchDataAndDetermineRole() {
+            const [allProperties, allTenants, allPayments, allLandlords, allPropertyOwners] = await Promise.all([
+                getProperties(),
+                getTenants(),
+                getAllPaymentsForReport(),
+                getLandlords(),
+                getPropertyOwners(),
+            ]);
+
+            const owner = allLandlords.find(l => l.id === effectiveOwnerId) || allPropertyOwners.find(o => o.id === effectiveOwnerId);
+
+            const ownedUnits: Unit[] = allProperties.flatMap(p =>
+                (p.units || []).filter(u => {
+                    if (isAdmin && effectiveOwnerId === 'soil_merchants_internal') {
+                        return u.ownership === 'SM';
                     }
+                    if (owner && 'assignedUnits' in owner) { 
+                        return (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
+                    }
+                    if (owner && 'phone' in owner) { 
+                        return u.landlordId === effectiveOwnerId;
+                    }
+                    return false;
+                }).map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+            );
+            
+            const uniqueOwnedUnits = Array.from(new Map(ownedUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values());
 
-                    const landlordProperties: { property: Property, units: Unit[] }[] = [];
-                    properties.forEach(p => {
-                        const units = p.units.filter(u => u.landlordId === landlordId);
-                        if (units.length > 0) {
-                            landlordProperties.push({ property: p, units });
-                        }
-                    });
-                    
-                    const ownedUnitIdentifiers = new Set<string>();
-                    landlordProperties.forEach(p => p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`)));
-                    const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                    const relevantTenantIds = relevantTenants.map(t => t.id);
-                    const relevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
+            const isInvestor = uniqueOwnedUnits.some(u => u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb');
+            const isClient = uniqueOwnedUnits.some(u => u.managementStatus === 'Client Managed');
 
-                    const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
-                    
-                    setLandlordData({
-                        properties: landlordProperties,
-                        tenants: relevantTenants,
-                        payments: relevantPayments,
-                        financialSummary: summary,
-                    });
-                    
-                    setLoading(false);
+            if (isInvestor) {
+                setDashboardType('landlord');
+                const landlordProperties: { property: Property, units: Unit[] }[] = [];
+                allProperties.forEach(p => {
+                    let unitsForLandlord: Unit[] = [];
+                    if (isAdmin && effectiveOwnerId === 'soil_merchants_internal') {
+                        unitsForLandlord = p.units.filter(u => u.ownership === 'SM');
+                    } else {
+                        unitsForLandlord = p.units.filter(u => u.landlordId === effectiveOwnerId);
+                    }
+                    if (unitsForLandlord.length > 0) {
+                        landlordProperties.push({ property: p, units: unitsForLandlord });
+                    }
                 });
-            } else if (userProfile.role === 'homeowner' && userProfile.tenantId) {
-                Promise.all([
-                    getTenantPayments(userProfile.tenantId),
-                    getTenantWaterReadings(userProfile.tenantId),
-                    getProperties()
-                ]).then(([paymentData, waterData, propertiesData]) => {
-                     const ownerUnits = propertiesData.flatMap(p => 
-                        p.units
-                         .filter(u => u.landlordId === userProfile.landlordId || u.landlordId === userProfile.propertyOwnerId)
-                         .map(u => ({...u, propertyName: p.name}))
-                     );
-                    setHomeownerData({
-                        tenantDetails: userProfile.tenantDetails,
-                        payments: paymentData,
-                        waterReadings: waterData,
-                        allProperties: propertiesData,
-                        units: ownerUnits
-                    });
-                    setLoading(false);
+
+                const ownedUnitIdentifiers = new Set<string>();
+                landlordProperties.forEach(p => p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`)));
+                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                const relevantTenantIds = relevantTenants.map(t => t.id);
+                const relevantPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
+
+                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
+
+                setViewData({
+                    properties: landlordProperties,
+                    tenants: relevantTenants,
+                    payments: relevantPayments,
+                    financialSummary: summary,
+                });
+            } else if (isClient) {
+                setDashboardType('homeowner');
+                const homeownerTenantProfile = allTenants.find(t => t.userId === userProfile.id || t.id === userProfile.tenantId);
+                const [paymentData, waterData] = await Promise.all([
+                    getTenantPayments(homeownerTenantProfile?.id || ''),
+                    getTenantWaterReadings(homeownerTenantProfile?.id || ''),
+                ]);
+                setViewData({
+                    tenantDetails: homeownerTenantProfile,
+                    payments: paymentData,
+                    waterReadings: waterData,
+                    allProperties: allProperties,
+                    units: uniqueOwnedUnits
                 });
             } else {
-                setLoading(false);
+                setDashboardType(null);
             }
+            setLoading(false);
         }
+
+        fetchDataAndDetermineRole();
+
     }, [userProfile, authLoading]);
 
     const handleSignOut = async () => {
@@ -102,8 +134,8 @@ export default function UniversalOwnerDashboardPage() {
         );
     }
     
-    // Conditional Rendering
-    if (userProfile?.role === 'homeowner' && homeownerData) {
+    // --- Render Logic ---
+    if (dashboardType === 'homeowner' && viewData) {
         return (
              <div className="container mx-auto p-4 md:p-8">
                 <header className="flex items-center justify-between mb-8">
@@ -116,12 +148,12 @@ export default function UniversalOwnerDashboardPage() {
                         Sign Out
                     </Button>
                 </header>
-                <ClientLandlordDashboard {...homeownerData} />
+                <ClientLandlordDashboard {...viewData} />
             </div>
         )
     }
 
-    if ((userProfile?.role === 'landlord' || userProfile?.role === 'admin') && landlordData) {
+    if (dashboardType === 'landlord' && viewData) {
          return (
             <div className="container mx-auto p-4 md:p-8">
                 <header className="flex items-center justify-between mb-8">
@@ -134,7 +166,7 @@ export default function UniversalOwnerDashboardPage() {
                         Sign Out
                     </Button>
                 </header>
-                <LandlordDashboardContent {...landlordData} />
+                <LandlordDashboardContent {...viewData} />
             </div>
         );
     }
