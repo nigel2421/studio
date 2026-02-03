@@ -1,6 +1,6 @@
 
 import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord } from './types';
-import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths } from 'date-fns';
+import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore } from 'date-fns';
 
 /**
  * Calculates the total amount due for a tenant in the current billing cycle.
@@ -226,7 +226,8 @@ export function generateLedger(
     tenant: Tenant, 
     allTenantPayments: Payment[], 
     properties: Property[],
-    owner?: PropertyOwner | Landlord | null
+    owner?: PropertyOwner | Landlord | null,
+    asOfDate: Date = new Date()
 ): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
     
     let ownerUnits: (Unit & { propertyId: string; propertyName: string; })[] = [];
@@ -287,10 +288,10 @@ export function generateLedger(
             }
 
             let loopDate = billingStartDate;
-            const today = new Date();
+            const today = asOfDate;
             const startOfCurrentMonth = startOfMonth(today);
             
-            while (loopDate <= startOfCurrentMonth) {
+            while (isBefore(loopDate, startOfCurrentMonth) || isSameMonth(loopDate, startOfCurrentMonth)) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
                     monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [] });

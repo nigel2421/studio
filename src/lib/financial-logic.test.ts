@@ -152,12 +152,16 @@ describe('Financial Logic', () => {
         ]);
 
         it('should order transactions chronologically', () => {
-            const tenant = createMockTenant({ lease: { startDate: '2024-01-01', rent: 25000 } });
+            const tenant = createMockTenant({ 
+                unitName: 'A1',
+                propertyId: 'prop-1',
+                lease: { startDate: '2024-01-01', rent: 25000 } 
+            });
             const payments = [
-                createMockPayment({ amount: 25000, date: '2024-02-04' }), // Feb payment
-                createMockPayment({ amount: 25000, date: '2024-01-05' }), // Jan payment
+                createMockPayment({ amount: 25000, date: '2024-02-04', tenantId: tenant.id }), // Feb payment
+                createMockPayment({ amount: 25000, date: '2024-01-05', tenantId: tenant.id }), // Jan payment
             ];
-            const { ledger } = generateLedger(tenant, payments, [mockProperty]);
+            const { ledger } = generateLedger(tenant, payments, [mockProperty], null, parseISO('2024-02-28'));
 
             // Check order
             const janPaymentIndex = ledger.findIndex(l => l.description.includes('Payment Received') && new Date(l.date).getMonth() === 0);
@@ -168,17 +172,21 @@ describe('Financial Logic', () => {
 
         it('should correctly break down an initial lump-sum payment', () => {
             const tenant = createMockTenant({ 
+                propertyId: 'prop-1',
+                unitName: 'A1',
                 lease: { startDate: '2023-10-01', rent: 25000 },
                 securityDeposit: 25000,
                 waterDeposit: 5000,
                 dueBalance: 0,
             });
             const payment = createMockPayment({
+                tenantId: tenant.id,
                 amount: 130000,
                 date: '2023-10-02',
             });
             
-            const { ledger, finalDueBalance } = generateLedger(tenant, [payment], [mockProperty]);
+            const asOfDate = parseISO('2024-01-31');
+            const { ledger, finalDueBalance } = generateLedger(tenant, [payment], [mockProperty], null, asOfDate);
             
             const chargeDescriptions = ledger.map(l => l.description);
             expect(chargeDescriptions).toContain('Security Deposit');
