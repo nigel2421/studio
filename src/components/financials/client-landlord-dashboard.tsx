@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Tenant, Payment, Property, Unit } from '@/lib/types';
-import { DollarSign, Calendar, Droplets, PlusCircle, AlertCircle, FileDown } from 'lucide-react';
-import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
+import type { Tenant, Payment, Property, Unit, LedgerEntry } from '@/lib/types';
+import { DollarSign, Calendar, Droplets, PlusCircle, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 import {
     Table,
     TableBody,
@@ -15,12 +15,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { StatementOptionsDialog } from './statement-options-dialog';
-import { generateTenantStatementPDF } from '@/lib/pdf-generator';
-import { useLoading } from '@/hooks/useLoading';
-
+import { generateLedger } from '@/lib/financial-logic';
 
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
@@ -31,36 +26,35 @@ interface ClientLandlordDashboardProps {
 }
 
 export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units }: ClientLandlordDashboardProps) {
-    const { toast } = useToast();
-    const { startLoading, stopLoading, isLoading: isGenerating } = useLoading();
     
+    const { ledger, finalDueBalance, finalAccountBalance } = useMemo(() => {
+        if (!tenantDetails) {
+            return { ledger: [], finalDueBalance: 0, finalAccountBalance: 0 };
+        }
+        return generateLedger(tenantDetails, payments, allProperties);
+    }, [tenantDetails, payments, allProperties]);
+
     const latestWaterReading = waterReadings?.[0];
     const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);
 
-    const getPaymentStatusVariant = (status?: Tenant['lease']['paymentStatus']) => {
-        switch (status) {
-            case 'Paid': return 'default';
-            case 'Pending': return 'secondary';
-            case 'Overdue': return 'destructive';
-            default: return 'outline';
-        }
-    };
-
-    const nextRentDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
+    if (!tenantDetails) {
+        return (
+            <div className="text-center py-10">
+                <p className="text-muted-foreground">Could not load homeowner details.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold">Service Charge Overview</h2>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
                         <AlertCircle className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails?.dueBalance || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                     </CardContent>
                 </Card>
@@ -70,35 +64,14 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         <PlusCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails?.accountBalance || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
-                        <Droplets className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        {latestWaterReading ? (
-                            <>
-                                <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    Current: {latestWaterReading.currentReading}, Prior: {latestWaterReading.priorReading}
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <div className="text-xl font-bold">Not Available</div>
-                                <p className="text-xs text-muted-foreground">No recent reading found.</p>
-                            </>
-                        )}
                     </CardContent>
                 </Card>
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Your Units</CardTitle>
+                    <CardTitle>Your Units & Monthly Service Charge</CardTitle>
                 </CardHeader>
                 <CardContent>
                      <Table>
@@ -127,29 +100,43 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Payment History</CardTitle>
+                    <CardTitle>Transaction History</CardTitle>
+                    <CardDescription>A summary of your recent charges and payments.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Amount Paid</TableHead>
-                                <TableHead>For Month</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="text-right">Charge</TableHead>
+                                <TableHead className="text-right">Payment</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {payments.length > 0 ? (
-                                payments.map(payment => (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{format(new Date(payment.date), 'PPP')}</TableCell>
-                                        <TableCell>Ksh {payment.amount.toLocaleString()}</TableCell>
-                                        <TableCell>{payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMMM yyyy') : 'N/A'}</TableCell>
+                            {ledger.length > 0 ? (
+                                ledger.slice(-10).reverse().map((entry, index) => ( // Show last 10 transactions
+                                    <TableRow key={`${entry.id}-${index}`}>
+                                        <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                        <TableCell>{entry.description}</TableCell>
+                                        <TableCell className="text-right text-red-600">
+                                            {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right text-green-600">
+                                            {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold">
+                                             {entry.balance < 0
+                                                ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                                : `Ksh ${entry.balance.toLocaleString()}`
+                                            }
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center">No payment history found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center">No transaction history found.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

@@ -218,45 +218,75 @@ export function validatePayment(
 
 export function generateLedger(tenant: Tenant, allTenantPayments: Payment[], properties: Property[]): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
     const property = properties.find(p => p.id === tenant.propertyId);
-    const unit = property?.units.find(u => u.name === tenant.unitName);
     
-    const monthlyCharge = tenant.residentType === 'Homeowner' 
-        ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
-        : (tenant.lease.rent || 0);
+    // For homeowners, find all units associated with them.
+    const units = tenant.residentType === 'Homeowner' 
+        ? properties.flatMap(p => p.units.filter(u => u.name === tenant.unitName && p.id === tenant.propertyId)) // Simplification: assuming homeowner tenant maps to one property/unit, but can be expanded
+        : [property?.units.find(u => u.name === tenant.unitName)].filter(Boolean) as Unit[];
 
     // --- GENERATE ALL CHARGES ---
-    const allCharges: { id: string, date: Date, description: string, charge: number, payment: number }[] = [];
-    const leaseStartDate = new Date(tenant.lease.startDate);
+    let allCharges: { id: string, date: Date, description: string, charge: number, payment: number }[] = [];
 
-    if (tenant.securityDeposit && tenant.securityDeposit > 0) {
-        allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0 });
+    // Initial charges (Deposits) - only for Tenants
+    if (tenant.residentType === 'Tenant') {
+        const leaseStartDate = new Date(tenant.lease.startDate);
+        if (tenant.securityDeposit && tenant.securityDeposit > 0) {
+            allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0 });
+        }
+        if (tenant.waterDeposit && tenant.waterDeposit > 0) {
+            allCharges.push({ id: 'charge-water-deposit', date: leaseStartDate, description: 'Water Deposit', charge: tenant.waterDeposit, payment: 0 });
+        }
     }
-    if (tenant.waterDeposit && tenant.waterDeposit > 0) {
-         allCharges.push({ id: 'charge-water-deposit', date: leaseStartDate, description: 'Water Deposit', charge: tenant.waterDeposit, payment: 0 });
-    }
-    
-    if (monthlyCharge > 0) {
-        let billingStartDate: Date;
 
-        if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-            const handoverDate = new Date(unit.handoverDate);
-            const handoverDay = handoverDate.getDate();
-            if (handoverDay <= 10) {
-                billingStartDate = startOfMonth(handoverDate);
+    const monthlyChargesMap = new Map<string, { charge: number; unitNames: string[] }>();
+
+    units.forEach(unit => {
+        const monthlyCharge = tenant.residentType === 'Homeowner' 
+            ? (unit?.serviceCharge || tenant.lease.serviceCharge || 0) 
+            : (tenant.lease.rent || 0);
+
+        if (monthlyCharge > 0) {
+            let billingStartDate: Date;
+            const leaseStartDate = new Date(tenant.lease.startDate);
+
+            if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
+                const handoverDate = new Date(unit.handoverDate);
+                const handoverDay = handoverDate.getDate();
+                billingStartDate = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
             } else {
-                billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+                billingStartDate = startOfMonth(leaseStartDate);
             }
-        } else {
-            billingStartDate = startOfMonth(leaseStartDate);
-        }
 
-        let loopDate = billingStartDate;
-        const today = new Date();
-        while (loopDate <= today) {
-            allCharges.push({ id: `charge-${format(loopDate, 'yyyy-MM')}`, date: loopDate, description: `${tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Rent'} for ${format(loopDate, 'MMMM yyyy')}`, charge: monthlyCharge, payment: 0 });
-            loopDate = addMonths(loopDate, 1);
+            let loopDate = billingStartDate;
+            const today = new Date();
+            while (loopDate <= today) {
+                const monthKey = format(loopDate, 'yyyy-MM');
+                if (!monthlyChargesMap.has(monthKey)) {
+                    monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [] });
+                }
+                const entry = monthlyChargesMap.get(monthKey)!;
+                entry.charge += monthlyCharge;
+                if (!entry.unitNames.includes(unit.name)) {
+                    entry.unitNames.push(unit.name);
+                }
+                loopDate = addMonths(loopDate, 1);
+            }
         }
-    }
+    });
+
+    monthlyChargesMap.forEach((value, key) => {
+        const chargeDate = new Date(key + '-01T12:00:00Z'); // Use a consistent time to avoid TZ issues
+        const chargeType = tenant.residentType === 'Homeowner' ? 'S.Charge' : 'Rent';
+        const unitsCharged = value.unitNames.join(', ');
+        const description = `${chargeType} for Units: ${unitsCharged}`;
+        allCharges.push({
+            id: `charge-${key}`,
+            date: chargeDate,
+            description: description,
+            charge: value.charge,
+            payment: 0,
+        });
+    });
 
     // --- COMBINE WITH PAYMENTS ---
     const allPaymentsAndAdjustments = allTenantPayments.map(p => {
