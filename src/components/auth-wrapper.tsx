@@ -12,9 +12,9 @@ const ADMIN_AGENT_ROUTES = [
     '/water-meter/add'
 ];
 const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/documents', '/clients', '/landlords'];
-const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance'];
+const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance', '/tenant/documents'];
 const LANDLORD_ROUTES = ['/landlord/dashboard'];
-const HOMEOWNER_ROUTES = ['/owner/dashboard'];
+const HOMEOWNER_ROUTES = ['/landlord/dashboard']; // Redirect to the same universal dashboard
 
 // Helper function to check if a path is allowed for a given set of routes
 const isPathAllowed = (pathname: string, allowedRoutes: string[]) => {
@@ -65,7 +65,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
               break;
           case 'homeowner':
               allowedRoutes = HOMEOWNER_ROUTES;
-              targetDashboard = '/owner/dashboard';
+              targetDashboard = '/landlord/dashboard';
               break;
           default:
               allowedRoutes = [];

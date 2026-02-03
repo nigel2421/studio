@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -25,7 +24,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
 const navItems = [
-  { href: '/owner/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/landlord/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
 ];
 
 export function OwnerSidebar() {
