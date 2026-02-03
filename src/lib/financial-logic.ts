@@ -138,7 +138,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     let loopDate = firstBillableMonth;
     const startOfToday = startOfMonth(date);
 
-    while (loopDate <= startOfToday) {
+    while (loopDate < startOfToday) { // Rent is billed in arrears (e.g. Feb rent is billed on March 1st)
         monthsToBill++;
         latestBilledPeriod = format(loopDate, 'yyyy-MM');
         loopDate = addMonths(loopDate, 1);
@@ -286,7 +286,8 @@ export function generateLedger(
 
             let loopDate = billingStartDate;
             const today = new Date();
-            while (loopDate <= today) {
+            const startOfCurrentMonth = startOfMonth(today);
+            while (loopDate < startOfCurrentMonth) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
                     monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [] });
