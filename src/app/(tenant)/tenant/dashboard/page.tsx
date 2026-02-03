@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -51,7 +52,7 @@ export default function TenantDashboardPage() {
                 setProperties(propertiesData);
                 if(tenantDetails) {
                     const { ledger: generatedLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
-                    setLedger(generatedLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setLedger(generatedLedger.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
                     setBalances({ due: finalDueBalance, credit: finalAccountBalance });
                 }
                 setIsLoading(false);
@@ -261,3 +262,4 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
+
