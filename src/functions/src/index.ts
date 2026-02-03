@@ -136,7 +136,7 @@ export const sendCustomEmail = onCall({
                     </div>
                     <h2 style="color: #333; font-size: 18px; margin-bottom: 15px;">${subject}</h2>
                     <div style="line-height: 1.6; color: #444; font-size: 16px;">
-                        ${body.replace(/\n/g, '<br>')}
+                        ${body.replace(/\\n/g, '<br>')}
                     </div>
                     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.8em; color: #888; text-align: center;">
                         <p>You are receiving this email as a resident of an Eracov Properties managed development.</p>
@@ -238,13 +238,13 @@ export const checkAndSendLeaseReminders = onCall({
             shouldSendEmail = true;
             subType = 'Overdue Notice';
             subject = `Urgent: Overdue Balance for ${tenant.name}`;
-            body = `Dear ${tenant.name},\n\nThis is a notice regarding an overdue balance on your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nPlease settle this amount immediately to avoid further action.\n\nThank you,\nEracov Properties`;
+            body = `Dear ${tenant.name},\\n\\nThis is a notice regarding an overdue balance on your account. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\\n\\nPlease settle this amount immediately to avoid further action.\\n\\nThank you,\\nEracov Properties`;
         } 
         else if (tenant.lease.paymentStatus === 'Pending' && dayOfMonth >= 2 && dayOfMonth <= 5) {
             shouldSendEmail = true;
             subType = 'Payment Reminder';
             subject = `Reminder: Rent Payment Due Soon`;
-            body = `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent payment is due on the 5th of this month. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\n\nThank you,\nEracov Properties`;
+            body = `Dear ${tenant.name},\\n\\nThis is a friendly reminder that your rent payment is due on the 5th of this month. Your current outstanding balance is Ksh ${tenant.dueBalance.toLocaleString()}.\\n\\nThank you,\\nEracov Properties`;
         }
 
         if (shouldSendEmail) {
@@ -253,7 +253,7 @@ export const checkAndSendLeaseReminders = onCall({
                 from: `"Eracov Properties" <${process.env.EMAIL_USER || emailUser.value()}>`,
                 to: tenant.email,
                 subject: subject,
-                html: body.replace(/\n/g, '<br>')
+                html: body.replace(/\\n/g, '<br>')
             };
 
             emailPromises.push(transporter.sendMail(mailOptions));

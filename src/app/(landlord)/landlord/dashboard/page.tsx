@@ -114,7 +114,7 @@ export default function UniversalOwnerDashboardPage() {
                 });
             } else if (isClient) {
                 setDashboardType('homeowner');
-                const homeownerTenantProfile = allTenants.find(t => t.userId === userProfile.id || t.email === userProfile.email && t.residentType === 'Homeowner');
+                const homeownerTenantProfile = allTenants.find(t => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
                 const [paymentData, waterData] = await Promise.all([
                     getTenantPayments(homeownerTenantProfile?.id || ''),
                     getTenantWaterReadings(homeownerTenantProfile?.id || ''),

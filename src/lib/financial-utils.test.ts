@@ -86,7 +86,7 @@ describe('Financial Utils Logic', () => {
                 handoverDate: '2023-07-15' // Recently handed over
             });
             const tenant = createMockTenant({
-                lease: { startDate: '2023-08-01', rent: 50000 }
+                lease: { startDate: '2023-08-01', rent: 50000, endDate: '2024-08-01', paymentStatus: 'Paid' }
             });
             const payment = createMockPayment({
                 amount: 50000,
@@ -107,7 +107,7 @@ describe('Financial Utils Logic', () => {
                 handoverDate: '2022-01-01' // Handed over long ago
             });
             const tenant = createMockTenant({
-                lease: { startDate: '2023-08-01', rent: 50000 } // New tenant, but not initial letting
+                lease: { startDate: '2023-08-01', rent: 50000, endDate: '2024-08-01', paymentStatus: 'Paid' } // New tenant, but not initial letting
             });
             const payment = createMockPayment({
                 amount: 50000,
@@ -132,7 +132,7 @@ describe('Financial Utils Logic', () => {
                 id: 't-lump',
                 unitName: 'A1',
                 propertyId: 'prop-1',
-                lease: { startDate: '2023-10-01', rent: 25000 },
+                lease: { startDate: '2023-10-01', rent: 25000, endDate: '2024-10-01', paymentStatus: 'Paid' },
                 securityDeposit: 25000,
                 waterDeposit: 5000,
             });
@@ -168,7 +168,7 @@ describe('Financial Utils Logic', () => {
                 id: 't-anchor',
                 unitName: 'A1',
                 propertyId: 'prop-1',
-                lease: { startDate: '2023-07-15', rent: 25000 },
+                lease: { startDate: '2023-07-15', rent: 25000, endDate: '2024-07-15', paymentStatus: 'Paid' },
                 securityDeposit: 0, waterDeposit: 0,
             });
             
