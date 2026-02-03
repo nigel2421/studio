@@ -34,12 +34,19 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
 
     const displayTransactions = useMemo(() => {
         const transactions: any[] = [];
-        // Process payments chronologically to build up the transaction list in order
+        // Chronological sort is crucial for identifying the first payment
         const sortedPayments = [...payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        const tenantFirstPaymentMap = new Map<string, string>();
+        tenants.forEach(tenant => {
+            const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id);
+            if (firstPayment) {
+                tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
+            }
+        });
 
         sortedPayments.forEach(payment => {
             const tenant = tenants.find(t => t.id === payment.tenantId);
-            // Exclude pure deposit payments from landlord statements
             if (!tenant || payment.type === 'Deposit') {
                 return;
             }
@@ -47,30 +54,27 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
             const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
 
-            // Check if this payment is likely an initial lump sum covering rent and deposits.
+            const isFirstPaymentForTenant = tenantFirstPaymentMap.get(tenant.id) === payment.id;
+            
             const isInitialLumpSum =
                 payment.type === 'Rent' &&
-                tenant.lease.startDate &&
+                isFirstPaymentForTenant &&
                 unitRent > 0 &&
-                Math.abs(differenceInDays(parseISO(payment.date), parseISO(tenant.lease.startDate))) < 45 && // Allow ~1.5 month window
                 payment.amount > unitRent * 1.5;
 
             let amountToApportionAsRent = payment.amount;
 
             if (isInitialLumpSum) {
                 const totalDeposits = (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
-                // If payment seems to cover deposits, subtract them to find the rent portion
                 if (payment.amount >= totalDeposits) {
                     amountToApportionAsRent = payment.amount - totalDeposits;
                 } else {
-                    // Payment is less than total deposits, so no rent portion for landlord
                     amountToApportionAsRent = 0;
                 }
             }
+            
+            if (amountToApportionAsRent <= 0) return;
 
-            if (amountToApportionAsRent <= 0) return; // Nothing to show landlord
-
-            // Unroll lump-sum rent payments month by month
             if (unitRent > 0 && amountToApportionAsRent > unitRent * 1.1) {
                 let remainingAmount = amountToApportionAsRent;
                 let monthIndex = 0;
@@ -95,7 +99,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     monthIndex++;
                 }
 
-                // Handle any partial remainder as the last rent portion
                 if (remainingAmount > 1) {
                     const nextMonth = addMonths(leaseStartDate, monthIndex);
                     const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
@@ -111,7 +114,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                     });
                 }
             } else {
-                // Handle single rent payments or smaller payments
                 const paymentForBreakdown = { ...payment, amount: amountToApportionAsRent };
                 const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
                 transactions.push({
@@ -125,9 +127,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             }
         });
         
-        // Since payments are processed chronologically, the transactions array will be in order.
         return transactions;
     }, [payments, tenants, unitMap]);
+
 
     const transactionTotals = useMemo(() => {
         return displayTransactions.reduce((acc, t) => {
