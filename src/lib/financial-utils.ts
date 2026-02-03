@@ -1,5 +1,5 @@
 import { Payment, Property, Tenant, Unit } from "./types";
-import { isSameMonth, parseISO, differenceInMonths } from 'date-fns';
+import { isSameMonth, parseISO, differenceInMonths, addMonths, format } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -86,35 +86,22 @@ export interface FinancialSummary {
 }
 
 export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
+    const transactions = generateLandlordDisplayTransactions(payments, tenants, properties);
+
     const summary: FinancialSummary = {
         totalRent: 0,
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalNetRemittance: 0,
-        transactionCount: 0,
+        transactionCount: transactions.length,
         vacantUnitServiceChargeDeduction: 0,
     };
-
-    const unitMap = new Map<string, Unit>();
-    properties.forEach(p => {
-        p.units.forEach(u => {
-            unitMap.set(`${p.property.id}-${u.name}`, u);
-        });
-    });
-
-    const rentPayments = payments.filter(p => p.status === 'Paid' && p.type === 'Rent');
-    summary.transactionCount = rentPayments.length;
-
-    rentPayments.forEach(payment => {
-        const tenant = tenants.find(t => t.id === payment.tenantId);
-        const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-        
-        const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
-
-        summary.totalRent += breakdown.gross;
-        summary.totalServiceCharges += breakdown.serviceChargeDeduction;
-        summary.totalManagementFees += breakdown.managementFee;
-        summary.totalNetRemittance += breakdown.netToLandlord;
+    
+    transactions.forEach(transaction => {
+        summary.totalRent += transaction.gross;
+        summary.totalServiceCharges += transaction.serviceChargeDeduction;
+        summary.totalManagementFees += transaction.managementFee;
+        summary.totalNetRemittance += transaction.netToLandlord;
     });
 
     // Calculate service charge for vacant units that have been handed over
@@ -130,4 +117,106 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
     summary.totalNetRemittance -= vacantUnitDeduction; // Deduct from the final payout
 
     return summary;
+}
+
+
+export function generateLandlordDisplayTransactions(
+    payments: Payment[], 
+    tenants: Tenant[], 
+    properties: { property: Property, units: Unit[] }[]
+) {
+    const unitMap = new Map<string, Unit>();
+    properties.forEach(p => {
+        p.units.forEach(u => {
+            unitMap.set(`${p.property.id}-${u.name}`, u);
+        });
+    });
+
+    const transactions: any[] = [];
+    const sortedPayments = [...payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const tenantFirstPaymentMap = new Map<string, string>();
+    tenants.forEach(tenant => {
+        const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id);
+        if (firstPayment) {
+            tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
+        }
+    });
+
+    sortedPayments.forEach(payment => {
+        const tenant = tenants.find(t => t.id === payment.tenantId);
+        if (!tenant || payment.type === 'Deposit') {
+            return;
+        }
+
+        const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
+        const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+        const isFirstPaymentForTenant = tenantFirstPaymentMap.get(tenant.id) === payment.id;
+        
+        let amountToApportionAsRent = payment.amount;
+
+        if (isFirstPaymentForTenant) {
+            const totalDeposits = (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
+            if (payment.amount >= totalDeposits) {
+                amountToApportionAsRent = payment.amount - totalDeposits;
+            } else {
+                amountToApportionAsRent = 0;
+            }
+        }
+        
+        if (amountToApportionAsRent <= 0) return;
+
+        if (unitRent > 0 && amountToApportionAsRent > unitRent * 1.1) {
+            let remainingAmount = amountToApportionAsRent;
+            let monthIndex = 0;
+            const leaseStartDate = parseISO(tenant.lease.startDate);
+
+            while (remainingAmount >= unitRent) {
+                const currentMonth = addMonths(leaseStartDate, monthIndex);
+                const monthString = format(currentMonth, 'yyyy-MM');
+                const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
+                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                
+                transactions.push({
+                    id: `${payment.id}-${monthIndex}`,
+                    date: payment.date,
+                    unitName: tenant.unitName,
+                    unitType: unit?.unitType || 'N/A',
+                    forMonth: format(currentMonth, 'MMM yyyy'),
+                    ...breakdown,
+                });
+                
+                remainingAmount -= unitRent;
+                monthIndex++;
+            }
+
+            if (remainingAmount > 1) {
+                const nextMonth = addMonths(leaseStartDate, monthIndex);
+                const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
+                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+
+                transactions.push({
+                    id: `${payment.id}-rem`,
+                    date: payment.date,
+                    unitName: tenant.unitName,
+                    unitType: unit?.unitType || 'N/A',
+                    forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
+                    ...breakdown,
+                });
+            }
+        } else {
+            const paymentForBreakdown = { ...payment, amount: amountToApportionAsRent };
+            const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
+            transactions.push({
+                id: payment.id,
+                date: payment.date,
+                unitName: tenant.unitName,
+                unitType: unit?.unitType || 'N/A',
+                forMonth: payment.rentForMonth ? format(parseISO(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+                ...breakdown,
+            });
+        }
+    });
+    
+    return transactions;
 }

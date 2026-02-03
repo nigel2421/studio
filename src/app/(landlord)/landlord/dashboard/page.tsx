@@ -10,7 +10,7 @@ import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
-import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown } from '@/lib/financial-utils';
+import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
@@ -157,27 +157,17 @@ export default function UniversalOwnerDashboardPage() {
 
                 const summary = aggregateFinancials(relevantPayments, allTenants, landlordProperties);
                 
-                const unitMap = new Map<string, Unit>();
-                landlordProperties.forEach((p: { property: Property, units: Unit[] }) => {
-                    p.units.forEach(u => {
-                        unitMap.set(`${p.property.id}-${u.name}`, u);
-                    });
-                });
+                const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, allTenants, landlordProperties);
 
-                const transactionsForPDF = relevantPayments.map((payment: Payment) => {
-                    const tenant = allTenants.find((t: Tenant) => t.id === payment.tenantId);
-                    const unit = tenant ? unitMap.get(`${tenant.propertyId}-${tenant.unitName}`) : undefined;
-                    const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
-                    return {
-                        date: new Date(payment.date).toLocaleDateString(),
-                        unit: tenant?.unitName || 'N/A',
-                        rentForMonth: payment.rentForMonth,
-                        gross: breakdown.gross,
-                        serviceCharge: breakdown.serviceChargeDeduction,
-                        mgmtFee: breakdown.managementFee,
-                        net: breakdown.netToLandlord,
-                    };
-                });
+                const transactionsForPDF = displayTransactions.map(t => ({
+                    date: new Date(t.date).toLocaleDateString(),
+                    unit: t.unitName,
+                    rentForMonth: t.forMonth,
+                    gross: t.gross,
+                    serviceCharge: t.serviceChargeDeduction,
+                    mgmtFee: t.managementFee,
+                    net: t.netToLandlord,
+                }));
 
                 const unitsForPDF = landlordProperties.flatMap((p: { property: Property, units: Unit[] }) => p.units.map(u => ({
                     property: p.property.name,

@@ -306,7 +306,7 @@ export const generateLandlordStatementPDF = (
     yPos += 8;
 
     const summaryData = [
-        ['Total Revenue (from Occupied Units)', formatCurrency(summary.totalRevenue)],
+        ['Total Rent (Gross)', formatCurrency(summary.totalRent)],
         ['Service Charges (from Occupied Units)', `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
     ];
@@ -346,7 +346,7 @@ export const generateLandlordStatementPDF = (
         body: transactions.map(t => [
             t.date,
             t.unit,
-            t.rentForMonth ? format(new Date(t.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
+            t.rentForMonth || 'N/A',
             formatCurrency(t.gross),
             `-${formatCurrency(t.serviceCharge)}`,
             `-${formatCurrency(t.mgmtFee)}`,
