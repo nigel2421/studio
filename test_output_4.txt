@@ -1,0 +1,10 @@
+PASS src/ai/flows/automated-maintenance-response-drafts.test.ts
+  Maintenance Response AI Flow
+    ÔêÜ should generate a response for valid input (7 ms)
+    ÔêÜ should throw error if AI generation fails (12 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        4.174 s
+Ran all test suites matching /src\\ai\\flows\\automated-maintenance-response-drafts.test.ts/i.
