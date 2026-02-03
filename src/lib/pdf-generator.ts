@@ -201,7 +201,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     }
 
     const tenantPayments = allPayments.filter(p => p.tenantId === tenant.id);
-    const { ledger, finalDueBalance } = generateLedger(tenant, tenantPayments, allProperties);
+    const { ledger, finalDueBalance } = generateLedger(tenant, tenantPayments, allProperties, owner);
     
     const periodLedger = ledger.filter(entry => {
         const entryDate = new Date(entry.date);
@@ -218,12 +218,20 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const totalCharges = periodLedger.reduce((sum, item) => sum + item.charge, 0);
     const totalPayments = periodLedger.reduce((sum, item) => sum + item.payment, 0);
-    const closingBalance = periodLedger.length > 0 ? periodLedger[periodLedger.length - 1].balance : 0;
+    
+    const openingBalanceEntry = ledger.find(entry => new Date(entry.date) >= startDate);
+    const openingBalance = openingBalanceEntry ? (openingBalanceEntry.balance + openingBalanceEntry.payment - openingBalanceEntry.charge) : 0;
+    
+    const closingBalance = periodLedger.length > 0 ? periodLedger[periodLedger.length - 1].balance : openingBalance;
+
 
     autoTable(doc, {
         startY: yPosHeader + 10,
         head: [['Date', 'Details', 'Charge', 'Payment', 'Balance']],
-        body: tableBody,
+        body: [
+            [{content: 'Opening Balance', colSpan: 4, styles: {fontStyle: 'italic'}}, formatCurrency(openingBalance)],
+            ...tableBody
+        ],
         foot: [[
             { content: 'Totals for Period', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
@@ -470,7 +478,11 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
 
 export const generateArrearsServiceChargeInvoicePDF = (
     owner: PropertyOwner | Landlord,
-    invoiceDetails: ArrearsInvoiceDetails
+    invoiceDetails: {
+        month: string;
+        items: { description: string; amount: number; }[];
+        totalDue: number;
+    }
 ): string => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
