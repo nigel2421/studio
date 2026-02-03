@@ -46,7 +46,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             if (payment.type === 'Rent' && unitRent > 0 && payment.amount > unitRent * 1.1) {
                 let remainingAmount = payment.amount;
                 let monthIndex = 0;
-                const paymentStartDate = payment.rentForMonth ? parseISO(`${payment.rentForMonth}-01`) : parseISO(tenant.lease.startDate);
+                const paymentStartDate = parseISO(tenant.lease.startDate);
 
                 while (remainingAmount >= unitRent) {
                     const currentMonth = addMonths(paymentStartDate, monthIndex);
