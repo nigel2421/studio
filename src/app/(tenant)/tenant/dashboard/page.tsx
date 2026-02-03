@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -103,7 +102,36 @@ export default function TenantDashboardPage() {
         }
     };
 
-    const nextRentDueDate = tenantDetails ? format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') : 'N/A';
+    const { dueDateLabel, dueDateString, dueDateStatus } = useMemo(() => {
+        if (!tenantDetails?.lease) {
+            return { dueDateLabel: 'Next Rent Due', dueDateString: 'N/A', dueDateStatus: 'Pending' as const };
+        }
+        
+        const { paymentStatus, lastBilledPeriod } = tenantDetails.lease;
+
+        // If status is Overdue or Pending, it refers to the last billed month.
+        if (paymentStatus === 'Overdue' || paymentStatus === 'Pending') {
+            const lastBilledMonth = lastBilledPeriod ? parseISO(lastBilledPeriod + '-01T12:00:00Z') : new Date();
+            return {
+                dueDateLabel: 'Payment Due For',
+                dueDateString: format(lastBilledMonth, 'MMMM yyyy'),
+                dueDateStatus: paymentStatus,
+            };
+        }
+        
+        // Status is 'Paid', so show next month's details
+        const today = new Date();
+        const lastBilledDate = lastBilledPeriod ? parseISO(lastBilledPeriod + '-01T12:00:00Z') : today;
+        const nextBillingMonth = addMonths(startOfMonth(lastBilledDate), 1);
+        
+        return {
+            dueDateLabel: 'Next Payment Due',
+            dueDateString: format(nextBillingMonth, 'MMMM yyyy'),
+            dueDateStatus: paymentStatus,
+        };
+
+    }, [tenantDetails]);
+
 
     if (isLoading || authIsLoading) {
       return (
@@ -197,14 +225,16 @@ export default function TenantDashboardPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Next Rent Due Date</CardTitle>
+                                <CardTitle className="text-sm font-medium">{dueDateLabel}</CardTitle>
                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{nextRentDueDate}</div>
-                                <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
-                                    {tenantDetails.lease.paymentStatus}
-                                </Badge>
+                                <div className="text-2xl font-bold">{dueDateString}</div>
+                                {dueDateStatus && (
+                                    <Badge variant={getPaymentStatusVariant(dueDateStatus)} className="mt-1">
+                                        {dueDateStatus}
+                                    </Badge>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -262,4 +292,3 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
-
