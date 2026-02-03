@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,8 +11,11 @@ import { useRouter } from 'next/navigation';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
 import { FinancialSummary, aggregateFinancials } from '@/lib/financial-utils';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
+import { generateTenantStatementPDF } from '@/lib/pdf-generator';
+import { useLoading } from '@/hooks/useLoading';
 
 export default function UniversalOwnerDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
@@ -20,6 +24,9 @@ export default function UniversalOwnerDashboardPage() {
     const [dashboardType, setDashboardType] = useState<'landlord' | 'homeowner' | null>(null);
     const [viewData, setViewData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
+    const [isStatementOpen, setIsStatementOpen] = useState(false);
+    const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
 
     useEffect(() => {
         if (authLoading || !userProfile) return;
@@ -126,6 +133,21 @@ export default function UniversalOwnerDashboardPage() {
         router.push('/login');
     };
 
+    const handleGenerateStatement = async (entity: Tenant, startDate: Date, endDate: Date) => {
+        startPdfLoading('Generating Statement...');
+        try {
+            const allPayments = await getTenantPayments(entity.id);
+            const allProperties = await getProperties();
+            generateTenantStatementPDF(entity, allPayments, allProperties);
+            setIsStatementOpen(false);
+        } catch (error) {
+            console.error("Error generating statement", error);
+        } finally {
+            stopPdfLoading();
+        }
+    };
+
+
     if (authLoading || loading) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -135,58 +157,48 @@ export default function UniversalOwnerDashboardPage() {
     }
     
     // --- Render Logic ---
-    if (dashboardType === 'homeowner' && viewData) {
-        return (
-             <div className="container mx-auto p-4 md:p-8">
-                <header className="flex items-center justify-between mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
-                        <p className="text-muted-foreground">Here is the overview of your service charge account.</p>
-                    </div>
-                    <Button onClick={handleSignOut} variant="outline">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                    </Button>
-                </header>
-                <ClientLandlordDashboard {...viewData} />
-            </div>
-        )
-    }
+    const headerTitle = dashboardType === 'landlord' ? 'Investor Overview' : 'Homeowner Overview';
+    const headerDescription = dashboardType === 'landlord' ? 'Financial overview of your managed property portfolio.' : 'Here is the overview of your service charge account.';
 
-    if (dashboardType === 'landlord' && viewData) {
-         return (
-            <div className="container mx-auto p-4 md:p-8">
-                <header className="flex items-center justify-between mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
-                        <p className="text-muted-foreground">Here is the investor overview of your property portfolio.</p>
-                    </div>
-                    <Button onClick={handleSignOut} variant="outline">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                    </Button>
-                </header>
-                <LandlordDashboardContent {...viewData} />
-            </div>
-        );
-    }
-    
-    // Fallback for when data isn't loaded or role is wrong
     return (
         <div className="container mx-auto p-4 md:p-8">
-             <header className="flex items-center justify-between mb-8">
+            <header className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
+                    <p className="text-muted-foreground">{headerDescription}</p>
                 </div>
-                <Button onClick={handleSignOut} variant="outline">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                </Button>
+                <div className="flex items-center gap-2">
+                    {dashboardType === 'homeowner' && (
+                        <Button onClick={() => setIsStatementOpen(true)} variant="outline">
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Download Statement
+                        </Button>
+                    )}
+                    <Button onClick={handleSignOut} variant="outline">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                    </Button>
+                </div>
             </header>
-            <div className="text-center py-10">
-                <h2 className="text-xl font-semibold">No Property Data Found</h2>
-                <p className="text-muted-foreground mt-2">Your account is not currently assigned to any properties. Please contact management.</p>
-            </div>
+            
+            {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} />}
+            {dashboardType === 'landlord' && viewData && <LandlordDashboardContent {...viewData} />}
+            {!dashboardType && !loading && (
+                 <div className="text-center py-10">
+                    <h2 className="text-xl font-semibold">No Property Data Found</h2>
+                    <p className="text-muted-foreground mt-2">Your account is not currently assigned to any properties. Please contact management.</p>
+                </div>
+            )}
+
+            {viewData?.tenantDetails && dashboardType === 'homeowner' && (
+                <StatementOptionsDialog
+                    isOpen={isStatementOpen}
+                    onClose={() => setIsStatementOpen(false)}
+                    entity={viewData.tenantDetails}
+                    onGenerate={handleGenerateStatement as any}
+                    isGenerating={isPdfGenerating}
+                />
+            )}
         </div>
     );
 }

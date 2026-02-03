@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -52,22 +53,28 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold">Service Charge Overview</h2>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Monthly Service Charge</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+                        <AlertCircle className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {monthlyServiceCharge.toLocaleString()}</div>
-                        {tenantDetails && (
-                            <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
-                                {tenantDetails.lease.paymentStatus}
-                            </Badge>
-                        )}
+                        <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails?.dueBalance || 0).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">Total outstanding amount</p>
                     </CardContent>
                 </Card>
                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
+                        <PlusCircle className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails?.accountBalance || 0).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                    </CardContent>
+                </Card>
+                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
                         <Droplets className="h-4 w-4 text-muted-foreground" />
@@ -88,27 +95,36 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         )}
                     </CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">Ksh {(tenantDetails?.dueBalance || 0).toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Total outstanding amount</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
-                        <PlusCircle className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">Ksh {(tenantDetails?.accountBalance || 0).toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                    </CardContent>
-                </Card>
             </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Your Units</CardTitle>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Property</TableHead>
+                                <TableHead>Unit Name</TableHead>
+                                <TableHead className="text-right">Monthly Service Charge</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {units.map(unit => (
+                                <TableRow key={unit.name}>
+                                    <TableCell>{unit.propertyName}</TableCell>
+                                    <TableCell>{unit.name}</TableCell>
+                                    <TableCell className="text-right">Ksh {(unit.serviceCharge || 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                             <TableRow className="font-bold bg-muted">
+                                <TableCell colSpan={2}>Total Monthly Service Charge</TableCell>
+                                <TableCell className="text-right">Ksh {monthlyServiceCharge.toLocaleString()}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
             <Card>
                 <CardHeader>
                     <CardTitle>Payment History</CardTitle>
