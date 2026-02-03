@@ -202,7 +202,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     }
 
     const tenantPayments = allPayments.filter(p => p.tenantId === tenant.id);
-    const { ledger, finalDueBalance } = generateLedger(tenant, tenantPayments, allProperties, owner);
+    const { ledger } = generateLedger(tenant, tenantPayments, allProperties, owner);
     
     const periodLedger = ledger.filter(entry => {
         const entryDate = new Date(entry.date);
@@ -221,10 +221,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     const totalCharges = periodLedger.reduce((sum, item) => sum + item.charge, 0);
     const totalPayments = periodLedger.reduce((sum, item) => sum + item.payment, 0);
     
-    const openingBalanceEntry = ledger.find(entry => new Date(entry.date) >= startDate);
-    const openingBalance = openingBalanceEntry ? (openingBalanceEntry.balance + openingBalanceEntry.payment - openingBalanceEntry.charge) : 0;
-    
-    const closingBalance = periodLedger.length > 0 ? periodLedger[periodLedger.length - 1].balance : openingBalance;
+    const closingBalance = periodLedger.length > 0 ? periodLedger[periodLedger.length - 1].balance : 0;
 
 
     autoTable(doc, {
@@ -232,7 +229,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         head: [['Date', 'For Month', 'Details', 'Charge', 'Payment', 'Balance']],
         body: tableBody,
         foot: [[
-            { content: 'Totals for Period', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'Totals for Period', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalPayments), styles: { fontStyle: 'bold', halign: 'right' } },
             '', // Balance column in totals is not typically summed
@@ -311,7 +308,7 @@ export const generateLandlordStatementPDF = (
     const summaryData = [
         ['Total Revenue (from Occupied Units)', formatCurrency(summary.totalRevenue)],
         ['Service Charges (from Occupied Units)', `-${formatCurrency(summary.totalServiceCharges)}`],
-        ['Management Fees (5%)', `-${formatCurrency(summary.totalManagementFees)}`],
+        ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
     ];
 
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
@@ -436,10 +433,11 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     doc.setFontSize(10);
     doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
 
-    const { ledger: finalLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, properties);
+    const { ledger: finalLedger } = generateLedger(tenant, payments, properties);
 
     const tableBodyData = finalLedger.map(t => [
         t.date,
+        t.forMonth || '',
         t.description,
         t.charge > 0 ? formatCurrency(t.charge) : '',
         t.payment > 0 ? formatCurrency(t.payment) : '',
@@ -452,7 +450,7 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
     
     autoTable(doc, {
         startY: 80, // Increased startY for more space
-        head: [['Date', 'Description', chargeColumnTitle, 'Payment', 'Balance']],
+        head: [['Date', 'For Month', 'Description', chargeColumnTitle, 'Payment', 'Balance']],
         body: tableBodyData,
         foot: [[
             { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -465,10 +463,11 @@ export const generateTenantStatementPDF = (tenant: Tenant, payments: Payment[], 
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] }, // slate-100 bg, slate-900 text
         columnStyles: {
             0: { cellWidth: 25 },
-            1: { cellWidth: 'auto' },
-            2: { halign: 'right', cellWidth: 30 },
-            3: { halign: 'right', cellWidth: 30 },
-            4: { halign: 'right', cellWidth: 30 }
+            1: { cellWidth: 20 },
+            2: { cellWidth: 'auto' },
+            3: { halign: 'right', cellWidth: 25 },
+            4: { halign: 'right', cellWidth: 25 },
+            5: { halign: 'right', cellWidth: 30 }
         }
     });
     

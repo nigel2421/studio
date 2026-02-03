@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -144,6 +145,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Date</TableHead>
+                                        <TableHead>For Month</TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead className="text-right">Charge</TableHead>
                                         <TableHead className="text-right">Payment</TableHead>
@@ -156,6 +158,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                         paginatedLedger.map((entry, index) => (
                                             <TableRow key={`${entry.id}-${index}`}>
                                                 <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                                                <TableCell>{entry.forMonth}</TableCell>
                                                 <TableCell>{entry.description}</TableCell>
                                                 <TableCell className="text-right text-red-600 font-medium">
                                                     {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
@@ -180,7 +183,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                                 No transaction history found.
                                             </TableCell>
                                         </TableRow>

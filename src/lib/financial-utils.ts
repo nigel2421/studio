@@ -1,7 +1,5 @@
-
-
 import { Payment, Property, Tenant, Unit } from "./types";
-import { isSameMonth, parseISO } from 'date-fns';
+import { isSameMonth, parseISO, differenceInMonths } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -9,9 +7,9 @@ import { isSameMonth, parseISO } from 'date-fns';
  * Logic:
  * 1. Gross Amount = The actual payment amount made.
  * 2. Management Fee:
- *    - For "Rented for Clients" units, it's 50% for the first month of a new tenant (calculated on standard rent).
+ *    - For "Rented for Clients" units on their first-ever letting, it's 50% for the first month of a new tenant.
  *    - Otherwise, it's 5% of the unit's standard rent. For lump-sum payments, this is pro-rated.
- * 3. Service Charge = The unit's standard service charge. This is WAIVED for the first month on a "Rented for Clients" unit. For lump-sum payments, this is pro-rated.
+ * 3. Service Charge = The unit's standard service charge. This is WAIVED for the landlord on the first month of an initial letting. For lump-sum payments, this is pro-rated.
  * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
  * 
  * @param payment The payment object.
@@ -31,23 +29,39 @@ export function calculateTransactionBreakdown(
     let managementFee = 0;
     const standardManagementFeeRate = 0.05;
 
-    const isFirstMonthForClientRental =
-        unit?.managementStatus === 'Rented for Clients' &&
-        tenant?.lease?.startDate &&
-        payment.rentForMonth &&
-        isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`));
+    const isRentedForClients = unit?.managementStatus === 'Rented for Clients';
+    const isFirstMonthOfLease = tenant?.lease?.startDate && payment.rentForMonth && isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`));
 
-    if (isFirstMonthForClientRental) {
+    // Determine if this is the initial letting of the unit after it was handed over.
+    // We consider it "initial" if the lease starts within 3 months of the handover.
+    // This helps differentiate a true first-time letting from a subsequent re-letting.
+    let isInitialLettingAfterHandover = false;
+    if (isRentedForClients && isFirstMonthOfLease && unit?.handoverDate && tenant?.lease?.startDate) {
+        try {
+            const handoverDate = parseISO(unit.handoverDate);
+            const leaseStartDate = parseISO(tenant.lease.startDate);
+            if (differenceInMonths(leaseStartDate, handoverDate) < 3) {
+                isInitialLettingAfterHandover = true;
+            }
+        } catch (e) {
+            console.error("Error parsing dates for letting check:", e);
+        }
+    }
+
+    if (isRentedForClients && isFirstMonthOfLease && isInitialLettingAfterHandover) {
+        // Special 50% first-month commission for a new letting.
         managementFee = unitRent * 0.50;
-        serviceChargeDeduction = 0; // Service charge is waived for the first month in this scenario.
+        // Service charge is waived for the landlord for the very first month's rent collection.
+        serviceChargeDeduction = 0;
     } else {
-        // Handle standard fees, pro-rating for lump-sum payments
+        // Standard fee calculation for all other months or scenarios.
         if (unitRent > 0 && payment.type === 'Rent') {
+            // Pro-rate deductions for lump-sum payments that cover multiple months.
             const rentRatio = grossAmount / unitRent;
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
             serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
-            // Fallback for non-rent payments or zero rent
+            // Fallback for non-rent payments or if rent is zero.
             managementFee = unitRent * standardManagementFeeRate;
         }
     }

@@ -12,6 +12,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { downloadCSV } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from 'date-fns';
 
 interface LandlordDashboardContentProps {
     properties: { property: Property, units: Unit[] }[];
@@ -48,9 +49,10 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             return {
                 Date: new Date(p.date).toLocaleDateString(),
                 Unit: t?.unitName || 'Unknown',
+                "For_Month": p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
                 "Gross Amount": breakdown.gross,
                 "Service Charge Deduction": breakdown.serviceChargeDeduction,
-                "Management Fee (5%)": breakdown.managementFee,
+                "Management Fee": breakdown.managementFee,
                 "Net Payout": breakdown.netToLandlord,
                 Notes: p.notes || ''
             };
@@ -124,10 +126,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <CardTitle>Transaction History</CardTitle>
                         <CardDescription>Detailed breakdown of recent payments and deductions.</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleExport}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export Statement
-                    </Button>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -135,6 +133,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Unit</TableHead>
+                                <TableHead>For Month</TableHead>
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">S. Charge</TableHead>
                                 <TableHead className="text-right">Mgmt Fee</TableHead>
@@ -155,6 +154,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                             <div className="font-medium">{tenant?.unitName}</div>
                                             <div className="text-xs text-muted-foreground">{unitType}</div>
                                         </TableCell>
+                                        <TableCell>{payment.rentForMonth ? format(new Date(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right">Ksh {breakdown.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {breakdown.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {breakdown.managementFee.toLocaleString()}</TableCell>
