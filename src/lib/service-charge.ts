@@ -135,8 +135,13 @@ export function processServiceChargeData(
             
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
-                if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
+                let firstBillableMonth: Date;
+                if (handoverDay <= 10) {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                } else {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                }
+                if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
                     isBillable = true;
                 }
             }
@@ -208,8 +213,13 @@ export function processServiceChargeData(
             : parseISO(handoverDateSource);
         if (isValid(handoverDate)) {
           const handoverDay = handoverDate.getDate();
-          const firstBillableMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
-          if (!isAfter(firstBillableMonth, startOfMonth(selectedMonth))) {
+          let firstBillableMonth: Date;
+          if (handoverDay <= 10) {
+              firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+          } else {
+              firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+          }
+          if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
             isBillable = true;
           }
         }
@@ -287,9 +297,9 @@ export function processServiceChargeData(
       let firstBillableMonth: Date;
 
       if (handoverDay <= 10) {
-        firstBillableMonth = startOfMonth(handoverDate);
-      } else {
         firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+      } else {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
       }
       
       const today = selectedMonth;

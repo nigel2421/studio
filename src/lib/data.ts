@@ -297,15 +297,17 @@ export async function addTenant(data: {
     if (residentType === 'Homeowner' && unit.handoverDate) {
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
-        // If handover is after the 10th, the first billable month is the next one.
-        // So, the last "billed" period is the handover month itself.
-        if (handoverDay > 10) {
-            lastBilledPeriod = format(handoverDate, 'yyyy-MM');
+
+        let firstBillableMonth: Date;
+        if (handoverDay <= 10) {
+            // Handover before/on 10th waives that month, billing starts next month.
+            firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
         } else {
-        // If handover is on/before the 10th, the first billable month is the handover month.
-        // So, the last "billed" period is the month before.
-            lastBilledPeriod = format(addMonths(handoverDate, -1), 'yyyy-MM');
+            // Handover after 10th waives next month, billing starts month after.
+            firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
         }
+        // Last billed period is the month *before* the first billable one.
+        lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
     }
 
 
@@ -1315,15 +1317,16 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
     const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
     const handoverDay = handoverDate.getDate();
 
-    let lastBilledPeriodDate: Date;
-    if (handoverDay > 10) {
-        // First bill is next month, so last billed is this month
-        lastBilledPeriodDate = startOfMonth(handoverDate);
+    let lastBilledPeriod: string;
+    let firstBillableMonth: Date;
+
+    if (handoverDay <= 10) {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
     } else {
-        // First bill is this month, so last billed is month before
-        lastBilledPeriodDate = addMonths(startOfMonth(handoverDate), -1);
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
     }
-    const lastBilledPeriod = format(lastBilledPeriodDate, 'yyyy-MM');
+    lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
+
 
     const newTenantData = {
         name: owner.name,

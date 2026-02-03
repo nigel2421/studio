@@ -111,8 +111,14 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
-        // Handover on/before 10th bills same month, after 10th bills next month.
-        billingStartDate = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+        
+        // Handover before/on 10th waives that month, billing starts next month.
+        // Handover after 10th waives next month, billing starts month after.
+        if (handoverDay <= 10) {
+            billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+        } else {
+            billingStartDate = startOfMonth(addMonths(handoverDate, 2));
+        }
     } else {
         billingStartDate = startOfMonth(leaseStartDate);
     }
@@ -226,16 +232,7 @@ export function generateLedger(
         // Find all units belonging to this owner
         ownerUnits = properties.flatMap(p =>
             p.units
-              .filter(u => {
-                  // Check if the unit is assigned to the owner, works for both Landlord and PropertyOwner
-                  if ('assignedUnits' in owner && owner.assignedUnits) { // It's a PropertyOwner
-                      return owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
-                  }
-                  if ('bankAccount' in owner) { // It's a Landlord
-                      return u.landlordId === owner.id;
-                  }
-                  return false;
-              })
+              .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
               .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
         );
         // De-duplicate units in case of multiple assignment paths
@@ -277,8 +274,11 @@ export function generateLedger(
             if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
                 const handoverDate = new Date(unit.handoverDate);
                 const handoverDay = handoverDate.getDate();
-                // Handover on/before 10th bills same month, after 10th bills next month.
-                billingStartDate = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                if (handoverDay <= 10) {
+                    billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+                } else {
+                    billingStartDate = startOfMonth(addMonths(handoverDate, 2));
+                }
             } else {
                 billingStartDate = startOfMonth(new Date(tenant.lease.startDate));
             }
