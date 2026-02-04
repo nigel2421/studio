@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature, PlusCircle } from 'lucide-react';
+import { Loader2, Search, MoreHorizontal, CheckCircle, ChevronLeft, ChevronRight, FileText, Eye, ChevronDown, FileSignature, PlusCircle, Building2, AlertCircle, PieChart, DollarSign } from 'lucide-react';
 import { isSameMonth, startOfMonth, format, addMonths, subMonths, isAfter, parseISO, isValid } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -35,9 +35,6 @@ export default function ServiceChargesPage() {
   const [managedVacantAccounts, setManagedVacantAccounts] = useState<ServiceChargeAccount[]>([]);
   const [arrearsAccounts, setArrearsAccounts] = useState<VacantArrearsAccount[]>([]);
   
-  const [groupedSmAccounts, setGroupedSmAccounts] = useState<GroupedServiceChargeAccount[]>([]);
-  const [groupedMvAccounts, setGroupedMvAccounts] = useState<GroupedServiceChargeAccount[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -73,6 +70,7 @@ export default function ServiceChargesPage() {
 
 
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
   const fetchData = async () => {
     try {
@@ -119,14 +117,46 @@ export default function ServiceChargesPage() {
     );
 
     setSelfManagedAccounts(clientOccupiedServiceChargeAccounts);
-    setGroupedSmAccounts(groupAccounts(clientOccupiedServiceChargeAccounts));
-
     setManagedVacantAccounts(managedVacantServiceChargeAccounts);
-    setGroupedMvAccounts(groupAccounts(managedVacantServiceChargeAccounts));
-    
     setArrearsAccounts(vacantArrears);
 
   }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments, allLandlords]);
+
+  const {
+      filteredSelfManagedAccounts,
+      filteredManagedVacantAccounts,
+      filteredArrearsAccounts
+  } = useMemo(() => {
+      if (selectedPropertyId === 'all') {
+          return {
+              filteredSelfManagedAccounts: selfManagedAccounts,
+              filteredManagedVacantAccounts: managedVacantAccounts,
+              filteredArrearsAccounts: arrearsAccounts,
+          };
+      }
+      return {
+          filteredSelfManagedAccounts: selfManagedAccounts.filter(a => a.propertyId === selectedPropertyId),
+          filteredManagedVacantAccounts: managedVacantAccounts.filter(a => a.propertyId === selectedPropertyId),
+          filteredArrearsAccounts: arrearsAccounts.filter(a => a.propertyId === selectedPropertyId),
+      };
+  }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
+  
+  const stats = useMemo(() => {
+      const relevantAccounts = [...filteredSelfManagedAccounts, ...filteredManagedVacantAccounts].filter(acc => acc.paymentStatus !== 'N/A');
+      const totalUnits = relevantAccounts.length;
+
+      const paidAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Paid');
+      const pendingAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Pending');
+
+      const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+      const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+
+      const totalCharged = totalPaid + totalPending;
+      const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
+
+      return { totalUnits, totalPaid, totalPending, paidPercentage };
+  }, [filteredSelfManagedAccounts, filteredManagedVacantAccounts]);
+
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
     let ownerForDialog: PropertyOwner | Landlord | undefined;
@@ -343,8 +373,12 @@ export default function ServiceChargesPage() {
   };
 
 
-  const filteredSelfManaged = useMemo(() => {
-    let accounts = groupedSmAccounts;
+  const filteredGroupedSmAccounts = useMemo(() => groupAccounts(filteredSelfManagedAccounts), [filteredSelfManagedAccounts]);
+  const filteredGroupedMvAccounts = useMemo(() => groupAccounts(filteredManagedVacantAccounts), [filteredManagedVacantAccounts]);
+
+
+  const finalFilteredSelfManaged = useMemo(() => {
+    let accounts = filteredGroupedSmAccounts;
     if (smStatusFilter !== 'all') {
       accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
     }
@@ -354,13 +388,13 @@ export default function ServiceChargesPage() {
         group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
         group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [groupedSmAccounts, searchTerm, smStatusFilter]);
+  }, [filteredGroupedSmAccounts, searchTerm, smStatusFilter]);
   
-  const smTotalPages = Math.ceil(filteredSelfManaged.length / smPageSize);
-  const paginatedSmAccounts = filteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
+  const smTotalPages = Math.ceil(finalFilteredSelfManaged.length / smPageSize);
+  const paginatedSmAccounts = finalFilteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
 
-  const filteredManagedVacant = useMemo(() => {
-    let accounts = groupedMvAccounts;
+  const finalFilteredManagedVacant = useMemo(() => {
+    let accounts = filteredGroupedMvAccounts;
     if (mvStatusFilter !== 'all') {
         accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
     }
@@ -370,41 +404,98 @@ export default function ServiceChargesPage() {
         group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
         group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [groupedMvAccounts, searchTerm, mvStatusFilter]);
+  }, [filteredGroupedMvAccounts, searchTerm, mvStatusFilter]);
 
-  const mvTotalPages = Math.ceil(filteredManagedVacant.length / mvPageSize);
-  const paginatedMvAccounts = filteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
+  const mvTotalPages = Math.ceil(finalFilteredManagedVacant.length / mvPageSize);
+  const paginatedMvAccounts = finalFilteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
   
-  const filteredArrears = useMemo(() => {
-    if (!searchTerm) return arrearsAccounts;
+  const finalFilteredArrears = useMemo(() => {
+    if (!searchTerm) return filteredArrearsAccounts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return arrearsAccounts.filter(acc =>
+    return filteredArrearsAccounts.filter(acc =>
         acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
         acc.unitName.toLowerCase().includes(lowercasedFilter) ||
         acc.ownerName?.toLowerCase().includes(lowercasedFilter)
     );
-  }, [arrearsAccounts, searchTerm]);
+  }, [filteredArrearsAccounts, searchTerm]);
 
-  const arrearsTotalPages = Math.ceil(filteredArrears.length / arrearsPageSize);
-  const paginatedArrears = filteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
+  const arrearsTotalPages = Math.ceil(finalFilteredArrears.length / arrearsPageSize);
+  const paginatedArrears = finalFilteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
 
   return (
     <div className="space-y-6">
-       <div className="flex items-center justify-between">
+       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
           <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
         </div>
-        <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium w-32 text-center">{format(selectedMonth, 'MMMM yyyy')}</span>
-            <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-            </Button>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+             <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger className="w-full sm:w-[240px]">
+                    <SelectValue placeholder="Filter by property..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Properties</SelectItem>
+                    {allProperties.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2 justify-end w-full">
+              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium w-32 text-center">{format(selectedMonth, 'MMMM yyyy')}</span>
+              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
         </div>
       </div>
+      
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Billable Client Units</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalUnits}</div>
+              <p className="text-xs text-muted-foreground">Units with a service charge for {format(selectedMonth, 'MMMM')}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Paid Service Charge</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Ksh {stats.totalPaid.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Collected for {format(selectedMonth, 'MMMM')}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Service Charge</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Ksh {stats.totalPending.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Outstanding for {format(selectedMonth, 'MMMM')}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Paid Percentage</CardTitle>
+              <PieChart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.paidPercentage.toFixed(1)}%</div>
+              <p className="text-xs text-muted-foreground">Of total billable charges for {format(selectedMonth, 'MMMM')}</p>
+            </CardContent>
+          </Card>
+      </div>
+
       <Tabs defaultValue="client-occupied">
         <div className="flex justify-between items-center">
             <TabsList>
@@ -436,7 +527,7 @@ export default function ServiceChargesPage() {
               totalPages={smTotalPages}
               onPageChange={setSmCurrentPage}
               onPageSizeChange={setSmPageSize}
-              totalItems={filteredSelfManaged.length}
+              totalItems={finalFilteredSelfManaged.length}
             />
         </TabsContent>
         <TabsContent value="managed-vacant">
@@ -453,7 +544,7 @@ export default function ServiceChargesPage() {
               totalPages={mvTotalPages}
               onPageChange={setMvCurrentPage}
               onPageSizeChange={setMvPageSize}
-              totalItems={filteredManagedVacant.length}
+              totalItems={finalFilteredManagedVacant.length}
             />
         </TabsContent>
         <TabsContent value="arrears">
@@ -465,7 +556,7 @@ export default function ServiceChargesPage() {
               totalPages={arrearsTotalPages}
               onPageChange={setArrearsCurrentPage}
               onPageSizeChange={setArrearsPageSize}
-              totalItems={filteredArrears.length}
+              totalItems={finalFilteredArrears.length}
             />
         </TabsContent>
       </Tabs>
@@ -731,3 +822,4 @@ const VacantArrearsTab = ({
     
 
     
+
