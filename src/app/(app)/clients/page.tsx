@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPayments, getLandlords, deletePropertyOwner } from '@/lib/data';
+import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPaymentsForReport, getLandlords, deletePropertyOwner } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ export default function ClientsPage() {
       getProperties(),
       getPropertyOwners(),
       getTenants(),
-      getAllPayments(),
+      getAllPaymentsForReport(),
       getLandlords(),
     ]);
     setAllProperties(props);
