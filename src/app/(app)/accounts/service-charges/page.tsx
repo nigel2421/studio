@@ -40,7 +40,7 @@ export default function ServiceChargesPage() {
   
   const [smCurrentPage, setSmCurrentPage] = useState(1);
   const [smPageSize, setSmPageSize] = useState(10);
-  const [smStatusFilter, setSmStatusFilter] = useState<'all' | 'Paid' | 'Pending'>('all');
+  const [smStatusFilter, setSmStatusFilter] = useState<'all' | 'Paid' | 'Pending' | 'N/A'>('all');
 
   const [mvCurrentPage, setMvCurrentPage] = useState(1);
   const [mvPageSize, setMvPageSize] = useState(10);
@@ -422,6 +422,16 @@ export default function ServiceChargesPage() {
   const arrearsTotalPages = Math.ceil(finalFilteredArrears.length / arrearsPageSize);
   const paginatedArrears = finalFilteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
 
+  const handleSmStatusFilterChange = useCallback((status: 'all' | 'Paid' | 'Pending' | 'N/A') => {
+    setSmStatusFilter(status);
+    setSmCurrentPage(1);
+  }, []);
+
+  const handleMvStatusFilterChange = useCallback((status: 'all' | 'Paid' | 'Pending' | 'N/A') => {
+    setMvStatusFilter(status);
+    setMvCurrentPage(1);
+  }, []);
+
   return (
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -512,7 +522,7 @@ export default function ServiceChargesPage() {
               onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
               onViewHistory={handleOpenHistoryDialog}
               statusFilter={smStatusFilter}
-              onStatusFilterChange={(status) => { setSmStatusFilter(status as any); setSmCurrentPage(1); }}
+              onStatusFilterChange={handleSmStatusFilterChange}
               currentPage={smCurrentPage}
               pageSize={smPageSize}
               totalPages={smTotalPages}
@@ -529,7 +539,7 @@ export default function ServiceChargesPage() {
               onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
               onViewHistory={handleOpenHistoryDialog}
               statusFilter={mvStatusFilter}
-              onStatusFilterChange={(status) => { setMvStatusFilter(status as any); setMvCurrentPage(1); }}
+              onStatusFilterChange={handleMvStatusFilterChange}
               currentPage={mvCurrentPage}
               pageSize={mvPageSize}
               totalPages={mvTotalPages}
@@ -629,7 +639,7 @@ const ServiceChargeStatusTable = ({
                 <CardTitle>{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>
                 <div className="flex justify-end">
-                    <Select value={statusFilter} onValueChange={onStatusFilterChange as any}>
+                    <Select value={statusFilter} onValueChange={onStatusFilterChange}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Filter by status" />
                         </SelectTrigger>
@@ -815,5 +825,7 @@ const VacantArrearsTab = ({
     
 
 
+
+    
 
     
