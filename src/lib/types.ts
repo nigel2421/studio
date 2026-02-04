@@ -195,7 +195,7 @@ export type MaintenanceRequest = {
   createdAt: Date;
 };
 
-export type UserRole = 'admin' | 'viewer' | 'agent' | 'tenant' | 'water-meter-reader' | 'landlord' | 'homeowner' | 'investment-consultant';
+export type UserRole = 'admin' | 'viewer' | 'agent' | 'tenant' | 'water-meter-reader' | 'landlord' | 'homeowner' | 'investment-consultant' | 'accounts';
 
 export type UserProfile = {
   id: string;
