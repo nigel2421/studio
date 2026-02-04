@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog';
+import { useAuth } from '@/hooks/useAuth';
 
 const SOIL_MERCHANTS_LANDLORD: Landlord = {
   id: 'soil_merchants_internal',
@@ -52,6 +53,8 @@ export default function LandlordsPage() {
   const [showAllUnassigned, setShowAllUnassigned] = useState(false);
   const [landlordCurrentPage, setLandlordCurrentPage] = useState(1);
   const [landlordPageSize, setLandlordPageSize] = useState(6);
+  const { userProfile } = useAuth();
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
   const fetchData = () => {
     startLoading('Loading property data...');
@@ -313,11 +316,15 @@ export default function LandlordsPage() {
           <p className="text-muted-foreground">Manage landlords whose units are managed by Eracov.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => handleOpenDialog(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Landlord
-          </Button>
-          <LandlordCsvUploader onUploadComplete={fetchData} />
+            {!isInvestmentConsultant && (
+                <>
+                    <Button onClick={() => handleOpenDialog(null)}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Landlord
+                    </Button>
+                    <LandlordCsvUploader onUploadComplete={fetchData} />
+                </>
+            )}
         </div>
       </div>
 
@@ -418,19 +425,23 @@ export default function LandlordsPage() {
                               <CardDescription>{landlord.phone}</CardDescription>
                             </div>
                             <div className="flex items-center">
-                                <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
-                                    <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => {
-                                    if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
-                                        toast({ variant: 'destructive', title: 'Action Not Allowed', description: 'The internal Soil Merchants profile cannot be deleted.' });
-                                        return;
-                                    }
-                                    setLandlordToDelete(landlord);
-                                    setIsDeleteDialogOpen(true);
-                                }}>
-                                    <Trash className="h-4 w-4" />
-                                </Button>
+                                {!isInvestmentConsultant && (
+                                    <>
+                                        <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(landlord)}>
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => {
+                                            if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
+                                                toast({ variant: 'destructive', title: 'Action Not Allowed', description: 'The internal Soil Merchants profile cannot be deleted.' });
+                                                return;
+                                            }
+                                            setLandlordToDelete(landlord);
+                                            setIsDeleteDialogOpen(true);
+                                        }}>
+                                            <Trash className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                           </div>
                         </CardHeader>

@@ -13,6 +13,7 @@ import { useLoading } from '@/hooks/useLoading';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function ClientsPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -33,6 +34,8 @@ export default function ClientsPage() {
 
   const [ownerToDelete, setOwnerToDelete] = useState<PropertyOwner | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { userProfile } = useAuth();
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
   const fetchData = async () => {
     const [props, owners, tenants, payments, landlords] = await Promise.all([
@@ -255,16 +258,18 @@ export default function ClientsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Client Self Managed Units</h2>
           <p className="text-muted-foreground">Manage contact information for owners who self-manage their units.</p>
         </div>
-        <Button
-            onClick={() => {
-              setSelectedOwner(null);
-              setIsOwnerDialogOpen(true);
-            }}
-            disabled={!selectedPropertyId}
-        >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Owner
-        </Button>
+        {!isInvestmentConsultant && (
+            <Button
+                onClick={() => {
+                setSelectedOwner(null);
+                setIsOwnerDialogOpen(true);
+                }}
+                disabled={!selectedPropertyId}
+            >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Owner
+            </Button>
+        )}
       </div>
       
       <div className="grid gap-6 md:grid-cols-3">
@@ -345,28 +350,32 @@ export default function ClientsPage() {
                           >
                               <FileSignature className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
-                            onClick={() => {
-                              setSelectedOwner(owner);
-                              setIsOwnerDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:bg-red-500 hover:text-white transition-colors"
-                            onClick={() => {
-                                setOwnerToDelete(owner);
-                                setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                          {!isInvestmentConsultant && (
+                            <>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:bg-amber-500 hover:text-white transition-colors"
+                                    onClick={() => {
+                                    setSelectedOwner(owner);
+                                    setIsOwnerDialogOpen(true);
+                                    }}
+                                >
+                                    <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:bg-red-500 hover:text-white transition-colors"
+                                    onClick={() => {
+                                        setOwnerToDelete(owner);
+                                        setIsDeleteDialogOpen(true);
+                                    }}
+                                >
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-wrap">
@@ -385,7 +394,7 @@ export default function ClientsPage() {
                 )}
             </div>
             
-            {unassignedUnits.length > 0 && (
+            {unassignedUnits.length > 0 && !isInvestmentConsultant && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-[10px] font-bold uppercase text-amber-600 tracking-widest flex items-center gap-1.5">
                   <div className="h-1 w-1 rounded-full bg-amber-500" />

@@ -23,6 +23,7 @@ import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { useLoading } from "@/hooks/useLoading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from "@/hooks/useAuth";
 
 
 export default function DashboardPage() {
@@ -31,6 +32,8 @@ export default function DashboardPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const { startLoading, stopLoading, isLoading } = useLoading();
+  const { userProfile } = useAuth();
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
@@ -207,42 +210,55 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Welcome, Property Manager</h2>
-          <p className="text-sm text-muted-foreground">Here's a summary of your properties today.</p>
-        </div>
-        <Button variant="outline" onClick={handleExportPDF} disabled={isLoading}>
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-          Export PDF Report
-        </Button>
-      </div>
+      {!isInvestmentConsultant && (
+        <>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Welcome, Property Manager</h2>
+              <p className="text-sm text-muted-foreground">Here's a summary of your properties today.</p>
+            </div>
+            <Button variant="outline" onClick={handleExportPDF} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+              Export PDF Report
+            </Button>
+          </div>
 
-      <DashboardStats
-        tenants={tenants}
-        properties={properties}
-        maintenanceRequests={maintenanceRequests}
-        payments={payments}
-      />
+          <DashboardStats
+            tenants={tenants}
+            properties={properties}
+            maintenanceRequests={maintenanceRequests}
+            payments={payments}
+          />
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <FinancialOverviewChart payments={payments} tenants={tenants} />
-        <OccupancyOverviewChart properties={properties} tenants={tenants} />
-      </div>
+          <div className="grid gap-8 md:grid-cols-2">
+            <FinancialOverviewChart payments={payments} tenants={tenants} />
+            <OccupancyOverviewChart properties={properties} tenants={tenants} />
+          </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
-        <OrientationOverviewChart properties={properties} />
-      </div>
+          <div className="grid gap-8 md:grid-cols-2">
+            <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
+            <OrientationOverviewChart properties={properties} />
+          </div>
 
-      <div className="grid gap-8">
-        <RentBreakdownChart payments={payments} tenants={tenants} properties={properties} />
-      </div>
+          <div className="grid gap-8">
+            <RentBreakdownChart payments={payments} tenants={tenants} properties={properties} />
+          </div>
+        </>
+      )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Detailed Property Analytics</CardTitle>
-          <CardDescription>Select a property to view its detailed occupancy and status breakdown.</CardDescription>
+          {isInvestmentConsultant ? (
+            <>
+              <CardTitle>Welcome, Investment Consultant</CardTitle>
+              <CardDescription>Select a property to view its detailed occupancy and status breakdown.</CardDescription>
+            </>
+          ) : (
+            <>
+              <CardTitle>Detailed Property Analytics</CardTitle>
+              <CardDescription>Select a property to view its detailed occupancy and status breakdown.</CardDescription>
+            </>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <Select onValueChange={setSelectedPropertyId}>
@@ -291,37 +307,37 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Maintenance Requests</CardTitle>
-            <CardDescription>Top pending requests from the last 90 days.</CardDescription>
-          </div>
-          <Link href="/maintenance">
-            <Button variant="outline" size="sm">
-              View All <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-4">
-            {recentRequests.map(req => (
-              <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-muted/30 rounded-lg transition-colors">
-                <div className="flex flex-col min-w-0 flex-1 mr-4">
-                  <span className="font-medium truncate">{getTenantName(req.tenantId)} - <span className="text-muted-foreground">{getPropertyName(req.propertyId)}</span></span>
-                  <span className="text-sm text-muted-foreground truncate">{req.details}</span>
-                </div>
-                <span className="text-xs sm:text-sm font-medium whitespace-nowrap bg-muted px-2 py-1 rounded-full">{new Date(req.date).toLocaleDateString()}</span>
-              </li>
-            ))}
-            {recentRequests.length === 0 && (
-              <p className="text-sm text-muted-foreground">No pending maintenance requests.</p>
-            )}
-          </ul>
-        </CardContent>
-      </Card>
+      {!isInvestmentConsultant && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Recent Maintenance Requests</CardTitle>
+              <CardDescription>Top pending requests from the last 90 days.</CardDescription>
+            </div>
+            <Link href="/maintenance">
+              <Button variant="outline" size="sm">
+                View All <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {recentRequests.map(req => (
+                <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-muted/30 rounded-lg transition-colors">
+                  <div className="flex flex-col min-w-0 flex-1 mr-4">
+                    <span className="font-medium truncate">{getTenantName(req.tenantId)} - <span className="text-muted-foreground">{getPropertyName(req.propertyId)}</span></span>
+                    <span className="text-sm text-muted-foreground truncate">{req.details}</span>
+                  </div>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap bg-muted px-2 py-1 rounded-full">{new Date(req.date).toLocaleDateString()}</span>
+                </li>
+              ))}
+              {recentRequests.length === 0 && (
+                <p className="text-sm text-muted-foreground">No pending maintenance requests.</p>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
-
-
