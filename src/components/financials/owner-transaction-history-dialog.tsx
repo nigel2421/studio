@@ -36,39 +36,45 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const { toast } = useToast();
     const [isSending, setIsSending] = useState(false);
     const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
-
-    const associatedTenant = useMemo(() => {
-        if (!owner) return null;
-        // Prioritize finding by userId if available
-        if (owner.userId) {
-            const tenantByUserId = allTenants.find(t => t.residentType === 'Homeowner' && t.userId === owner.userId);
-            if(tenantByUserId) return tenantByUserId;
-        }
-        // Fallback to email
-        return allTenants.find(t => 
-            t.residentType === 'Homeowner' && t.email === owner.email
-        );
-    }, [owner, allTenants]);
     
     useEffect(() => {
-        if (owner && open && associatedTenant) {
-            setIsLoading(true);
-            const tenantPayments = allPayments.filter(p => p.tenantId === associatedTenant.id);
-            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(associatedTenant, tenantPayments, allProperties, owner);
+        if (!owner || !open) return;
+
+        setIsLoading(true);
+
+        const associatedTenants = (owner.userId 
+            ? allTenants.filter(t => t.residentType === 'Homeowner' && t.userId === owner.userId) 
+            : allTenants.filter(t => t.residentType === 'Homeowner' && t.email === owner.email)
+        );
+        const uniqueTenants = Array.from(new Map(associatedTenants.map(t => [t.id, t])).values());
+
+        if (uniqueTenants.length > 0) {
+            const associatedTenantIds = uniqueTenants.map(t => t.id);
+            const tenantPayments = allPayments.filter(p => associatedTenantIds.includes(p.tenantId));
+            const primaryTenant = uniqueTenants[0];
+
+            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant, tenantPayments, allProperties, owner);
             
-            const sortedLedger = generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
-            setLedger(sortedLedger);
+            setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setFinalDueBalance(dueBalance);
-            setIsLoading(false);
-        } else if (owner && open && !associatedTenant) {
-            // Handle case where a homeowner exists but has no matching proxy 'tenant' record yet
-            setLedger([]);
-            setFinalDueBalance(0);
-            setIsLoading(false);
-            console.warn(`No associated homeowner tenant record found for owner ${owner.name}.`);
+        } else {
+            // No tenant records exist, but we can still show charges
+            const dummyTenant: Tenant = {
+                id: `dummy-${owner.id}`,
+                name: owner.name,
+                email: owner.email,
+                phone: owner.phone,
+                residentType: 'Homeowner',
+                lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
+                propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
+            };
+
+            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, owner);
+            setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            setFinalDueBalance(dueBalance);
         }
-    }, [owner, open, associatedTenant, allPayments, allProperties]);
+        setIsLoading(false);
+    }, [owner, open, allTenants, allPayments, allProperties]);
     
 
     const handleOpenInvoicePreview = () => {
