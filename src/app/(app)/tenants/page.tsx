@@ -1,11 +1,12 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { getTenants, getProperties, archiveTenant } from "@/lib/data";
+import { getTenants, getProperties, archiveTenant, getPaymentHistory } from "@/lib/data";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Edit, Trash, FileArchive, Search, FileDown, Users, Home, Percent } from "lucide-react";
+import { PlusCircle, Edit, Trash, FileArchive, Search, FileDown, Users, Home, Percent, Loader2 } from "lucide-react";
 import { Tenant, Property } from '@/lib/types';
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { downloadCSV } from "@/lib/utils";
@@ -41,6 +42,7 @@ import { TenantActions } from './tenant-actions';
 import { Input } from '@/components/ui/input';
 import { useLoading } from '@/hooks/useLoading';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TenantsPage() {
     const [allResidents, setAllResidents] = useState<Tenant[]>([]);
@@ -51,6 +53,9 @@ export default function TenantsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+    const { userProfile } = useAuth();
+    const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
+    const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
 
     const fetchResidents = () => {
         getTenants().then(setAllResidents);
@@ -67,7 +72,6 @@ export default function TenantsPage() {
     const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (p.units?.length || 0), 0), [properties]);
     const occupiedUnits = allResidents.length;
     const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
-
 
     const handleArchive = async (tenantId: string) => {
         startLoading('Archiving resident...');
@@ -114,6 +118,24 @@ export default function TenantsPage() {
         (currentPage - 1) * pageSize,
         currentPage * pageSize
     );
+    
+    const handleExportStatement = async (tenant: Tenant) => {
+        if (!tenant) return;
+        setGeneratingPdfFor(tenant.id);
+        startLoading('Generating Statement...');
+        try {
+            const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
+            const tenantPayments = await getPaymentHistory(tenant.id);
+            generateTenantStatementPDF(tenant, tenantPayments, properties);
+            toast({ title: 'Statement Generated', description: `Statement for ${tenant.name} downloaded.` });
+        } catch (error) {
+            console.error("Error generating statement", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });
+        } finally {
+            stopLoading();
+            setGeneratingPdfFor(null);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -122,20 +144,22 @@ export default function TenantsPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Residents</h2>
                     <p className="text-muted-foreground">Manage tenants and homeowners across your portfolio.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button asChild variant="outline">
-                        <Link href="/tenants/archived">
-                            <FileArchive className="mr-2 h-4 w-4" />
-                            View Archived
-                        </Link>
-                    </Button>
-                    <Button asChild>
-                        <Link href="/tenants/add">
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Tenant
-                        </Link>
-                    </Button>
-                </div>
+                {!isInvestmentConsultant && (
+                    <div className="flex items-center gap-2">
+                        <Button asChild variant="outline">
+                            <Link href="/tenants/archived">
+                                <FileArchive className="mr-2 h-4 w-4" />
+                                View Archived
+                            </Link>
+                        </Button>
+                        <Button asChild>
+                            <Link href="/tenants/add">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Tenant
+                            </Link>
+                        </Button>
+                    </div>
+                )}
             </div>
             
             <div className="grid gap-6 md:grid-cols-3">
@@ -239,43 +263,59 @@ export default function TenantsPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <TenantActions tenant={tenant} />
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                                        <span className="sr-only">Open menu</span>
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/tenants/edit/${tenant.id}`}>
-                                                            <Edit className="mr-2 h-4 w-4" /> Edit
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                                <Trash className="mr-2 h-4 w-4" /> Archive
-                                                            </DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    This action will archive the occupant and mark their unit as vacant. You can view archived records later.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleArchive(tenant.id)}>Continue</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
+                                        {isInvestmentConsultant ? (
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={() => handleExportStatement(tenant)}
+                                                disabled={generatingPdfFor === tenant.id}
+                                            >
+                                                {generatingPdfFor === tenant.id ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <FileDown className="mr-2 h-4 w-4" />
+                                                )}
+                                                Export Statement
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center justify-end gap-2">
+                                                <TenantActions tenant={tenant} />
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Open menu</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/tenants/edit/${tenant.id}`}>
+                                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                                    <Trash className="mr-2 h-4 w-4" /> Archive
+                                                                </DropdownMenuItem>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This action will archive the occupant and mark their unit as vacant. You can view archived records later.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleArchive(tenant.id)}>Continue</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -303,3 +343,4 @@ export default function TenantsPage() {
         </div>
     );
 }
+
