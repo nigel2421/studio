@@ -69,7 +69,7 @@ export default function ServiceChargesPage() {
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
 
 
-  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
+  const selectedMonth = startOfMonth(new Date());
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
   const fetchData = async () => {
@@ -220,7 +220,7 @@ export default function ServiceChargesPage() {
 
             let firstBillableMonth: Date | null = null;
             
-            if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
+            if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
                 firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
             } else if (unit.handoverStatus === 'Handed Over') {
                 const dateToUse = unit.handoverDate || tenant?.lease.startDate;
@@ -441,15 +441,6 @@ export default function ServiceChargesPage() {
                     ))}
                 </SelectContent>
             </Select>
-            <div className="flex items-center gap-2 justify-end w-full">
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-                  <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium w-32 text-center">{format(selectedMonth, 'MMMM yyyy')}</span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-                  <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
         </div>
       </div>
       
@@ -823,3 +814,6 @@ const VacantArrearsTab = ({
 
     
 
+
+
+    
