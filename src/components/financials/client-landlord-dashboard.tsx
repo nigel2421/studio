@@ -15,6 +15,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { generateLedger } from '@/lib/financial-logic';
+import { PaginationControls } from '../ui/pagination-controls';
 
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
@@ -26,13 +27,23 @@ interface ClientLandlordDashboardProps {
 }
 
 export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner }: ClientLandlordDashboardProps) {
-    
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
     const { ledger, finalDueBalance, finalAccountBalance } = useMemo(() => {
         if (!tenantDetails) {
             return { ledger: [], finalDueBalance: 0, finalAccountBalance: 0 };
         }
         return generateLedger(tenantDetails, payments, allProperties, owner);
     }, [tenantDetails, payments, allProperties, owner]);
+
+    const sortedLedger = useMemo(() => ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()), [ledger]);
+
+    const totalPages = Math.ceil(sortedLedger.length / pageSize);
+    const paginatedLedger = sortedLedger.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
 
     const latestWaterReading = waterReadings?.[0];
     const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);
@@ -103,11 +114,12 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     <CardTitle>Transaction History</CardTitle>
                     <CardDescription>A summary of your recent charges and payments.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
+                                <TableHead>For Month</TableHead>
                                 <TableHead>Description</TableHead>
                                 <TableHead className="text-right">Charge</TableHead>
                                 <TableHead className="text-right">Payment</TableHead>
@@ -115,10 +127,11 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {ledger.length > 0 ? (
-                                ledger.slice(-10).reverse().map((entry, index) => ( // Show last 10 transactions
+                            {paginatedLedger.length > 0 ? (
+                                paginatedLedger.map((entry, index) => (
                                     <TableRow key={`${entry.id}-${index}`}>
                                         <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                        <TableCell>{entry.forMonth}</TableCell>
                                         <TableCell>{entry.description}</TableCell>
                                         <TableCell className="text-right text-red-600">
                                             {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
@@ -136,12 +149,24 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center">No transaction history found.</TableCell>
+                                    <TableCell colSpan={6} className="text-center">No transaction history found.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                     </Table>
                 </CardContent>
+                 {totalPages > 1 && (
+                    <div className="p-4 border-t">
+                        <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalItems={sortedLedger.length}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                        />
+                    </div>
+                )}
             </Card>
         </div>
     );
