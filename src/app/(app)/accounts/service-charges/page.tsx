@@ -69,7 +69,7 @@ export default function ServiceChargesPage() {
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
 
 
-  const selectedMonth = startOfMonth(new Date());
+  const selectedMonth = useMemo(() => startOfMonth(new Date()), []);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
   const fetchData = async () => {
@@ -825,6 +825,8 @@ const VacantArrearsTab = ({
     
 
 
+
+    
 
     
 
