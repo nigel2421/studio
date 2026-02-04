@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -24,6 +25,7 @@ import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { reconcileMonthlyBilling } from '@/lib/financial-logic';
 
 export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -57,6 +59,34 @@ export default function AccountsPage() {
     fetchAllData();
   }, []);
 
+  const displayTenants = useMemo(() => {
+    if (!tenants.length || !properties.length) return [];
+
+    const propertiesMap = new Map(properties.map(p => [p.id, p]));
+
+    return tenants.map(tenant => {
+        const property = propertiesMap.get(tenant.propertyId);
+        const unit = property?.units.find(u => u.name === tenant.unitName);
+        const updates = reconcileMonthlyBilling(tenant, unit, new Date());
+
+        const updatedTenant = { ...tenant, lease: { ...tenant.lease } };
+
+        if (updates.dueBalance !== undefined) {
+            updatedTenant.dueBalance = updates.dueBalance;
+        }
+        if (updates.accountBalance !== undefined) {
+            updatedTenant.accountBalance = updates.accountBalance;
+        }
+        if (updates['lease.paymentStatus'] !== undefined) {
+            updatedTenant.lease.paymentStatus = updates['lease.paymentStatus'];
+        }
+        if (updates['lease.lastBilledPeriod'] !== undefined) {
+            updatedTenant.lease.lastBilledPeriod = updates['lease.lastBilledPeriod'];
+        }
+        return updatedTenant;
+    });
+  }, [tenants, properties]);
+
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
     return property ? property.name : 'N/A';
@@ -79,11 +109,11 @@ export default function AccountsPage() {
     .filter(p => p.type === 'Rent' && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const rentArrears = useMemo(() => tenants
-    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [tenants]);
+  const rentArrears = useMemo(() => displayTenants
+    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [displayTenants]);
 
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
-  const occupiedUnits = tenants.length;
+  const occupiedUnits = displayTenants.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
@@ -94,7 +124,7 @@ export default function AccountsPage() {
   ];
 
   // Filtering for Rent tab
-  const filteredRentTenants = tenants.filter(t =>
+  const filteredRentTenants = displayTenants.filter(t =>
     t.name.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
     t.unitName.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
     t.email.toLowerCase().includes(rentSearchTerm.toLowerCase())
