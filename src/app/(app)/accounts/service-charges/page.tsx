@@ -69,8 +69,16 @@ export default function ServiceChargesPage() {
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
 
 
-  const selectedMonth = useMemo(() => startOfMonth(new Date()), []);
+  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+
+  const handlePrevMonth = () => {
+    setSelectedMonth(currentMonth => subMonths(currentMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth(currentMonth => addMonths(currentMonth, 1));
+  };
 
   const fetchData = async () => {
     try {
@@ -440,6 +448,11 @@ export default function ServiceChargesPage() {
           <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+                <span className="font-semibold text-center w-32">{format(selectedMonth, 'MMMM yyyy')}</span>
+                <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                 <SelectTrigger className="w-full sm:w-[240px]">
                     <SelectValue placeholder="Filter by property..." />
@@ -462,7 +475,7 @@ export default function ServiceChargesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalUnits}</div>
-              <p className="text-xs text-muted-foreground">Units with a service charge for {format(selectedMonth, 'MMMM')}</p>
+              <p className="text-xs text-muted-foreground">Total billable client-owned units</p>
             </CardContent>
           </Card>
           <Card>
@@ -472,7 +485,7 @@ export default function ServiceChargesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">Ksh {stats.totalPaid.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Collected for {format(selectedMonth, 'MMMM')}</p>
+              <p className="text-xs text-muted-foreground">Total service charge collected</p>
             </CardContent>
           </Card>
           <Card>
@@ -482,7 +495,7 @@ export default function ServiceChargesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">Ksh {stats.totalPending.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Outstanding for {format(selectedMonth, 'MMMM')}</p>
+              <p className="text-xs text-muted-foreground">Total service charge pending</p>
             </CardContent>
           </Card>
           <Card>
@@ -492,7 +505,7 @@ export default function ServiceChargesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.paidPercentage.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">Of total billable charges for {format(selectedMonth, 'MMMM')}</p>
+              <p className="text-xs text-muted-foreground">Of total billable charges</p>
             </CardContent>
           </Card>
       </div>
@@ -831,3 +844,4 @@ const VacantArrearsTab = ({
     
 
     
+
