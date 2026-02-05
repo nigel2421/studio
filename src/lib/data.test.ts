@@ -9,6 +9,7 @@ import { addDoc, runTransaction, updateDoc } from 'firebase/firestore';
 // Mock the entire 'firebase/firestore' module since it's a low-level dependency used by many functions
 jest.mock('firebase/firestore', () => ({
     ...jest.requireActual('firebase/firestore'),
+    getFirestore: jest.fn(() => ({})), // Return a dummy object to prevent real DB initialization
     getDocs: jest.fn(),
     getDoc: jest.fn(),
     doc: jest.fn((db, collection, id) => ({
@@ -22,11 +23,14 @@ jest.mock('firebase/firestore', () => ({
     collection: jest.fn((db, path) => ({
         _path: { segments: [path] },
     })),
+    // Pass through query and where so we can inspect them in mocks
+    query: jest.fn((coll, ...constraints) => ({ ...coll, _constraints: constraints})),
+    where: jest.fn((field, op, value) => ({ field, op, value })),
     deleteField: jest.fn(() => 'DELETE_FIELD_SENTINEL'), // Return a sentinel value for inspection
 }));
 
 // Import the mocked functions so we can manipulate them
-import { getDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { getDoc, writeBatch, getDocs, updateDoc, addDoc } from 'firebase/firestore';
 
 const mockGetDocs = getDocs as jest.Mock;
 const mockGetDoc = getDoc as jest.Mock;
@@ -231,7 +235,8 @@ describe('Data Logic in `data.ts`', () => {
             // Mock Firestore getDocs to return tenant and property
             mockGetDocs.mockImplementation(async (q: any) => {
                 const path = q._path.segments[0];
-                if (path === 'tenants') {
+                const constraints = q._constraints || [];
+                if (path === 'tenants' && constraints.length > 0) {
                      return {
                         empty: false,
                         docs: [{
@@ -241,18 +246,12 @@ describe('Data Logic in `data.ts`', () => {
                         }],
                     };
                 }
-                if (path === 'properties') {
-                    return {
-                        docs: [{
-                            id: 'prop-1',
-                            data: () => mockProperty
-                        }]
-                    };
-                }
-                return { docs: [] };
+                return { docs: [], empty: true };
             });
 
-            // Mock the updateDoc and addDoc calls
+            // Also mock the getProperty call which uses getDocs internally without constraints
+            const mockGetProperty = jest.spyOn(data, 'getProperty').mockResolvedValue(mockProperty as any);
+            
             const mockUpdateDoc = updateDoc as jest.Mock;
             const mockAddDoc = addDoc as jest.Mock;
             mockUpdateDoc.mockResolvedValue(undefined);
@@ -277,13 +276,15 @@ describe('Data Logic in `data.ts`', () => {
             const tenantUpdateCall = mockUpdateDoc.mock.calls[0];
             expect(tenantUpdateCall).toBeDefined();
             const updatedData = tenantUpdateCall[1];
-            expect(tenantUpdateCall[0].path).toBe('tenants/tenant-1'); // Check it updates the correct tenant
+            expect(tenantUpdateCall[0].path).toBe('tenants/tenant-1');
             // The logic in reconcileMonthlyBilling also runs, so need to calculate expected balance carefully.
             // As of Feb 15, Feb rent is due. Initial balance is 1000. Feb rent is 20000. Water bill is 3000.
             // Total due should be 1000 + 20000 + 3000 = 24000.
             expect(updatedData.dueBalance).toBe(1000 + expectedAmount + 20000); // 1000 (initial) + 3000 (water) + 20000 (Feb rent)
             expect(updatedData['lease.paymentStatus']).toBe('Overdue');
             expect(updatedData['lease.lastBilledPeriod']).toBe('2024-02');
+
+            mockGetProperty.mockRestore();
         });
     });
 });
