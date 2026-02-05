@@ -66,12 +66,16 @@ export function calculateTransactionBreakdown(
         }
     }
 
-    const netToLandlord = grossAmount - serviceChargeDeduction - managementFee;
+    const isEracovManaged = unit?.managementStatus !== 'Client Managed';
+    const otherCosts = isEracovManaged && payment.type === 'Rent' ? 500 : 0;
+
+    const netToLandlord = grossAmount - serviceChargeDeduction - managementFee - otherCosts;
 
     return {
         gross: grossAmount,
         serviceChargeDeduction: Math.round(serviceChargeDeduction),
         managementFee: Math.round(managementFee),
+        otherCosts: otherCosts,
         netToLandlord: Math.round(netToLandlord),
     };
 }
@@ -80,6 +84,7 @@ export interface FinancialSummary {
     totalRent: number;
     totalManagementFees: number;
     totalServiceCharges: number;
+    totalOtherCosts: number;
     totalNetRemittance: number;
     transactionCount: number;
     vacantUnitServiceChargeDeduction?: number;
@@ -92,6 +97,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         totalRent: 0,
         totalManagementFees: 0,
         totalServiceCharges: 0,
+        totalOtherCosts: 0,
         totalNetRemittance: 0,
         transactionCount: transactions.length,
         vacantUnitServiceChargeDeduction: 0,
@@ -101,6 +107,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         summary.totalRent += transaction.gross;
         summary.totalServiceCharges += transaction.serviceChargeDeduction;
         summary.totalManagementFees += transaction.managementFee;
+        summary.totalOtherCosts += transaction.otherCosts || 0;
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 

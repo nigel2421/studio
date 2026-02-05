@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Banknote, Wallet, Building2, TrendingUp, Download } from 'lucide-react';
+import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
 import { Payment, Property, Tenant, Unit } from '@/lib/types';
 import { FinancialSummary, calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { useState, useMemo } from 'react';
@@ -136,12 +136,14 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             acc.gross += t.gross;
             acc.serviceChargeDeduction += t.serviceChargeDeduction;
             acc.managementFee += t.managementFee;
+            acc.otherCosts += t.otherCosts || 0;
             acc.netToLandlord += t.netToLandlord;
             return acc;
         }, {
             gross: 0,
             serviceChargeDeduction: 0,
             managementFee: 0,
+            otherCosts: 0,
             netToLandlord: 0,
         });
     }, [displayTransactions]);
@@ -155,6 +157,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
             "Gross Amount": t.gross,
             "Service Charge Deduction": t.serviceChargeDeduction,
             "Management Fee": t.managementFee,
+            "Other Costs": t.otherCosts || 0,
             "Net Payout": t.netToLandlord,
         }));
         downloadCSV(data, 'landlord_financial_statement.csv');
@@ -167,7 +170,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 <p className="text-muted-foreground">Financial overview of your properties and remittances.</p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium">Total Rent (Gross)</CardTitle>
@@ -208,6 +211,16 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                         <p className="text-xs text-muted-foreground">5% agency fee on rent</p>
                     </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-sm font-medium">Other Costs</CardTitle>
+                        <Coins className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Ksh {transactionTotals.otherCosts.toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">Transaction fees</p>
+                    </CardContent>
+                </Card>
                 <Card className="bg-primary/5 border-primary/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium text-primary">Net Rent Payout</CardTitle>
@@ -237,6 +250,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">S. Charge</TableHead>
                                 <TableHead className="text-right">Mgmt Fee</TableHead>
+                                <TableHead className="text-right">Other Costs</TableHead>
                                 <TableHead className="text-right">Net</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -252,6 +266,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                         <TableCell className="text-right">Ksh {transaction.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.managementFee.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">- {(transaction.otherCosts || 0).toLocaleString()}</TableCell>
                                         <TableCell className="text-right font-bold">Ksh {transaction.netToLandlord.toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}
@@ -262,6 +277,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                                 <TableCell className="text-right font-bold">Ksh {transactionTotals.gross.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold text-muted-foreground">- {transactionTotals.serviceChargeDeduction.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold text-muted-foreground">- {transactionTotals.managementFee.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold text-muted-foreground">- {transactionTotals.otherCosts.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">Ksh {transactionTotals.netToLandlord.toLocaleString()}</TableCell>
                             </TableRow>
                         </TableFooter>

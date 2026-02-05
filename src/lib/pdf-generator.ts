@@ -262,7 +262,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; net: number, rentForMonth?: string }[],
+    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; otherCosts?: number; net: number, rentForMonth?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -309,6 +309,7 @@ export const generateLandlordStatementPDF = (
         ['Total Rent (Gross)', formatCurrency(summary.totalRent)],
         ['Service Charges (from Occupied Units)', `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
+        ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
 
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
@@ -336,13 +337,14 @@ export const generateLandlordStatementPDF = (
         acc.gross += t.gross;
         acc.serviceCharge += t.serviceCharge;
         acc.mgmtFee += t.mgmtFee;
+        acc.otherCosts += t.otherCosts || 0;
         acc.net += t.net;
         return acc;
-    }, { gross: 0, serviceCharge: 0, mgmtFee: 0, net: 0 });
+    }, { gross: 0, serviceCharge: 0, mgmtFee: 0, otherCosts: 0, net: 0 });
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
         body: transactions.map(t => [
             t.date,
             t.unit,
@@ -350,6 +352,7 @@ export const generateLandlordStatementPDF = (
             formatCurrency(t.gross),
             `-${formatCurrency(t.serviceCharge)}`,
             `-${formatCurrency(t.mgmtFee)}`,
+            `-${formatCurrency(t.otherCosts || 0)}`,
             formatCurrency(t.net),
         ]),
         foot: [[
@@ -357,6 +360,7 @@ export const generateLandlordStatementPDF = (
             { content: formatCurrency(totals.gross), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(totals.serviceCharge)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(totals.mgmtFee)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(totals.otherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totals.net), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
@@ -367,6 +371,7 @@ export const generateLandlordStatementPDF = (
             4: { halign: 'right' },
             5: { halign: 'right' },
             6: { halign: 'right' },
+            7: { halign: 'right' },
         },
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
