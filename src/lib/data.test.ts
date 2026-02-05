@@ -4,7 +4,7 @@ import { cacheService } from './cache'; // Import the cache service
 
 // Import types for mock data
 import { Landlord, Property, PropertyOwner, UserProfile, Unit, Payment } from './types';
-import { addDoc, runTransaction } from 'firebase/firestore';
+import { addDoc, runTransaction, updateDoc } from 'firebase/firestore';
 
 // Mock the entire 'firebase/firestore' module since it's a low-level dependency used by many functions
 jest.mock('firebase/firestore', () => ({
@@ -51,7 +51,7 @@ describe('Data Logic in `data.ts`', () => {
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockInvestorUnit] };
             
             mockGetDocs.mockImplementation(async (q: any) => {
-                const path = q._query.path.segments[0];
+                const path = q._path.segments[0];
                 if (path === 'users') return { docs: [{ id: 'user-1', data: () => mockUser }] };
                 if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
                 if (path === 'landlords') return { docs: [{ id: 'landlord-1', data: () => mockLandlord }] };
@@ -75,7 +75,7 @@ describe('Data Logic in `data.ts`', () => {
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockClientUnit] };
     
             mockGetDocs.mockImplementation(async (q: any) => {
-                const path = q._query.path.segments[0];
+                const path = q._path.segments[0];
                 if (path === 'users') return { docs: [{ id: 'user-2', data: () => mockUser }] };
                 if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
                 if (path === 'landlords') return { docs: [] };
@@ -100,7 +100,7 @@ describe('Data Logic in `data.ts`', () => {
             const mockProperty: Property = { id: 'prop-1', name: 'Prop 1', address: 'addr', type: 'res', imageId: '1', units: [mockInvestorUnit, mockClientUnit] };
 
             mockGetDocs.mockImplementation(async (q: any) => {
-                const path = q._query.path.segments[0];
+                const path = q._path.segments[0];
                 if (path === 'users') return { docs: [{ id: 'user-3', data: () => mockUser }] };
                 if (path === 'properties') return { docs: [{ id: 'prop-1', data: () => mockProperty }] };
                 if (path === 'landlords') return { docs: [{ id: 'owner-2', data: () => mockOwner }] };
@@ -121,7 +121,7 @@ describe('Data Logic in `data.ts`', () => {
             const mockUser: UserProfile = { id: 'user-4', email: 'unlinked@test.com', role: 'viewer' };
             
             mockGetDocs.mockImplementation(async (q: any) => {
-                const path = q._query.path.segments[0];
+                const path = q._path.segments[0];
                 if (path === 'users') return { docs: [{ id: 'user-4', data: () => mockUser }] };
                 if (path === 'properties') return { docs: [] };
                 if (path === 'landlords') return { docs: [] };
@@ -163,7 +163,7 @@ describe('Data Logic in `data.ts`', () => {
             
             mockGetDoc.mockResolvedValue({ exists: () => true, data: () => mockLandlord });
             mockGetDocs.mockImplementation(async (q: any) => {
-                if (q._query.path.segments[0] === 'properties') {
+                if (q._path.segments[0] === 'properties') {
                     return { docs: mockProperties.map(p => ({ id: p.id, data: () => p }))};
                 }
                 return { docs: [] };
@@ -215,8 +215,8 @@ describe('Data Logic in `data.ts`', () => {
     describe('Water Meter Logic', () => {
         it('should add a water reading and update tenant balance', async () => {
             // Arrange
-            const mockTenant = { id: 'tenant-1', name: 'Water Tenant', dueBalance: 1000, lease: { rent: 20000, paymentStatus: 'Pending', lastBilledPeriod: '2024-01', startDate: '2024-01-01', endDate: '2025-01-01' } };
-            const mockProperty = { id: 'prop-1', name: 'Prop 1', units: [{ name: 'Unit 1' }] };
+            const mockTenant = { id: 'tenant-1', name: 'Water Tenant', dueBalance: 1000, lease: { rent: 20000, paymentStatus: 'Pending' as const, lastBilledPeriod: '2024-01', startDate: '2024-01-01', endDate: '2025-01-01' } };
+            const mockProperty = { id: 'prop-1', name: 'Prop 1', units: [{ name: 'Unit 1', serviceCharge: 0 }] };
             const readingData = {
                 propertyId: 'prop-1',
                 unitName: 'Unit 1',
@@ -225,43 +225,47 @@ describe('Data Logic in `data.ts`', () => {
                 date: '2024-02-15',
             };
             const expectedConsumption = 20;
-            const expectedAmount = expectedConsumption * 150; // WATER_RATE
+            const WATER_RATE = 150;
+            const expectedAmount = expectedConsumption * WATER_RATE;
     
-            // Mock Firestore calls
-            mockGetDocs.mockResolvedValue({
-                empty: false,
-                docs: [{
-                    id: 'tenant-1',
-                    ref: { path: 'tenants/tenant-1'},
-                    data: () => mockTenant,
-                }],
+            // Mock Firestore getDocs to return tenant and property
+            mockGetDocs.mockImplementation(async (q: any) => {
+                const path = q._path.segments[0];
+                if (path === 'tenants') {
+                     return {
+                        empty: false,
+                        docs: [{
+                            id: 'tenant-1',
+                            ref: { path: 'tenants/tenant-1'},
+                            data: () => mockTenant,
+                        }],
+                    };
+                }
+                if (path === 'properties') {
+                    return {
+                        docs: [{
+                            id: 'prop-1',
+                            data: () => mockProperty
+                        }]
+                    };
+                }
+                return { docs: [] };
             });
-            
-            const mockTransaction = {
-                get: jest.fn().mockResolvedValue({
-                    exists: () => true,
-                    data: () => mockTenant,
-                }),
-                update: jest.fn(),
-                set: jest.fn(),
-            };
-            mockRunTransaction.mockImplementation(async (db, updateFunction) => {
-                await updateFunction(mockTransaction);
-            });
-    
-            // Mock other dependencies
-            jest.spyOn(data, 'getTenant').mockResolvedValue(mockTenant as any);
-            jest.spyOn(data, 'getProperty').mockResolvedValue(mockProperty as any);
-            jest.spyOn(data, 'logActivity').mockResolvedValue();
+
+            // Mock the updateDoc and addDoc calls
+            const mockUpdateDoc = updateDoc as jest.Mock;
+            const mockAddDoc = addDoc as jest.Mock;
+            mockUpdateDoc.mockResolvedValue(undefined);
+            mockAddDoc.mockResolvedValue(undefined);
     
             // Act
             await data.addWaterMeterReading(readingData);
     
             // Assert
             // Check that a water reading was added
-            const addDocCall = (addDoc as jest.Mock).mock.calls[0];
-            expect(addDocCall[0]._path.segments.join('/')).toBe('waterReadings');
-            expect(addDocCall[1]).toMatchObject({
+            const addWaterReadingCall = mockAddDoc.mock.calls.find(call => call[0]._path.segments[0] === 'waterReadings');
+            expect(addWaterReadingCall).toBeDefined();
+            expect(addWaterReadingCall[1]).toMatchObject({
                 propertyId: 'prop-1',
                 unitName: 'Unit 1',
                 consumption: expectedConsumption,
@@ -269,12 +273,17 @@ describe('Data Logic in `data.ts`', () => {
                 status: 'Pending'
             });
             
-            // Check that the tenant's balance was updated correctly in the transaction
-            const tenantUpdateCall = mockTransaction.update.mock.calls[0];
+            // Check that the tenant's balance was updated correctly
+            const tenantUpdateCall = mockUpdateDoc.mock.calls[0];
+            expect(tenantUpdateCall).toBeDefined();
             const updatedData = tenantUpdateCall[1];
             expect(tenantUpdateCall[0].path).toBe('tenants/tenant-1'); // Check it updates the correct tenant
-            expect(updatedData.dueBalance).toBe(1000 + expectedAmount);
-            expect(updatedData['lease.paymentStatus']).toBe('Overdue'); 
+            // The logic in reconcileMonthlyBilling also runs, so need to calculate expected balance carefully.
+            // As of Feb 15, Feb rent is due. Initial balance is 1000. Feb rent is 20000. Water bill is 3000.
+            // Total due should be 1000 + 20000 + 3000 = 24000.
+            expect(updatedData.dueBalance).toBe(1000 + expectedAmount + 20000); // 1000 (initial) + 3000 (water) + 20000 (Feb rent)
+            expect(updatedData['lease.paymentStatus']).toBe('Overdue');
+            expect(updatedData['lease.lastBilledPeriod']).toBe('2024-02');
         });
     });
 });
