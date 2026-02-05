@@ -67,7 +67,6 @@ export default function AddWaterMeterReadingPage() {
             setIsReadingsLoading(false);
         } else {
             setAllReadings([]);
-            setIsReadingsLoading(false);
         }
     }
     fetchReadings();
@@ -287,7 +286,12 @@ export default function AddWaterMeterReadingPage() {
               <div>
                 <CardTitle>Water Reading History</CardTitle>
                 <CardDescription>
-                    {selectedUnit ? `Showing records for unit ${selectedUnit}.` : (selectedProperty ? `Showing all records for ${properties.find(p=>p.id === selectedProperty)?.name}.` : "Select a property to see reading history.")}
+                    {selectedProperty
+                        ? selectedUnit
+                          ? `Showing records for unit ${selectedUnit}.`
+                          : `Showing all records for ${properties.find(p => p.id === selectedProperty)?.name}.`
+                        : "Select a property to see reading history."
+                    }
                 </CardDescription>
               </div>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
@@ -303,12 +307,14 @@ export default function AddWaterMeterReadingPage() {
             </div>
         </CardHeader>
         <CardContent>
-            {!selectedProperty ? (
-              <div className="text-center py-16 text-muted-foreground">Select a property to see reading history.</div>
-            ) : isReadingsLoading ? (
+            {isReadingsLoading ? (
                 <div className="flex justify-center items-center h-48">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+            ) : !selectedProperty ? (
+                <div className="text-center py-16 text-muted-foreground">Select a property to see reading history.</div>
+            ) : paginatedReadings.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">No readings found for the selected filters.</div>
             ) : (
                 <>
                     <Table>
@@ -322,7 +328,7 @@ export default function AddWaterMeterReadingPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {paginatedReadings.length > 0 ? paginatedReadings.map(reading => (
+                            {paginatedReadings.map(reading => (
                                 <TableRow key={reading.id}>
                                     <TableCell>{format(new Date(reading.date), 'dd MMM yyyy')}</TableCell>
                                     <TableCell>{reading.unitName}</TableCell>
@@ -334,11 +340,7 @@ export default function AddWaterMeterReadingPage() {
                                         </Badge>
                                     </TableCell>
                                 </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24">No readings found.</TableCell>
-                                </TableRow>
-                            )}
+                            ))}
                         </TableBody>
                     </Table>
                     {totalPages > 1 && (
