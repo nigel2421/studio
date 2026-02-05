@@ -93,7 +93,8 @@ export type WaterMeterReading = {
   amount: number;
   date: string;
   createdAt: Date;
-}
+  status?: 'Paid' | 'Pending';
+};
 
 export type Task = {
   id: string;

@@ -1,21 +1,24 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getLatestWaterReading } from '@/lib/data';
-import type { Property } from '@/lib/types';
+import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings } from '@/lib/data';
+import type { Property, WaterMeterReading } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
 export default function AddWaterMeterReadingPage() {
   const router = useRouter();
@@ -29,6 +32,11 @@ export default function AddWaterMeterReadingPage() {
   const [currentReading, setCurrentReading] = useState('');
   const [readingDate, setReadingDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
+
+  const [allReadings, setAllReadings] = useState<WaterMeterReading[]>([]);
+  const [isReadingsLoading, setIsReadingsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     selectedProperty,
@@ -48,6 +56,20 @@ export default function AddWaterMeterReadingPage() {
     }
     fetchData();
   }, []);
+  
+  useEffect(() => {
+    async function fetchReadings() {
+        if(selectedProperty) {
+            setIsReadingsLoading(true);
+            const readings = await getPropertyWaterReadings(selectedProperty);
+            setAllReadings(readings);
+            setIsReadingsLoading(false);
+        } else {
+            setAllReadings([]);
+        }
+    }
+    fetchReadings();
+  }, [selectedProperty]);
 
   useEffect(() => {
     if (selectedUnit && selectedProperty) {
@@ -81,7 +103,6 @@ export default function AddWaterMeterReadingPage() {
   }, [selectedUnit, selectedProperty, properties]);
 
   const consumption = (currentReading && priorReading !== null) ? Number(currentReading) - priorReading : 0;
-
 
   const { startLoading, stopLoading } = useLoading();
 
@@ -141,10 +162,20 @@ export default function AddWaterMeterReadingPage() {
       setIsLoading(false);
     }
   };
+  
+  const paginatedReadings = useMemo(() => {
+    const filtered = allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit);
+    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [allReadings, selectedUnit, currentPage, pageSize]);
+
+  const totalPages = useMemo(() => {
+      const filtered = allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit);
+      return Math.ceil(filtered.length / pageSize)
+  }, [allReadings, selectedUnit, pageSize]);
 
   return (
-    <div className="flex justify-center items-start pt-8">
-      <Card className="w-full max-w-lg">
+    <div className="space-y-6">
+      <Card className="w-full max-w-lg mx-auto">
         <CardHeader>
           <CardTitle>Add Water Meter Reading</CardTitle>
           <CardDescription>Enter the new water meter reading for a tenant's unit.</CardDescription>
@@ -241,6 +272,68 @@ export default function AddWaterMeterReadingPage() {
           </form>
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Water Reading History</CardTitle>
+            <CardDescription>
+                {selectedUnit ? `Showing records for unit ${selectedUnit}.` : (selectedProperty ? `Showing all records for ${properties.find(p=>p.id === selectedProperty)?.name}.` : "Select a property to see reading history.")}
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            {isReadingsLoading ? (
+                <div className="flex justify-center items-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : (
+                <>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Unit</TableHead>
+                                <TableHead className="text-right">Consumption</TableHead>
+                                <TableHead className="text-right">Amount (Ksh)</TableHead>
+                                <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedReadings.length > 0 ? paginatedReadings.map(reading => (
+                                <TableRow key={reading.id}>
+                                    <TableCell>{format(new Date(reading.date), 'dd MMM yyyy')}</TableCell>
+                                    <TableCell>{reading.unitName}</TableCell>
+                                    <TableCell className="text-right">{reading.consumption} units</TableCell>
+                                    <TableCell className="text-right">{reading.amount.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Badge variant={reading.status === 'Paid' ? 'default' : 'destructive'}>
+                                            {reading.status || 'Pending'}
+                                        </Badge>
+                                    </TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-24">No readings found.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                    {totalPages > 1 && (
+                        <div className="pt-4">
+                            <PaginationControls
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                pageSize={pageSize}
+                                totalItems={allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit).length}
+                                onPageChange={setCurrentPage}
+                                onPageSizeChange={setPageSize}
+                            />
+                        </div>
+                    )}
+                </>
+            )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

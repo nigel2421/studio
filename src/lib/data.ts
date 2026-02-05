@@ -12,7 +12,7 @@ import {
     HandoverStatus
 } from '@/lib/types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths } from "date-fns";
@@ -574,6 +574,7 @@ export async function addWaterMeterReading(data: {
         rate: WATER_RATE,
         amount,
         createdAt: serverTimestamp(),
+        status: 'Pending',
     });
 
     // 2. Prepare initial update from the water bill
@@ -695,6 +696,33 @@ export async function batchProcessPayments(
     const property = await getProperty(tempTenant.propertyId);
     const unit = property?.units.find(u => u.name === tempTenant.unitName);
 
+    const waterPaymentAmount = paymentEntries
+        .filter(p => p.type === 'Water' && p.amount > 0)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+    const pendingReadingsToUpdateRefs: DocumentReference[] = [];
+
+    if (waterPaymentAmount > 0) {
+        const waterReadingsQuery = query(
+            collection(db, 'waterReadings'),
+            where('tenantId', '==', tenantId),
+            where('status', '==', 'Pending'),
+            orderBy('date', 'asc')
+        );
+        const pendingReadingsSnap = await getDocs(waterReadingsQuery);
+        let remainingPayment = waterPaymentAmount;
+        
+        for (const docSnap of pendingReadingsSnap.docs) {
+            if (remainingPayment <= 0) break;
+            const reading = docSnap.data() as WaterMeterReading;
+            if (reading.amount && remainingPayment >= reading.amount) {
+                pendingReadingsToUpdateRefs.push(docSnap.ref);
+                remainingPayment -= reading.amount;
+            }
+        }
+    }
+
+
     await runTransaction(db, async (transaction) => {
         // 1. Transactional read of the tenant document
         const tenantSnap = await transaction.get(tenantRef);
@@ -761,6 +789,10 @@ export async function batchProcessPayments(
 
         // 6. Perform the single final write to the tenant document
         transaction.update(tenantRef, finalUpdates);
+
+        for (const readingRef of pendingReadingsToUpdateRefs) {
+            transaction.update(readingRef, { status: 'Paid' });
+        }
     });
 
     if (taskId) {
@@ -799,6 +831,7 @@ export async function batchProcessPayments(
         }
     }
 }
+
 
 export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
     const { tenantId, amount, date, notes, rentForMonth, type } = paymentData;
@@ -1269,7 +1302,7 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
             }
             if (!shouldBeAssigned && isAssigned) {
                 needsUpdate = true;
-                const { landlordId, ...rest } = unit; // Remove landlordId
+                const { landlordId: _, ...rest } = unit; // Remove landlordId
                 return rest as Unit;
             }
             return unit;
