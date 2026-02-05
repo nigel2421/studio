@@ -106,12 +106,14 @@ describe('Server Actions', () => {
         });
 
         it('should handle AI errors gracefully', async () => {
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
             (generateMaintenanceResponseDraft as unknown as jest.Mock).mockRejectedValue(new Error('AI Busy'));
 
             const result = await getMaintenanceResponseDraft({} as any);
 
             expect(result.success).toBe(false);
             expect(result.error).toBe('AI Busy');
+            consoleSpy.mockRestore();
         });
     });
 });

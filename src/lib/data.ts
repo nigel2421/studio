@@ -63,7 +63,7 @@ export async function getUsers(): Promise<UserProfile[]> {
 
     for (const owner of allCombinedOwners) {
         let unitsOfOwner: Unit[] = [];
-        
+
         // Find units associated with this owner
         properties.forEach(p => {
             p.units.forEach(u => {
@@ -81,7 +81,7 @@ export async function getUsers(): Promise<UserProfile[]> {
                 }
             });
         });
-        
+
         unitsOfOwner = [...new Map(unitsOfOwner.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
 
         if (unitsOfOwner.length === 0) continue;
@@ -103,7 +103,7 @@ export async function getUsers(): Promise<UserProfile[]> {
                 return { ...user, role: 'homeowner' };
             }
             if (investorIds.has(ownerId)) {
-                 return { ...user, role: 'landlord' };
+                return { ...user, role: 'landlord' };
             }
         }
         return user;
@@ -307,7 +307,7 @@ export async function addTenant(data: {
     }
 
     const initialDue = rent + (securityDeposit || 0) + (waterDeposit || 0);
-    
+
     // For homeowners, service charge billing start date is determined by handover date
     let lastBilledPeriod = format(new Date(leaseStartDate), 'yyyy-MM');
     if (residentType === 'Homeowner' && unit.handoverDate) {
@@ -555,7 +555,7 @@ export async function addWaterMeterReading(data: {
     priorReading: number;
     currentReading: number;
     date: string;
-}) {
+}, asOfDate?: Date) {
     const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', data.propertyId), where('unitName', '==', data.unitName)));
     if (tenantsSnapshot.empty) {
         throw new Error("Tenant not found for the selected unit.");
@@ -598,7 +598,7 @@ export async function addWaterMeterReading(data: {
     const unit = property?.units.find(u => u.name === originalTenant.unitName);
 
     // 4. Run reconciliation on this new transient state
-    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, new Date());
+    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, asOfDate || new Date());
 
     // 5. Merge all updates for the final write
     const finalUpdates = {
@@ -711,7 +711,7 @@ export async function batchProcessPayments(
         );
         const pendingReadingsSnap = await getDocs(waterReadingsQuery);
         let remainingPayment = waterPaymentAmount;
-        
+
         for (const docSnap of pendingReadingsSnap.docs) {
             if (remainingPayment <= 0) break;
             const reading = docSnap.data() as WaterMeterReading;
@@ -1448,7 +1448,7 @@ export async function deletePropertyOwner(ownerId: string): Promise<void> {
         const userRef = doc(db, 'users', owner.userId);
         batch.update(userRef, {
             propertyOwnerId: deleteField(),
-            role: 'viewer' 
+            role: 'viewer'
         });
     }
 
@@ -1460,7 +1460,7 @@ export async function deleteLandlord(landlordId: string): Promise<void> {
     if (landlordId === 'soil_merchants_internal') {
         throw new Error("Cannot delete the internal Soil Merchants profile.");
     }
-    
+
     const landlord = await getLandlord(landlordId);
     if (!landlord) {
         throw new Error("Landlord not found.");
@@ -1485,7 +1485,7 @@ export async function deleteLandlord(landlordId: string): Promise<void> {
             batch.update(propRef, { units: newUnits });
         }
     }
-    
+
     const landlordRef = doc(db, 'landlords', landlordId);
     batch.delete(landlordRef);
 
