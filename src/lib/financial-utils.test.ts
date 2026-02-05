@@ -96,7 +96,8 @@ describe('Financial Utils Logic', () => {
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             expect(breakdown.managementFee).toBe(25000); // 50%
             expect(breakdown.serviceChargeDeduction).toBe(0); // Waived
-            expect(breakdown.netToLandlord).toBe(25000);
+            expect(breakdown.otherCosts).toBe(500); // Transaction cost
+            expect(breakdown.netToLandlord).toBe(24500); // 50000 - 25000 - 0 - 500
         });
 
         it('should calculate 5% commission for a subsequent letting of a "Rented for Clients" unit', () => {
@@ -117,7 +118,8 @@ describe('Financial Utils Logic', () => {
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             expect(breakdown.managementFee).toBe(2500); // 5%
             expect(breakdown.serviceChargeDeduction).toBe(6000); // Not waived
-            expect(breakdown.netToLandlord).toBe(41500);
+            expect(breakdown.otherCosts).toBe(500);
+            expect(breakdown.netToLandlord).toBe(41000); // 50000 - 6000 - 2500 - 500
         });
     });
 
@@ -153,7 +155,8 @@ describe('Financial Utils Logic', () => {
             expect(transactions[0].forMonth).toBe('Oct 2023');
             expect(transactions[0].gross).toBe(25000);
             expect(transactions[0].managementFee).toBe(1250); // 5% of 25k
-            expect(transactions[0].netToLandlord).toBe(23750);
+            expect(transactions[0].otherCosts).toBe(500);
+            expect(transactions[0].netToLandlord).toBe(23250); // 25000 - 1250 - 500
 
             // Check January (last month)
             expect(transactions[3].forMonth).toBe('Jan 2024');
