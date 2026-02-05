@@ -202,4 +202,42 @@ describe('Financial Logic', () => {
         });
     });
 
+    describe('generateLedger for Homeowners without tenant records', () => {
+        it('should generate service charge bills even if no homeowner tenant record exists yet', () => {
+            const mockUnit = createMockUnit({ name: 'H1', serviceCharge: 3000, handoverStatus: 'Handed Over', handoverDate: '2024-01-01' });
+            const mockProperty = createMockProperty('prop-h', [mockUnit]);
+            const mockOwner = createMockOwner('owner-h1', 'Home Owner 1', [{ propertyId: 'prop-h', unitNames: ['H1'] }]);
+            
+            // Create a "dummy" tenant as the dialog would
+            const dummyTenant: Tenant = {
+                id: `dummy-${mockOwner.id}`,
+                name: mockOwner.name,
+                email: mockOwner.email,
+                phone: mockOwner.phone,
+                residentType: 'Homeowner',
+                lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
+                propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
+            };
+    
+            const asOfDate = parseISO('2024-03-15');
+            
+            // Act: Generate ledger with dummy tenant and no payments
+            const { ledger, finalDueBalance } = generateLedger(dummyTenant, [], [mockProperty], mockOwner, asOfDate);
+    
+            // Assert
+            // Handover Jan 1 (day <= 10) -> waive Jan, first bill is Feb.
+            // As of March 15, should be billed for Feb and March.
+            expect(ledger.length).toBe(2);
+            expect(finalDueBalance).toBe(6000); // 2 * 3000
+    
+            const febCharge = ledger.find(l => l.forMonth === 'Feb 2024');
+            const marCharge = ledger.find(l => l.forMonth === 'Mar 2024');
+    
+            expect(febCharge).toBeDefined();
+            expect(febCharge?.charge).toBe(3000);
+            expect(marCharge).toBeDefined();
+            expect(marCharge?.charge).toBe(3000);
+        });
+    });
+
 });

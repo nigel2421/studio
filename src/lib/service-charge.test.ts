@@ -147,6 +147,23 @@ describe('Service Charge Logic', () => {
             expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
             expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('N/A');
         });
+
+        it('should remain "N/A" even if a payment is made for a waived month', () => {
+            // Handover March 5th. March is waived.
+            const mockUnits = [ createMockUnit('E1', { status: 'client occupied', managementStatus: 'Client Managed', handoverStatus: 'Handed Over', serviceCharge: 2500, handoverDate: '2024-03-05' }) ];
+            const mockProperties = [ createMockProperty('prop-1', mockUnits) ];
+            const mockOwners = [ createMockOwner('owner-1', 'Alice', [{ propertyId: 'prop-1', unitNames: ['E1']}]) ];
+            // Tenant record has last billed period before the handover month
+            const mockTenants = [ createMockHomeownerTenant('tenant-E1', 'prop-1', 'E1', 2500, feb2024Formatted) ];
+            // A payment is made for the waived month (March)
+            const mockPayments = [ createMockPayment('tenant-E1', 2500, 'ServiceCharge', '2024-03-08', march2024Formatted) ];
+            
+            // Run for March
+            const { clientOccupiedServiceChargeAccounts } = processServiceChargeData(mockProperties, mockOwners, mockTenants, mockPayments, [], march2024);
+            
+            expect(clientOccupiedServiceChargeAccounts).toHaveLength(1);
+            expect(clientOccupiedServiceChargeAccounts[0].paymentStatus).toBe('N/A');
+        });
     });
 
     test('should identify managed vacant units and determine payment status', () => {
