@@ -1,3 +1,4 @@
+
 import { generateLedger, reconcileMonthlyBilling } from './financial-logic';
 import { Tenant, Unit, Payment, Property, Lease, PropertyOwner, Landlord } from './types';
 import { parseISO, format, addMonths } from 'date-fns';
@@ -214,6 +215,7 @@ describe('Financial Logic', () => {
                 name: mockOwner.name,
                 email: mockOwner.email,
                 phone: mockOwner.phone,
+                idNumber: 'N/A',
                 residentType: 'Homeowner',
                 lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
                 propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0

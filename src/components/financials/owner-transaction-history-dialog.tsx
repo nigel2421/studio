@@ -64,6 +64,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 name: owner.name,
                 email: owner.email,
                 phone: owner.phone,
+                idNumber: 'N/A',
                 residentType: 'Homeowner',
                 lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
                 propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
