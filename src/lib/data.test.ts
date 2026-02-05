@@ -3,17 +3,25 @@ import * as data from './data';
 import { cacheService } from './cache'; // Import the cache service
 
 // Import types for mock data
-import { Landlord, Property, PropertyOwner, UserProfile, Unit } from './types';
+import { Landlord, Property, PropertyOwner, UserProfile, Unit, Payment } from './types';
+import { addDoc, runTransaction } from 'firebase/firestore';
 
 // Mock the entire 'firebase/firestore' module since it's a low-level dependency used by many functions
 jest.mock('firebase/firestore', () => ({
     ...jest.requireActual('firebase/firestore'),
     getDocs: jest.fn(),
     getDoc: jest.fn(),
-    doc: jest.fn(),
+    doc: jest.fn((db, collection, id) => ({
+        path: `${collection}/${id}`,
+    })),
     writeBatch: jest.fn(),
     deleteDoc: jest.fn(),
     updateDoc: jest.fn(),
+    addDoc: jest.fn(),
+    runTransaction: jest.fn(),
+    collection: jest.fn((db, path) => ({
+        _path: { segments: [path] },
+    })),
     deleteField: jest.fn(() => 'DELETE_FIELD_SENTINEL'), // Return a sentinel value for inspection
 }));
 
@@ -22,6 +30,7 @@ import { getDoc, writeBatch, getDocs } from 'firebase/firestore';
 
 const mockGetDocs = getDocs as jest.Mock;
 const mockGetDoc = getDoc as jest.Mock;
+const mockRunTransaction = runTransaction as jest.Mock;
 
 // --- Test Suite ---
 describe('Data Logic in `data.ts`', () => {
@@ -200,6 +209,72 @@ describe('Data Logic in `data.ts`', () => {
                 propertyOwnerId: 'DELETE_FIELD_SENTINEL',
                 role: 'viewer'
             });
+        });
+    });
+
+    describe('Water Meter Logic', () => {
+        it('should add a water reading and update tenant balance', async () => {
+            // Arrange
+            const mockTenant = { id: 'tenant-1', name: 'Water Tenant', dueBalance: 1000, lease: { rent: 20000, paymentStatus: 'Pending', lastBilledPeriod: '2024-01', startDate: '2024-01-01', endDate: '2025-01-01' } };
+            const mockProperty = { id: 'prop-1', name: 'Prop 1', units: [{ name: 'Unit 1' }] };
+            const readingData = {
+                propertyId: 'prop-1',
+                unitName: 'Unit 1',
+                priorReading: 100,
+                currentReading: 120,
+                date: '2024-02-15',
+            };
+            const expectedConsumption = 20;
+            const expectedAmount = expectedConsumption * 150; // WATER_RATE
+    
+            // Mock Firestore calls
+            mockGetDocs.mockResolvedValue({
+                empty: false,
+                docs: [{
+                    id: 'tenant-1',
+                    ref: { path: 'tenants/tenant-1'},
+                    data: () => mockTenant,
+                }],
+            });
+            
+            const mockTransaction = {
+                get: jest.fn().mockResolvedValue({
+                    exists: () => true,
+                    data: () => mockTenant,
+                }),
+                update: jest.fn(),
+                set: jest.fn(),
+            };
+            mockRunTransaction.mockImplementation(async (db, updateFunction) => {
+                await updateFunction(mockTransaction);
+            });
+    
+            // Mock other dependencies
+            jest.spyOn(data, 'getTenant').mockResolvedValue(mockTenant as any);
+            jest.spyOn(data, 'getProperty').mockResolvedValue(mockProperty as any);
+            jest.spyOn(data, 'logActivity').mockResolvedValue();
+    
+            // Act
+            await data.addWaterMeterReading(readingData);
+    
+            // Assert
+            // Check that a water reading was added
+            const addDocCall = (addDoc as jest.Mock).mock.calls[0];
+            expect(addDocCall[0]._path.segments.join('/')).toBe('waterReadings');
+            expect(addDocCall[1]).toMatchObject({
+                propertyId: 'prop-1',
+                unitName: 'Unit 1',
+                consumption: expectedConsumption,
+                amount: expectedAmount,
+                status: 'Pending'
+            });
+            
+            // Check that the tenant's balance was updated correctly in the transaction
+            const tenantUpdateCall = mockTransaction.update.mock.calls[0];
+            const updatedData = tenantUpdateCall[1];
+            expect(tenantUpdateCall[0].path).toBe('tenants/tenant-1'); // Check it updates the correct tenant
+            expect(updatedData.dueBalance).toBe(1000 + expectedAmount);
+            expect(updatedData['lease.paymentStatus']).toBe('Overdue'); 
         });
     });
 });

@@ -1,5 +1,5 @@
 
-import { generateLedger, reconcileMonthlyBilling } from './financial-logic';
+import { generateLedger, reconcileMonthlyBilling, validatePayment } from './financial-logic';
 import { Tenant, Unit, Payment, Property, Lease, PropertyOwner, Landlord } from './types';
 import { parseISO, format, addMonths } from 'date-fns';
 
@@ -239,6 +239,39 @@ describe('Financial Logic', () => {
             expect(febCharge?.charge).toBe(3000);
             expect(marCharge).toBeDefined();
             expect(marCharge?.charge).toBe(3000);
+        });
+    });
+
+    describe('validatePayment', () => {
+        const mockTenant = createMockTenant({ lease: { startDate: '2024-01-01' } });
+        const paymentDate = new Date('2024-02-01');
+    
+        it('should not throw for a valid payment', () => {
+            expect(() => validatePayment(1000, paymentDate, mockTenant, 'Rent')).not.toThrow();
+        });
+    
+        it('should throw if payment amount is zero for non-adjustment type', () => {
+            expect(() => validatePayment(0, paymentDate, mockTenant, 'Rent')).toThrow('Invalid payment amount: Ksh 0. Amount must be positive.');
+        });
+        
+        it('should throw if adjustment amount is zero', () => {
+            expect(() => validatePayment(0, paymentDate, mockTenant, 'Adjustment')).toThrow('Adjustment amount cannot be zero.');
+        });
+    
+        it('should throw if payment date is in the future', () => {
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 1);
+            expect(() => validatePayment(1000, futureDate, mockTenant, 'Rent')).toThrow('Invalid payment date');
+        });
+    
+        it('should throw if payment date is before lease start date', () => {
+            const earlyDate = new Date('2023-12-31');
+            expect(() => validatePayment(1000, earlyDate, mockTenant, 'Rent')).toThrow('Invalid payment date');
+        });
+    
+        it('should not throw for a valid adjustment', () => {
+             expect(() => validatePayment(-500, paymentDate, mockTenant, 'Adjustment')).not.toThrow();
+             expect(() => validatePayment(500, paymentDate, mockTenant, 'Adjustment')).not.toThrow();
         });
     });
 
