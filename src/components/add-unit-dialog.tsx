@@ -29,6 +29,7 @@ const addUnitSchema = z.object({
     unitOrientation: z.enum(unitOrientations).optional(),
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
+    baselineReading: z.coerce.number().optional(),
 });
 
 type AddUnitFormValues = z.infer<typeof addUnitSchema>;
@@ -50,6 +51,7 @@ export function AddUnitDialog({ open, onOpenChange, onSave }: AddUnitDialogProps
             ownership: 'SM',
             rentAmount: 0,
             serviceCharge: 0,
+            baselineReading: 0,
         },
     });
 
@@ -179,6 +181,17 @@ export function AddUnitDialog({ open, onOpenChange, onSave }: AddUnitDialogProps
                                 )}
                             />
                         </div>
+                        <FormField
+                            control={form.control}
+                            name="baselineReading"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Baseline Water Reading</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g. 12345" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                             <Button type="submit" disabled={isSaving}>

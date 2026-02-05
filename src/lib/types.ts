@@ -71,6 +71,7 @@ export type Unit = {
   managementStatus?: ManagementStatus;
   rentAmount?: number;
   serviceCharge?: number;
+  baselineReading?: number;
   handoverStatus?: HandoverStatus;
   handoverDate?: string;
   propertyId?: string;

@@ -1,3 +1,4 @@
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
@@ -254,6 +255,21 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
     );
     const readingsSnapshot = await getDocs(readingsQuery);
     return readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+}
+
+export async function getLatestWaterReading(propertyId: string, unitName: string): Promise<WaterMeterReading | null> {
+    const q = query(
+        collection(db, 'waterReadings'),
+        where('propertyId', '==', propertyId),
+        where('unitName', '==', unitName),
+        orderBy('date', 'desc'),
+        limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+        return null;
+    }
+    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as WaterMeterReading;
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
@@ -897,7 +913,7 @@ export async function bulkUpdateUnitsFromCSV(
     const updatedUnits = [...property.units];
 
     for (const [index, row] of data.entries()) {
-        const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge } = row;
+        const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge, BaselineReading } = row;
 
         if (!UnitName) {
             continue;
@@ -945,6 +961,11 @@ export async function bulkUpdateUnitsFromCSV(
             const charge = Number(ServiceCharge);
             if (isNaN(charge) || charge < 0) { errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}".`); continue; }
             unitData.serviceCharge = charge;
+        }
+        if (BaselineReading !== undefined && BaselineReading.trim() !== '') {
+            const reading = Number(BaselineReading);
+            if (isNaN(reading) || reading < 0) { errors.push(`Row ${index + 2}: Invalid BaselineReading "${BaselineReading}".`); continue; }
+            unitData.baselineReading = reading;
         }
 
         const unitIndex = updatedUnits.findIndex(u => u.name === UnitName);

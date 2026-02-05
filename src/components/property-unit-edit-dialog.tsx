@@ -36,6 +36,7 @@ const unitSchema = z.object({
     rentAmount: z.coerce.number().optional(),
     serviceCharge: z.coerce.number().optional(),
     unitOrientation: z.enum(unitOrientations).optional(),
+    baselineReading: z.coerce.number().optional(),
 });
 
 type UnitFormValues = z.infer<typeof unitSchema>;
@@ -65,6 +66,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
             rentAmount: 0,
             serviceCharge: 0,
             unitOrientation: undefined,
+            baselineReading: 0,
         },
     });
 
@@ -75,6 +77,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                 landlordId: unit.landlordId || 'none',
                 rentAmount: unit.rentAmount || 0,
                 serviceCharge: unit.serviceCharge || 0,
+                baselineReading: unit.baselineReading || 0,
                 handoverDate: unit.handoverDate ? new Date(unit.handoverDate) : undefined,
             });
         }
@@ -317,6 +320,19 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Service Charge (Ksh)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="baselineReading"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Baseline Water Reading</FormLabel>
                                                 <FormControl>
                                                     <Input type="number" {...field} />
                                                 </FormControl>

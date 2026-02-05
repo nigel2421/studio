@@ -53,6 +53,7 @@ export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
       HandoverDate: '2023-01-15',
       RentAmount: '25000',
       ServiceCharge: '3000',
+      BaselineReading: '100',
     }];
     downloadCSV(templateData, 'unit_update_template.csv');
   };

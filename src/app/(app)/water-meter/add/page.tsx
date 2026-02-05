@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getTenants } from '@/lib/data';
+import { getProperties, addWaterMeterReading, getLatestWaterReading } from '@/lib/data';
 import type { Property } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -21,9 +21,13 @@ export default function AddWaterMeterReadingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [properties, setProperties] = useState<Property[]>([]);
-  const [priorReading, setPriorReading] = useState('');
+  
+  const [priorReading, setPriorReading] = useState<number | null>(null);
+  const [isPriorReadingLoading, setIsPriorReadingLoading] = useState(false);
+  const [priorReadingSource, setPriorReadingSource] = useState<string | null>(null);
+
   const [currentReading, setCurrentReading] = useState('');
-  const [readingDate, setReadingDate] = useState<Date | undefined>();
+  const [readingDate, setReadingDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -45,18 +49,60 @@ export default function AddWaterMeterReadingPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (selectedUnit && selectedProperty) {
+      const fetchPriorReading = async () => {
+        setIsPriorReadingLoading(true);
+        setPriorReading(null);
+        setPriorReadingSource(null);
+
+        const latestReading = await getLatestWaterReading(selectedProperty, selectedUnit);
+        if (latestReading) {
+          setPriorReading(latestReading.currentReading);
+          setPriorReadingSource(`From last reading on ${format(new Date(latestReading.date), 'PPP')}`);
+        } else {
+          const property = properties.find(p => p.id === selectedProperty);
+          const unit = property?.units.find(u => u.name === selectedUnit);
+          if (unit && unit.baselineReading !== undefined) {
+            setPriorReading(unit.baselineReading);
+            setPriorReadingSource('From unit baseline reading');
+          } else {
+            setPriorReading(0);
+            setPriorReadingSource('No previous reading or baseline found. Defaulted to 0.');
+          }
+        }
+        setIsPriorReadingLoading(false);
+      };
+      fetchPriorReading();
+    } else {
+        setPriorReading(null);
+        setPriorReadingSource(null);
+    }
+  }, [selectedUnit, selectedProperty, properties]);
+
+  const consumption = (currentReading && priorReading !== null) ? Number(currentReading) - priorReading : 0;
+
+
   const { startLoading, stopLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedProperty || !selectedUnit || priorReading === '' || currentReading === '') {
+    if (!selectedProperty || !selectedUnit || currentReading === '') {
       toast({
         variant: "destructive",
         title: "Missing Information",
         description: "Please fill out all fields.",
       });
       return;
+    }
+    if (priorReading === null) {
+        toast({ variant: "destructive", title: "Missing Information", description: "Prior reading is not set. Please select a unit." });
+        return;
+    }
+    if (Number(currentReading) < priorReading) {
+        toast({ variant: "destructive", title: "Invalid Reading", description: "Current reading cannot be less than the prior reading." });
+        return;
     }
     if (!readingDate) {
       toast({
@@ -67,7 +113,6 @@ export default function AddWaterMeterReadingPage() {
       return;
     }
 
-
     setIsLoading(true);
     startLoading('Recording Water Reading...');
 
@@ -75,7 +120,7 @@ export default function AddWaterMeterReadingPage() {
       await addWaterMeterReading({
         propertyId: selectedProperty,
         unitName: selectedUnit,
-        priorReading: Number(priorReading),
+        priorReading: priorReading,
         currentReading: Number(currentReading),
         date: format(readingDate, 'yyyy-MM-dd'),
       });
@@ -157,14 +202,17 @@ export default function AddWaterMeterReadingPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="prior-reading">Prior Reading</Label>
-                <Input
-                  id="prior-reading"
-                  type="number"
-                  value={priorReading}
-                  onChange={(e) => setPriorReading(e.target.value)}
-                  placeholder="e.g., 1234"
-                  required
-                />
+                <div className="relative">
+                    <Input
+                      id="prior-reading"
+                      type="number"
+                      value={priorReading === null ? '' : priorReading}
+                      readOnly
+                      className="bg-muted font-medium"
+                    />
+                    {isPriorReadingLoading && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                </div>
+                {priorReadingSource && <p className="text-xs text-muted-foreground pt-1">{priorReadingSource}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="current-reading">Current Reading</Label>
@@ -175,9 +223,16 @@ export default function AddWaterMeterReadingPage() {
                   onChange={(e) => setCurrentReading(e.target.value)}
                   placeholder="e.g., 1250"
                   required
+                  disabled={priorReading === null}
                 />
               </div>
             </div>
+            
+            {consumption > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                    <p className="text-sm text-blue-800">Consumption: <span className="font-bold">{consumption} units</span></p>
+                </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

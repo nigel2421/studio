@@ -20,11 +20,11 @@ interface BulkUnitUpdateDialogProps {
     unitCount: number;
 }
 
-type UpdatableUnitField = keyof Pick<Unit, 'status' | 'ownership' | 'unitType' | 'unitOrientation' | 'managementStatus' | 'handoverStatus' | 'rentAmount' | 'serviceCharge'>;
+type UpdatableUnitField = keyof Pick<Unit, 'status' | 'ownership' | 'unitType' | 'unitOrientation' | 'managementStatus' | 'handoverStatus' | 'rentAmount' | 'serviceCharge' | 'baselineReading'>;
 
 
 const updatableFields: UpdatableUnitField[] = [
-    'status', 'ownership', 'unitType', 'unitOrientation', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge'
+    'status', 'ownership', 'unitType', 'unitOrientation', 'managementStatus', 'handoverStatus', 'rentAmount', 'serviceCharge', 'baselineReading'
 ];
 
 export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: BulkUnitUpdateDialogProps) {
@@ -57,7 +57,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                 hasActiveField = true;
                 let value = data[fieldKey];
                 
-                if (fieldKey === 'rentAmount' || fieldKey === 'serviceCharge') {
+                if (fieldKey === 'rentAmount' || fieldKey === 'serviceCharge' || fieldKey === 'baselineReading') {
                     value = value !== '' && !isNaN(value) ? Number(value) : undefined;
                 }
                 
@@ -175,6 +175,7 @@ export function BulkUnitUpdateDialog({ open, onOpenChange, onSave, unitCount }: 
                 );
             case 'rentAmount':
             case 'serviceCharge':
+            case 'baselineReading':
                 return <Input type="number" {...register(field)} disabled={isDisabled} placeholder="Enter new value" />;
             default:
                 return null;
