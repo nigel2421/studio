@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -34,9 +33,11 @@ export default function AddWaterMeterReadingPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [allReadings, setAllReadings] = useState<WaterMeterReading[]>([]);
-  const [isReadingsLoading, setIsReadingsLoading] = useState(true);
+  const [isReadingsLoading, setIsReadingsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Pending'>('all');
+
 
   const {
     selectedProperty,
@@ -66,6 +67,7 @@ export default function AddWaterMeterReadingPage() {
             setIsReadingsLoading(false);
         } else {
             setAllReadings([]);
+            setIsReadingsLoading(false);
         }
     }
     fetchReadings();
@@ -163,15 +165,21 @@ export default function AddWaterMeterReadingPage() {
     }
   };
   
+  const filteredReadings = useMemo(() => {
+    return allReadings.filter(r => {
+      const unitMatch = !selectedUnit || r.unitName === selectedUnit;
+      const statusMatch = statusFilter === 'all' || r.status === statusFilter;
+      return unitMatch && statusMatch;
+    });
+  }, [allReadings, selectedUnit, statusFilter]);
+
   const paginatedReadings = useMemo(() => {
-    const filtered = allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit);
-    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  }, [allReadings, selectedUnit, currentPage, pageSize]);
+    return filteredReadings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filteredReadings, currentPage, pageSize]);
 
   const totalPages = useMemo(() => {
-      const filtered = allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit);
-      return Math.ceil(filtered.length / pageSize)
-  }, [allReadings, selectedUnit, pageSize]);
+      return Math.ceil(filteredReadings.length / pageSize)
+  }, [filteredReadings, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -275,13 +283,29 @@ export default function AddWaterMeterReadingPage() {
       
       <Card>
         <CardHeader>
-            <CardTitle>Water Reading History</CardTitle>
-            <CardDescription>
-                {selectedUnit ? `Showing records for unit ${selectedUnit}.` : (selectedProperty ? `Showing all records for ${properties.find(p=>p.id === selectedProperty)?.name}.` : "Select a property to see reading history.")}
-            </CardDescription>
+          <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Water Reading History</CardTitle>
+                <CardDescription>
+                    {selectedUnit ? `Showing records for unit ${selectedUnit}.` : (selectedProperty ? `Showing all records for ${properties.find(p=>p.id === selectedProperty)?.name}.` : "Select a property to see reading history.")}
+                </CardDescription>
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                  <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="Paid">Paid</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                  </SelectContent>
+              </Select>
+            </div>
         </CardHeader>
         <CardContent>
-            {isReadingsLoading ? (
+            {!selectedProperty ? (
+              <div className="text-center py-16 text-muted-foreground">Select a property to see reading history.</div>
+            ) : isReadingsLoading ? (
                 <div className="flex justify-center items-center h-48">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
@@ -318,12 +342,12 @@ export default function AddWaterMeterReadingPage() {
                         </TableBody>
                     </Table>
                     {totalPages > 1 && (
-                        <div className="pt-4">
+                        <div className="pt-4 border-t">
                             <PaginationControls
                                 currentPage={currentPage}
                                 totalPages={totalPages}
                                 pageSize={pageSize}
-                                totalItems={allReadings.filter(r => !selectedUnit || r.unitName === selectedUnit).length}
+                                totalItems={filteredReadings.length}
                                 onPageChange={setCurrentPage}
                                 onPageSizeChange={setPageSize}
                             />
@@ -336,4 +360,3 @@ export default function AddWaterMeterReadingPage() {
     </div>
   );
 }
-
