@@ -21,7 +21,6 @@ interface DashboardStatsProps {
 
 export function DashboardStats({ tenants, properties, maintenanceRequests, payments }: DashboardStatsProps) {
   const totalTenants = tenants.length;
-  const totalProperties = properties.length;
   const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
   
   const totalArrears = tenants
@@ -78,7 +77,7 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
 
   const stats = [
     { title: "Total Tenants", value: totalTenants, icon: Users, color: "text-blue-500" },
-    { title: "Properties Managed", value: totalProperties, icon: Building, color: "text-green-500" },
+    { title: "Total Units", value: totalUnits, icon: Building, color: "text-green-500" },
     { title: "Occupied Units", value: occupiedUnits, icon: Building2, color: "text-purple-500" },
     { title: "Vacant Units", value: vacantUnits, icon: Home, color: "text-gray-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
