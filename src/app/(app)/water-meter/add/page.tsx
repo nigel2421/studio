@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants } from '@/lib/data';
 import type { Property, WaterMeterReading, Tenant } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, PlusCircle } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 
 
 interface WaterReadingRecord extends WaterMeterReading {
@@ -62,12 +63,13 @@ export default function MegarackPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
 
   // Combined data fetching
-  useEffect(() => {
-    async function fetchData() {
+  const fetchData = async () => {
         setLoadingRecords(true);
-        const [propsData, tenantsData] = await Promise.all([getProperties(), getTenants()]);
+        const [propsData, tenantsData] = await Promise.all([getProperties(true), getTenants()]);
         setProperties(propsData);
         setTenants(tenantsData);
 
@@ -83,11 +85,17 @@ export default function MegarackPage() {
                 };
             });
         
-        setAllReadings(allReadingsData);
+        setAllReadings(allReadingsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         setLoadingRecords(false);
     }
+
+  useEffect(() => {
     fetchData();
   }, []);
+
+  const handlePaymentAdded = () => {
+      fetchData();
+  }
 
   // Effect for Add Form (fetching prior reading)
   useEffect(() => {
@@ -154,14 +162,33 @@ export default function MegarackPage() {
         date: format(readingDate, 'yyyy-MM-dd'),
       });
       toast({ title: "Reading Added", description: `Water meter reading for unit ${selectedUnit} has been saved.` });
-      router.push('/dashboard');
+      // Switch to records tab after successful submission
+      const recordsTab = document.querySelector('button[data-state="inactive"][value="records"]');
+      if (recordsTab instanceof HTMLElement) {
+          recordsTab.click();
+      }
+      fetchData(); // Refresh records
     } catch (error: any) {
       console.error('Error adding water meter reading:', error);
       toast({ variant: "destructive", title: "Error", description: error.message || "Failed to add reading. Please try again." });
-      stopLoading();
     } finally {
       setIsSaving(false);
+      stopLoading();
     }
+  };
+
+  const handleRecordPaymentClick = (reading: WaterReadingRecord) => {
+      const tenant = tenants.find(t => t.id === reading.tenantId);
+      if (tenant) {
+          setSelectedTenantForPayment(tenant);
+          setIsPaymentDialogOpen(true);
+      } else {
+          toast({
+              variant: 'destructive',
+              title: 'Tenant not found',
+              description: 'Could not find an active tenant for this water reading.',
+          });
+      }
   };
 
   const filteredReadings = useMemo(() => {
@@ -184,6 +211,7 @@ export default function MegarackPage() {
   const totalPages = Math.ceil(filteredReadings.length / pageSize);
 
   return (
+    <>
     <Tabs defaultValue="records" className="space-y-4">
         <div className="flex items-center justify-between">
              <div>
@@ -241,13 +269,14 @@ export default function MegarackPage() {
                                 <TableHead>Current Reading</TableHead>
                                 <TableHead>Units Consumed</TableHead>
                                 <TableHead>Payable Amount</TableHead>
-                                <TableHead className="text-right">Payment Status</TableHead>
+                                <TableHead>Payment Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loadingRecords ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
@@ -263,16 +292,27 @@ export default function MegarackPage() {
                                         <TableCell>{reading.currentReading}</TableCell>
                                         <TableCell className="font-semibold">{reading.consumption} units</TableCell>
                                         <TableCell>Ksh {reading.amount.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell>
                                             <Badge variant={(reading.status || 'Pending') === 'Paid' ? 'default' : 'destructive'}>
                                                 {reading.status || 'Pending'}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={(reading.status || 'Pending') === 'Paid'}
+                                                onClick={() => handleRecordPaymentClick(reading)}
+                                            >
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Record Payment
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         No records found for the selected filters.
                                     </TableCell>
                                 </TableRow>
@@ -394,5 +434,17 @@ export default function MegarackPage() {
             </Card>
         </TabsContent>
     </Tabs>
+
+    <AddPaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        tenant={selectedTenantForPayment}
+        properties={properties}
+        tenants={tenants}
+        onPaymentAdded={handlePaymentAdded}
+        defaultPaymentType="Water"
+    />
+    </>
   );
 }
+
