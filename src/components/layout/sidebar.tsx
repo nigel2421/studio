@@ -56,7 +56,7 @@ const navItems = [
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
   { href: '/documents', icon: FileText, label: 'Receipts' },
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
-  { href: '/water-meter/add', icon: Droplets, label: 'Add Water Reading' },
+  { href: '/water-meter/add', icon: Droplets, label: 'Megarack' },
   { href: '/properties', icon: Building2, label: 'Properties' },
 ];
 

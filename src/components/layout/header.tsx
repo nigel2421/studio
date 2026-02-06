@@ -17,6 +17,7 @@ const titleMap: { [key: string]: string } = {
   '/logs': 'Activity Logs',
   '/users': 'User Management',
   '/communications': 'Communications',
+  '/megarack': 'Megarack',
   '/tenant/dashboard': 'Dashboard',
   '/tenant/maintenance': 'Maintenance',
   '/tenant/documents': 'Documents',
