@@ -1,15 +1,17 @@
 import { getTenantsInArrears, getLandlordArrearsBreakdown } from './arrears';
-import { getTenants, getProperties } from './data';
+import { getTenants, getProperties, getAllPendingWaterBills } from './data';
 import { Tenant, Property, Unit } from './types';
 
 // Mock the data fetching functions
 jest.mock('./data', () => ({
   getTenants: jest.fn(),
   getProperties: jest.fn(),
+  getAllPendingWaterBills: jest.fn().mockResolvedValue([]),
 }));
 
 const mockGetTenants = getTenants as jest.Mock;
 const mockGetProperties = getProperties as jest.Mock;
+const mockGetAllPendingWaterBills = getAllPendingWaterBills as jest.Mock;
 
 // Helper to create mock data
 const createMockTenant = (id: string, dueBalance: number, propertyId = 'prop-1', unitName = 'A1'): Tenant => ({
@@ -52,6 +54,7 @@ describe('Arrears Logic', () => {
         // Clear all mocks before each test
         mockGetTenants.mockClear();
         mockGetProperties.mockClear();
+        mockGetAllPendingWaterBills.mockClear();
     });
 
     describe('getTenantsInArrears', () => {

@@ -129,37 +129,35 @@ export function processServiceChargeData(
 
         let paymentStatus: 'Paid' | 'Pending' | 'N/A';
         
-        if (paymentInSelectedMonth) {
+        let isBillable = false;
+        if (unit.handoverDate) {
+            const handoverDateSource = unit.handoverDate as any;
+            const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+                ? handoverDateSource.toDate()
+                : parseISO(handoverDateSource);
+            
+            if (isValid(handoverDate)) {
+                const handoverDay = handoverDate.getDate();
+                let firstBillableMonth: Date;
+                if (handoverDay <= 10) {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                } else {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                }
+                if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
+                    isBillable = true;
+                }
+            }
+        } else if (unit.handoverStatus === 'Handed Over') {
+            isBillable = true;
+        }
+
+        if (!isBillable) {
+            paymentStatus = 'N/A';
+        } else if (paymentInSelectedMonth) {
             paymentStatus = 'Paid';
         } else {
-            let isBillable = false;
-            if (unit.handoverDate) {
-                const handoverDateSource = unit.handoverDate as any;
-                const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
-                    ? handoverDateSource.toDate()
-                    : parseISO(handoverDateSource);
-                
-                if (isValid(handoverDate)) {
-                    const handoverDay = handoverDate.getDate();
-                    let firstBillableMonth: Date;
-                    if (handoverDay <= 10) {
-                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-                    } else {
-                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                    }
-                    if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
-                        isBillable = true;
-                    }
-                }
-            } else if (unit.handoverStatus === 'Handed Over') {
-                isBillable = true;
-            }
-
-            if (isBillable) {
-                paymentStatus = 'Pending';
-            } else {
-                paymentStatus = 'N/A';
-            }
+            paymentStatus = 'Pending';
         }
 
         return {
@@ -208,9 +206,6 @@ export function processServiceChargeData(
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A';
       
-      if (paymentForMonthExists) {
-        paymentStatus = 'Paid';
-      } else {
         let isBillable = false;
         if (unit.handoverDate) {
           const handoverDateSource = unit.handoverDate as any;
@@ -233,12 +228,13 @@ export function processServiceChargeData(
             isBillable = true;
         }
 
-        if (isBillable) {
-            paymentStatus = 'Pending';
-        } else {
+        if (!isBillable) {
             paymentStatus = 'N/A';
+        } else if (paymentForMonthExists) {
+            paymentStatus = 'Paid';
+        } else {
+            paymentStatus = 'Pending';
         }
-      }
 
       return {
         propertyId: unit.propertyId,
