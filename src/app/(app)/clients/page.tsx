@@ -161,14 +161,10 @@ export default function ClientsPage() {
   }, [propertyOwners, allLandlords, allProperties, clientOwnerIds]);
   
   const clientProperties = useMemo(() => {
-      const propertyIdsWithClients = new Set<string>();
-      unifiedClientOwners.forEach(owner => {
-          if (owner.assignedUnits) {
-              owner.assignedUnits.forEach(au => propertyIdsWithClients.add(au.propertyId));
-          }
-      });
-      return allProperties.filter(p => propertyIdsWithClients.has(p.id) && p.units.some(u => u.managementStatus === 'Client Managed'));
-  }, [allProperties, unifiedClientOwners]);
+    return allProperties.filter(p =>
+      p.units.some(u => u.managementStatus === 'Client Managed')
+    );
+  }, [allProperties]);
 
   const selectedProperty = useMemo(() => {
     if (!selectedPropertyId) return null;
@@ -467,3 +463,5 @@ export default function ClientsPage() {
     </div>
   );
 }
+
+    
