@@ -111,7 +111,7 @@ export type Task = {
   createdAt: string;
 };
 
-export type PaymentStatus = 'Paid' | 'Pending' | 'Failed';
+export type PaymentStatus = 'Paid' | 'Pending' | 'Failed' | 'Voided';
 
 export const paymentMethods = ['M-Pesa', 'Bank Transfer', 'Card'] as const;
 
@@ -127,13 +127,13 @@ export type Payment = {
   tenantId: string;
   amount: number;
   date: string;
-  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Water' | 'Other' | 'Adjustment';
+  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Water' | 'Other' | 'Adjustment' | 'Reversal';
   status: PaymentStatus;
   notes?: string;
   rentForMonth?: string;
   // Optional fields for more detailed tracking
   paymentMethod: (typeof paymentMethods)[number];
-  transactionId: string; // e.g., M-Pesa transaction code
+  transactionId: string;
   createdAt: Date;
   reference?: string;
   editHistory?: {
@@ -146,93 +146,7 @@ export type Payment = {
       notes?: string;
     };
   }[];
-};
-
-/**
- * Represents the lease terms associated with a tenant.
- * It's embedded within the Tenant object for simplicity.
- */
-export type Lease = {
-  startDate: string;
-  endDate: string;
-  rent: number;
-  serviceCharge?: number;
-  paymentStatus: 'Paid' | 'Pending' | 'Overdue';
-  lastPaymentDate?: string;
-  lastBilledPeriod?: string;
-  lastLateFeeAppliedPeriod?: string;
-};
-
-export type Tenant = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  idNumber: string;
-  propertyId: string;
-  unitName: string;
-  agent: Agent;
-  status: 'active' | 'archived';
-  securityDeposit: number;
-  waterDeposit: number;
-  residentType: 'Tenant' | 'Homeowner';
-  lease: Lease;
-  accountBalance: number; // For overpayments
-  dueBalance: number;      // For carry-over debts
-  waterReadings?: WaterMeterReading[];
-  userId?: string;
-};
-
-export type ArchivedTenant = Tenant & {
-  archivedAt: string;
-}
-
-export type MaintenanceRequest = {
-  id: string;
-  tenantId: string;
-  propertyId: string;
-  date: string;
-  details: string;
-  urgency: 'high' | 'medium' | 'low';
-  status: 'New' | 'In Progress' | 'Completed';
-  createdAt: Date;
-};
-
-export type UserRole = 'admin' | 'viewer' | 'agent' | 'tenant' | 'water-meter-reader' | 'landlord' | 'homeowner' | 'investment-consultant' | 'accounts';
-
-export type UserProfile = {
-  id: string;
-  email: string;
-  role: UserRole;
-  name?: string;
-  tenantId?: string;
-  propertyId?: string;
-  landlordId?: string;
-  propertyOwnerId?: string;
-  tenantDetails?: Tenant;
-  landlordDetails?: {
-    properties: { property: Property, units: Unit[] }[]
-  };
-  propertyOwnerDetails?: {
-    properties: { property: Property, units: Unit[] }[]
-  };
-}
-
-export type Log = {
-  id: string;
-  userId: string;
-  userEmail?: string;
-  action: string;
-  timestamp: string;
-}
-
-export type Landlord = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  bankAccount?: string;
-  userId?: string;
+  linkedTo?: string;
 };
 
 /**
@@ -288,4 +202,5 @@ export interface LedgerEntry {
     payment: number;
     balance: number;
     forMonth?: string;
+    status?: PaymentStatus;
 }

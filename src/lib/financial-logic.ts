@@ -335,7 +335,8 @@ export function generateLedger(
             description: details,
             charge: isAdjustment && p.amount > 0 ? p.amount : 0,
             payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
-            forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : undefined
+            forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : undefined,
+            status: p.status,
         };
     });
 
@@ -353,7 +354,7 @@ export function generateLedger(
     const ledgerWithBalance: LedgerEntry[] = combined.map(item => {
         runningBalance += item.charge;
         runningBalance -= item.payment;
-        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance, forMonth: item.forMonth };
+        return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance, forMonth: item.forMonth, status: (item as any).status };
     });
     
     const finalDueBalance = Math.max(0, runningBalance);
