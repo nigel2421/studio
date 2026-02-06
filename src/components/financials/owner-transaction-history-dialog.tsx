@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -74,7 +73,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
 
                 setTenantPayments(currentTenantPayments);
     
-                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant!, currentTenantPayments, allProperties, currentTenantWaterReadings, owner);
+                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant!, currentTenantPayments, allProperties, currentTenantWaterReadings, owner, undefined, { includeWater: false });
                 
                 setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                 setFinalDueBalance(dueBalance);
@@ -90,7 +89,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
                 };
                 primaryTenant = dummyTenant;
-                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, [], owner);
+                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, [], owner, undefined, { includeWater: false });
                 setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                 setFinalDueBalance(dueBalance);
             }

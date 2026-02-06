@@ -229,7 +229,8 @@ export function generateLedger(
     properties: Property[],
     allTenantWaterReadings: WaterMeterReading[],
     owner?: PropertyOwner | Landlord | null,
-    asOfDate: Date = new Date()
+    asOfDate: Date = new Date(),
+    options: { includeWater?: boolean } = { includeWater: true }
 ): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
 
     let ownerUnits: (Unit & { propertyId: string; propertyName: string; })[] = [];
@@ -324,19 +325,25 @@ export function generateLedger(
     });
 
     // Add Water Bill Charges
-    allTenantWaterReadings.forEach(reading => {
-        allCharges.push({
-            id: `charge-water-${reading.id}`,
-            date: new Date(reading.date),
-            description: `Water Bill (${reading.consumption} units @ Ksh ${reading.rate})`,
-            charge: reading.amount,
-            payment: 0,
-            forMonth: format(new Date(reading.date), 'MMM yyyy'),
-        });
-    });
+    if (options.includeWater) {
+      allTenantWaterReadings.forEach(reading => {
+          allCharges.push({
+              id: `charge-water-${reading.id}`,
+              date: new Date(reading.date),
+              description: `Water Bill (${reading.consumption} units @ Ksh ${reading.rate})`,
+              charge: reading.amount,
+              payment: 0,
+              forMonth: format(new Date(reading.date), 'MMM yyyy'),
+          });
+      });
+    }
 
     // --- COMBINE WITH PAYMENTS ---
-    const allPaymentsAndAdjustments = allTenantPayments.map(p => {
+    const paymentsToInclude = options.includeWater
+        ? allTenantPayments
+        : allTenantPayments.filter(p => p.type !== 'Water');
+
+    const allPaymentsAndAdjustments = paymentsToInclude.map(p => {
         const isAdjustment = p.type === 'Adjustment';
         let details = p.notes || `Payment Received`;
         if (p.paymentMethod) {
