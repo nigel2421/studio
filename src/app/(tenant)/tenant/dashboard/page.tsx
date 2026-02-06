@@ -24,6 +24,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { generateTenantStatementPDF } from '@/lib/pdf-generator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 export default function TenantDashboardPage() {
@@ -35,7 +36,8 @@ export default function TenantDashboardPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [waterReadings, setWaterReadings] = useState<WaterMeterReading[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+    const [rentLedger, setRentLedger] = useState<LedgerEntry[]>([]);
+    const [waterLedger, setWaterLedger] = useState<LedgerEntry[]>([]);
     const [balances, setBalances] = useState({ due: 0, credit: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
@@ -51,8 +53,12 @@ export default function TenantDashboardPage() {
                 setWaterReadings(waterData);
                 setProperties(propertiesData);
                 if(tenantDetails) {
-                    const { ledger: generatedLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData, waterData);
-                    setLedger(generatedLedger.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+                    const { ledger: fullLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData, waterData);
+                    const { ledger: rentOnlyLedger } = generateLedger(tenantDetails, paymentData, propertiesData, [], { includeWater: false });
+                    const { ledger: waterOnlyLedger } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, { includeRent: false });
+
+                    setRentLedger(rentOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setWaterLedger(waterOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                     setBalances({ due: finalDueBalance, credit: finalAccountBalance });
                 }
                 setIsLoading(false);
@@ -67,7 +73,7 @@ export default function TenantDashboardPage() {
     }, [userProfile, authIsLoading, tenantDetails, toast]);
 
 
-    const latestWaterReading = waterReadings?.[0];
+    const latestWaterReading = waterReadings?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
     const handleSignOut = async () => {
         await signOut(auth);
@@ -79,7 +85,7 @@ export default function TenantDashboardPage() {
         toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
         try {
             // We can reuse the payments and properties already in state
-            generateTenantStatementPDF(tenantDetails, payments, properties);
+            generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings);
         } catch(e) {
             console.error("Error generating PDF:", e);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate your statement.' });
@@ -141,6 +147,46 @@ export default function TenantDashboardPage() {
         </div>
       );
     }
+    
+    const renderLedgerTable = (ledgerEntries: LedgerEntry[]) => (
+         <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Charge</TableHead>
+                    <TableHead className="text-right">Payment</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {ledgerEntries.length > 0 ? (
+                    ledgerEntries.map((entry, index) => (
+                        <TableRow key={`${entry.id}-${index}`}>
+                            <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
+                            <TableCell>{entry.description}</TableCell>
+                            <TableCell className="text-right text-red-600">
+                                {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600">
+                                {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                                 {entry.balance < 0
+                                    ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                    : `Ksh ${entry.balance.toLocaleString()}`
+                                }
+                            </TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={5} className="text-center">No transaction history found for this category.</TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
+    );
 
     return (
         <div className="space-y-8">
@@ -185,7 +231,7 @@ export default function TenantDashboardPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Water Bill</CardTitle>
+                                <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
                                 <Droplets className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -193,20 +239,20 @@ export default function TenantDashboardPage() {
                                     <>
                                         <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
                                         <p className="text-xs text-muted-foreground">
-                                            Current: {latestWaterReading.currentReading}, Prior: {latestWaterReading.priorReading}
+                                            {latestWaterReading.consumption} units consumed
                                         </p>
                                     </>
                                 ) : (
                                     <>
                                         <div className="text-xl font-bold">Not Available</div>
-                                        <p className="text-xs text-muted-foreground">No recent reading found.</p>
+                                        <p className="text-xs text-muted-foreground">No recent reading.</p>
                                     </>
                                 )}
                             </CardContent>
                         </Card>
                          <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Due Balance</CardTitle>
+                                <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
                                 <AlertCircle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
@@ -246,43 +292,18 @@ export default function TenantDashboardPage() {
                     <CardTitle>Transaction History</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Charge</TableHead>
-                                <TableHead className="text-right">Payment</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {ledger.length > 0 ? (
-                                ledger.map((entry, index) => (
-                                    <TableRow key={`${entry.id}-${index}`}>
-                                        <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
-                                        <TableCell>{entry.description}</TableCell>
-                                        <TableCell className="text-right text-red-600">
-                                            {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
-                                        </TableCell>
-                                        <TableCell className="text-right text-green-600">
-                                            {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                                        </TableCell>
-                                        <TableCell className="text-right font-bold">
-                                             {entry.balance < 0
-                                                ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                                : `Ksh ${entry.balance.toLocaleString()}`
-                                            }
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center">No transaction history found.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                    <Tabs defaultValue="rent">
+                        <TabsList>
+                            <TabsTrigger value="rent">Rent Ledger</TabsTrigger>
+                            <TabsTrigger value="water">Water Bills</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="rent" className="mt-4">
+                            {renderLedgerTable(rentLedger)}
+                        </TabsContent>
+                         <TabsContent value="water" className="mt-4">
+                            {renderLedgerTable(waterLedger)}
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
             <div className='px-2 space-y-2 mt-8'>
