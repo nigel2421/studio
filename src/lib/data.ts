@@ -557,17 +557,63 @@ export async function addWaterMeterReading(data: {
     currentReading: number;
     date: string;
 }, asOfDate?: Date) {
-    const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', data.propertyId), where('unitName', '==', data.unitName)));
-    if (tenantsSnapshot.empty) {
-        throw new Error("Tenant not found for the selected unit.");
-    }
-    const tenantDoc = tenantsSnapshot.docs[0];
-    const originalTenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
+    const { propertyId, unitName, currentReading, date } = data;
 
-    const consumption = data.currentReading - data.priorReading;
+    const property = await getProperty(propertyId);
+    if (!property) {
+        throw new Error("Property not found.");
+    }
+    const unit = property.units.find(u => u.name === unitName);
+    if (!unit) {
+        throw new Error("Unit not found in property.");
+    }
+
+    // Step 1: Find or create a tenant record for this unit
+    let tenantForReading: Tenant | null = null;
+    const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', propertyId), where('unitName', '==', unitName), limit(1)));
+    
+    if (!tenantsSnapshot.empty) {
+        tenantForReading = { id: tenantsSnapshot.docs[0].id, ...tenantsSnapshot.docs[0].data() } as Tenant;
+    } else {
+        // If no tenant, it might be a client-managed unit. Find the owner.
+        const allOwners = await getPropertyOwners();
+        const allLandlords = await getLandlords();
+        
+        let owner: PropertyOwner | Landlord | undefined;
+
+        const foundOwner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === propertyId && au.unitNames.includes(unitName)));
+        if(foundOwner) {
+            owner = foundOwner;
+        }
+
+        if (!owner && unit.landlordId) {
+            owner = allLandlords.find(l => l.id === unit.landlordId);
+        }
+
+        if (owner) {
+            const ownerAsPropertyOwner: PropertyOwner = {
+                id: owner.id,
+                name: owner.name,
+                email: owner.email,
+                phone: owner.phone,
+                userId: owner.userId,
+                bankAccount: 'bankAccount' in owner ? owner.bankAccount : undefined,
+                assignedUnits: 'assignedUnits' in owner ? owner.assignedUnits : [],
+            };
+            tenantForReading = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, propertyId);
+        }
+    }
+
+    if (!tenantForReading) {
+        throw new Error(`Could not find or create a resident record for unit ${unitName} to bill.`);
+    }
+    
+    const originalTenant = tenantForReading;
+
+    const consumption = currentReading - data.priorReading;
     const amount = consumption * WATER_RATE;
 
-    // 1. Record the water reading
+    // 2. Record the water reading
     await addDoc(collection(db, 'waterReadings'), {
         ...data,
         tenantId: originalTenant.id,
@@ -578,14 +624,14 @@ export async function addWaterMeterReading(data: {
         status: 'Pending',
     });
 
-    // 2. Prepare initial update from the water bill
+    // 3. Prepare initial update from the water bill
     const newDueBalance = (originalTenant.dueBalance || 0) + amount;
     const initialUpdates = {
         dueBalance: newDueBalance,
         'lease.paymentStatus': getRecommendedPaymentStatus({ ...originalTenant, dueBalance: newDueBalance })
     };
 
-    // 3. Create a transient in-memory state after applying the bill
+    // 4. Create a transient in-memory state after applying the bill
     const tenantAfterBill: Tenant = {
         ...originalTenant,
         dueBalance: initialUpdates.dueBalance,
@@ -595,19 +641,16 @@ export async function addWaterMeterReading(data: {
         }
     };
 
-    const property = await getProperty(originalTenant.propertyId);
-    const unit = property?.units.find(u => u.name === originalTenant.unitName);
-
-    // 4. Run reconciliation on this new transient state
+    // 5. Run reconciliation on this new transient state
     const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, asOfDate || new Date());
 
-    // 5. Merge all updates for the final write
+    // 6. Merge all updates for the final write
     const finalUpdates = {
         ...initialUpdates,
         ...reconciliationUpdates
     };
 
-    // 6. Update tenant in Firestore
+    // 7. Update tenant in Firestore
     const tenantRef = doc(db, 'tenants', originalTenant.id);
     await updateDoc(tenantRef, finalUpdates);
 
@@ -893,9 +936,10 @@ export async function forceRecalculateTenantBalance(tenantId: string) {
     }
 
     const allPayments = await getPaymentHistory(tenantId);
+    const allTenantWaterReadings = await getTenantWaterReadings(tenantId);
     const allProperties = await getProperties();
 
-    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties);
+    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties, allTenantWaterReadings);
 
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, {
@@ -1747,8 +1791,9 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
       const tenant = await getTenant(oldPayment.tenantId);
       if (tenant) {
           const allPayments = await getPaymentHistory(tenant.id);
+          const allTenantWaterReadings = await getTenantWaterReadings(tenant.id);
           const allProperties = await getProperties();
-          const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties);
+          const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties, allTenantWaterReadings);
           
           const tenantRef = doc(db, 'tenants', tenant.id);
           transaction.update(tenantRef, {
@@ -1767,3 +1812,4 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+

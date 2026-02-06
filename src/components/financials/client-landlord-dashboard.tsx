@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Tenant, Payment, Property, Unit, LedgerEntry, PropertyOwner, Landlord } from '@/lib/types';
+import type { Tenant, Payment, Property, Unit, LedgerEntry, PropertyOwner, Landlord, WaterMeterReading } from '@/lib/types';
 import { DollarSign, Calendar, Droplets, PlusCircle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -20,7 +21,7 @@ import { PaginationControls } from '../ui/pagination-controls';
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
     payments: Payment[];
-    waterReadings: any[];
+    waterReadings: WaterMeterReading[];
     allProperties: Property[];
     units: (Unit & { propertyName: string })[];
     owner: PropertyOwner | Landlord | null;
@@ -34,8 +35,8 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
         if (!tenantDetails) {
             return { ledger: [], finalDueBalance: 0, finalAccountBalance: 0 };
         }
-        return generateLedger(tenantDetails, payments, allProperties, owner);
-    }, [tenantDetails, payments, allProperties, owner]);
+        return generateLedger(tenantDetails, payments, allProperties, waterReadings, owner);
+    }, [tenantDetails, payments, allProperties, waterReadings, owner]);
 
     const sortedLedger = useMemo(() => ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()), [ledger]);
 
@@ -171,3 +172,4 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
         </div>
     );
 }
+

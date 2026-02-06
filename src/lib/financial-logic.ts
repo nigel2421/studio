@@ -1,5 +1,6 @@
 
-import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord } from './types';
+
+import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord, WaterMeterReading } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore } from 'date-fns';
 
 /**
@@ -223,21 +224,22 @@ export function validatePayment(
 }
 
 export function generateLedger(
-    tenant: Tenant, 
-    allTenantPayments: Payment[], 
+    tenant: Tenant,
+    allTenantPayments: Payment[],
     properties: Property[],
+    allTenantWaterReadings: WaterMeterReading[],
     owner?: PropertyOwner | Landlord | null,
     asOfDate: Date = new Date()
 ): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
-    
+
     let ownerUnits: (Unit & { propertyId: string; propertyName: string; })[] = [];
 
     if (tenant.residentType === 'Homeowner' && owner) {
         // Find all units belonging to this owner
         ownerUnits = properties.flatMap(p =>
             p.units
-              .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
-              .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+                .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+                .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
         );
         // De-duplicate units in case of multiple assignment paths
         ownerUnits = [...new Map(ownerUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
@@ -268,8 +270,8 @@ export function generateLedger(
     const monthlyChargesMap = new Map<string, { charge: number; unitNames: string[] }>();
 
     ownerUnits.forEach(unit => {
-        const monthlyCharge = tenant.residentType === 'Homeowner' 
-            ? (unit?.serviceCharge || 0) 
+        const monthlyCharge = tenant.residentType === 'Homeowner'
+            ? (unit?.serviceCharge || 0)
             : (tenant.lease.rent || 0);
 
         if (monthlyCharge > 0) {
@@ -290,7 +292,7 @@ export function generateLedger(
             let loopDate = billingStartDate;
             const today = asOfDate;
             const startOfCurrentMonth = startOfMonth(today);
-            
+
             while (isBefore(loopDate, startOfCurrentMonth) || isSameMonth(loopDate, startOfCurrentMonth)) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
@@ -321,6 +323,18 @@ export function generateLedger(
         });
     });
 
+    // Add Water Bill Charges
+    allTenantWaterReadings.forEach(reading => {
+        allCharges.push({
+            id: `charge-water-${reading.id}`,
+            date: new Date(reading.date),
+            description: `Water Bill (${reading.consumption} units @ Ksh ${reading.rate})`,
+            charge: reading.amount,
+            payment: 0,
+            forMonth: format(new Date(reading.date), 'MMM yyyy'),
+        });
+    });
+
     // --- COMBINE WITH PAYMENTS ---
     const allPaymentsAndAdjustments = allTenantPayments.map(p => {
         const isAdjustment = p.type === 'Adjustment';
@@ -347,7 +361,7 @@ export function generateLedger(
         if (a.payment > 0 && b.charge > 0) return 1;
         return 0;
     });
-    
+
     // --- CALCULATE RUNNING BALANCE ---
     let runningBalance = 0;
 
@@ -356,10 +370,10 @@ export function generateLedger(
         runningBalance -= item.payment;
         return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance, forMonth: item.forMonth, status: (item as any).status };
     });
-    
+
     const finalDueBalance = Math.max(0, runningBalance);
     const finalAccountBalance = Math.max(0, -runningBalance);
-    
+
     return {
         ledger: ledgerWithBalance,
         finalDueBalance,

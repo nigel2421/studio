@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import type { Tenant, Payment, Property, LedgerEntry } from '@/lib/types';
+import type { Tenant, Payment, Property, LedgerEntry, WaterMeterReading } from '@/lib/types';
 import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2, FileDown } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
@@ -32,7 +33,7 @@ export default function TenantDashboardPage() {
     const tenantDetails = userProfile?.tenantDetails;
     
     const [payments, setPayments] = useState<Payment[]>([]);
-    const [waterReadings, setWaterReadings] = useState<any[]>([]);
+    const [waterReadings, setWaterReadings] = useState<WaterMeterReading[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
     const [balances, setBalances] = useState({ due: 0, credit: 0 });
@@ -50,7 +51,7 @@ export default function TenantDashboardPage() {
                 setWaterReadings(waterData);
                 setProperties(propertiesData);
                 if(tenantDetails) {
-                    const { ledger: generatedLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData);
+                    const { ledger: generatedLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData, waterData);
                     setLedger(generatedLedger.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
                     setBalances({ due: finalDueBalance, credit: finalAccountBalance });
                 }
@@ -292,3 +293,4 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
+

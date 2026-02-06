@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -5,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, Loader2, PlusCircle, Edit2 } from 'lucide-react';
-import { Tenant, Payment, Property, LedgerEntry } from '@/lib/types';
-import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance } from '@/lib/data';
+import { Tenant, Payment, Property, LedgerEntry, WaterMeterReading } from '@/lib/types';
+import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings } from '@/lib/data';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { format } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -40,9 +41,12 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (tenant && open) {
             setIsLoading(true);
             try {
-                const payments = await getPaymentHistory(tenant.id);
+                const [payments, waterReadings] = await Promise.all([
+                    getPaymentHistory(tenant.id),
+                    getTenantWaterReadings(tenant.id)
+                ]);
                 setAllTenantPayments(payments); 
-                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties);
+                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, waterReadings);
                 setLedger(generatedLedger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
@@ -217,3 +221,4 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </>
     );
 }
+
