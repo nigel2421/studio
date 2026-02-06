@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -269,6 +268,8 @@ export default function MegarackPage() {
                                 <TableHead>Current Reading</TableHead>
                                 <TableHead>Units Consumed</TableHead>
                                 <TableHead>Payable Amount</TableHead>
+                                <TableHead>Paid Amount</TableHead>
+                                <TableHead>Balance</TableHead>
                                 <TableHead>Payment Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -276,12 +277,16 @@ export default function MegarackPage() {
                         <TableBody>
                             {loadingRecords ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={10} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             ) : paginatedReadings.length > 0 ? (
-                                paginatedReadings.map(reading => (
+                                paginatedReadings.map(reading => {
+                                    const isPaid = (reading.status || 'Pending') === 'Paid';
+                                    const paidAmount = isPaid ? reading.amount : 0;
+                                    const balance = isPaid ? 0 : reading.amount;
+                                    return (
                                     <TableRow key={reading.id}>
                                         <TableCell className="font-medium">
                                             <div>{reading.unitName}</div>
@@ -292,15 +297,18 @@ export default function MegarackPage() {
                                         <TableCell>{reading.currentReading}</TableCell>
                                         <TableCell className="font-semibold">{reading.consumption} units</TableCell>
                                         <TableCell>Ksh {reading.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-green-600">Ksh {paidAmount.toLocaleString()}</TableCell>
+                                        <TableCell className="font-semibold text-red-600">Ksh {balance.toLocaleString()}</TableCell>
                                         <TableCell>
-                                            <Badge variant={(reading.status || 'Pending') === 'Paid' ? 'default' : 'destructive'}>
+                                            <Badge variant={isPaid ? 'default' : 'destructive'}>
                                                 {reading.status || 'Pending'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button
                                                 size="sm"
-                                                disabled={(reading.status || 'Pending') === 'Paid'}
+                                                variant="default"
+                                                disabled={isPaid}
                                                 onClick={() => handleRecordPaymentClick(reading)}
                                             >
                                                 <PlusCircle className="mr-2 h-4 w-4" />
@@ -308,10 +316,11 @@ export default function MegarackPage() {
                                             </Button>
                                         </TableCell>
                                     </TableRow>
-                                ))
+                                    )
+                                })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={10} className="h-24 text-center">
                                         No records found for the selected filters.
                                     </TableCell>
                                 </TableRow>
@@ -447,7 +456,3 @@ export default function MegarackPage() {
     </>
   );
 }
-
-
-
-
