@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -58,12 +57,14 @@ export default function AccountsPage() {
     fetchAllData();
   }, []);
 
-  const displayResidents = useMemo(() => {
-    if (!residents.length || !properties.length) return [];
+  const tenantsOnly = useMemo(() => residents.filter(r => r.residentType === 'Tenant'), [residents]);
+
+  const displayTenants = useMemo(() => {
+    if (!tenantsOnly.length || !properties.length) return [];
 
     const propertiesMap = new Map(properties.map(p => [p.id, p]));
     
-    return residents.map(tenant => {
+    return tenantsOnly.map(tenant => {
         const property = propertiesMap.get(tenant.propertyId);
         const unit = property?.units.find(u => u.name === tenant.unitName);
         const updates = reconcileMonthlyBilling(tenant, unit, new Date());
@@ -87,7 +88,7 @@ export default function AccountsPage() {
 
         return { ...updatedTenant, chargeArrears };
     });
-  }, [residents, properties]);
+  }, [tenantsOnly, properties]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
@@ -108,31 +109,31 @@ export default function AccountsPage() {
   };
 
   const paymentsCollected = useMemo(() => payments
-    .filter(p => (p.type === 'Rent' || p.type === 'ServiceCharge') && p.status === 'Paid')
+    .filter(p => p.type === 'Rent' && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const totalArrears = useMemo(() => displayResidents
-    .reduce((sum, t) => sum + (t.chargeArrears || 0), 0), [displayResidents]);
+  const totalArrears = useMemo(() => displayTenants
+    .reduce((sum, t) => sum + (t.chargeArrears || 0), 0), [displayTenants]);
 
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
-  const occupiedUnits = displayResidents.length;
+  const occupiedUnits = tenantsOnly.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Payments Collected", value: `Ksh ${paymentsCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
-    { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-purple-500" },
-    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
+    { title: "Rent Collected", value: `Ksh ${paymentsCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
+    { title: "Total Rent Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
+    { title: "Active Tenants", value: `${occupiedUnits}`, icon: Users, color: "text-purple-500" },
+    { title: "Portfolio Occupancy", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
   ];
 
-  const filteredResidents = displayResidents.filter(t =>
+  const filteredTenants = displayTenants.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filteredResidents.length / pageSize);
-  const paginatedResidents = filteredResidents.slice(
+  const totalPages = Math.ceil(filteredTenants.length / pageSize);
+  const paginatedTenants = filteredTenants.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -146,10 +147,10 @@ export default function AccountsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Financial Accounts</h2>
-          <p className="text-muted-foreground">A financial overview of your properties.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Tenant Accounts</h2>
+          <p className="text-muted-foreground">A financial overview of tenant rent accounts.</p>
         </div>
-        <AddPaymentDialog properties={properties} tenants={residents} onPaymentAdded={fetchAllData} />
+        <AddPaymentDialog properties={properties} tenants={tenantsOnly} onPaymentAdded={fetchAllData} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -170,19 +171,19 @@ export default function AccountsPage() {
 
         <Card>
             <CardHeader>
-              <CardTitle>Resident Financial Status</CardTitle>
-              <CardDescription>Detailed list of resident lease and payment information.</CardDescription>
+              <CardTitle>Tenant Financial Status</CardTitle>
+              <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
                 <div className="relative w-full sm:w-[300px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search resident, unit or email..."
+                    placeholder="Search tenant, unit or email..."
                     className="pl-9"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredResidents, 'financial_status.csv')}>
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'financial_status.csv')}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   Export CSV
                 </Button>
@@ -192,9 +193,9 @@ export default function AccountsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Resident</TableHead>
+                    <TableHead>Tenant</TableHead>
                     <TableHead>Property</TableHead>
-                    <TableHead>Monthly Charge</TableHead>
+                    <TableHead>Monthly Rent</TableHead>
                     <TableHead>Balance (Due)</TableHead>
                     <TableHead>Excess (Cr)</TableHead>
                     <TableHead className="text-right">Payment Status</TableHead>
@@ -202,7 +203,7 @@ export default function AccountsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedResidents.map((tenant) => (
+                  {paginatedTenants.map((tenant) => (
                     <TableRow key={tenant.id}>
                       <TableCell>
                         <div className="font-medium">{tenant.name}</div>
@@ -213,8 +214,8 @@ export default function AccountsPage() {
                         <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
                       </TableCell>
                       <TableCell>
-                        {tenant.lease && typeof (tenant.lease.rent || tenant.lease.serviceCharge) === 'number'
-                          ? `Ksh ${(tenant.lease.rent || tenant.lease.serviceCharge).toLocaleString()}`
+                        {tenant.lease && typeof tenant.lease.rent === 'number'
+                          ? `Ksh ${tenant.lease.rent.toLocaleString()}`
                           : 'N/A'
                         }
                       </TableCell>
@@ -231,7 +232,7 @@ export default function AccountsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => handleViewHistory(tenant)}>
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye className="mr-2 h-4 w-4" />
                           View
                         </Button>
                       </TableCell>
@@ -245,7 +246,7 @@ export default function AccountsPage() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 pageSize={pageSize}
-                totalItems={filteredResidents.length}
+                totalItems={filteredTenants.length}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={setPageSize}
               />
@@ -257,7 +258,7 @@ export default function AccountsPage() {
         open={isHistoryOpen}
         onOpenChange={setIsHistoryOpen}
         onPaymentAdded={fetchAllData}
-        allTenants={residents}
+        allTenants={tenantsOnly}
         allProperties={properties}
       />
     </div>
