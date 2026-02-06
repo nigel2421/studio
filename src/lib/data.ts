@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
@@ -495,7 +496,7 @@ export async function createUserProfile(userId: string, email: string, role: Use
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
     const userProfileRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(userProfileRef);
+    const docSnap = await getDoc(docSnap.ref);
     if (docSnap.exists()) {
         const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
 
@@ -1246,7 +1247,7 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     const landlordRef = doc(db, 'landlords', landlord.id);
     const batch = writeBatch(db);
 
-    let finalLandlordData = { ...landlord };
+    let finalLandlordData: Partial<Landlord> = { ...landlord };
 
     // --- Auth User & Profile Linking ---
     if (landlord.email && landlord.phone && !landlord.userId) {
@@ -1283,6 +1284,10 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
         }
     }
     // --- End Auth Logic ---
+    
+    if (finalLandlordData.userId === undefined) {
+        delete finalLandlordData.userId;
+    }
 
     // Set/update the landlord document itself
     batch.set(landlordRef, finalLandlordData, { merge: true });
@@ -1541,7 +1546,14 @@ export async function updatePropertyOwner(
         }
     }
 
-    const finalData = { ...data, userId: userId || data.userId };
+    const finalData: { [key: string]: any } = { ...data };
+    const resolvedUserId = userId || data.userId;
+
+    if (resolvedUserId) {
+        finalData.userId = resolvedUserId;
+    } else {
+        delete finalData.userId;
+    }
 
     await setDoc(ownerRef, finalData, { merge: true });
     await logActivity(`Updated property owner details: ${data.name || ownerId}`);
