@@ -162,7 +162,7 @@ describe('Financial Logic', () => {
                 createMockPayment({ amount: 25000, date: '2024-02-04', tenantId: tenant.id }), // Feb payment
                 createMockPayment({ amount: 25000, date: '2024-01-05', tenantId: tenant.id }), // Jan payment
             ];
-            const { ledger } = generateLedger(tenant, payments, [mockProperty], null, parseISO('2024-02-28'));
+            const { ledger } = generateLedger(tenant, payments, [mockProperty], [], parseISO('2024-02-28'));
 
             // Check order
             const janPaymentIndex = ledger.findIndex(l => l.description.includes('Payment Received') && new Date(l.date).getMonth() === 0);
@@ -187,7 +187,7 @@ describe('Financial Logic', () => {
             });
             
             const asOfDate = parseISO('2024-01-31');
-            const { ledger, finalDueBalance } = generateLedger(tenant, [payment], [mockProperty], null, asOfDate);
+            const { ledger, finalDueBalance } = generateLedger(tenant, [payment], [mockProperty], [], asOfDate);
             
             const chargeDescriptions = ledger.map(l => l.description);
             expect(chargeDescriptions).toContain('Security Deposit');
@@ -224,7 +224,7 @@ describe('Financial Logic', () => {
             const asOfDate = parseISO('2024-03-15');
             
             // Act: Generate ledger with dummy tenant and no payments
-            const { ledger, finalDueBalance } = generateLedger(dummyTenant, [], [mockProperty], mockOwner, asOfDate);
+            const { ledger, finalDueBalance } = generateLedger(dummyTenant, [], [mockProperty], mockOwner, asOfDate, { includeWater: false });
     
             // Assert
             // Handover Jan 1 (day <= 10) -> waive Jan, first bill is Feb.

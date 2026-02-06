@@ -217,9 +217,9 @@ describe('Data Logic in `data.ts`', () => {
     });
 
     describe('Water Meter Logic', () => {
-        it('should add a water reading and update tenant balance', async () => {
+        it('should add a water reading and only reconcile rent balance', async () => {
             // Arrange
-            const mockTenant = { id: 'tenant-1', name: 'Water Tenant', dueBalance: 1000, lease: { rent: 20000, paymentStatus: 'Pending' as const, lastBilledPeriod: '2024-01', startDate: '2024-01-01', endDate: '2025-01-01' } };
+            const mockTenant = { id: 'tenant-1', name: 'Water Tenant', dueBalance: 1000, accountBalance: 0, lease: { rent: 20000, paymentStatus: 'Pending' as const, lastBilledPeriod: '2024-01', startDate: '2024-01-01', endDate: '2025-01-01' } };
             const mockProperty = { id: 'prop-1', name: 'Prop 1', units: [{ name: 'Unit 1', serviceCharge: 0 }] };
             const readingData = {
                 propertyId: 'prop-1',
@@ -230,20 +230,15 @@ describe('Data Logic in `data.ts`', () => {
             };
             const expectedConsumption = 20;
             const WATER_RATE = 150;
-            const expectedAmount = expectedConsumption * WATER_RATE;
+            const expectedWaterAmount = expectedConsumption * WATER_RATE;
 
             // Mock Firestore getDocs to return tenant and getDoc to return property
             mockGetDocs.mockImplementation(async (q: any) => {
                 const path = q._path.segments[0];
-                const constraints = q._constraints || [];
-                if (path === 'tenants' && constraints.length > 0) {
+                if (path === 'tenants') {
                     return {
                         empty: false,
-                        docs: [{
-                            id: 'tenant-1',
-                            ref: { path: 'tenants/tenant-1' },
-                            data: () => mockTenant,
-                        }],
+                        docs: [{ id: 'tenant-1', ref: { path: 'tenants/tenant-1' }, data: () => mockTenant }],
                     };
                 }
                 return { docs: [], empty: true };
@@ -251,11 +246,7 @@ describe('Data Logic in `data.ts`', () => {
 
             mockGetDoc.mockImplementation(async (ref: any) => {
                 if (ref.path === 'properties/prop-1') {
-                    return {
-                        exists: () => true,
-                        id: 'prop-1',
-                        data: () => mockProperty,
-                    };
+                    return { exists: () => true, id: 'prop-1', data: () => mockProperty };
                 }
                 return { exists: () => false };
             });
@@ -269,26 +260,25 @@ describe('Data Logic in `data.ts`', () => {
             await data.addWaterMeterReading(readingData, new Date('2024-02-20'));
 
             // Assert
-            // Check that a water reading was added
+            // 1. Check that a water reading was added with correct details
             const addWaterReadingCall = mockAddDoc.mock.calls.find(call => call[0]._path.segments[0] === 'waterReadings');
             expect(addWaterReadingCall).toBeDefined();
             expect(addWaterReadingCall[1]).toMatchObject({
                 propertyId: 'prop-1',
                 unitName: 'Unit 1',
                 consumption: expectedConsumption,
-                amount: expectedAmount,
+                amount: expectedWaterAmount,
                 status: 'Pending'
             });
 
-            // Check that the tenant's balance was updated correctly
+            // 2. Check that the tenant's balance was updated ONLY with rent reconciliation
             const tenantUpdateCall = mockUpdateDoc.mock.calls[0];
             expect(tenantUpdateCall).toBeDefined();
             const updatedData = tenantUpdateCall[1];
             expect(tenantUpdateCall[0].path).toBe('tenants/tenant-1');
-            // The logic in reconcileMonthlyBilling also runs, so need to calculate expected balance carefully.
-            // As of Feb 15, Feb rent is due. Initial balance is 1000. Feb rent is 20000. Water bill is 3000.
-            // Total due should be 1000 + 20000 + 3000 = 24000.
-            expect(updatedData.dueBalance).toBe(1000 + expectedAmount + 20000); // 1000 (initial) + 3000 (water) + 20000 (Feb rent)
+            
+            // Expected balance = initial due (1000) + Feb rent (20000) = 21000. Water bill should NOT be added here.
+            expect(updatedData.dueBalance).toBe(21000); 
             expect(updatedData['lease.paymentStatus']).toBe('Overdue');
             expect(updatedData['lease.lastBilledPeriod']).toBe('2024-02');
         });
