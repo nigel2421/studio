@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -6,11 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { format } from 'date-fns';
+import { format, parseISO, addMonths } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Payment, paymentMethods } from '@/lib/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AccountInfo {
     unitName: string;
@@ -27,15 +27,16 @@ interface ConfirmOwnerPaymentDialogProps {
     totalBalanceDue: number;
 }
 
-const monthOptions = Array.from({ length: 18 }, (_, i) => {
+const monthOptions = Array.from({ length: 6 }, (_, i) => { // show 6 months: this month, past 5
     const d = new Date();
     d.setDate(1);
-    d.setMonth(d.getMonth() - i + 2);
+    d.setMonth(d.getMonth() - i);
     return {
       value: format(d, 'yyyy-MM'),
       label: format(d, 'MMMM yyyy'),
     };
-});
+}).reverse(); // oldest first
+
 
 export function ConfirmOwnerPaymentDialog({
     isOpen,
@@ -48,7 +49,7 @@ export function ConfirmOwnerPaymentDialog({
 }: ConfirmOwnerPaymentDialogProps) {
     const [amount, setAmount] = useState<string>('');
     const [date, setDate] = useState<Date>(new Date());
-    const [forMonth, setForMonth] = useState<string>('');
+    const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<Payment['paymentMethod']>('M-Pesa');
     const [transactionId, setTransactionId] = useState('');
 
@@ -56,15 +57,26 @@ export function ConfirmOwnerPaymentDialog({
         if (isOpen) {
             setAmount(totalBalanceDue.toString());
             setDate(new Date());
-            setForMonth(format(new Date(), 'yyyy-MM'));
+            setSelectedMonths([format(new Date(), 'yyyy-MM')]);
             setPaymentMethod('M-Pesa');
             setTransactionId('');
         }
     }, [isOpen, totalBalanceDue]);
+    
+    const handleMonthToggle = (monthValue: string) => {
+        setSelectedMonths(prev =>
+            prev.includes(monthValue)
+                ? prev.filter(m => m !== monthValue)
+                : [...prev, monthValue]
+        );
+    };
 
     const handleSubmit = () => {
-        if (Number(amount) > 0 && forMonth && transactionId) {
-            onConfirm({ amount: Number(amount), date, notes: '', forMonth, paymentMethod, transactionId });
+        if (Number(amount) > 0 && selectedMonths.length > 0 && transactionId) {
+            const sortedMonths = [...selectedMonths].sort();
+            const notes = `Consolidated service charge payment for ${sortedMonths.map(m => format(parseISO(m + '-02'), 'MMM yyyy')).join(', ')}.`;
+            const forMonth = sortedMonths[sortedMonths.length - 1]; // Use the latest selected month for the main record
+            onConfirm({ amount: Number(amount), date, notes, forMonth, paymentMethod, transactionId });
         }
     };
 
@@ -101,17 +113,24 @@ export function ConfirmOwnerPaymentDialog({
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="for-month">Payment for Month</Label>
-                        <Select value={forMonth} onValueChange={setForMonth}>
-                            <SelectTrigger id="for-month">
-                                <SelectValue placeholder="Select month..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {monthOptions.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Label>Payment for Months</Label>
+                        <div className="grid grid-cols-2 gap-2 rounded-md border p-4">
+                            {monthOptions.map(option => (
+                                <div key={option.value} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={`month-${option.value}`}
+                                        checked={selectedMonths.includes(option.value)}
+                                        onCheckedChange={() => handleMonthToggle(option.value)}
+                                    />
+                                    <label
+                                        htmlFor={`month-${option.value}`}
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        {option.label}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -140,7 +159,7 @@ export function ConfirmOwnerPaymentDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSaving || !amount || !forMonth || !transactionId}>
+                    <Button onClick={handleSubmit} disabled={isSaving || !amount || selectedMonths.length === 0 || !transactionId}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Record Payment
                     </Button>
@@ -149,7 +168,3 @@ export function ConfirmOwnerPaymentDialog({
         </Dialog>
     );
 }
-
-    
-
-    
