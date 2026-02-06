@@ -206,3 +206,80 @@ export interface LedgerEntry {
     forMonth?: string;
     status?: PaymentStatus;
 }
+
+export type Lease = {
+    startDate: string;
+    endDate: string;
+    rent: number;
+    serviceCharge?: number;
+    paymentStatus: 'Paid' | 'Pending' | 'Overdue';
+    lastBilledPeriod?: string;
+    lastPaymentDate?: string;
+    lastLateFeeAppliedPeriod?: string;
+};
+
+export type Tenant = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  idNumber: string;
+  propertyId: string;
+  unitName: string;
+  agent: Agent;
+  status: 'active' | 'archived';
+  residentType: 'Tenant' | 'Homeowner';
+  lease: Lease;
+  securityDeposit: number;
+  waterDeposit: number;
+  dueBalance: number;
+  accountBalance: number;
+  userId?: string;
+};
+
+export type ArchivedTenant = Tenant & {
+  archivedAt: string;
+};
+
+export type Landlord = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  bankAccount?: string;
+  userId?: string;
+};
+
+export const userRoles = ['admin', 'agent', 'tenant', 'landlord', 'viewer', 'water-meter-reader', 'investment-consultant', 'accounts', 'homeowner'] as const;
+export type UserRole = (typeof userRoles)[number];
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  role: UserRole;
+  name?: string;
+  tenantId?: string;
+  propertyId?: string;
+  landlordId?: string;
+  propertyOwnerId?: string;
+  tenantDetails?: Tenant;
+};
+
+export type Log = {
+  id: string;
+  userId: string;
+  userEmail: string;
+  action: string;
+  timestamp: string;
+};
+
+export type MaintenanceRequest = {
+  id: string;
+  tenantId: string;
+  propertyId: string;
+  details: string;
+  date: string;
+  status: 'New' | 'In Progress' | 'Completed';
+  urgency: 'low' | 'medium' | 'high';
+  createdAt: any; // Firestore Timestamp
+};

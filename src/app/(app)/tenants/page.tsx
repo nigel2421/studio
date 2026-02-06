@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { getTenants, getProperties, archiveTenant, getPaymentHistory } from "@/lib/data";
+import { getTenants, getProperties, archiveTenant, getPaymentHistory, getTenantWaterReadings } from "@/lib/data";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -126,7 +126,8 @@ export default function TenantsPage() {
         try {
             const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
             const tenantPayments = await getPaymentHistory(tenant.id);
-            generateTenantStatementPDF(tenant, tenantPayments, properties);
+            const tenantWaterReadings = await getTenantWaterReadings(tenant.id);
+            generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings);
             toast({ title: 'Statement Generated', description: `Statement for ${tenant.name} downloaded.` });
         } catch (error) {
             console.error("Error generating statement", error);
@@ -343,4 +344,3 @@ export default function TenantsPage() {
         </div>
     );
 }
-

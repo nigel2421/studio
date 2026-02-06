@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner } from '@/lib/types';
-import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners } from '@/lib/data';
+import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -146,7 +146,7 @@ export default function UniversalOwnerDashboardPage() {
         startPdfLoading('Generating Statement...');
         try {
             if (dashboardType === 'homeowner') {
-                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), startDate, endDate);
+                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), await getAllWaterReadings(), startDate, endDate);
             } else if (dashboardType === 'landlord') {
                 const landlordProperties = viewData.properties;
                 const allTenants = viewData.tenants;

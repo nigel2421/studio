@@ -238,7 +238,7 @@ export function generateLedger(
     if (tenant.residentType === 'Homeowner' && owner) {
         ownerUnits = properties.flatMap(p =>
             p.units
-                .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+                .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
                 .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
         );
         ownerUnits = [...new Map(ownerUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values()];

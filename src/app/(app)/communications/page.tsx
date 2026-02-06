@@ -53,7 +53,7 @@ export default function CommunicationsPage() {
     const userResults = await Promise.all(userPromises);
 
     const userMap = new Map<string, UserProfile>();
-    userResults.forEach(user => {
+    userResults.forEach((user: UserProfile | null) => {
       if (user) {
         userMap.set(user.id, user);
       }

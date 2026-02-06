@@ -16,7 +16,7 @@ import { InvoicePreviewDialog } from './invoice-preview-dialog';
 import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
 import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
-import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings } from '@/lib/data';
+import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings, getAllWaterReadings } from '@/lib/data';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -176,7 +176,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
-            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, startDate, endDate);
+            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, await getAllWaterReadings(), startDate, endDate);
             setIsStatementOptionsOpen(false);
             toast({ title: 'Statement Downloaded', description: 'Your PDF statement has been generated.' });
         } catch (error) {

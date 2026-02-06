@@ -102,7 +102,8 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (!tenant) return;
         const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
         const fullPaymentHistory = await getPaymentHistory(tenant.id);
-        generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties);
+        const waterReadings = await getTenantWaterReadings(tenant.id);
+        generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties, waterReadings);
     };
 
     if (!tenant) return null;
@@ -219,4 +220,3 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         </>
     );
 }
-

@@ -1,4 +1,5 @@
 
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
@@ -161,7 +162,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const ownerUnits = allProperties.flatMap(p =>
         p.units
-            .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+            .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
             .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
     );
 
