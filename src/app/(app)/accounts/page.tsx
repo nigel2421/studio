@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -27,15 +28,14 @@ import { format } from 'date-fns';
 import { reconcileMonthlyBilling } from '@/lib/financial-logic';
 
 export default function AccountsPage() {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [residents, setResidents] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pendingWaterBills, setPendingWaterBills] = useState<WaterMeterReading[]>([]);
 
-  // State for Rent tab
-  const [rentCurrentPage, setRentCurrentPage] = useState(1);
-  const [rentPageSize, setRentPageSize] = useState(10);
-  const [rentSearchTerm, setRentSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -48,7 +48,7 @@ export default function AccountsPage() {
         getAllPayments(),
         getAllPendingWaterBills(),
       ]);
-      setTenants(tenantsData.filter(t => t.residentType === 'Tenant'));
+      setResidents(tenantsData);
       setProperties(propertiesData);
       setPayments(paymentsData);
       setPendingWaterBills(pendingWaterBillsData);
@@ -61,8 +61,8 @@ export default function AccountsPage() {
     fetchAllData();
   }, []);
 
-  const displayTenants = useMemo(() => {
-    if (!tenants.length || !properties.length) return [];
+  const displayResidents = useMemo(() => {
+    if (!residents.length || !properties.length) return [];
 
     const propertiesMap = new Map(properties.map(p => [p.id, p]));
     
@@ -72,7 +72,7 @@ export default function AccountsPage() {
         pendingBillsByTenant.set(bill.tenantId, total + bill.amount);
     });
 
-    return tenants.map(tenant => {
+    return residents.map(tenant => {
         const property = propertiesMap.get(tenant.propertyId);
         const unit = property?.units.find(u => u.name === tenant.unitName);
         const updates = reconcileMonthlyBilling(tenant, unit, new Date());
@@ -93,15 +93,15 @@ export default function AccountsPage() {
         }
         
         const totalPendingWater = pendingBillsByTenant.get(tenant.id) || 0;
-        let rentOnlyDueBalance = updatedTenant.dueBalance || 0;
+        let chargeArrears = updatedTenant.dueBalance || 0;
 
-        if (rentOnlyDueBalance > 0) {
-            rentOnlyDueBalance = Math.max(0, rentOnlyDueBalance - totalPendingWater);
+        if (chargeArrears > 0) {
+            chargeArrears = Math.max(0, chargeArrears - totalPendingWater);
         }
 
-        return { ...updatedTenant, rentOnlyDueBalance };
+        return { ...updatedTenant, chargeArrears };
     });
-  }, [tenants, properties, pendingWaterBills]);
+  }, [residents, properties, pendingWaterBills]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
@@ -121,35 +121,34 @@ export default function AccountsPage() {
     }
   };
 
-  const rentCollected = useMemo(() => payments
-    .filter(p => p.type === 'Rent' && p.status === 'Paid')
+  const paymentsCollected = useMemo(() => payments
+    .filter(p => (p.type === 'Rent' || p.type === 'ServiceCharge') && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const rentArrears = useMemo(() => displayTenants
-    .reduce((sum, t) => sum + (t.rentOnlyDueBalance || 0), 0), [displayTenants]);
+  const totalArrears = useMemo(() => displayResidents
+    .reduce((sum, t) => sum + (t.chargeArrears || 0), 0), [displayResidents]);
 
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
-  const occupiedUnits = displayTenants.length;
+  const occupiedUnits = displayResidents.length;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
   const stats = [
-    { title: "Rent Collected", value: `Ksh ${rentCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
-    { title: "Rent Arrears", value: `Ksh ${rentArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
+    { title: "Payments Collected", value: `Ksh ${paymentsCollected.toLocaleString()}`, icon: DollarSign, color: "text-green-500" },
+    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
     { title: "Occupied Units", value: `${occupiedUnits}`, icon: Users, color: "text-purple-500" },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
   ];
 
-  // Filtering for Rent tab
-  const filteredRentTenants = displayTenants.filter(t =>
-    t.name.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
-    t.unitName.toLowerCase().includes(rentSearchTerm.toLowerCase()) ||
-    t.email.toLowerCase().includes(rentSearchTerm.toLowerCase())
+  const filteredResidents = displayResidents.filter(t =>
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const rentTotalPages = Math.ceil(filteredRentTenants.length / rentPageSize);
-  const paginatedRentTenants = filteredRentTenants.slice(
-    (rentCurrentPage - 1) * rentPageSize,
-    rentCurrentPage * rentPageSize
+  const totalPages = Math.ceil(filteredResidents.length / pageSize);
+  const paginatedResidents = filteredResidents.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const handleViewHistory = (tenant: Tenant) => {
@@ -164,7 +163,7 @@ export default function AccountsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Financial Accounts</h2>
           <p className="text-muted-foreground">A financial overview of your properties.</p>
         </div>
-        <AddPaymentDialog properties={properties} tenants={tenants} onPaymentAdded={fetchAllData} />
+        <AddPaymentDialog properties={properties} tenants={residents} onPaymentAdded={fetchAllData} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -185,19 +184,19 @@ export default function AccountsPage() {
 
         <Card>
             <CardHeader>
-              <CardTitle>Tenant Financial Status</CardTitle>
-              <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
+              <CardTitle>Resident Financial Status</CardTitle>
+              <CardDescription>Detailed list of resident lease and payment information.</CardDescription>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
                 <div className="relative w-full sm:w-[300px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search tenant, unit or email..."
+                    placeholder="Search resident, unit or email..."
                     className="pl-9"
-                    value={rentSearchTerm}
-                    onChange={(e) => setRentSearchTerm(e.target.value)}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredRentTenants, 'rent_financial_status.csv')}>
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredResidents, 'financial_status.csv')}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   Export CSV
                 </Button>
@@ -207,9 +206,9 @@ export default function AccountsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tenant</TableHead>
+                    <TableHead>Resident</TableHead>
                     <TableHead>Property</TableHead>
-                    <TableHead>Rent Amount</TableHead>
+                    <TableHead>Monthly Charge</TableHead>
                     <TableHead>Balance (Due)</TableHead>
                     <TableHead>Excess (Cr)</TableHead>
                     <TableHead className="text-right">Payment Status</TableHead>
@@ -217,7 +216,7 @@ export default function AccountsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedRentTenants.map((tenant) => (
+                  {paginatedResidents.map((tenant) => (
                     <TableRow key={tenant.id}>
                       <TableCell>
                         <div className="font-medium">{tenant.name}</div>
@@ -228,13 +227,13 @@ export default function AccountsPage() {
                         <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
                       </TableCell>
                       <TableCell>
-                        {tenant.lease && typeof tenant.lease.rent === 'number'
-                          ? `Ksh ${tenant.lease.rent.toLocaleString()}`
+                        {tenant.lease && typeof (tenant.lease.rent || tenant.lease.serviceCharge) === 'number'
+                          ? `Ksh ${(tenant.lease.rent || tenant.lease.serviceCharge).toLocaleString()}`
                           : 'N/A'
                         }
                       </TableCell>
                       <TableCell className="font-semibold text-destructive">
-                        Ksh {(tenant.rentOnlyDueBalance || 0).toLocaleString()}
+                        Ksh {(tenant.chargeArrears || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-green-600 font-semibold">
                         Ksh {(tenant.accountBalance || 0).toLocaleString()}
@@ -257,12 +256,12 @@ export default function AccountsPage() {
             </CardContent>
             <div className="p-4 border-t">
               <PaginationControls
-                currentPage={rentCurrentPage}
-                totalPages={rentTotalPages}
-                pageSize={rentPageSize}
-                totalItems={filteredRentTenants.length}
-                onPageChange={setRentCurrentPage}
-                onPageSizeChange={setRentPageSize}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredResidents.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
               />
             </div>
           </Card>
@@ -272,7 +271,7 @@ export default function AccountsPage() {
         open={isHistoryOpen}
         onOpenChange={setIsHistoryOpen}
         onPaymentAdded={fetchAllData}
-        allTenants={tenants}
+        allTenants={residents}
         allProperties={properties}
       />
     </div>
