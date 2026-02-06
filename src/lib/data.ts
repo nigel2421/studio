@@ -258,6 +258,12 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
     return readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
 
+export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
+    const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+}
+
 export async function getLatestWaterReading(propertyId: string, unitName: string): Promise<WaterMeterReading | null> {
     const q = query(
         collection(db, 'waterReadings'),
@@ -630,7 +636,7 @@ export async function addWaterMeterReading(data: {
     });
 
     // 3. Run reconciliation on the current tenant state to update rent, but DO NOT add the water bill to the balance.
-    const reconciliationUpdates = reconcileMonthlyBilling(originalTenant, unit, asOfDate || new Date());
+    const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
 
     // 4. Update tenant in Firestore if there are any rent reconciliation updates
     if (Object.keys(reconciliationUpdates).length > 0) {
@@ -1781,6 +1787,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 

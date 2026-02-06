@@ -2,8 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPaymentsForReport, getLandlords, deletePropertyOwner } from '@/lib/data';
-import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
+import { getProperties, getPropertyOwners, updatePropertyOwner, getTenants, getAllPaymentsForReport, getLandlords, deletePropertyOwner, getAllWaterReadings } from '@/lib/data';
+import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord, WaterMeterReading } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, UserCog, PlusCircle, FileSignature, Building2, Users, Trash } from 'lucide-react';
@@ -21,6 +21,7 @@ export default function ClientsPage() {
   const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  const [allWaterReadings, setAllWaterReadings] = useState<WaterMeterReading[]>([]);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   
@@ -38,18 +39,20 @@ export default function ClientsPage() {
   const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
   const fetchData = async () => {
-    const [props, owners, tenants, payments, landlords] = await Promise.all([
+    const [props, owners, tenants, payments, landlords, waterReadings] = await Promise.all([
       getProperties(),
       getPropertyOwners(),
       getTenants(),
       getAllPaymentsForReport(),
       getLandlords(),
+      getAllWaterReadings()
     ]);
     setAllProperties(props);
     setPropertyOwners(owners);
     setAllTenants(tenants);
     setAllPayments(payments);
     setAllLandlords(landlords);
+    setAllWaterReadings(waterReadings);
   }
 
   useEffect(() => {
@@ -240,7 +243,7 @@ export default function ClientsPage() {
             throw new Error("Owner not found");
         }
         
-        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, startDate, endDate);
+        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, allWaterReadings, startDate, endDate);
         
         setIsStatementDialogOpen(false);
     } catch (error: any) {

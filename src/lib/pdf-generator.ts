@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant } from '@/lib/types';
 import { FinancialSummary, calculateTransactionBreakdown } from '@/lib/financial-utils';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
 // Helper to add company header
@@ -150,13 +150,14 @@ export const generateOwnerServiceChargeStatementPDF = (
     allProperties: Property[],
     allTenants: Tenant[],
     allPayments: Payment[],
+    allWaterReadings: WaterMeterReading[],
     startDate: Date,
     endDate: Date,
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    addHeader(doc, 'SERVICE CHARGE STATEMENT');
+    addHeader(doc, 'Resident Statement');
 
     const ownerUnits = allProperties.flatMap(p =>
         p.units
@@ -189,7 +190,6 @@ export const generateOwnerServiceChargeStatementPDF = (
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
     doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
 
-    // Find the homeowner tenant profile
     const tenant = allTenants.find(t => 
         t.residentType === 'Homeowner' && 
         (t.userId === owner.userId || t.email === owner.email)
@@ -202,58 +202,113 @@ export const generateOwnerServiceChargeStatementPDF = (
     }
 
     const tenantPayments = allPayments.filter(p => p.tenantId === tenant.id);
-    const { ledger } = generateLedger(tenant, tenantPayments, allProperties, [], owner);
-    
-    const periodLedger = ledger.filter(entry => {
-        const entryDate = new Date(entry.date);
-        return entryDate >= startDate && entryDate <= endDate;
-    });
+    const tenantWaterReadings = allWaterReadings.filter(r => r.tenantId === tenant.id);
 
-    const tableBody = periodLedger.map(item => [
-        item.date,
-        item.forMonth || '',
-        item.description,
-        item.charge > 0 ? formatCurrency(item.charge) : '',
-        item.payment > 0 ? formatCurrency(item.payment) : '',
-        item.balance < 0 ? `${formatCurrency(Math.abs(item.balance))} Cr` : formatCurrency(item.balance),
+    const { ledger: serviceChargeLedger, finalDueBalance: serviceChargeDue, finalAccountBalance: serviceChargeCredit } = generateLedger(tenant, tenantPayments, allProperties, [], owner, undefined, { includeWater: false, includeRent: false, includeServiceCharge: true });
+    
+    const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, tenantPayments, allProperties, tenantWaterReadings, owner, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
+
+    let yPos = Math.max(yPosHeader, 80);
+
+    // --- Service Charge Section ---
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Service Charge Statement', 14, yPos);
+    yPos += 2;
+
+    const serviceChargeTableBody = serviceChargeLedger
+        .filter(entry => {
+            try {
+                const entryDate = parseISO(entry.date);
+                return isValid(entryDate) && entryDate >= startDate && entryDate <= endDate;
+            } catch {
+                return false;
+            }
+        })
+        .map(t => [
+        t.date,
+        t.forMonth || '',
+        t.description,
+        t.charge > 0 ? formatCurrency(t.charge) : '',
+        t.payment > 0 ? formatCurrency(t.payment) : '',
+        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
     ]);
 
-    const totalCharges = periodLedger.reduce((sum, item) => sum + item.charge, 0);
-    const totalPayments = periodLedger.reduce((sum, item) => sum + item.payment, 0);
-    
-    const closingBalance = periodLedger.length > 0 ? periodLedger[periodLedger.length - 1].balance : 0;
-
-
     autoTable(doc, {
-        startY: yPosHeader + 10,
-        head: [['Date', 'For Month', 'Details', 'Charge', 'Payment', 'Balance']],
-        body: tableBody,
-        foot: [[
-            { content: 'Totals for Period', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(totalCharges), styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(totalPayments), styles: { fontStyle: 'bold', halign: 'right' } },
-            '', // Balance column in totals is not typically summed
-        ]],
+        startY: yPos,
+        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+        body: serviceChargeTableBody,
         theme: 'striped',
-        headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255] },
-        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
-        columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 'auto' },
-            3: { halign: 'right', cellWidth: 25 },
-            4: { halign: 'right', cellWidth: 25 },
-            5: { halign: 'right', cellWidth: 30 },
-        },
-        didDrawPage: (data) => {
-            // Final Balance Footer
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            const finalY = doc.internal.pageSize.height - 20;
-            doc.text('Balance Due:', 140, finalY);
-            doc.text(closingBalance < 0 ? `${formatCurrency(Math.abs(closingBalance))} Cr` : formatCurrency(closingBalance), 196, finalY, { align: 'right' });
-        }
+        headStyles: { fillColor: [51, 65, 85] },
+        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
     });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Service Charge Balance:', 140, yPos);
+    doc.text(serviceChargeDue > 0 ? formatCurrency(serviceChargeDue) : `${formatCurrency(serviceChargeCredit)} Cr`, 196, yPos, { align: 'right' });
+    yPos += 10;
+
+    if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+    }
+
+    // --- Water Bill Section ---
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Water Bill Statement', 14, yPos);
+    yPos += 2;
+
+    const waterTableBody = waterLedger
+        .filter(entry => {
+            try {
+                const entryDate = parseISO(entry.date);
+                return isValid(entryDate) && entryDate >= startDate && entryDate <= endDate;
+            } catch {
+                return false;
+            }
+        })
+        .map(t => [
+        t.date,
+        t.forMonth || '',
+        t.description,
+        t.charge > 0 ? formatCurrency(t.charge) : '',
+        t.payment > 0 ? formatCurrency(t.payment) : '',
+        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
+    ]);
+    
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+        body: waterTableBody,
+        theme: 'striped',
+        headStyles: { fillColor: [21, 128, 61] },
+        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Water Bill Balance:', 140, yPos);
+    doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
+    
+    yPos += 10;
+    
+    // --- Overall Total ---
+    doc.setDrawColor(150);
+    doc.line(14, yPos, 196, yPos);
+    yPos += 5;
+    
+    const totalDue = serviceChargeDue + waterDue;
+    const totalCredit = serviceChargeCredit + waterCredit;
+    const finalBalance = totalDue - totalCredit;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Balance Due:', 140, yPos);
+    doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
     
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
