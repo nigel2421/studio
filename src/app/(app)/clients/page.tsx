@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -161,8 +160,10 @@ export default function ClientsPage() {
   }, [propertyOwners, allLandlords, allProperties, clientOwnerIds]);
   
   const clientProperties = useMemo(() => {
+    // A property is relevant for this page if it contains any units that are
+    // owned by a 'Landlord', as these are the ones that can be assigned to a client for self-management.
     return allProperties.filter(p =>
-      p.units.some(u => u.managementStatus === 'Client Managed')
+      p.units.some(u => u.ownership === 'Landlord')
     );
   }, [allProperties]);
 
@@ -186,11 +187,11 @@ export default function ClientsPage() {
 
   const totalClientUnits = useMemo(() => {
     let count = 0;
-    clientProperties.forEach(p => {
+    allProperties.forEach(p => {
       count += p.units.filter(u => u.managementStatus === 'Client Managed').length;
     });
     return count;
-  }, [clientProperties]);
+  }, [allProperties]);
 
   const handleSaveOwner = async (ownerData: PropertyOwner, selectedUnitNames: string[]) => {
     if (!selectedProperty) return;
@@ -463,5 +464,3 @@ export default function ClientsPage() {
     </div>
   );
 }
-
-    
