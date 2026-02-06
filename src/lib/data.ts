@@ -10,13 +10,14 @@ import {
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
     OwnershipType,
     ManagementStatus,
-    HandoverStatus
+    HandoverStatus,
+    Lease
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
-import { format, startOfMonth, addMonths } from "date-fns";
+import { format, startOfMonth, addMonths, parseISO } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -1343,7 +1344,7 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
 }
 
-export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount: string }[]): Promise<{ added: number; skipped: number }> {
+export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount?: string }[]): Promise<{ added: number; skipped: number }> {
     const landlordsRef = collection(db, 'landlords');
     const batch = writeBatch(db);
     let added = 0;
@@ -1787,6 +1788,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 

@@ -24,7 +24,7 @@ interface CsvData {
   name: string;
   email: string;
   phone: string;
-  bankAccount: string;
+  bankAccount?: string;
 }
 
 interface Props {
@@ -50,7 +50,6 @@ export function LandlordCsvUploader({ onUploadComplete }: Props) {
       name: 'John Doe',
       email: 'john.doe@example.com',
       phone: '254712345678',
-      bankAccount: '1234567890 KCB Bank',
     }];
     downloadCSV(templateData, 'landlord_upload_template.csv');
   };
@@ -70,7 +69,7 @@ export function LandlordCsvUploader({ onUploadComplete }: Props) {
       complete: async (results) => {
         const { data, errors, meta } = results;
 
-        const requiredHeaders = ['name', 'email', 'phone', 'bankAccount'];
+        const requiredHeaders = ['name', 'email', 'phone'];
         const actualHeaders = meta.fields || [];
         const missingHeaders = requiredHeaders.filter(h => !actualHeaders.includes(h));
 
@@ -143,7 +142,7 @@ export function LandlordCsvUploader({ onUploadComplete }: Props) {
         <DialogHeader>
           <DialogTitle>Bulk Upload Landlords</DialogTitle>
           <DialogDescription>
-            Upload a CSV with columns: <strong>name</strong>, <strong>email</strong>, <strong>phone</strong>, and <strong>bankAccount</strong>. Existing landlords (by email) will be skipped.
+            Upload a CSV with columns: <strong>name</strong>, <strong>email</strong>, and <strong>phone</strong>. Existing landlords (by email) will be skipped.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
