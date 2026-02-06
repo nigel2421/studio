@@ -122,47 +122,43 @@ export function processServiceChargeData(
 
         const tenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
         
-        let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
-        let paymentAmount: number | undefined;
-        let paymentForMonth: string | undefined;
+        const tenantPayments = tenant ? paymentsByTenantMap.get(tenant.id) || [] : [];
+        const paymentInSelectedMonth = tenant ? tenantPayments
+            .filter(p => (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
+            .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
 
-        let isBillable = false;
-        if (unit.handoverDate) {
-            const handoverDateSource = unit.handoverDate as any;
-            const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
-                ? handoverDateSource.toDate()
-                : parseISO(handoverDateSource);
-            
-            if (isValid(handoverDate)) {
-                const handoverDay = handoverDate.getDate();
-                let firstBillableMonth: Date;
-                if (handoverDay <= 10) {
-                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-                } else {
-                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                }
-                if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
-                    isBillable = true;
-                }
-            }
-        } else if (unit.handoverStatus === 'Handed Over') {
-            isBillable = true;
-        }
-
-        if (!isBillable) {
-            paymentStatus = 'N/A';
+        let paymentStatus: 'Paid' | 'Pending' | 'N/A';
+        
+        if (paymentInSelectedMonth) {
+            paymentStatus = 'Paid';
         } else {
-             const tenantPayments = tenant ? paymentsByTenantMap.get(tenant.id) || [] : [];
-             const paymentInSelectedMonth = tenant ? tenantPayments
-                .filter(p => (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
-                .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
+            let isBillable = false;
+            if (unit.handoverDate) {
+                const handoverDateSource = unit.handoverDate as any;
+                const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+                    ? handoverDateSource.toDate()
+                    : parseISO(handoverDateSource);
+                
+                if (isValid(handoverDate)) {
+                    const handoverDay = handoverDate.getDate();
+                    let firstBillableMonth: Date;
+                    if (handoverDay <= 10) {
+                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                    } else {
+                        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                    }
+                    if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
+                        isBillable = true;
+                    }
+                }
+            } else if (unit.handoverStatus === 'Handed Over') {
+                isBillable = true;
+            }
 
-            if (paymentInSelectedMonth) {
-                paymentStatus = 'Paid';
-                paymentAmount = paymentInSelectedMonth.amount;
-                paymentForMonth = paymentInSelectedMonth.rentForMonth;
-            } else {
+            if (isBillable) {
                 paymentStatus = 'Pending';
+            } else {
+                paymentStatus = 'N/A';
             }
         }
 
@@ -176,8 +172,8 @@ export function processServiceChargeData(
             tenantId: tenant?.id,
             tenantName: tenant?.name,
             paymentStatus,
-            paymentAmount,
-            paymentForMonth,
+            paymentAmount: paymentInSelectedMonth?.amount,
+            paymentForMonth: paymentInSelectedMonth?.rentForMonth,
         };
     });
 
@@ -203,45 +199,44 @@ export function processServiceChargeData(
       }
 
       const homeownerTenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
-
-      let paymentStatus: 'Paid' | 'Pending' | 'N/A' = 'Pending';
-      let isBillable = false;
-      if (unit.handoverDate) {
-        const handoverDateSource = unit.handoverDate as any;
-        const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
-            ? handoverDateSource.toDate()
-            : parseISO(handoverDateSource);
-        if (isValid(handoverDate)) {
-          const handoverDay = handoverDate.getDate();
-          let firstBillableMonth: Date;
-          if (handoverDay <= 10) {
-              firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-          } else {
-              firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-          }
-          if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
-            isBillable = true;
-          }
-        }
-      } else if (unit.handoverStatus === 'Handed Over') {
-          isBillable = true;
-      }
-
-
-      if (!isBillable) {
-        paymentStatus = 'N/A';
-      } else {
-        const tenantPayments = homeownerTenant ? paymentsByTenantMap.get(homeownerTenant.id) || [] : [];
-        const paymentForMonthExists = tenantPayments.some(p =>
+      const tenantPayments = homeownerTenant ? paymentsByTenantMap.get(homeownerTenant.id) || [] : [];
+      const paymentForMonthExists = tenantPayments.some(p =>
             p.rentForMonth === format(selectedMonth, 'yyyy-MM') &&
             p.status === 'Paid' &&
             (p.type === 'ServiceCharge')
-        );
+      );
 
-        if (paymentForMonthExists) {
-            paymentStatus = 'Paid';
-        } else {
+      let paymentStatus: 'Paid' | 'Pending' | 'N/A';
+      
+      if (paymentForMonthExists) {
+        paymentStatus = 'Paid';
+      } else {
+        let isBillable = false;
+        if (unit.handoverDate) {
+          const handoverDateSource = unit.handoverDate as any;
+          const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
+              ? handoverDateSource.toDate()
+              : parseISO(handoverDateSource);
+          if (isValid(handoverDate)) {
+            const handoverDay = handoverDate.getDate();
+            let firstBillableMonth: Date;
+            if (handoverDay <= 10) {
+                firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+            } else {
+                firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+            }
+            if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
+              isBillable = true;
+            }
+          }
+        } else if (unit.handoverStatus === 'Handed Over') {
+            isBillable = true;
+        }
+
+        if (isBillable) {
             paymentStatus = 'Pending';
+        } else {
+            paymentStatus = 'N/A';
         }
       }
 
