@@ -11,7 +11,7 @@ import {
     OwnershipType,
     ManagementStatus,
     HandoverStatus
-} from '@/lib/types';
+} from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference } from 'firebase/firestore';
 import { auth } from './firebase';
@@ -1704,4 +1704,66 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
         console.error("Error listening to tasks:", error);
     });
     return unsubscribe;
+}
+
+export async function voidPayment(paymentId: string, reason: string, editorId: string): Promise<void> {
+    const paymentRef = doc(db, "payments", paymentId);
+  
+    await runTransaction(db, async (transaction) => {
+      const paymentSnap = await transaction.get(paymentRef);
+      if (!paymentSnap.exists()) {
+        throw new Error("Payment to void not found.");
+      }
+      const oldPayment = paymentSnap.data() as Payment;
+  
+      if (oldPayment.status === "Voided") {
+        throw new Error("This payment has already been voided.");
+      }
+  
+      // 1. Create the reversal transaction
+      const reversalPaymentRef = doc(collection(db, "payments"));
+      const reversalPayment: Omit<Payment, 'id'> = {
+        tenantId: oldPayment.tenantId,
+        amount: -oldPayment.amount,
+        date: oldPayment.date, 
+        type: "Reversal",
+        status: "Paid",
+        notes: `Reversal for transaction ID: ${oldPayment.transactionId}. Reason: ${reason}`,
+        rentForMonth: oldPayment.rentForMonth,
+        paymentMethod: oldPayment.paymentMethod,
+        transactionId: `REV-${oldPayment.transactionId}`,
+        createdAt: new Date(),
+        linkedTo: oldPayment.id,
+      };
+      transaction.set(reversalPaymentRef, reversalPayment);
+  
+      // 2. Mark the original payment as Voided
+      transaction.update(paymentRef, { 
+          status: 'Voided',
+          notes: oldPayment.notes ? `${oldPayment.notes} [VOIDED: ${reason}]` : `[VOIDED: ${reason}]`
+      });
+  
+      // 3. Recalculate tenant balance
+      const tenant = await getTenant(oldPayment.tenantId);
+      if (tenant) {
+          const allPayments = await getPaymentHistory(tenant.id);
+          const allProperties = await getProperties();
+          const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties);
+          
+          const tenantRef = doc(db, 'tenants', tenant.id);
+          transaction.update(tenantRef, {
+              dueBalance: finalDueBalance + oldPayment.amount, // Add back the voided amount to due balance
+              accountBalance: finalAccountBalance
+          });
+      }
+    });
+  
+    await logActivity(`Voided payment ${paymentId}. Reason: ${reason}`, editorId);
+    await forceRecalculateTenantBalance( (await getDocument<Payment>('payments', paymentId))!.tenantId );
+}
+
+export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
+    const q = query(collection(db, 'waterReadings'), where('status', '==', 'Pending'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }

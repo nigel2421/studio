@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getTenants, getProperties, getAllPayments } from '@/lib/data';
-import type { Tenant, Property, Payment } from '@/lib/types';
+import { getTenants, getProperties, getAllPayments, getAllPendingWaterBills } from '@/lib/data';
+import type { Tenant, Property, Payment, WaterMeterReading } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -31,6 +30,7 @@ export default function AccountsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [pendingWaterBills, setPendingWaterBills] = useState<WaterMeterReading[]>([]);
 
   // State for Rent tab
   const [rentCurrentPage, setRentCurrentPage] = useState(1);
@@ -42,14 +42,16 @@ export default function AccountsPage() {
 
   const fetchAllData = async () => {
     try {
-      const [tenantsData, propertiesData, paymentsData] = await Promise.all([
+      const [tenantsData, propertiesData, paymentsData, pendingWaterBillsData] = await Promise.all([
         getTenants(), 
         getProperties(),
-        getAllPayments()
+        getAllPayments(),
+        getAllPendingWaterBills(),
       ]);
       setTenants(tenantsData.filter(t => t.residentType === 'Tenant'));
       setProperties(propertiesData);
       setPayments(paymentsData);
+      setPendingWaterBills(pendingWaterBillsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -63,6 +65,12 @@ export default function AccountsPage() {
     if (!tenants.length || !properties.length) return [];
 
     const propertiesMap = new Map(properties.map(p => [p.id, p]));
+    
+    const pendingBillsByTenant = new Map<string, number>();
+    pendingWaterBills.forEach(bill => {
+        const total = pendingBillsByTenant.get(bill.tenantId) || 0;
+        pendingBillsByTenant.set(bill.tenantId, total + bill.amount);
+    });
 
     return tenants.map(tenant => {
         const property = propertiesMap.get(tenant.propertyId);
@@ -83,9 +91,17 @@ export default function AccountsPage() {
         if (updates['lease.lastBilledPeriod'] !== undefined) {
             updatedTenant.lease.lastBilledPeriod = updates['lease.lastBilledPeriod'];
         }
-        return updatedTenant;
+        
+        const totalPendingWater = pendingBillsByTenant.get(tenant.id) || 0;
+        let rentOnlyDueBalance = updatedTenant.dueBalance || 0;
+
+        if (rentOnlyDueBalance > 0) {
+            rentOnlyDueBalance = Math.max(0, rentOnlyDueBalance - totalPendingWater);
+        }
+
+        return { ...updatedTenant, rentOnlyDueBalance };
     });
-  }, [tenants, properties]);
+  }, [tenants, properties, pendingWaterBills]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
@@ -110,7 +126,7 @@ export default function AccountsPage() {
     .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
   const rentArrears = useMemo(() => displayTenants
-    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [displayTenants]);
+    .reduce((sum, t) => sum + (t.rentOnlyDueBalance || 0), 0), [displayTenants]);
 
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
   const occupiedUnits = displayTenants.length;
@@ -218,7 +234,7 @@ export default function AccountsPage() {
                         }
                       </TableCell>
                       <TableCell className="font-semibold text-destructive">
-                        Ksh {(tenant.dueBalance || 0).toLocaleString()}
+                        Ksh {(tenant.rentOnlyDueBalance || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-green-600 font-semibold">
                         Ksh {(tenant.accountBalance || 0).toLocaleString()}
