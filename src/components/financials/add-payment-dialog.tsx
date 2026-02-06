@@ -49,7 +49,7 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  controlledOpen,
+  open: controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
@@ -99,7 +99,7 @@ export function AddPaymentDialog({
     let waterBalance = 0;
     if (defaultPaymentType === 'Water' && allReadings) {
         waterBalance = allReadings
-            .filter(r => r.tenantId === tenantForDisplay.id && r.status === 'Pending')
+            .filter(r => r.tenantId === tenantForDisplay.id && (r.status === 'Pending' || r.status === undefined))
             .reduce((sum, r) => sum + r.amount, 0);
     }
 
