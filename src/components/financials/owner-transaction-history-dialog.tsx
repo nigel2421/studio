@@ -14,10 +14,10 @@ import { useLoading } from '@/hooks/useLoading';
 import { useToast } from '@/hooks/use-toast';
 import { performSendServiceChargeInvoice } from '@/app/actions';
 import { InvoicePreviewDialog } from './invoice-preview-dialog';
-import { generateLedger, updatePayment, forceRecalculateTenantBalance } from '@/lib/financial-logic';
+import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
 import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
-import { getPaymentHistory } from '@/lib/data';
+import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance } from '@/lib/data';
 
 
 interface OwnerTransactionHistoryDialogProps {
