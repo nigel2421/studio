@@ -422,6 +422,7 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
     const propertyRef = doc(db, 'properties', propertyId);
     await updateDoc(propertyRef, data);
+    cacheService.clear('properties'); // Invalidate cache on update
     await logActivity(`Updated property: ID ${propertyId}`);
 }
 
@@ -776,7 +777,7 @@ export async function batchProcessPayments(
 
         let workingTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
 
-        // 2. Perform reconciliation in memory
+        // 2. Perform reconciliation in memory to get up-to-date rent balance
         const reconciliationUpdates = reconcileMonthlyBilling(workingTenant, unit, new Date());
 
         // 3. Apply reconciliation updates to the in-memory tenant object
@@ -802,19 +803,21 @@ export async function batchProcessPayments(
                 createdAt: serverTimestamp()
             });
 
-            // Apply payment logic to the in-memory object
-            const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
+            // ONLY apply rent/deposit/etc payments to the main tenant balance
+            if (entry.type !== 'Water') {
+                const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
 
-            workingTenant = {
-                ...workingTenant,
-                dueBalance: paymentProcessingUpdates.dueBalance,
-                accountBalance: paymentProcessingUpdates.accountBalance,
-                lease: {
-                    ...workingTenant.lease,
-                    paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
-                    lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
-                }
-            };
+                workingTenant = {
+                    ...workingTenant,
+                    dueBalance: paymentProcessingUpdates.dueBalance,
+                    accountBalance: paymentProcessingUpdates.accountBalance,
+                    lease: {
+                        ...workingTenant.lease,
+                        paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
+                        lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
+                    }
+                };
+            }
         }
 
         // 5. Prepare the final, combined updates for the tenant document
@@ -834,6 +837,7 @@ export async function batchProcessPayments(
         // 6. Perform the single final write to the tenant document
         transaction.update(tenantRef, finalUpdates);
 
+        // 7. Update status of any water bills that have now been paid
         for (const readingRef of pendingReadingsToUpdateRefs) {
             transaction.update(readingRef, { status: 'Paid' });
         }
@@ -1808,8 +1812,9 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
 }
 
 export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
-    const q = query(collection(db, 'waterReadings'), where('status', '==', 'Pending'));
+    const q = query(collectionGroup(db, 'waterReadings'), where('status', '==', 'Pending'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
