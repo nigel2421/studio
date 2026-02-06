@@ -41,12 +41,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (tenant && open) {
             setIsLoading(true);
             try {
-                const [payments, waterReadings] = await Promise.all([
-                    getPaymentHistory(tenant.id),
-                    getTenantWaterReadings(tenant.id)
-                ]);
+                // Rent module should not show water bills, so we don't fetch/pass them
+                const payments = await getPaymentHistory(tenant.id);
                 setAllTenantPayments(payments); 
-                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, waterReadings);
+                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, undefined, { includeWater: false });
                 setLedger(generatedLedger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
