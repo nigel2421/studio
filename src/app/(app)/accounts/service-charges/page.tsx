@@ -299,20 +299,21 @@ export default function ServiceChargesPage() {
   };
 
   const handleConfirmOwnerPayment = async (paymentData: { amount: number; date: Date, notes: string, forMonth: string; paymentMethod: Payment['paymentMethod'], transactionId: string }) => {
-    if (!ownerForPayment || accountsForPayment.length === 0) return;
+    if (!ownerForPayment) return;
 
     startLoading(`Recording payment for ${ownerForPayment.name}...`);
     try {
-        let remainingAmount = paymentData.amount;
+        // Find a primary tenant account for this owner
+        let primaryTenant: Tenant | null = allTenants.find(t => t.residentType === 'Homeowner' && (t.userId === ownerForPayment.userId || t.email === ownerForPayment.email)) || null;
 
-        const tenantPromises = accountsForPayment.map(async (acc) => {
-            let tenant = allTenants.find(t => t.propertyId === acc.propertyId && t.unitName === acc.unitName);
-            if (tenant) return tenant;
-
-            const property = allProperties.find(p => p.id === acc.propertyId);
-            const unit = property?.units.find(u => u.name === acc.unitName);
-            if (property && unit && ownerForPayment) {
-                 const ownerAsPropertyOwner: PropertyOwner = {
+        // If no tenant account exists, create one based on the first unit being paid for.
+        if (!primaryTenant && accountsForPayment.length > 0) {
+            const firstAccount = accountsForPayment[0];
+            const property = allProperties.find(p => p.id === firstAccount.propertyId);
+            const unit = property?.units.find(u => u.name === firstAccount.unitName);
+            
+            if (property && unit) {
+                const ownerAsPropertyOwner: PropertyOwner = {
                     id: ownerForPayment.id,
                     name: ownerForPayment.name,
                     email: ownerForPayment.email,
@@ -321,50 +322,31 @@ export default function ServiceChargesPage() {
                     bankAccount: 'bankAccount' in ownerForPayment ? ownerForPayment.bankAccount : undefined,
                     assignedUnits: 'assignedUnits' in ownerForPayment ? ownerForPayment.assignedUnits : [],
                 };
-                return await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
+                primaryTenant = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
             }
-            return null;
+        }
+        
+        if (!primaryTenant) {
+            throw new Error(`Could not find or create a resident account for ${ownerForPayment.name} to record the payment against.`);
+        }
+
+        // Record a single payment for the total amount
+        await addPayment({
+            tenantId: primaryTenant.id,
+            amount: paymentData.amount,
+            date: format(paymentData.date, 'yyyy-MM-dd'),
+            notes: paymentData.notes || `Consolidated service charge payment for ${ownerForPayment.name}`,
+            rentForMonth: paymentData.forMonth,
+            status: 'Paid',
+            type: 'ServiceCharge',
+            paymentMethod: paymentData.paymentMethod,
+            transactionId: paymentData.transactionId,
         });
-        
-        const tenantsForPayment = (await Promise.all(tenantPromises)).filter(Boolean) as Tenant[];
-        
-        if (tenantsForPayment.length !== accountsForPayment.length) {
-            throw new Error(`Could not find or create resident accounts for all selected units. Expected ${accountsForPayment.length}, found ${tenantsForPayment.length}.`);
-        }
 
-        const paymentPromises = [];
-        let paymentsRecorded = 0;
-
-        for (const account of accountsForPayment) {
-            if (remainingAmount <= 0) break;
-
-            const tenant = tenantsForPayment.find(t => t.propertyId === account.propertyId && t.unitName === account.unitName);
-            if (tenant) {
-                const amountToApply = Math.min(remainingAmount, account.unitServiceCharge);
-                
-                paymentPromises.push(addPayment({
-                    tenantId: tenant.id,
-                    amount: amountToApply,
-                    date: format(paymentData.date, 'yyyy-MM-dd'),
-                    notes: paymentData.notes,
-                    rentForMonth: paymentData.forMonth,
-                    status: 'Paid',
-                    type: 'ServiceCharge',
-                    paymentMethod: paymentData.paymentMethod,
-                    transactionId: paymentData.transactionId,
-                }));
-
-                remainingAmount -= amountToApply;
-                paymentsRecorded++;
-            }
-        }
-        
-        await Promise.all(paymentPromises);
-
-        toast({ title: "Payment Recorded", description: `${paymentsRecorded} service charge payment(s) for ${ownerForPayment.name} have been recorded.` });
+        toast({ title: "Payment Recorded", description: `A payment of Ksh ${paymentData.amount.toLocaleString()} for ${ownerForPayment.name} has been recorded.` });
         
         setIsOwnerPaymentDialogOpen(false);
-        fetchData();
+        fetchData(); // Refresh all data
 
     } catch (error: any) {
         console.error("Error recording consolidated payment:", error);
@@ -845,4 +827,5 @@ const VacantArrearsTab = ({
     
 
     
+
 
