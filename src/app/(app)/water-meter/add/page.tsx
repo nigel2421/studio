@@ -299,7 +299,7 @@ export default function MegarackPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button
-                                                variant="outline"
+                                                variant="secondary"
                                                 size="sm"
                                                 disabled={(reading.status || 'Pending') === 'Paid'}
                                                 onClick={() => handleRecordPaymentClick(reading)}
@@ -448,5 +448,6 @@ export default function MegarackPage() {
     </>
   );
 }
+
 
 
