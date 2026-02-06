@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { batchProcessPayments } from '@/lib/data';
-import { type Tenant, type Property, type Payment, type Unit, paymentMethods } from '@/lib/types';
+import { type Tenant, type Property, type Payment, type Unit, paymentMethods, type WaterMeterReading } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -41,6 +40,7 @@ interface AddPaymentDialogProps {
   onOpenChange?: (open: boolean) => void;
   taskId?: string;
   defaultPaymentType?: Payment['type'];
+  allReadings?: WaterMeterReading[];
 }
 
 export function AddPaymentDialog({ 
@@ -49,10 +49,11 @@ export function AddPaymentDialog({
   onPaymentAdded, 
   tenant = null, 
   children,
-  open: controlledOpen,
+  controlledOpen,
   onOpenChange: setControlledOpen,
   taskId,
   defaultPaymentType,
+  allReadings,
 }: AddPaymentDialogProps) {
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -82,7 +83,7 @@ export function AddPaymentDialog({
   }, [tenant, selectedUnit, selectedProperty, tenants]);
 
   const displayData = useMemo(() => {
-    if (!tenantForDisplay) return { balance: 0, nextDueDate: null };
+    if (!tenantForDisplay) return { balance: 0, nextDueDate: null, waterBalance: 0 };
 
     const today = new Date();
     const dayOfMonth = today.getDate();
@@ -95,13 +96,20 @@ export function AddPaymentDialog({
     }
      dueDate.setDate(5);
 
+    let waterBalance = 0;
+    if (defaultPaymentType === 'Water' && allReadings) {
+        waterBalance = allReadings
+            .filter(r => r.tenantId === tenantForDisplay.id && r.status === 'Pending')
+            .reduce((sum, r) => sum + r.amount, 0);
+    }
 
     return {
         balance: tenantForDisplay.dueBalance || 0,
-        nextDueDate: format(dueDate, 'do MMMM yyyy')
+        nextDueDate: format(dueDate, 'do MMMM yyyy'),
+        waterBalance,
     };
 
-  }, [tenantForDisplay]);
+  }, [tenantForDisplay, defaultPaymentType, allReadings]);
 
   const availablePaymentTypes = useMemo(() => {
     if (tenantForDisplay?.residentType === 'Homeowner') {
@@ -327,18 +335,26 @@ export function AddPaymentDialog({
                 <div className="p-4 my-2 border rounded-lg bg-blue-50 border-blue-200">
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
-                        <div>
-                            <div className="text-muted-foreground">Monthly Charge:</div>
-                            <div className="font-medium">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
-                        </div>
-                        <div>
-                            <div className="text-muted-foreground">Next Due Date:</div>
-                            <div className="font-medium">{displayData.nextDueDate}</div>
-                        </div>
+                        {defaultPaymentType !== 'Water' && (
+                            <>
+                                <div>
+                                    <div className="text-muted-foreground">Monthly Charge:</div>
+                                    <div className="font-medium">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Next Due Date:</div>
+                                    <div className="font-medium">{displayData.nextDueDate}</div>
+                                </div>
+                            </>
+                        )}
                         <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
                             <div className="flex justify-between items-center">
-                                <div className="text-muted-foreground font-bold text-red-600">Total Amount Pending:</div>
-                                <div className="font-bold text-red-600 text-lg">Ksh {displayData.balance.toLocaleString()}</div>
+                                <div className="text-muted-foreground font-bold text-red-600">
+                                    {defaultPaymentType === 'Water' ? 'Total Pending Water Bill:' : 'Total Amount Pending:'}
+                                </div>
+                                <div className="font-bold text-red-600 text-lg">
+                                    Ksh {(defaultPaymentType === 'Water') ? displayData.waterBalance.toLocaleString() : displayData.balance.toLocaleString()}
+                                </div>
                             </div>
                         </div>
                     </div>

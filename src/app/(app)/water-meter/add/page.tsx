@@ -443,8 +443,10 @@ export default function MegarackPage() {
         tenants={tenants}
         onPaymentAdded={handlePaymentAdded}
         defaultPaymentType="Water"
+        allReadings={allReadings}
     />
     </>
   );
 }
+
 
