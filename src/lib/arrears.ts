@@ -1,5 +1,6 @@
+
 import { Tenant, Unit, Property } from '@/lib/types';
-import { getProperties, getTenants } from '@/lib/data';
+import { getProperties, getTenants, getAllPendingWaterBills } from '@/lib/data';
 
 /**
  * @fileOverview Service Charge Arrears Management
@@ -24,16 +25,31 @@ export interface LandlordArrearsSummary {
 /**
  * Gets a list of all tenants currently in arrears, sorted from most to least.
  * A tenant is in arrears if their `dueBalance` is greater than zero.
+ * This function specifically calculates RENT arrears, excluding pending water bills.
  * @returns A sorted list of tenants with their arrears amount.
  */
 export async function getTenantsInArrears(): Promise<{ tenant: Tenant; arrears: number }[]> {
-  const allTenants = await getTenants();
+  const [allTenants, allPendingWaterBills] = await Promise.all([
+    getTenants(),
+    getAllPendingWaterBills()
+  ]);
+
+  const pendingBillsByTenant = new Map<string, number>();
+  allPendingWaterBills.forEach(bill => {
+      const total = pendingBillsByTenant.get(bill.tenantId) || 0;
+      pendingBillsByTenant.set(bill.tenantId, total + bill.amount);
+  });
   
   const tenantsWithArrears = allTenants
-    .map(tenant => ({
-      tenant,
-      arrears: tenant.dueBalance || 0, 
-    }))
+    .map(tenant => {
+      const totalDue = tenant.dueBalance || 0;
+      const waterDue = pendingBillsByTenant.get(tenant.id) || 0;
+      const rentArrears = Math.max(0, totalDue - waterDue);
+      return {
+        tenant,
+        arrears: rentArrears, 
+      }
+    })
     .filter(item => item.arrears > 0);
 
   return tenantsWithArrears.sort((a, b) => b.arrears - a.arrears);
@@ -48,8 +64,17 @@ export async function getTenantsInArrears(): Promise<{ tenant: Tenant; arrears: 
 export async function getLandlordArrearsBreakdown(
   landlordId: string
 ): Promise<LandlordArrearsSummary> {
-  const allProperties = await getProperties();
-  const allTenants = await getTenants();
+  const [allProperties, allTenants, allPendingWaterBills] = await Promise.all([
+    getProperties(),
+    getTenants(),
+    getAllPendingWaterBills()
+  ]);
+  
+  const pendingBillsByTenant = new Map<string, number>();
+  allPendingWaterBills.forEach(bill => {
+      const total = pendingBillsByTenant.get(bill.tenantId) || 0;
+      pendingBillsByTenant.set(bill.tenantId, total + bill.amount);
+  });
 
   const landlordUnits: { unit: Unit, property: Property }[] = [];
   allProperties.forEach(p => {
@@ -68,7 +93,10 @@ export async function getLandlordArrearsBreakdown(
 
     if (tenant) {
       // Unit is occupied, so we check for tenant arrears.
-      const tenantArrears = tenant.dueBalance || 0;
+      const totalDue = tenant.dueBalance || 0;
+      const waterDue = pendingBillsByTenant.get(tenant.id) || 0;
+      const tenantArrears = Math.max(0, totalDue - waterDue);
+
       totalTenantArrears += tenantArrears;
       return {
         unit,
