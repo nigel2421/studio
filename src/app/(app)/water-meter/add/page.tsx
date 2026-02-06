@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -64,6 +65,7 @@ export default function MegarackPage() {
   const [pageSize, setPageSize] = useState(10);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
+  const [selectedReadingForPayment, setSelectedReadingForPayment] = useState<WaterReadingRecord | null>(null);
 
   // Combined data fetching
   const fetchData = async () => {
@@ -180,6 +182,7 @@ export default function MegarackPage() {
       const tenant = tenants.find(t => t.id === reading.tenantId);
       if (tenant) {
           setSelectedTenantForPayment(tenant);
+          setSelectedReadingForPayment(reading);
           setIsPaymentDialogOpen(true);
       } else {
           toast({
@@ -445,13 +448,17 @@ export default function MegarackPage() {
 
     <AddPaymentDialog
         open={isPaymentDialogOpen}
-        onOpenChange={setIsPaymentDialogOpen}
+        onOpenChange={(isOpen) => {
+            setIsPaymentDialogOpen(isOpen);
+            if (!isOpen) setSelectedReadingForPayment(null);
+        }}
         tenant={selectedTenantForPayment}
         properties={properties}
         tenants={tenants}
         onPaymentAdded={handlePaymentAdded}
         defaultPaymentType="Water"
         allReadings={allReadings}
+        readingForPayment={selectedReadingForPayment}
     />
     </>
   );

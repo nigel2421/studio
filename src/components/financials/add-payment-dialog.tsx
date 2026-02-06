@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -41,6 +42,7 @@ interface AddPaymentDialogProps {
   taskId?: string;
   defaultPaymentType?: Payment['type'];
   allReadings?: WaterMeterReading[];
+  readingForPayment?: WaterMeterReading | null;
 }
 
 export function AddPaymentDialog({ 
@@ -54,6 +56,7 @@ export function AddPaymentDialog({
   taskId,
   defaultPaymentType,
   allReadings,
+  readingForPayment,
 }: AddPaymentDialogProps) {
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -125,7 +128,9 @@ export function AddPaymentDialog({
 
   const getDefaultAmount = (type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
     if (!tenantInfo) return '';
-    const latestWaterBillAmount = tenantInfo.waterReadings?.[0]?.amount;
+    // This is buggy because Tenant type does not have waterReadings.
+    // The logic is now handled by the readingForPayment prop, so this can be simplified.
+    // const latestWaterBillAmount = tenantInfo.waterReadings?.[0]?.amount;
 
     switch (type) {
       case 'Rent':
@@ -133,7 +138,7 @@ export function AddPaymentDialog({
       case 'ServiceCharge':
         return (tenantInfo.lease?.serviceCharge || '').toString();
       case 'Water':
-        return (latestWaterBillAmount || '').toString();
+        return (displayData.waterBalance || '').toString();
       case 'Deposit':
         return (tenantInfo.securityDeposit || '').toString();
       default:
@@ -144,7 +149,13 @@ export function AddPaymentDialog({
   useEffect(() => {
     if (open) {
         const type = defaultPaymentType || defaultEntryType;
-        const amount = tenantForDisplay ? getDefaultAmount(type, tenantForDisplay) : '';
+        
+        let amount = '';
+        if (readingForPayment && type === 'Water') {
+            amount = readingForPayment.amount.toString();
+        } else if (tenantForDisplay) {
+            amount = getDefaultAmount(type, tenantForDisplay);
+        }
 
         let rentForMonthDefault = format(new Date(), 'yyyy-MM');
         if (tenantForDisplay && tenantForDisplay.lease.lastBilledPeriod) {
@@ -186,7 +197,7 @@ export function AddPaymentDialog({
             setSelectedUnit('');
         }
     }
-}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType]);
+}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment]);
 
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
