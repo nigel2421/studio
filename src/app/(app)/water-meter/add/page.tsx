@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants } from '@/lib/data';
-import type { Property, WaterMeterReading, Tenant } from '@/lib/types';
+import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance } from '@/lib/data';
+import type { Property, WaterMeterReading, Tenant, Payment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, PlusCircle } from 'lucide-react';
+import { Loader2, Search, PlusCircle, Edit2 } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
@@ -21,6 +21,10 @@ import { Badge } from '@/components/ui/badge';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
+import { useAuth } from '@/hooks/useAuth';
+import { EditPaymentDialog, EditFormValues } from '@/components/financials/edit-payment-dialog';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 
 interface WaterReadingRecord extends WaterMeterReading {
@@ -35,6 +39,7 @@ export default function MegarackPage() {
   // Common state
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const { userProfile } = useAuth();
   
   // State for Add Form
   const [priorReading, setPriorReading] = useState<number | null>(null);
@@ -66,6 +71,12 @@ export default function MegarackPage() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedTenantForPayment, setSelectedTenantForPayment] = useState<Tenant | null>(null);
   const [selectedReadingForPayment, setSelectedReadingForPayment] = useState<WaterReadingRecord | null>(null);
+
+  // State for Editing Payment
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const { startLoading, stopLoading, isLoading: isActionLoading } = useLoading();
+
 
   // Combined data fetching
   const fetchData = async () => {
@@ -131,7 +142,6 @@ export default function MegarackPage() {
   }, [selectedUnit, formSelectedProperty, properties]);
 
   const consumption = (currentReading && priorReading !== null) ? Number(currentReading) - priorReading : 0;
-  const { startLoading, stopLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,6 +201,60 @@ export default function MegarackPage() {
               description: 'Could not find an active tenant for this water reading.',
           });
       }
+  };
+
+  const handleEditClick = async (reading: WaterReadingRecord) => {
+    if (!reading.paymentId) {
+        toast({
+            variant: 'destructive',
+            title: 'No Payment Record',
+            description: 'Could not find the payment record associated with this bill.',
+        });
+        return;
+    }
+    startLoading('Loading payment details...');
+    try {
+        const payment = await getPayment(reading.paymentId);
+        if (payment) {
+            setSelectedPayment(payment);
+            setIsEditDialogOpen(true);
+        } else {
+            toast({ variant: 'destructive', title: 'Payment Not Found' });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch payment details.' });
+    } finally {
+        stopLoading();
+    }
+  };
+
+  const handleSaveEdit = async (paymentId: string, data: EditFormValues) => {
+    if (!userProfile?.id || !selectedPayment?.tenantId) return;
+
+    startLoading('Updating payment record...');
+    try {
+        await updatePayment(
+            paymentId,
+            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd'), notes: data.notes },
+            data.reason,
+            userProfile.id
+        );
+
+        if (selectedPayment.waterReadingId) {
+             const readingRef = doc(db, 'waterReadings', selectedPayment.waterReadingId);
+             await updateDoc(readingRef, { amount: data.amount });
+        }
+        
+        await forceRecalculateTenantBalance(selectedPayment.tenantId);
+        
+        toast({ title: "Payment Updated", description: "The payment has been successfully updated."});
+        fetchData(); 
+        setIsEditDialogOpen(false);
+    } catch(error) {
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment.' });
+    } finally {
+        stopLoading();
+    }
   };
 
   const filteredReadings = useMemo(() => {
@@ -308,15 +372,17 @@ export default function MegarackPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="default"
-                                                disabled={isPaid}
-                                                onClick={() => handleRecordPaymentClick(reading)}
-                                            >
-                                                <PlusCircle className="mr-2 h-4 w-4" />
-                                                Record Payment
-                                            </Button>
+                                            {isPaid ? (
+                                                <Button size="sm" variant="outline" onClick={() => handleEditClick(reading)}>
+                                                    <Edit2 className="mr-2 h-4 w-4" />
+                                                    Edit Payment
+                                                </Button>
+                                            ) : (
+                                                <Button size="sm" variant="default" onClick={() => handleRecordPaymentClick(reading)}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Record Payment
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                     )
@@ -459,6 +525,13 @@ export default function MegarackPage() {
         defaultPaymentType="Water"
         allReadings={allReadings}
         readingForPayment={selectedReadingForPayment}
+    />
+
+    <EditPaymentDialog 
+        payment={selectedPayment}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSave={handleSaveEdit}
     />
     </>
   );

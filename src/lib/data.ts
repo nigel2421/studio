@@ -277,6 +277,10 @@ export async function getTenant(id: string): Promise<Tenant | null> {
     return getDocument<Tenant>('tenants', id);
 }
 
+export async function getPayment(id: string): Promise<Payment | null> {
+    return getDocument<Payment>('payments', id);
+}
+
 export async function addTenant(data: {
     name: string;
     email: string;
@@ -709,6 +713,7 @@ export async function batchProcessPayments(
         type: Payment['type'],
         paymentMethod?: Payment['paymentMethod'],
         transactionId?: string,
+        waterReadingId?: string,
     }[],
     taskId?: string
 ) {
@@ -719,33 +724,6 @@ export async function batchProcessPayments(
     if (!tempTenant) throw new Error("Tenant not found before transaction.");
     const property = await getProperty(tempTenant.propertyId);
     const unit = property?.units.find(u => u.name === tempTenant.unitName);
-
-    const waterPaymentAmount = paymentEntries
-        .filter(p => p.type === 'Water' && p.amount > 0)
-        .reduce((sum, p) => sum + p.amount, 0);
-
-    const pendingReadingsToUpdateRefs: DocumentReference[] = [];
-
-    if (waterPaymentAmount > 0) {
-        const waterReadingsQuery = query(
-            collection(db, 'waterReadings'),
-            where('tenantId', '==', tenantId),
-            where('status', '==', 'Pending'),
-            orderBy('date', 'asc')
-        );
-        const pendingReadingsSnap = await getDocs(waterReadingsQuery);
-        let remainingPayment = waterPaymentAmount;
-
-        for (const docSnap of pendingReadingsSnap.docs) {
-            if (remainingPayment <= 0) break;
-            const reading = docSnap.data() as WaterMeterReading;
-            if (reading.amount && remainingPayment >= reading.amount) {
-                pendingReadingsToUpdateRefs.push(docSnap.ref);
-                remainingPayment -= reading.amount;
-            }
-        }
-    }
-
 
     await runTransaction(db, async (transaction) => {
         // 1. Transactional read of the tenant document
@@ -774,13 +752,26 @@ export async function batchProcessPayments(
         // 4. Process all new payments against the in-memory state
         for (const entry of paymentEntries) {
             const paymentDocRef = doc(collection(db, 'payments'));
-            // Write payment document
-            transaction.set(paymentDocRef, {
-                ...entry,
-                tenantId: tenantId,
+            const paymentPayload: Partial<Payment> = {
+                tenantId,
+                amount: entry.amount,
+                date: entry.date,
+                notes: entry.notes,
+                rentForMonth: entry.rentForMonth,
+                type: entry.type,
                 status: 'Paid',
-                createdAt: serverTimestamp()
-            });
+                paymentMethod: entry.paymentMethod,
+                transactionId: entry.transactionId,
+                createdAt: new Date(),
+            };
+
+            if (entry.type === 'Water' && entry.waterReadingId) {
+                paymentPayload.waterReadingId = entry.waterReadingId;
+                const readingRef = doc(db, 'waterReadings', entry.waterReadingId);
+                transaction.update(readingRef, { status: 'Paid', paymentId: paymentDocRef.id });
+            }
+            
+            transaction.set(paymentDocRef, paymentPayload);
 
             // ONLY apply rent/deposit/etc payments to the main tenant balance
             if (entry.type !== 'Water') {
@@ -815,11 +806,6 @@ export async function batchProcessPayments(
 
         // 6. Perform the single final write to the tenant document
         transaction.update(tenantRef, finalUpdates);
-
-        // 7. Update status of any water bills that have now been paid
-        for (const readingRef of pendingReadingsToUpdateRefs) {
-            transaction.update(readingRef, { status: 'Paid' });
-        }
     });
 
     if (taskId) {
@@ -1795,6 +1781,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 

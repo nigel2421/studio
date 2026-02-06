@@ -95,6 +95,7 @@ export type WaterMeterReading = {
   date: string;
   createdAt: Date;
   status?: 'Paid' | 'Pending';
+  paymentId?: string;
 };
 
 export type Task = {
@@ -136,6 +137,7 @@ export type Payment = {
   transactionId: string;
   createdAt: Date;
   reference?: string;
+  waterReadingId?: string;
   editHistory?: {
     editedAt: string;
     editedBy: string;

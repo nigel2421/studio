@@ -279,6 +279,7 @@ export function AddPaymentDialog({
         type: e.type,
         paymentMethod: e.paymentMethod,
         transactionId: e.transactionId,
+        waterReadingId: e.type === 'Water' && readingForPayment ? readingForPayment.id : undefined,
       }));
 
       await batchProcessPayments(finalTenantId, paymentsToBatch, taskId);
