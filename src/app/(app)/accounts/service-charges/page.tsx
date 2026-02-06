@@ -596,6 +596,7 @@ export default function ServiceChargesPage() {
             allPayments={allPayments}
             selectedMonth={selectedMonth}
             paymentStatusForMonth={statusForHistory}
+            onDataChange={fetchData}
         />
       )}
     </div>

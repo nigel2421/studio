@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Download, Mail } from 'lucide-react';
+import { Loader2, Download, Mail, Edit2 } from 'lucide-react';
 import { Tenant, Payment, Property, Landlord, PropertyOwner, Unit, LedgerEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { StatementOptionsDialog } from './statement-options-dialog';
@@ -14,7 +14,11 @@ import { useLoading } from '@/hooks/useLoading';
 import { useToast } from '@/hooks/use-toast';
 import { performSendServiceChargeInvoice } from '@/app/actions';
 import { InvoicePreviewDialog } from './invoice-preview-dialog';
-import { generateLedger } from '@/lib/financial-logic';
+import { generateLedger, updatePayment, forceRecalculateTenantBalance } from '@/lib/financial-logic';
+import { useAuth } from '@/hooks/useAuth';
+import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
+import { getPaymentHistory } from '@/lib/data';
+
 
 interface OwnerTransactionHistoryDialogProps {
     owner: PropertyOwner | Landlord | null;
@@ -25,9 +29,10 @@ interface OwnerTransactionHistoryDialogProps {
     allPayments: Payment[];
     selectedMonth: Date;
     paymentStatusForMonth: 'Paid' | 'Pending' | 'N/A' | null;
+    onDataChange?: () => void;
 }
 
-export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allProperties, allTenants, allPayments, selectedMonth, paymentStatusForMonth }: OwnerTransactionHistoryDialogProps) {
+export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allProperties, allTenants, allPayments, selectedMonth, paymentStatusForMonth, onDataChange }: OwnerTransactionHistoryDialogProps) {
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
     const [finalDueBalance, setFinalDueBalance] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +41,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const { toast } = useToast();
     const [isSending, setIsSending] = useState(false);
     const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
-    
+
+    const { userProfile } = useAuth();
+    const [selectedPaymentForEdit, setSelectedPaymentForEdit] = useState<Payment | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [tenantPayments, setTenantPayments] = useState<Payment[]>([]);
+
     useEffect(() => {
         if (!owner || !open) return;
 
@@ -47,18 +57,19 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             : allTenants.filter(t => t.residentType === 'Homeowner' && t.email === owner.email)
         );
         const uniqueTenants = Array.from(new Map(associatedTenants.map(t => [t.id, t])).values());
+        
+        let primaryTenant: Tenant | undefined = uniqueTenants[0];
 
         if (uniqueTenants.length > 0) {
             const associatedTenantIds = uniqueTenants.map(t => t.id);
-            const tenantPayments = allPayments.filter(p => associatedTenantIds.includes(p.tenantId));
-            const primaryTenant = uniqueTenants[0];
+            const currentTenantPayments = allPayments.filter(p => associatedTenantIds.includes(p.tenantId));
+            setTenantPayments(currentTenantPayments);
 
-            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant, tenantPayments, allProperties, owner);
+            const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant, currentTenantPayments, allProperties, owner);
             
             setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setFinalDueBalance(dueBalance);
         } else {
-            // No tenant records exist, but we can still show charges
             const dummyTenant: Tenant = {
                 id: `dummy-${owner.id}`,
                 name: owner.name,
@@ -69,7 +80,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                 lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
                 propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
             };
-
+            primaryTenant = dummyTenant;
             const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, owner);
             setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setFinalDueBalance(dueBalance);
@@ -77,6 +88,33 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         setIsLoading(false);
     }, [owner, open, allTenants, allPayments, allProperties]);
     
+
+    const handleEditClick = (paymentId: string) => {
+        const payment = tenantPayments.find(p => p.id === paymentId);
+        if (payment) {
+            setSelectedPaymentForEdit(payment);
+            setIsEditDialogOpen(true);
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the original payment record to edit.' });
+        }
+    };
+    
+    const handleSaveEdit = async (paymentId: string, data: EditFormValues) => {
+        if (!userProfile?.id || !owner) return;
+
+        const tenant = allTenants.find(t => t.residentType === 'Homeowner' && (t.userId === owner.userId || t.email === owner.email));
+        if (!tenant) {
+            toast({ variant: "destructive", title: "Error", description: "Associated resident account not found for balance recalculation."});
+            return;
+        }
+
+        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd'), notes: data.notes }, data.reason, userProfile.id);
+        await forceRecalculateTenantBalance(tenant.id);
+        toast({ title: "Payment Updated", description: "The transaction has been successfully updated."});
+        if (onDataChange) {
+            onDataChange();
+        }
+    };
 
     const handleOpenInvoicePreview = () => {
         if (!finalDueBalance || finalDueBalance <= 0) {
@@ -170,6 +208,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                         <TableHead className="text-right">Charge</TableHead>
                                         <TableHead className="text-right">Payment</TableHead>
                                         <TableHead className="text-right">Balance</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -185,6 +224,13 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                                                     ? <span className="text-green-600">Ksh {Math.abs(t.balance).toLocaleString()} Cr</span>
                                                     : `Ksh ${t.balance.toLocaleString()}`
                                                 }
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {!t.id.startsWith('charge-') && (
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(t.id)}>
+                                                        <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                                    </Button>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -210,6 +256,12 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+             <EditPaymentDialog 
+                payment={selectedPaymentForEdit}
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                onSave={handleSaveEdit}
+            />
             <InvoicePreviewDialog
                 isOpen={isInvoicePreviewOpen}
                 onClose={() => setIsInvoicePreviewOpen(false)}
