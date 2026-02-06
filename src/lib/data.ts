@@ -625,35 +625,14 @@ export async function addWaterMeterReading(data: {
         status: 'Pending',
     });
 
-    // 3. Prepare initial update from the water bill
-    const newDueBalance = (originalTenant.dueBalance || 0) + amount;
-    const initialUpdates = {
-        dueBalance: newDueBalance,
-        'lease.paymentStatus': getRecommendedPaymentStatus({ ...originalTenant, dueBalance: newDueBalance })
-    };
+    // 3. Run reconciliation on the current tenant state to update rent, but DO NOT add the water bill to the balance.
+    const reconciliationUpdates = reconcileMonthlyBilling(originalTenant, unit, asOfDate || new Date());
 
-    // 4. Create a transient in-memory state after applying the bill
-    const tenantAfterBill: Tenant = {
-        ...originalTenant,
-        dueBalance: initialUpdates.dueBalance,
-        lease: {
-            ...originalTenant.lease,
-            paymentStatus: initialUpdates['lease.paymentStatus'],
-        }
-    };
-
-    // 5. Run reconciliation on this new transient state
-    const reconciliationUpdates = reconcileMonthlyBilling(tenantAfterBill, unit, asOfDate || new Date());
-
-    // 6. Merge all updates for the final write
-    const finalUpdates = {
-        ...initialUpdates,
-        ...reconciliationUpdates
-    };
-
-    // 7. Update tenant in Firestore
-    const tenantRef = doc(db, 'tenants', originalTenant.id);
-    await updateDoc(tenantRef, finalUpdates);
+    // 4. Update tenant in Firestore if there are any rent reconciliation updates
+    if (Object.keys(reconciliationUpdates).length > 0) {
+        const tenantRef = doc(db, 'tenants', originalTenant.id);
+        await updateDoc(tenantRef, reconciliationUpdates);
+    }
 
     await logActivity(`Added water reading for unit ${data.unitName}`);
 }
@@ -1816,5 +1795,6 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 

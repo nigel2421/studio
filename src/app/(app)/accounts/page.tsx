@@ -2,8 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getTenants, getProperties, getAllPayments, getAllPendingWaterBills } from '@/lib/data';
-import type { Tenant, Property, Payment, WaterMeterReading } from '@/lib/types';
+import { getTenants, getProperties, getAllPayments } from '@/lib/data';
+import type { Tenant, Property, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -31,7 +31,6 @@ export default function AccountsPage() {
   const [residents, setResidents] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [pendingWaterBills, setPendingWaterBills] = useState<WaterMeterReading[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -42,16 +41,14 @@ export default function AccountsPage() {
 
   const fetchAllData = async () => {
     try {
-      const [tenantsData, propertiesData, paymentsData, pendingWaterBillsData] = await Promise.all([
+      const [tenantsData, propertiesData, paymentsData] = await Promise.all([
         getTenants(), 
         getProperties(),
         getAllPayments(),
-        getAllPendingWaterBills(),
       ]);
       setResidents(tenantsData);
       setProperties(propertiesData);
       setPayments(paymentsData);
-      setPendingWaterBills(pendingWaterBillsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -66,12 +63,6 @@ export default function AccountsPage() {
 
     const propertiesMap = new Map(properties.map(p => [p.id, p]));
     
-    const pendingBillsByTenant = new Map<string, number>();
-    pendingWaterBills.forEach(bill => {
-        const total = pendingBillsByTenant.get(bill.tenantId) || 0;
-        pendingBillsByTenant.set(bill.tenantId, total + bill.amount);
-    });
-
     return residents.map(tenant => {
         const property = propertiesMap.get(tenant.propertyId);
         const unit = property?.units.find(u => u.name === tenant.unitName);
@@ -92,16 +83,11 @@ export default function AccountsPage() {
             updatedTenant.lease.lastBilledPeriod = updates['lease.lastBilledPeriod'];
         }
         
-        const totalPendingWater = pendingBillsByTenant.get(tenant.id) || 0;
         let chargeArrears = updatedTenant.dueBalance || 0;
-
-        if (chargeArrears > 0) {
-            chargeArrears = Math.max(0, chargeArrears - totalPendingWater);
-        }
 
         return { ...updatedTenant, chargeArrears };
     });
-  }, [residents, properties, pendingWaterBills]);
+  }, [residents, properties]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
