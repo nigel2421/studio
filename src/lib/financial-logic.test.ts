@@ -217,14 +217,14 @@ describe('Financial Logic', () => {
                 phone: mockOwner.phone,
                 idNumber: 'N/A',
                 residentType: 'Homeowner',
-                lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
+                lease: { startDate: '2000-01-01', endDate: '2099-01-01', rent: 0, paymentStatus: 'Pending' },
                 propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
             };
     
-            const asOfDate = parseISO('2024-03-15');
+            const asOfDate = new Date(2024, 2, 15); // March 15, 2024
             
             // Act: Generate ledger with dummy tenant and no payments
-            const { ledger, finalDueBalance } = generateLedger(dummyTenant, [], [mockProperty], [], mockOwner, asOfDate, { includeWater: false });
+            const { ledger, finalDueBalance } = generateLedger(dummyTenant, [], [mockProperty], [], mockOwner, asOfDate, { includeWater: false, includeRent: false, includeServiceCharge: true });
     
             // Assert
             // Handover Jan 1 (day <= 10) -> waive Jan, first bill is Feb.

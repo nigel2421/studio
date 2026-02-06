@@ -108,10 +108,10 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
 
     // Determine the true start of billing
     let billingStartDate: Date;
-    const leaseStartDate = new Date(tenant.lease.startDate);
+    const leaseStartDate = parseISO(tenant.lease.startDate);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-        const handoverDate = new Date(unit.handoverDate);
+        const handoverDate = parseISO(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
         
         // Handover on/before 10th waives that month, billing starts next month
@@ -126,7 +126,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     }
     
     const lastBilledDate = tenant.lease.lastBilledPeriod
-        ? startOfMonth(new Date(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
+        ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
         : null;
 
     // The first month we should even consider billing for.
@@ -215,7 +215,7 @@ export function validatePayment(
     }
 
     if (tenant.residentType === 'Tenant' && tenant.lease?.startDate) {
-        const leaseStartDate = new Date(tenant.lease.startDate);
+        const leaseStartDate = parseISO(tenant.lease.startDate);
         leaseStartDate.setHours(0, 0, 0, 0);
         if (paymentDateOnly < leaseStartDate) {
             throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be before the lease start date of ${tenant.lease.startDate}.`);
@@ -253,7 +253,7 @@ export function generateLedger(
     let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string }[] = [];
 
     if (tenant.residentType === 'Tenant' && options.includeRent) {
-        const leaseStartDate = new Date(tenant.lease.startDate);
+        const leaseStartDate = parseISO(tenant.lease.startDate);
         if (tenant.securityDeposit && tenant.securityDeposit > 0) {
             allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
         }
@@ -266,7 +266,9 @@ export function generateLedger(
 
     ownerUnits.forEach(unit => {
         const isHomeowner = tenant.residentType === 'Homeowner';
-        if ((!isHomeowner && !options.includeRent) || (isHomeowner && !options.includeServiceCharge)) {
+        const finalOptions = { includeRent: true, includeServiceCharge: true, includeWater: true, ...options };
+
+        if ((!isHomeowner && !finalOptions.includeRent) || (isHomeowner && !finalOptions.includeServiceCharge)) {
             return;
         }
 
@@ -276,13 +278,18 @@ export function generateLedger(
         if (monthlyCharge > 0) {
             let billingStartDate: Date;
             if (isHomeowner && unit?.handoverDate) {
-                const handoverDate = new Date(unit.handoverDate);
+                const handoverDate = parseISO(unit.handoverDate);
                 const handoverDay = handoverDate.getDate();
-                billingStartDate = (handoverDay <= 10) ? startOfMonth(addMonths(handoverDate, 1)) : startOfMonth(addMonths(handoverDate, 2));
+                
+                if (handoverDay <= 10) {
+                    billingStartDate = startOfMonth(addMonths(handoverDate, 1));
+                } else {
+                    billingStartDate = startOfMonth(addMonths(handoverDate, 2));
+                }
             } else {
-                billingStartDate = startOfMonth(new Date(tenant.lease.startDate));
+                billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
             }
-
+            
             let loopDate = billingStartDate;
             const startOfCurrentMonth = startOfMonth(asOfDate);
 
@@ -300,14 +307,14 @@ export function generateLedger(
     });
 
     monthlyChargesMap.forEach((value, key) => {
-        const chargeDate = new Date(key + '-01T12:00:00Z');
+        const chargeDate = parseISO(key + '-01');
         const description = `${value.type} for Units: ${value.unitNames.join(', ')}`;
         allCharges.push({
             id: `charge-${key}`, date: chargeDate, description, charge: value.charge, payment: 0, forMonth: format(chargeDate, 'MMM yyyy'),
         });
     });
 
-    if (options.includeWater) {
+    if (options.includeWater && allTenantWaterReadings) {
       allTenantWaterReadings.forEach(reading => {
           allCharges.push({
               id: `charge-water-${reading.id}`, date: new Date(reading.date), description: `Water Bill (${reading.consumption} units @ Ksh ${reading.rate})`, charge: reading.amount, payment: 0, forMonth: format(new Date(reading.date), 'MMM yyyy'),
@@ -328,7 +335,7 @@ export function generateLedger(
         if (p.paymentMethod) details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
 
         return {
-            id: p.id, date: new Date(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(new Date(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status,
+            id: p.id, date: new Date(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status,
         };
     });
 

@@ -66,6 +66,7 @@ describe('Arrears Logic', () => {
                 createMockTenant('4', -100), // Credit
             ];
             mockGetTenants.mockResolvedValue(tenants);
+            mockGetAllPendingWaterBills.mockResolvedValue([]);
 
             const result = await getTenantsInArrears();
 
@@ -79,6 +80,7 @@ describe('Arrears Logic', () => {
                 createMockTenant('2', -50),
             ];
             mockGetTenants.mockResolvedValue(tenants);
+            mockGetAllPendingWaterBills.mockResolvedValue([]);
 
             const result = await getTenantsInArrears();
             expect(result).toHaveLength(0);
@@ -103,6 +105,7 @@ describe('Arrears Logic', () => {
 
             mockGetProperties.mockResolvedValue(properties);
             mockGetTenants.mockResolvedValue(tenants);
+            mockGetAllPendingWaterBills.mockResolvedValue([]);
 
             const result = await getLandlordArrearsBreakdown(landlordId);
 

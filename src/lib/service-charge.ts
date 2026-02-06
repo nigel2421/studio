@@ -206,8 +206,8 @@ export function processServiceChargeData(
 
       let paymentStatus: 'Paid' | 'Pending' | 'N/A';
       
-        let isBillable = false;
-        if (unit.handoverDate) {
+      let isBillable = false;
+      if (unit.handoverDate) {
           const handoverDateSource = unit.handoverDate as any;
           const handoverDate = handoverDateSource && typeof handoverDateSource.toDate === 'function'
               ? handoverDateSource.toDate()
@@ -221,20 +221,20 @@ export function processServiceChargeData(
                 firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
             }
             if (!isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
-              isBillable = true;
+                isBillable = true;
             }
           }
-        } else if (unit.handoverStatus === 'Handed Over') {
-            isBillable = true;
-        }
+      } else if (unit.handoverStatus === 'Handed Over') {
+          isBillable = true;
+      }
 
-        if (!isBillable) {
-            paymentStatus = 'N/A';
-        } else if (paymentForMonthExists) {
-            paymentStatus = 'Paid';
-        } else {
-            paymentStatus = 'Pending';
-        }
+      if (!isBillable) {
+          paymentStatus = 'N/A';
+      } else if (paymentForMonthExists) {
+          paymentStatus = 'Paid';
+      } else {
+          paymentStatus = 'Pending';
+      }
 
       return {
         propertyId: unit.propertyId,
