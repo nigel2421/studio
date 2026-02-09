@@ -31,12 +31,12 @@ This document provides a high-level overview of the architecture for the Eracov 
     *   `(tenant)`: The self-service portal for tenants to view payments and submit maintenance requests.
     *   `login`: The public-facing login page.
 *   **State Management**: Primarily uses React's built-in state management (e.g., `useState`, `useEffect`, `useContext`) for local and shared state. The `useAuth` hook provides global access to user and profile information.
-*   **Data Fetching**: Data is fetched from Firestore using a data access layer defined in `src/lib/data.ts`. This layer abstracts the direct Firestore queries. Real-time updates are handled via Firestore's `onSnapshot` listeners where necessary (e.g., Tasks).
+*   **Data Fetching**: Data is fetched from Firestore using a data access layer defined in `src/lib/data.ts`. This layer abstracts direct Firestore queries and includes a serialization helper (`postToJSON`) to safely convert Firestore `Timestamp` objects into strings, preventing server/client data type mismatches. Real-time updates are handled via Firestore's `onSnapshot` listeners where necessary (e.g., Tasks).
 *   **Document Generation**: PDF documents (receipts, statements) are generated on the client-side using the `jspdf` library. The logic is encapsulated in `src/lib/pdf-generator.ts`.
 
 ### 2. Backend (Firebase Cloud Functions)
 
-*   **Directory**: `src/functions`
+*   **Directory**: `functions`
 *   **Description**: Handles server-side logic that cannot be done on the client, such as sending emails or performing scheduled tasks.
 *   **Key Functions**:
     *   `sendCustomEmail`: A callable function to send bulk announcements to tenants, landlords, or other groups.

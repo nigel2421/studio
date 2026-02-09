@@ -10,12 +10,6 @@ This document outlines the testing strategy for the Eracov Properties applicatio
 
 ## Unit Tests
 
-### Financial Logic (`financial-logic.test.ts`)
-
-This suite tests the core financial calculations:
-*   `calculateTransactionBreakdown`: Verifies correct calculation of management fees (standard 5% and first-month 50% commission), service charge deductions, and net payouts.
-*   `aggregateFinancials`: Ensures that a landlord's summary is correctly aggregated from multiple payments across different unit types and ownership models.
-
 ### Arrears Logic (`arrears.test.ts`)
 
 Tests the logic for identifying and summarizing outstanding balances.
