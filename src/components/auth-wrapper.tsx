@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,11 +8,11 @@ import { useAuth } from '@/hooks/useAuth';
 // Define allowed routes for each role
 const ADMIN_AGENT_ROUTES = [
     '/dashboard', '/accounts', '/tenants', '/properties', '/maintenance',
-    '/documents', '/clients', '/landlords', '/airbnb', '/users', '/logs', '/communications',
+    '/clients', '/landlords', '/airbnb', '/users', '/logs', '/communications',
     '/water-meter/add'
 ];
-const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/documents', '/clients', '/landlords'];
-const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance', '/tenant/documents'];
+const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/clients', '/landlords'];
+const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance'];
 const LANDLORD_ROUTES = ['/landlord/dashboard'];
 const HOMEOWNER_ROUTES = ['/landlord/dashboard']; // Redirect to the same universal dashboard
 

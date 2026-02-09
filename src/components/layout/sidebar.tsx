@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -54,7 +53,6 @@ const navItems = [
   { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
   { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
-  { href: '/documents', icon: FileText, label: 'Receipts' },
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Megarack' },
   { href: '/properties', icon: Building2, label: 'Properties' },
