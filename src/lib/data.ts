@@ -50,9 +50,13 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
     }
 }
 
+async function getAllUsers(): Promise<UserProfile[]> {
+    return cacheService.getOrFetch('users', 'all', () => getCollection<UserProfile>('users'), 300000);
+}
+
 export async function getUsers(): Promise<UserProfile[]> {
     const [users, properties, landlords, propertyOwners] = await Promise.all([
-        getCollection<UserProfile>('users'),
+        getAllUsers(),
         getProperties(),
         getLandlords(),
         getPropertyOwners(),
@@ -120,6 +124,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
         const userEmail = userSnap.data().email;
 
         await updateDoc(userRef, { role });
+        cacheService.clear('users');
         await logActivity(`Updated role for user ${userEmail} to ${role}`);
     } catch (error: any) {
         console.error(`Error updating role for user ${userId}:`, error);
@@ -215,26 +220,31 @@ export async function getProperties(forceRefresh = false): Promise<Property[]> {
 }
 
 export async function getTenants(limitCount?: number): Promise<Tenant[]> {
-    const constraints: any[] = [];
-    if (limitCount) constraints.push(limit(limitCount));
-    return getCollection<Tenant>('tenants', constraints);
+    if (limitCount) {
+        const constraints: any[] = [];
+        constraints.push(limit(limitCount));
+        return getCollection<Tenant>('tenants', constraints);
+    }
+    return cacheService.getOrFetch('tenants', 'all', () => getCollection<Tenant>('tenants'), 300000);
 }
 
 export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
-    return getCollection<ArchivedTenant>('archived_tenants');
+    return cacheService.getOrFetch('archived_tenants', 'all', () => getCollection<ArchivedTenant>('archived_tenants'), 300000);
 }
 
 export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    return cacheService.getOrFetch('maintenanceRequests', 'last90days', async () => {
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    const q = query(
-        collection(db, 'maintenanceRequests'),
-        where('createdAt', '>=', ninetyDaysAgo),
-        orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+        const q = query(
+            collection(db, 'maintenanceRequests'),
+            where('createdAt', '>=', ninetyDaysAgo),
+            orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    }, 120000);
 }
 
 export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
@@ -259,9 +269,11 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
 }
 
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
-    const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    return cacheService.getOrFetch('waterReadings', 'all', async () => {
+        const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    }, 120000);
 }
 
 export async function getLatestWaterReading(propertyId: string, unitName: string): Promise<WaterMeterReading | null> {
@@ -419,6 +431,8 @@ export async function addTenant(data: {
 
     // Run everything in parallel
     await Promise.all([...independentOperations, createAuthUser()]);
+    cacheService.clear('tenants');
+    cacheService.clear('tasks');
 }
 
 export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): Promise<void> {
@@ -428,6 +442,7 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
     };
 
     await addDoc(collection(db, "properties"), newPropertyData);
+    cacheService.clear('properties');
     await logActivity(`Added new property: ${property.name}`);
 }
 
@@ -459,7 +474,8 @@ export async function archiveTenant(tenantId: string): Promise<void> {
             await updateDoc(propertyRef, { units: updatedUnits });
         }
 
-
+        cacheService.clear('tenants');
+        cacheService.clear('archived_tenants');
         await logActivity(`Archived resident: ${tenant.name}`);
     }
 }
@@ -468,6 +484,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
     const oldTenant = await getTenant(tenantId);
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, tenantData);
+    cacheService.clear('tenants');
 
     await logActivity(`Updated tenant: ${tenantData.name || oldTenant?.name}`);
 
@@ -530,6 +547,7 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
             createdAt: serverTimestamp(),
             status: 'New',
         });
+        cacheService.clear('maintenanceRequests');
         await logActivity(`Submitted maintenance request`);
     } catch (error: any) {
         console.error("Error adding maintenance request:", error);
@@ -541,6 +559,7 @@ export async function updateMaintenanceRequestStatus(requestId: string, status: 
     try {
         const requestRef = doc(db, 'maintenanceRequests', requestId);
         await updateDoc(requestRef, { status });
+        cacheService.clear('maintenanceRequests');
         await logActivity(`Updated maintenance request ${requestId} to ${status}`);
     } catch (error: any) {
         console.error(`Error updating maintenance request ${requestId}:`, error);
@@ -636,6 +655,7 @@ export async function addWaterMeterReading(data: {
         createdAt: serverTimestamp(),
         status: 'Pending',
     });
+    cacheService.clear('waterReadings');
 
     // 3. Run reconciliation on the current tenant state to update rent, but DO NOT add the water bill to the balance.
     const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
@@ -644,6 +664,7 @@ export async function addWaterMeterReading(data: {
     if (Object.keys(reconciliationUpdates).length > 0) {
         const tenantRef = doc(db, 'tenants', originalTenant.id);
         await updateDoc(tenantRef, reconciliationUpdates);
+        cacheService.clear('tenants');
     }
 
     await logActivity(`Added water reading for unit ${data.unitName}`);
@@ -826,6 +847,12 @@ export async function batchProcessPayments(
         }
     }
 
+    cacheService.clear('tenants');
+    cacheService.clear('payments');
+    if (paymentEntries.some(e => e.type === 'Water')) {
+        cacheService.clear('waterReadings');
+    }
+
     const tenant = await getTenant(tenantId);
     if (tenant) {
         const property = await getProperty(tenant.propertyId);
@@ -902,6 +929,7 @@ export async function updatePayment(
         });
     });
 
+    cacheService.clear('payments');
     await logActivity(`Edited payment ${paymentId}. Reason: ${reason}`);
 }
 
@@ -924,6 +952,7 @@ export async function forceRecalculateTenantBalance(tenantId: string) {
         accountBalance: finalAccountBalance,
         'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
     });
+    cacheService.clear('tenants');
 }
 
 export async function runMonthlyReconciliation(): Promise<void> {
@@ -948,6 +977,7 @@ export async function runMonthlyReconciliation(): Promise<void> {
     }
 
     await batch.commit();
+    cacheService.clear('tenants');
     await logActivity(`Monthly reconciliation completed for ${tenantsSnap.size} tenants.`);
 }
 
@@ -1257,7 +1287,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
 }
 
 export async function getLandlords(): Promise<Landlord[]> {
-    return getCollection<Landlord>('landlords');
+    return cacheService.getOrFetch('landlords', 'all', () => getCollection<Landlord>('landlords'), 300000);
 }
 
 export async function getLandlord(landlordId: string): Promise<Landlord | null> {
@@ -1342,6 +1372,8 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
 
 
     await batch.commit();
+    cacheService.clear('landlords');
+    cacheService.clear('properties');
     await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
 }
 
@@ -1373,6 +1405,7 @@ export async function addLandlordsFromCSV(data: { name: string; email: string; p
 
     await batch.commit();
     if (added > 0) {
+        cacheService.clear('landlords');
         await logActivity(`Bulk added ${added} landlords via CSV.`);
     }
     return { added, skipped };
@@ -1434,6 +1467,7 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
     };
 
     const tenantDocRef = await addDoc(tenantsRef, newTenantData);
+    cacheService.clear('tenants');
     await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
 
     // Also update the User profile if it exists and doesn't have a tenantId yet.
@@ -1443,6 +1477,7 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
         const userSnap = await getDoc(userRef);
         if (userSnap.exists() && !userSnap.data().tenantId) {
             await updateDoc(userRef, { tenantId: tenantDocRef.id });
+            cacheService.clear('users');
         }
     }
 
@@ -1452,7 +1487,7 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
 
 // Property Owner (Client) Functions
 export async function getPropertyOwners(): Promise<PropertyOwner[]> {
-    return getCollection<PropertyOwner>('propertyOwners');
+    return cacheService.getOrFetch('propertyOwners', 'all', () => getCollection<PropertyOwner>('propertyOwners'), 300000);
 }
 
 export async function getPropertyOwner(ownerId: string): Promise<PropertyOwner | null> {
@@ -1479,6 +1514,8 @@ export async function deletePropertyOwner(ownerId: string): Promise<void> {
     }
 
     await batch.commit();
+    cacheService.clear('propertyOwners');
+    cacheService.clear('users');
     await logActivity(`Deleted property owner: ${owner.name} (${owner.email})`);
 }
 
@@ -1524,6 +1561,9 @@ export async function deleteLandlord(landlordId: string): Promise<void> {
     }
 
     await batch.commit();
+    cacheService.clear('landlords');
+    cacheService.clear('properties');
+    cacheService.clear('users');
     await logActivity(`Deleted landlord: ${landlord.name} (${landlord.email})`);
 }
 
@@ -1577,6 +1617,10 @@ export async function updatePropertyOwner(
     }
 
     await setDoc(ownerRef, finalData, { merge: true });
+    cacheService.clear('propertyOwners');
+    if (userId) {
+        cacheService.clear('users');
+    }
     await logActivity(`Updated property owner details: ${data.name || ownerId}`);
 }
 
@@ -1599,18 +1643,21 @@ export async function getAllPaymentsForReport(): Promise<Payment[]> {
 }
 
 export async function getAllPayments(limitCount: number = 50): Promise<Payment[]> {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
+    const cacheKey = `last90days-limit${limitCount}`;
+    return cacheService.getOrFetch('payments', cacheKey, async () => {
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
 
-    const q = query(
-        collection(db, 'payments'),
-        where('date', '>=', dateStr),
-        orderBy('date', 'desc'),
-        limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        const q = query(
+            collection(db, 'payments'),
+            where('date', '>=', dateStr),
+            orderBy('date', 'desc'),
+            limit(limitCount)
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+    }, 120000); // 2 minutes cache
 }
 
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
@@ -1619,6 +1666,7 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<voi
             ...task,
             createdAt: serverTimestamp(),
         });
+        cacheService.clear('tasks');
         await logActivity(`Created task: ${task.title}`);
     } catch (error: any) {
         console.error("Error adding task:", error);
@@ -1780,21 +1828,16 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
       }
     });
   
+    cacheService.clear('payments');
+    cacheService.clear('tenants');
     await logActivity(`Voided payment ${paymentId}. Reason: ${reason}`, editorId);
     await forceRecalculateTenantBalance( (await getDocument<Payment>('payments', paymentId))!.tenantId );
 }
 
 export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
-    const q = query(collectionGroup(db, 'waterReadings'), where('status', '==', 'Pending'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    return cacheService.getOrFetch('waterReadings', 'all-pending', async () => {
+        const q = query(collectionGroup(db, 'waterReadings'), where('status', '==', 'Pending'));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    }, 120000); // 2 min cache
 }
-
-
-
-
-
-
-
-
-
