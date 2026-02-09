@@ -250,7 +250,7 @@ export function generateLedger(
         }
     }
 
-    let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string }[] = [];
+    let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string, priorReading?: number, currentReading?: number, consumption?: number, rate?: number, unitName?: string }[] = [];
 
     if (tenant.residentType === 'Tenant' && options.includeRent) {
         const leaseStartDate = parseISO(tenant.lease.startDate);
@@ -317,7 +317,17 @@ export function generateLedger(
     if (options.includeWater && allTenantWaterReadings) {
       allTenantWaterReadings.forEach(reading => {
           allCharges.push({
-              id: `charge-water-${reading.id}`, date: new Date(reading.date), description: `Water Bill (${reading.consumption} units @ Ksh ${reading.rate})`, charge: reading.amount, payment: 0, forMonth: format(new Date(reading.date), 'MMM yyyy'),
+              id: `charge-water-${reading.id}`,
+              date: new Date(reading.date),
+              description: `Water Bill for ${reading.unitName}`,
+              charge: reading.amount,
+              payment: 0,
+              forMonth: format(new Date(reading.date), 'MMM yyyy'),
+              priorReading: reading.priorReading,
+              currentReading: reading.currentReading,
+              consumption: reading.consumption,
+              rate: reading.rate,
+              unitName: reading.unitName,
           });
       });
     }

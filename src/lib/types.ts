@@ -205,6 +205,12 @@ export interface LedgerEntry {
     balance: number;
     forMonth?: string;
     status?: PaymentStatus;
+    // For water bills
+    priorReading?: number;
+    currentReading?: number;
+    consumption?: number;
+    rate?: number;
+    unitName?: string;
 }
 
 export type Lease = {

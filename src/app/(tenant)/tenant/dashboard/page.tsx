@@ -157,6 +157,55 @@ export default function TenantDashboardPage() {
         </Table>
     );
 
+    const renderWaterLedgerTable = (ledgerEntries: LedgerEntry[]) => (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>For Month</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Prior Rd</TableHead>
+                    <TableHead>Current Rd</TableHead>
+                    <TableHead>Rate</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Payment</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {ledgerEntries.length > 0 ? (
+                    ledgerEntries.map((entry, index) => (
+                        <TableRow key={`${entry.id}-${index}`}>
+                            <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
+                            <TableCell>{entry.forMonth}</TableCell>
+                            <TableCell>{entry.unitName || '-'}</TableCell>
+                            <TableCell>{entry.priorReading?.toLocaleString() ?? '-'}</TableCell>
+                            <TableCell>{entry.currentReading?.toLocaleString() ?? '-'}</TableCell>
+                            <TableCell>{entry.rate ? `Ksh ${entry.rate}` : '-'}</TableCell>
+                            <TableCell className="text-right text-red-600">
+                                {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600">
+                                {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                                {entry.balance < 0
+                                    ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                    : `Ksh ${entry.balance.toLocaleString()}`
+                                }
+                            </TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={9} className="text-center">No transaction history found for this category.</TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
+    );
+
+
     return (
         <div className="space-y-8">
             <Tabs value={activeTenantTab} onValueChange={(value) => setActiveTenantTab(value as any)} className="space-y-8">
@@ -235,52 +284,9 @@ export default function TenantDashboardPage() {
                  <TabsContent value="water">
                      {tenantDetails && (
                         <div className="space-y-8">
-                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                        <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
-                                        <Droplets className="h-4 w-4 text-muted-foreground" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        {latestWaterReading ? (
-                                            <>
-                                                <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {latestWaterReading.consumption} units consumed
-                                                </p>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="text-xl font-bold">Not Available</div>
-                                                <p className="text-xs text-muted-foreground">No recent reading.</p>
-                                            </>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                        <CardTitle className="text-sm font-medium">Water Bill Due Balance</CardTitle>
-                                        <AlertCircle className="h-4 w-4 text-red-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-red-600">Ksh {(balances.waterDue).toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">Total pending water bills</p>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                        <CardTitle className="text-sm font-medium">Water Credit Balance</CardTitle>
-                                        <PlusCircle className="h-4 w-4 text-green-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-green-600">Ksh {(balances.waterCredit).toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                                    </CardContent>
-                                </Card>
-                            </div>
                             <Card>
                                 <CardHeader><CardTitle>Water Bill Transaction History</CardTitle></CardHeader>
-                                <CardContent>{renderLedgerTable(waterLedger)}</CardContent>
+                                <CardContent className="p-0">{renderWaterLedgerTable(waterLedger)}</CardContent>
                             </Card>
                         </div>
                      )}

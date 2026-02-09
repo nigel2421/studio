@@ -16,9 +16,9 @@ const addHeader = (doc: jsPDF, title: string) => {
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('Mombasa Road, Nairobi', 14, 26);
-    doc.text('Phone: +254 700 000 000', 14, 30);
-    doc.text('Email: management@eracov.com', 14, 34);
+    doc.text('Westlands, Nairobi', 14, 26);
+    doc.text('Phone: +254 7XX XXX XXX', 14, 30);
+    doc.text('Email: support@eracovproperties.com', 14, 34);
 
     // Document Title
     doc.setFontSize(16);

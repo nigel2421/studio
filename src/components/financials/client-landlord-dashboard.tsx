@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -110,7 +111,74 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
       )
     };
     
-    const latestWaterReading = waterReadings?.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    const renderWaterLedgerTable = (ledgerEntries: LedgerEntry[]) => {
+      const totalPages = Math.ceil(ledgerEntries.length / pageSize);
+      const paginatedLedger = ledgerEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+      return (
+        <>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>For Month</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>Prior Rd</TableHead>
+                        <TableHead>Current Rd</TableHead>
+                        <TableHead>Rate</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Payment</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {paginatedLedger.length > 0 ? (
+                        paginatedLedger.map((entry, index) => (
+                            <TableRow key={`${entry.id}-${index}`}>
+                                <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                <TableCell>{entry.forMonth}</TableCell>
+                                <TableCell>{entry.unitName || '-'}</TableCell>
+                                <TableCell>{entry.priorReading?.toLocaleString() ?? '-'}</TableCell>
+                                <TableCell>{entry.currentReading?.toLocaleString() ?? '-'}</TableCell>
+                                <TableCell>{entry.rate ? `Ksh ${entry.rate}`: '-'}</TableCell>
+                                <TableCell className="text-right text-red-600">
+                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                </TableCell>
+                                <TableCell className="text-right text-green-600">
+                                    {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-bold">
+                                     {entry.balance < 0
+                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                        : `Ksh ${entry.balance.toLocaleString()}`
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={9} className="text-center">No transaction history found.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+            {totalPages > 1 && (
+                <div className="p-4 border-t">
+                    <PaginationControls
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        pageSize={pageSize}
+                        totalItems={ledgerEntries.length}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setPageSize}
+                    />
+                </div>
+            )}
+        </>
+      )
+    };
+
+
     const monthlyServiceCharge = units.reduce((acc, unit) => acc + (unit.serviceCharge || 0), 0);
 
     if (!tenantDetails) {
@@ -134,52 +202,6 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
-                    <p className="text-xs text-muted-foreground">Total outstanding amount</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
-                    <PlusCircle className="h-4 w-4 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
-                    <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                </CardContent>
-            </Card>
-        </>
-    );
-
-    const waterBillCards = (
-        <>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
-                    <Droplets className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                    <CardContent>
-                    {latestWaterReading ? (
-                        <>
-                            <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
-                            <p className="text-xs text-muted-foreground">
-                                {latestWaterReading.consumption} units consumed
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <div className="text-xl font-bold">Not Available</div>
-                            <p className="text-xs text-muted-foreground">No recent reading.</p>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
                     <AlertCircle className="h-4 w-4 text-red-500" />
@@ -248,16 +270,13 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                 </Card>
             </TabsContent>
             <TabsContent value="water" className="m-0">
-                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {waterBillCards}
-                </div>
                 <Card className="mt-8">
                     <CardHeader>
                         <CardTitle>Transaction History</CardTitle>
-                        <CardDescription>A summary of your recent charges and payments.</CardDescription>
+                        <CardDescription>A summary of your recent charges and payments for water.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
-                        {renderLedgerTable(waterLedger)}
+                        {renderWaterLedgerTable(waterLedger)}
                     </CardContent>
                 </Card>
             </TabsContent>
