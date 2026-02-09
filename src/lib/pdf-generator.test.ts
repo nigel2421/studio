@@ -1,3 +1,4 @@
+
 import { generateTenantStatementPDF } from './pdf-generator';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -28,7 +29,7 @@ describe('PDF Generation', () => {
     
     beforeEach(() => {
         jest.clearAllMocks();
-        (jsPDF as jest.Mock).mockImplementation(() => mockJsPDFInstance);
+        (jsPDF as unknown as jest.Mock).mockImplementation(() => mockJsPDFInstance);
     });
 
     it('generateTenantStatementPDF should generate a PDF with correct ledger data', () => {
@@ -49,7 +50,7 @@ describe('PDF Generation', () => {
         
         // Mock generateLedger to return predictable data
         mockGenerateLedger.mockImplementation((tenant, payments, properties, waterReadings, owner, asOf, options) => {
-            if (options && !options.includeWater) { // Rent ledger
+            if (options && options.includeRent && !options.includeWater) { // Rent ledger
                 return {
                     ledger: [
                         { id: 'charge1', date: '2023-01-01', description: 'Rent for Jan', charge: 20000, payment: 0, balance: 20000, forMonth: 'Jan 2023' },
