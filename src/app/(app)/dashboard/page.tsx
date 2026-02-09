@@ -139,7 +139,7 @@ async function DashboardData({ propertyId }: { propertyId: string | null }) {
     );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: { propertyId?: string } }) {
+async function DashboardPageContent({ searchParams }: { searchParams: { propertyId?: string } }) {
   const properties = await getProperties();
   const selectedPropertyId = searchParams.propertyId || null;
   const selectedProperty = properties.find(p => p.id === selectedPropertyId) || null;
@@ -166,4 +166,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       </Suspense>
     </div>
   );
+}
+
+export default function DashboardPage({ searchParams }: { searchParams: { propertyId?: string } }) {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <DashboardPageContent searchParams={searchParams} />
+    </Suspense>
+  )
 }
