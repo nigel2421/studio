@@ -9,6 +9,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
+import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -87,8 +88,29 @@ export default function UniversalOwnerDashboardPage() {
 
             if (isInvestor) {
                 setDashboardType('landlord');
-                // Landlord data processing remains the same
-                setViewData({}); // Placeholder
+                
+                const landlordProperties: { property: Property; units: Unit[] }[] = [];
+                allProperties.forEach(p => {
+                    const unitsForProp = uniqueOwnedUnits.filter(u => u.propertyId === p.id);
+                    if (unitsForProp.length > 0) {
+                        landlordProperties.push({ property: p, units: unitsForProp });
+                    }
+                });
+
+                const ownedUnitIdentifiers = new Set(uniqueOwnedUnits.map(u => `${u.propertyId}-${u.name}`));
+                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                const relevantTenantIds = new Set(relevantTenants.map(t => t.id));
+                const relevantPayments = allPayments.filter(p => relevantTenantIds.has(p.tenantId));
+
+                const financialSummary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
+                
+                setViewData({
+                    properties: landlordProperties,
+                    tenants: relevantTenants,
+                    payments: relevantPayments,
+                    financialSummary,
+                    owner,
+                });
             } else if (isClient) {
                 setDashboardType('homeowner');
                 const homeownerTenantProfile = allTenants.find(t => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
@@ -130,7 +152,54 @@ export default function UniversalOwnerDashboardPage() {
                 const allWaterReadings = await getAllWaterReadings();
                 await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, startDate, endDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
-                // Landlord statement logic remains unchanged for now
+                const allProperties = await getProperties();
+                const allTenants = await getTenants();
+                
+                const landlordProperties: { property: Property; units: Unit[] }[] = [];
+                const ownedUnits = allProperties.flatMap(p => 
+                    (p.units || []).filter(u => u.landlordId === entity.id || (entity.id === "soil_merchants_internal" && u.ownership === 'SM'))
+                    .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
+                );
+                
+                allProperties.forEach(p => {
+                    const unitsForProp = ownedUnits.filter(u => u.propertyId === p.id);
+                    if(unitsForProp.length > 0) {
+                        landlordProperties.push({property: p, units: unitsForProp});
+                    }
+                });
+    
+                const ownedUnitIdentifiers = new Set(ownedUnits.map(u => `${u.propertyId}-${u.name}`));
+                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                const relevantTenantIds = new Set(relevantTenants.map(t => t.id));
+    
+                const allPayments = await getAllPaymentsForReport();
+                const relevantPayments = allPayments.filter(p => 
+                    relevantTenantIds.has(p.tenantId) && 
+                    isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
+                );
+    
+                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
+                const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties);
+          
+                const transactionsForPDF = displayTransactions.map(t => ({
+                    date: new Date(t.date).toLocaleDateString(),
+                    unit: t.unitName,
+                    rentForMonth: t.forMonth,
+                    gross: t.gross,
+                    serviceCharge: t.serviceChargeDeduction,
+                    mgmtFee: t.managementFee,
+                    net: t.netToLandlord,
+                    otherCosts: t.otherCosts
+                }));
+    
+                const unitsForPDF = landlordProperties.flatMap(p => p.units.map(u => ({
+                    property: p.property.name,
+                    unitName: u.name,
+                    unitType: u.unitType,
+                    status: u.status
+                })));
+          
+                generateLandlordStatementPDF(entity as Landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
             }
             setIsStatementOpen(false);
         } catch (error) {
@@ -177,6 +246,7 @@ export default function UniversalOwnerDashboardPage() {
                     </div>
                 </header>
                 
+                {dashboardType === 'landlord' && viewData && <LandlordDashboardContent {...viewData} />}
                 {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} activeTab={activeOwnerTab} />}
                 
                 {!dashboardType && !loading && (

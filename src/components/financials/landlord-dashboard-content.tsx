@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
 import { Payment, Property, Tenant, Unit } from '@/lib/types';
-import { FinancialSummary, calculateTransactionBreakdown } from '@/lib/financial-utils';
+import { FinancialSummary, calculateTransactionBreakdown, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { downloadCSV } from '@/lib/utils';
@@ -33,102 +34,8 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
     }, [properties]);
 
     const displayTransactions = useMemo(() => {
-        const transactions: any[] = [];
-        // Chronological sort is crucial for identifying the first payment
-        const sortedPayments = [...payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        const tenantFirstPaymentMap = new Map<string, string>();
-        tenants.forEach(tenant => {
-            const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id);
-            if (firstPayment) {
-                tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
-            }
-        });
-
-        sortedPayments.forEach(payment => {
-            const tenant = tenants.find(t => t.id === payment.tenantId);
-            if (!tenant || payment.type === 'Deposit') {
-                return;
-            }
-
-            const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-            const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
-
-            const isFirstPaymentForTenant = tenantFirstPaymentMap.get(tenant.id) === payment.id;
-            
-            const isInitialLumpSum =
-                payment.type === 'Rent' &&
-                isFirstPaymentForTenant &&
-                unitRent > 0 &&
-                payment.amount > unitRent * 1.5;
-
-            let amountToApportionAsRent = payment.amount;
-
-            if (isInitialLumpSum) {
-                const totalDeposits = (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
-                if (payment.amount >= totalDeposits) {
-                    amountToApportionAsRent = payment.amount - totalDeposits;
-                } else {
-                    amountToApportionAsRent = 0;
-                }
-            }
-            
-            if (amountToApportionAsRent <= 0) return;
-
-            if (unitRent > 0 && amountToApportionAsRent > unitRent * 1.1) {
-                let remainingAmount = amountToApportionAsRent;
-                let monthIndex = 0;
-                const leaseStartDate = parseISO(tenant.lease.startDate);
-
-                while (remainingAmount >= unitRent) {
-                    const currentMonth = addMonths(leaseStartDate, monthIndex);
-                    const monthString = format(currentMonth, 'yyyy-MM');
-                    const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
-                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-                    
-                    transactions.push({
-                        id: `${payment.id}-${monthIndex}`,
-                        date: payment.date,
-                        unitName: tenant.unitName,
-                        unitType: unit?.unitType || 'N/A',
-                        forMonth: format(currentMonth, 'MMM yyyy'),
-                        ...breakdown,
-                    });
-                    
-                    remainingAmount -= unitRent;
-                    monthIndex++;
-                }
-
-                if (remainingAmount > 1) {
-                    const nextMonth = addMonths(leaseStartDate, monthIndex);
-                    const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
-                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-
-                    transactions.push({
-                        id: `${payment.id}-rem`,
-                        date: payment.date,
-                        unitName: tenant.unitName,
-                        unitType: unit?.unitType || 'N/A',
-                        forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
-                        ...breakdown,
-                    });
-                }
-            } else {
-                const paymentForBreakdown = { ...payment, amount: amountToApportionAsRent };
-                const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
-                transactions.push({
-                    id: payment.id,
-                    date: payment.date,
-                    unitName: tenant.unitName,
-                    unitType: unit?.unitType || 'N/A',
-                    forMonth: payment.rentForMonth ? format(parseISO(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-                    ...breakdown,
-                });
-            }
-        });
-        
-        return transactions;
-    }, [payments, tenants, unitMap]);
+        return generateLandlordDisplayTransactions(payments, tenants, properties);
+    }, [payments, tenants, properties]);
 
 
     const transactionTotals = useMemo(() => {
@@ -165,10 +72,6 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
 
     return (
         <div className="flex flex-col gap-8 pb-10">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight">Landlord Dashboard</h1>
-                <p className="text-muted-foreground">Financial overview of your properties and remittances.</p>
-            </div>
 
             <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
                 <Card>

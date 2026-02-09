@@ -1,3 +1,4 @@
+
 import { Payment, Property, Tenant, Unit } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format } from 'date-fns';
 
@@ -144,7 +145,7 @@ export function generateLandlordDisplayTransactions(
 
     const tenantFirstPaymentMap = new Map<string, string>();
     tenants.forEach(tenant => {
-        const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id);
+        const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id && p.type === 'Rent');
         if (firstPayment) {
             tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
         }
