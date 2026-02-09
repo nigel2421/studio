@@ -40,6 +40,8 @@ export default function TenantDashboardPage() {
     const [waterLedger, setWaterLedger] = useState<LedgerEntry[]>([]);
     const [balances, setBalances] = useState({ due: 0, credit: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [activeTenantTab, setActiveTenantTab] = useState<'rent' | 'water'>('rent');
+
 
     useEffect(() => {
         if (!authIsLoading && userProfile?.tenantId) {
@@ -85,7 +87,7 @@ export default function TenantDashboardPage() {
         toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
         try {
             // We can reuse the payments and properties already in state
-            generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings);
+            generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, activeTenantTab);
         } catch(e) {
             console.error("Error generating PDF:", e);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate your statement.' });
@@ -292,7 +294,7 @@ export default function TenantDashboardPage() {
                     <CardTitle>Transaction History</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Tabs defaultValue="rent">
+                    <Tabs defaultValue="rent" onValueChange={(value) => setActiveTenantTab(value as 'rent' | 'water')}>
                         <TabsList>
                             <TabsTrigger value="rent">Rent Ledger</TabsTrigger>
                             <TabsTrigger value="water">Water Bills</TabsTrigger>
@@ -314,4 +316,3 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
-

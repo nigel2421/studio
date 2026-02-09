@@ -154,6 +154,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     allWaterReadings: WaterMeterReading[],
     startDate: Date,
     endDate: Date,
+    context: 'service-charge' | 'water' | 'full' = 'full'
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -211,105 +212,85 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     let yPos = Math.max(yPosHeader, 80);
 
-    // --- Service Charge Section ---
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Service Charge Statement', 14, yPos);
-    yPos += 2;
-
-    const serviceChargeTableBody = serviceChargeLedger
-        .filter(entry => {
-            try {
-                const entryDate = parseISO(entry.date);
-                return isValid(entryDate) && entryDate >= startDate && entryDate <= endDate;
-            } catch {
-                return false;
-            }
-        })
-        .map(t => [
-        t.date,
-        t.forMonth || '',
-        t.description,
-        t.charge > 0 ? formatCurrency(t.charge) : '',
-        t.payment > 0 ? formatCurrency(t.payment) : '',
-        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
-    ]);
-
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
-        body: serviceChargeTableBody,
-        theme: 'striped',
-        headStyles: { fillColor: [51, 65, 85] },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+    const filterLedgerByDate = (ledger: LedgerEntry[]) => ledger.filter(entry => {
+        try {
+            const entryDate = parseISO(entry.date);
+            return isValid(entryDate) && entryDate >= startDate && entryDate <= endDate;
+        } catch {
+            return false;
+        }
     });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Service Charge Balance:', 140, yPos);
-    doc.text(serviceChargeDue > 0 ? formatCurrency(serviceChargeDue) : `${formatCurrency(serviceChargeCredit)} Cr`, 196, yPos, { align: 'right' });
-    yPos += 10;
 
-    if (yPos > 240) {
-        doc.addPage();
-        yPos = 20;
+    if (context === 'service-charge' || context === 'full') {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Service Charge Statement', 14, yPos);
+        yPos += 2;
+
+        const serviceChargeTableBody = filterLedgerByDate(serviceChargeLedger).map(t => [
+            t.date, t.forMonth || '', t.description, t.charge > 0 ? formatCurrency(t.charge) : '', t.payment > 0 ? formatCurrency(t.payment) : '', t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
+        ]);
+
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+            body: serviceChargeTableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [51, 65, 85] },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+        });
+        
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Service Charge Balance:', 140, yPos);
+        doc.text(serviceChargeDue > 0 ? formatCurrency(serviceChargeDue) : `${formatCurrency(serviceChargeCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 10;
     }
 
-    // --- Water Bill Section ---
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Water Bill Statement', 14, yPos);
-    yPos += 2;
+    if (context === 'water' || context === 'full') {
+        if (yPos > 240) { doc.addPage(); yPos = 20; }
 
-    const waterTableBody = waterLedger
-        .filter(entry => {
-            try {
-                const entryDate = parseISO(entry.date);
-                return isValid(entryDate) && entryDate >= startDate && entryDate <= endDate;
-            } catch {
-                return false;
-            }
-        })
-        .map(t => [
-        t.date,
-        t.forMonth || '',
-        t.description,
-        t.charge > 0 ? formatCurrency(t.charge) : '',
-        t.payment > 0 ? formatCurrency(t.payment) : '',
-        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
-    ]);
-    
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
-        body: waterTableBody,
-        theme: 'striped',
-        headStyles: { fillColor: [21, 128, 61] },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
-    });
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Water Bill Statement', 14, yPos);
+        yPos += 2;
 
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Water Bill Balance:', 140, yPos);
-    doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
-    
-    yPos += 10;
-    
-    // --- Overall Total ---
-    doc.setDrawColor(150);
-    doc.line(14, yPos, 196, yPos);
-    yPos += 5;
-    
-    const totalDue = serviceChargeDue + waterDue;
-    const totalCredit = serviceChargeCredit + waterCredit;
-    const finalBalance = totalDue - totalCredit;
+        const waterTableBody = filterLedgerByDate(waterLedger).map(t => [
+            t.date, t.forMonth || '', t.description, t.charge > 0 ? formatCurrency(t.charge) : '', t.payment > 0 ? formatCurrency(t.payment) : '', t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
+        ]);
+        
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+            body: waterTableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [21, 128, 61] },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+        });
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Balance Due:', 140, yPos);
-    doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Water Bill Balance:', 140, yPos);
+        doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 10;
+    }
+    
+    if (context === 'full') {
+        doc.setDrawColor(150);
+        doc.line(14, yPos, 196, yPos);
+        yPos += 5;
+        
+        const totalDue = serviceChargeDue + waterDue;
+        const totalCredit = serviceChargeCredit + waterCredit;
+        const finalBalance = totalDue - totalCredit;
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total Balance Due:', 140, yPos);
+        doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
+    }
     
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
@@ -529,7 +510,8 @@ export const generateTenantStatementPDF = (
     tenant: Tenant,
     payments: Payment[],
     properties: Property[],
-    waterReadings: WaterMeterReading[]
+    waterReadings: WaterMeterReading[],
+    context: 'rent' | 'water' | 'full' = 'full'
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
@@ -559,88 +541,89 @@ export const generateTenantStatementPDF = (
     doc.setFontSize(10);
     doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
 
-    // Generate Ledgers
     const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, undefined, { includeWater: false });
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, undefined, { includeRent: false, includeServiceCharge: false });
 
     let yPos = 80;
 
-    // --- Rent/Service Charge Section ---
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Rent / Service Charge Statement', 14, yPos);
-    yPos += 2;
+    if (context === 'rent' || context === 'full') {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Rent / Service Charge Statement', 14, yPos);
+        yPos += 2;
 
-    const rentTableBody = rentLedger.map(t => [
-        t.date,
-        t.forMonth || '',
-        t.description,
-        t.charge > 0 ? formatCurrency(t.charge) : '',
-        t.payment > 0 ? formatCurrency(t.payment) : '',
-        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
-    ]);
+        const rentTableBody = rentLedger.map(t => [
+            t.date,
+            t.forMonth || '',
+            t.description,
+            t.charge > 0 ? formatCurrency(t.charge) : '',
+            t.payment > 0 ? formatCurrency(t.payment) : '',
+            t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
+        ]);
 
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
-        body: rentTableBody,
-        theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235] },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
-    });
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+            body: rentTableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [37, 99, 235] },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+        });
+        
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Rent/Service Charge Balance:', 140, yPos);
+        doc.text(rentDue > 0 ? formatCurrency(rentDue) : `${formatCurrency(rentCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 10;
+    }
     
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Rent/Service Charge Balance:', 140, yPos);
-    doc.text(rentDue > 0 ? formatCurrency(rentDue) : `${formatCurrency(rentCredit)} Cr`, 196, yPos, { align: 'right' });
-    yPos += 10;
-    
-    // --- Water Bill Section ---
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Water Bill Statement', 14, yPos);
-    yPos += 2;
+    if (context === 'water' || context === 'full') {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Water Bill Statement', 14, yPos);
+        yPos += 2;
 
-    const waterTableBody = waterLedger.map(t => [
-        t.date,
-        t.forMonth || '',
-        t.description,
-        t.charge > 0 ? formatCurrency(t.charge) : '',
-        t.payment > 0 ? formatCurrency(t.payment) : '',
-        t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
-    ]);
-    
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
-        body: waterTableBody,
-        theme: 'striped',
-        headStyles: { fillColor: [21, 128, 61] },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
-    });
+        const waterTableBody = waterLedger.map(t => [
+            t.date,
+            t.forMonth || '',
+            t.description,
+            t.charge > 0 ? formatCurrency(t.charge) : '',
+            t.payment > 0 ? formatCurrency(t.payment) : '',
+            t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
+        ]);
+        
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+            body: waterTableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [21, 128, 61] },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+        });
 
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Water Bill Balance:', 140, yPos);
-    doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Water Bill Balance:', 140, yPos);
+        doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 10;
+    }
     
-    yPos += 10;
-    
-    // --- Overall Total ---
-    doc.setDrawColor(150);
-    doc.line(14, yPos, 196, yPos);
-    yPos += 5;
-    
-    const totalDue = rentDue + waterDue;
-    const totalCredit = rentCredit + waterCredit;
-    const finalBalance = totalDue - totalCredit;
+    if (context === 'full') {
+        doc.setDrawColor(150);
+        doc.line(14, yPos, 196, yPos);
+        yPos += 5;
+        
+        const totalDue = rentDue + waterDue;
+        const totalCredit = rentCredit + waterCredit;
+        const finalBalance = totalDue - totalCredit;
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Balance Due:', 140, yPos);
-    doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total Balance Due:', 140, yPos);
+        doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
+    }
 
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
@@ -738,5 +721,3 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
 };
-
-

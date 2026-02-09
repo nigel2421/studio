@@ -26,9 +26,11 @@ interface ClientLandlordDashboardProps {
     allProperties: Property[];
     units: (Unit & { propertyName: string })[];
     owner: PropertyOwner | Landlord | null;
+    activeTab: 'service-charge' | 'water';
+    onTabChange: (tab: 'service-charge' | 'water') => void;
 }
 
-export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner }: ClientLandlordDashboardProps) {
+export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner, activeTab, onTabChange }: ClientLandlordDashboardProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
@@ -212,7 +214,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     <CardDescription>A summary of your recent charges and payments.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <Tabs defaultValue="service-charge">
+                    <Tabs defaultValue={activeTab} onValueChange={(value) => onTabChange(value as 'service-charge' | 'water')}>
                         <TabsList className="px-6 border-b w-full justify-start rounded-none">
                             <TabsTrigger value="service-charge">Service Charge</TabsTrigger>
                             <TabsTrigger value="water">Water Bills</TabsTrigger>
@@ -229,4 +231,3 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
         </div>
     );
 }
-

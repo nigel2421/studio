@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner } from '@/lib/types';
+import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
 import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -25,6 +25,8 @@ export default function UniversalOwnerDashboardPage() {
     const [dashboardType, setDashboardType] = useState<'landlord' | 'homeowner' | null>(null);
     const [viewData, setViewData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [activeOwnerTab, setActiveOwnerTab] = useState<'service-charge' | 'water'>('service-charge');
+
 
     const [isStatementOpen, setIsStatementOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
@@ -146,7 +148,8 @@ export default function UniversalOwnerDashboardPage() {
         startPdfLoading('Generating Statement...');
         try {
             if (dashboardType === 'homeowner') {
-                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), await getAllWaterReadings(), startDate, endDate);
+                const allWaterReadings = await getAllWaterReadings();
+                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, startDate, endDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
                 const landlordProperties = viewData.properties;
                 const allTenants = viewData.tenants;
@@ -195,8 +198,6 @@ export default function UniversalOwnerDashboardPage() {
         );
     }
     
-    // --- Render Logic ---
-    const headerTitle = dashboardType === 'landlord' ? 'Investor Overview' : 'Homeowner Overview';
     const headerDescription = dashboardType === 'landlord' ? 'Financial overview of your managed property portfolio.' : 'Here is the overview of your service charge account.';
 
     return (
@@ -218,7 +219,7 @@ export default function UniversalOwnerDashboardPage() {
                 </div>
             </header>
             
-            {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} />}
+            {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} activeTab={activeOwnerTab} onTabChange={setActiveOwnerTab} />}
             {dashboardType === 'landlord' && viewData && <LandlordDashboardContent {...viewData} />}
             {!dashboardType && !loading && (
                  <div className="text-center py-10">
