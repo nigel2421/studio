@@ -238,7 +238,7 @@ export function generateLedger(
     if (tenant.residentType === 'Homeowner' && owner) {
         ownerUnits = properties.flatMap(p =>
             p.units
-                .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+                .filter(u => 'assignedUnits' in owner ? (owner as PropertyOwner).assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
                 .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
         );
         ownerUnits = [...new Map(ownerUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
@@ -344,8 +344,29 @@ export function generateLedger(
         let details = p.notes || `Payment Received`;
         if (p.paymentMethod) details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
 
+        let waterReadingDetails: Partial<LedgerEntry> = {};
+        if (p.type === 'Water' && p.waterReadingId && allTenantWaterReadings) {
+            const reading = allTenantWaterReadings.find(r => r.id === p.waterReadingId);
+            if (reading) {
+                waterReadingDetails = {
+                    unitName: reading.unitName,
+                    priorReading: reading.priorReading,
+                    currentReading: reading.currentReading,
+                    consumption: reading.consumption,
+                    rate: reading.rate,
+                };
+            }
+        }
+
         return {
-            id: p.id, date: new Date(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status,
+            id: p.id,
+            date: new Date(p.date),
+            description: details,
+            charge: isAdjustment && p.amount > 0 ? p.amount : 0,
+            payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
+            forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined,
+            status: p.status,
+            ...waterReadingDetails,
         };
     });
 

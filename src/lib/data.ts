@@ -252,8 +252,7 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
     const readingsQuery = query(
         collection(db, 'waterReadings'),
         where('tenantId', '==', tenantId),
-        orderBy('createdAt', 'desc'),
-        limit(12)
+        orderBy('createdAt', 'desc')
     );
     const readingsSnapshot = await getDocs(readingsQuery);
     return readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
@@ -1788,6 +1787,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 
