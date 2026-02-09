@@ -165,7 +165,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const ownerUnits = allProperties.flatMap(p =>
         p.units
-            .filter(u => 'assignedUnits' in owner ? (owner as PropertyOwner).assignedUnits.some((au) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+            .filter(u => 'assignedUnits' in owner ? (owner as PropertyOwner).assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
             .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
     );
 
@@ -194,7 +194,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
         ownerUnits.slice(0, 5).forEach(unit => {
             const charge = unit.serviceCharge || 0;
-            const line = `- ${unit.propertyName} ${unit.name} (${unit.unitType}): Service Charge KSh ${charge.toLocaleString()} pm`;
+            const line = `- ${unit.name} (${unit.unitType}): Service Charge KSh ${charge.toLocaleString()} pm`;
             doc.text(line, 14, unitYPos);
             unitYPos += 5;
         });
@@ -666,24 +666,21 @@ export const generateVacantServiceChargeInvoicePDF = (
     const body: (string | { content: string, styles: any })[][] = [];
 
     const monthlyArrears = new Map<string, number>();
-    const propertyNames = new Set<string>();
-    const unitNames: string[] = [];
+    
+    const unitNames = unitsWithArrears.map(item => item.unit.name).join(', ');
 
+     body.push([
+        { content: `Arrears for: Unit(s) ${unitNames}`, styles: { fontStyle: 'bold', halign: 'left', minCellHeight: 10 } },
+        ''
+    ]);
+    
     unitsWithArrears.forEach(item => {
-        propertyNames.add(item.property.name);
-        unitNames.push(item.unit.name);
         item.arrearsDetail.filter(d => d.status === 'Pending').forEach(detail => {
             const currentAmount = monthlyArrears.get(detail.month) || 0;
             monthlyArrears.set(detail.month, currentAmount + detail.amount);
         });
     });
 
-    const unitListString = `${[...propertyNames].join(', ')}: Unit(s) ${unitNames.join(', ')}`;
-     body.push([
-        { content: `Arrears for: ${unitListString}`, styles: { fontStyle: 'bold', halign: 'left', minCellHeight: 10 } },
-        ''
-    ]);
-    
     const sortedMonths = [...monthlyArrears.keys()].sort((a, b) => {
         const dateA = new Date(`01 ${a}`);
         const dateB = new Date(`01 ${b}`);
