@@ -257,7 +257,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     }
 
     if (context === 'water') {
-        const waterTableBody = filterLedgerByDate(waterLedger).map(entry => {
+        const waterTableBody = waterLedger.map(entry => {
             let readingDetails = { unit: entry.description, prior: '', current: '', rate: '' };
             if (entry.id.startsWith('charge-water-')) {
                 const readingId = entry.id.replace('charge-water-', '');
