@@ -46,7 +46,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 setAllTenantPayments(payments);
                 const asOf = tenant.lease?.endDate ? parseISO(tenant.lease.endDate) : new Date();
                 const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
-                setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                setLedger(generatedLedger);
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {
