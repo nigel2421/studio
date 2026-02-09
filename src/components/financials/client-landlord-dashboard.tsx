@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -16,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { generateLedger } from '@/lib/financial-logic';
 import { PaginationControls } from '../ui/pagination-controls';
+import { TabsContent } from '@/components/ui/tabs';
 
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
