@@ -664,14 +664,12 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     addHeader(doc, 'Service Charge Invoice');
     
-    // Owner Details
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text(owner.name, 14, 50);
     doc.setFont('helvetica', 'normal');
     doc.text(owner.email, 14, 56);
     
-    // Invoice Details
     doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
     doc.text(`For: Vacant Unit Service Charges`, 196, 56, { align: 'right' });
 
@@ -684,25 +682,45 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     const body: (string | { content: string, styles: any })[][] = [];
 
+    const monthlyArrears = new Map<string, number>();
+    const propertyNames = new Set<string>();
+    const unitNames: string[] = [];
+
     unitsWithArrears.forEach(item => {
-        body.push([
-            { content: `${item.property.name} - Unit ${item.unit.name}`, styles: { fontStyle: 'bold' } },
-            '' // empty for amount on the unit row
-        ]);
+        propertyNames.add(item.property.name);
+        unitNames.push(item.unit.name);
         item.arrearsDetail.filter(d => d.status === 'Pending').forEach(detail => {
-            body.push([
-                { content: `  - ${detail.month}`, styles: {} },
-                formatCurrency(detail.amount)
-            ]);
+            const currentAmount = monthlyArrears.get(detail.month) || 0;
+            monthlyArrears.set(detail.month, currentAmount + detail.amount);
         });
     });
+
+    const unitListString = `${[...propertyNames].join(', ')}: Unit(s) ${unitNames.join(', ')}`;
+     body.push([
+        { content: `Arrears for: ${unitListString}`, styles: { fontStyle: 'bold', halign: 'left', minCellHeight: 10 } },
+        ''
+    ]);
+    
+    const sortedMonths = [...monthlyArrears.keys()].sort((a, b) => {
+        const dateA = new Date(`01 ${a}`);
+        const dateB = new Date(`01 ${b}`);
+        return dateA.getTime() - dateB.getTime();
+    });
+
+    for (const month of sortedMonths) {
+        const amount = monthlyArrears.get(month) || 0;
+        body.push([
+            `Service Charge for ${month}`,
+            formatCurrency(amount)
+        ]);
+    }
 
     autoTable(doc, {
         startY: yPos,
         head: [['Description', 'Amount Due']],
         body,
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        headStyles: { fillColor: [217, 119, 6] },
         foot: [[
             { content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(grandTotalDue), styles: { fontStyle: 'bold', halign: 'right' } }
@@ -720,4 +738,5 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
 };
+
 

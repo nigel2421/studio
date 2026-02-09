@@ -770,7 +770,7 @@ const VacantArrearsTab = ({
                     <TableHeader>
                         <TableRow>
                             <TableHead>Owner</TableHead>
-                            <TableHead>Property / Unit</TableHead>
+                            <TableHead>Unit(s)</TableHead>
                             <TableHead>Handover Date</TableHead>
                             <TableHead>Months in Arrears</TableHead>
                             <TableHead>Total Due</TableHead>
@@ -778,32 +778,24 @@ const VacantArrearsTab = ({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {arrears.map(group => (
+                        {arrears.map(group => {
+                             const unitNames = group.units.map(u => u.unitName).join(', ');
+                             const uniqueDates = [...new Set(group.units.map(u => new Date(u.unitHandoverDate).toLocaleDateString()))];
+                             const handoverDateDisplay = uniqueDates.length === 1 ? uniqueDates[0] : 'Multiple';
+                             const maxMonthsInArrears = Math.max(...group.units.map(u => u.monthsInArrears));
+                            return (
                             <TableRow key={group.ownerId}>
                                 <TableCell>
                                     <div className="font-medium">{group.ownerName}</div>
                                 </TableCell>
                                 <TableCell>
-                                    {group.units.map(unit => (
-                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0">
-                                            <div className="font-medium">{unit.propertyName}</div>
-                                            <div className="text-sm text-muted-foreground">Unit {unit.unitName}</div>
-                                        </div>
-                                    ))}
+                                    <div className="font-medium">{unitNames}</div>
                                 </TableCell>
                                 <TableCell>
-                                    {group.units.map(unit => (
-                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0 h-[38px] flex items-center">
-                                            {new Date(unit.unitHandoverDate).toLocaleDateString()}
-                                        </div>
-                                    ))}
+                                   {handoverDateDisplay}
                                 </TableCell>
                                 <TableCell>
-                                    {group.units.map(unit => (
-                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0 h-[38px] flex items-center">
-                                            {unit.monthsInArrears}
-                                        </div>
-                                    ))}
+                                    {maxMonthsInArrears}
                                 </TableCell>
                                 <TableCell className="font-bold">Ksh {group.totalDue.toLocaleString()}</TableCell>
                                 <TableCell className="text-right">
@@ -813,7 +805,7 @@ const VacantArrearsTab = ({
                                     </Button>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )})}
                         {arrears.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-24 text-center">
