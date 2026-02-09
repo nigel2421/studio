@@ -23,6 +23,7 @@ describe('PDF Generation', () => {
         setDrawColor: jest.fn(),
         line: jest.fn(),
         save: jest.fn(),
+        setTextColor: jest.fn(),
     };
     
     beforeEach(() => {

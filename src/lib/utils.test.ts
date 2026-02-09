@@ -1,11 +1,14 @@
 import { downloadCSV, cn } from './utils';
 
-// Mocking the DOM environment for Blob, URL, and document
+// Mock the Blob constructor
+const mockBlob = jest.fn();
+(global as any).Blob = mockBlob;
+
+// Mocking the DOM environment for URL and document
 const mockCreateObjectURL = jest.fn(() => 'mock-url');
 if (typeof window.URL.createObjectURL === 'undefined') {
   Object.defineProperty(window.URL, 'createObjectURL', { value: mockCreateObjectURL });
 }
-
 
 const mockLink = {
   click: jest.fn(),
@@ -21,6 +24,7 @@ describe('Utility Functions', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        mockBlob.mockClear();
     });
 
     describe('downloadCSV', () => {
@@ -31,7 +35,7 @@ describe('Utility Functions', () => {
             downloadCSV(data, filename);
             
             // Check that a Blob was created
-            expect(Blob).toHaveBeenCalledWith(
+            expect(mockBlob).toHaveBeenCalledWith(
                 ['id,name\n1,John Doe\n2,Jane Smith'],
                 { type: 'text/csv;charset=utf-8;' }
             );
@@ -51,7 +55,7 @@ describe('Utility Functions', () => {
             const data = [{ description: 'A value with, a comma', notes: 'A "quote" inside' }];
             downloadCSV(data, 'special.csv');
             
-            expect(Blob).toHaveBeenCalledWith(
+            expect(mockBlob).toHaveBeenCalledWith(
                 ['description,notes\n"A value with, a comma","A ""quote"" inside"'],
                 { type: 'text/csv;charset=utf-8;' }
             );
@@ -59,7 +63,7 @@ describe('Utility Functions', () => {
 
         it('should not do anything if data is empty', () => {
             downloadCSV([], 'empty.csv');
-            expect(Blob).not.toHaveBeenCalled();
+            expect(mockBlob).not.toHaveBeenCalled();
         });
     });
     
