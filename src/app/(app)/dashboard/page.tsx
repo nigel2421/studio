@@ -1,7 +1,8 @@
 
+
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { getMaintenanceRequests, getTenants, getProperties, getAllPayments } from "@/lib/data";
+import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2, Loader2 } from "lucide-react";
@@ -34,26 +35,33 @@ async function DashboardData({ propertyId }: { propertyId: string | null }) {
         );
     }
     
-    // Fetch all data once
+    // Optimized data fetching
+    const selectedProperty = await getProperty(propertyId);
+    if (!selectedProperty) {
+         return (
+            <div className="flex flex-col items-center justify-center h-96 border-2 border-dashed rounded-lg text-center">
+              <h3 className="text-xl font-semibold">Property Not Found</h3>
+              <p className="text-muted-foreground mt-2 max-w-md">
+                The selected property could not be found. It may have been deleted.
+              </p>
+            </div>
+        );
+    }
+
+    const filteredTenants = await getTenants({ propertyId });
+    const tenantIdsInProperty = filteredTenants.map(t => t.id);
+
     const [
-        allProperties,
-        allTenants,
-        allMaintenanceRequests,
-        allPayments
+        filteredPayments,
+        filteredMaintenanceRequests,
+        allTenants // Still need all for some analytics, can be optimized further if needed
     ] = await Promise.all([
-        getProperties(),
-        getTenants(),
-        getMaintenanceRequests(),
-        getAllPayments()
+        getPaymentsForTenants(tenantIdsInProperty),
+        getMaintenanceRequests({ propertyId }),
+        getTenants()
     ]);
     
-    // Filter data on the server for the selected property
-    const selectedProperty = allProperties.find(p => p.id === propertyId) || null;
-    const filteredProperties = selectedProperty ? [selectedProperty] : [];
-    const filteredTenants = allTenants.filter(t => t.propertyId === propertyId);
-    const tenantIdsInProperty = new Set(filteredTenants.map(t => t.id));
-    const filteredPayments = allPayments.filter(p => tenantIdsInProperty.has(p.tenantId));
-    const filteredMaintenanceRequests = allMaintenanceRequests.filter(r => r.propertyId === propertyId);
+    const filteredProperties = [selectedProperty];
     const isInvestmentConsultant = false; // This needs to be passed down or checked differently. For now, assume not.
 
     return (

@@ -264,28 +264,49 @@ export async function getProperties(forceRefresh = false): Promise<Property[]> {
     }, 300000); // 5 minutes cache
 }
 
-export async function getTenants(limitCount?: number): Promise<Tenant[]> {
-    if (limitCount) {
+export async function getTenants(options: { propertyId?: string; limit?: number } = {}): Promise<Tenant[]> {
+    const { propertyId, limit: limitCount } = options;
+    const cacheKey = propertyId ? `prop-${propertyId}` : (limitCount ? `limit-${limitCount}` : 'all');
+    
+    // Reduce cache time for more dynamic filtered queries
+    const ttl = propertyId ? 60000 : 300000;
+
+    return cacheService.getOrFetch('tenants', cacheKey, () => {
         const constraints: any[] = [];
-        constraints.push(limit(limitCount));
+        if (propertyId) {
+            constraints.push(where("propertyId", "==", propertyId));
+        }
+        if (limitCount) {
+            constraints.push(limit(limitCount));
+        }
         return getCollection<Tenant>('tenants', constraints);
-    }
-    return cacheService.getOrFetch('tenants', 'all', () => getCollection<Tenant>('tenants'), 300000);
+    }, ttl);
 }
 
 export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
     return cacheService.getOrFetch('archived_tenants', 'all', () => getCollection<ArchivedTenant>('archived_tenants'), 300000);
 }
 
-export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
-    return cacheService.getOrFetch('maintenanceRequests', 'last90days', async () => {
+export async function getMaintenanceRequests(options: { propertyId?: string } = {}): Promise<MaintenanceRequest[]> {
+    const { propertyId } = options;
+    const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'last90days';
+    
+    return cacheService.getOrFetch('maintenanceRequests', cacheKey, async () => {
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
+        const constraints: any[] = [
+            where('createdAt', '>=', ninetyDaysAgo.toISOString()),
+            orderBy('createdAt', 'desc')
+        ];
+
+        if (propertyId) {
+            constraints.unshift(where('propertyId', '==', propertyId));
+        }
+
         const q = query(
             collection(db, 'maintenanceRequests'),
-            where('createdAt', '>=', ninetyDaysAgo),
-            orderBy('createdAt', 'desc')
+            ...constraints
         );
         return getCollection<MaintenanceRequest>(q);
     }, 120000);
@@ -730,6 +751,24 @@ export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
     return getPaymentHistory(tenantId);
 }
 
+export async function getPaymentsForTenants(tenantIds: string[]): Promise<Payment[]> {
+    if (tenantIds.length === 0) {
+        return [];
+    }
+    const cacheKey = `tenants-payments-${tenantIds.slice(0, 5).join('-')}`; // simple cache key
+    return cacheService.getOrFetch('payments', cacheKey, async () => {
+        const paymentChunks: Payment[][] = [];
+        // Firestore 'in' query is limited to 30 items per query
+        for (let i = 0; i < tenantIds.length; i += 30) {
+            const chunk = tenantIds.slice(i, i + 30);
+            const q = query(collection(db, 'payments'), where('tenantId', 'in', chunk));
+            const payments = await getCollection<Payment>(q);
+            paymentChunks.push(payments);
+        }
+        return paymentChunks.flat();
+    }, 60000);
+}
+
 export async function getPropertyWaterReadings(propertyId: string): Promise<WaterMeterReading[]> {
     const property = await getProperty(propertyId);
     if (!property) return [];
@@ -1124,200 +1163,6 @@ export async function bulkUpdateUnitsFromCSV(
 
 export async function getCommunications(): Promise<Communication[]> {
     return getCollection<Communication>('communications');
-}
-
-export async function getFinancialDocuments(userId: string, role: UserRole): Promise<FinancialDocument[]> {
-    let documents: FinancialDocument[] = [];
-
-    // Logic for Landlords and Property Owners (View documents for all their units)
-    if (role === 'landlord' || role === 'homeowner') {
-        let associatedUnitNames: string[] = [];
-        let associatedPropertyIds: string[] = [];
-
-        if (role === 'landlord') {
-            // Find landlord record linked to this user
-            const allLandlords = await getLandlords();
-            const landlord = allLandlords.find(l => l.email === userId || l.userId === userId); // Basic matching
-            if (landlord) {
-                const allProps = await getProperties();
-                allProps.forEach(p => {
-                    (p.units || []).forEach(u => {
-                        if (u.landlordId === landlord.id) {
-                            associatedUnitNames.push(u.name);
-                            if (!associatedPropertyIds.includes(p.id)) associatedPropertyIds.push(p.id);
-
-                            // Logic: If unit is vacant and handed over, Landlord pays service charge
-                            if (u.status === 'vacant' && u.handoverStatus === 'Handed Over') {
-                                const scAmount = u.serviceCharge ?? (u.unitType === 'Studio' ? 2000 : u.unitType === 'One Bedroom' ? 3000 : u.unitType === 'Two Bedroom' ? 4000 : 0);
-                                if (scAmount > 0) {
-                                    const today = new Date();
-                                    const currentPeriod = today.toLocaleDateString('default', { month: 'long', year: 'numeric' });
-
-                                    // Generate a service charge document
-                                    documents.push({
-                                        id: `sc-landlord-${u.name}-${currentPeriod.replace(' ', '-')}`,
-                                        type: 'Service Charge',
-                                        date: today.toISOString(),
-                                        amount: scAmount,
-                                        title: `Service Charge (Vacant) - ${u.name}`,
-                                        status: 'Pending',
-                                        sourceData: {
-                                            id: `sc-stmt-${u.name}-${Date.now()}`,
-                                            tenantId: 'vacant',
-                                            propertyId: p.name, // Using name as ID here as per existing pattern or actual ID
-                                            unitName: u.name,
-                                            period: currentPeriod,
-                                            amount: scAmount,
-                                            items: [{ description: 'Vacant Unit Service Charge', amount: scAmount }],
-                                            date: today.toISOString(),
-                                            status: 'Pending',
-                                            createdAt: today.toISOString()
-                                        } as ServiceChargeStatement
-                                    });
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-        } else if (role === 'homeowner') {
-            // Find property owner record
-            const allOwners = await getPropertyOwners();
-            const owner = allOwners.find(o => o.email === userId);
-            if (owner) {
-                owner.assignedUnits.forEach(au => {
-                    au.unitNames.forEach(name => {
-                        associatedUnitNames.push(name);
-                        if (!associatedPropertyIds.includes(au.propertyId)) associatedPropertyIds.push(au.propertyId);
-                    });
-                });
-            }
-        }
-
-        if (associatedUnitNames.length > 0) {
-            // Fetch Tenants in these units to get their payments/bills
-            const allTenants = await getTenants();
-            const keyTenants = allTenants.filter(t =>
-                associatedPropertyIds.includes(t.propertyId) && associatedUnitNames.includes(t.unitName)
-            );
-            const keyTenantIds = keyTenants.map(t => t.id);
-
-            if (keyTenantIds.length > 0) {
-                // Fetch Payments
-                const paymentsSnapshot = await getDocs(query(collection(db, 'payments'), where('tenantId', 'in', keyTenantIds.slice(0, 30)))); // Limit 30 for 'in' query constraint
-                const payments = paymentsSnapshot.docs.map(doc => postToJSON<Payment>(doc));
-
-                documents.push(...payments.map(p => {
-                    const t = keyTenants.find(kt => kt.id === p.tenantId);
-                    return {
-                        id: p.id,
-                        type: 'Rent Receipt' as const,
-                        date: p.date,
-                        amount: p.amount,
-                        title: `Rent Paid - ${t?.unitName} (${t?.name})`,
-                        status: 'Paid' as const,
-                        sourceData: p
-                    };
-                }));
-
-                // Fetch Water Bills
-                const waterSnapshot = await getDocs(query(collection(db, 'waterReadings'), where('tenantId', 'in', keyTenantIds.slice(0, 30))));
-                const readings = waterSnapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc));
-
-                documents.push(...readings.map(r => {
-                    const t = keyTenants.find(kt => kt.id === r.tenantId);
-                    return {
-                        id: r.id,
-                        type: 'Water Bill' as const,
-                        date: r.date,
-                        amount: r.amount,
-                        title: `Water Bill - ${t?.unitName}`,
-                        status: 'Paid' as const,
-                        sourceData: r
-                    };
-                }));
-            }
-        }
-    }
-
-    // Logic for Tenants (View their own documents)
-    if (role === 'tenant') {
-        const tenant = (await getTenants()).find(t => t.userId === userId);
-
-        if (tenant) {
-            // 1. Fetch Payments (Rent Receipts)
-            const paymentsQuery = query(
-                collection(db, 'payments'),
-                where('tenantId', '==', tenant.id),
-                orderBy('date', 'desc'),
-                limit(20)
-            );
-            const payments = await getCollection<Payment>(paymentsQuery);
-
-            documents.push(...payments.map(p => ({
-                id: p.id,
-                type: 'Rent Receipt' as const,
-                date: p.date,
-                amount: p.amount,
-                title: `Rent Payment - ${new Date(p.date).toLocaleDateString('default', { month: 'short', year: 'numeric' })}`,
-                status: 'Paid' as const,
-                sourceData: p
-            })));
-
-            // 2. Fetch Water Meter Readings (Water Bills)
-            const waterQuery = query(
-                collection(db, 'waterReadings'),
-                where('tenantId', '==', tenant.id),
-                orderBy('date', 'desc'),
-                limit(10)
-            );
-            const readings = await getCollection<WaterMeterReading>(waterQuery);
-
-            documents.push(...readings.map(r => ({
-                id: r.id,
-                type: 'Water Bill' as const,
-                date: r.date,
-                amount: r.amount,
-                title: `Water Bill - ${new Date(r.date).toLocaleDateString('default', { month: 'short', year: 'numeric' })}`,
-                status: 'Paid' as const,
-                sourceData: r
-            })));
-
-            // 3. Mock Service Charge Statements
-            if (tenant.lease.serviceCharge && tenant.lease.serviceCharge > 0) {
-                for (let i = 0; i < 3; i++) {
-                    const d = new Date();
-                    d.setMonth(d.getMonth() - i);
-                    const period = d.toLocaleDateString('default', { month: 'long', year: 'numeric' });
-
-                    const stmt: ServiceChargeStatement = {
-                        id: `sc-${tenant.id}-${i}`,
-                        tenantId: tenant.id,
-                        propertyId: tenant.propertyId,
-                        unitName: tenant.unitName,
-                        period: period,
-                        amount: tenant.lease.serviceCharge,
-                        items: [{ description: 'General Maintenance', amount: tenant.lease.serviceCharge * 0.7 }, { description: 'Security', amount: tenant.lease.serviceCharge * 0.3 }],
-                        date: d.toISOString(),
-                        status: 'Paid',
-                        createdAt: d.toISOString()
-                    };
-
-                    documents.push({
-                        id: stmt.id,
-                        type: 'Service Charge' as const,
-                        date: stmt.date,
-                        amount: stmt.amount,
-                        title: `Service Charge - ${period}`,
-                        status: 'Paid',
-                        sourceData: stmt
-                    });
-                }
-            }
-        }
-    }
-
-    return documents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function getLandlords(): Promise<Landlord[]> {

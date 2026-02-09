@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -109,6 +109,9 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
             <DialogContent className="max-w-2xl flex flex-col max-h-[90vh] p-0">
                 <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle>Edit Unit: {unit?.name}</DialogTitle>
+                    <DialogDescription>
+                        Update the details for this unit. Click save when you're done.
+                    </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">

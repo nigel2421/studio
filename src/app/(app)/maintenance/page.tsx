@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -176,7 +177,10 @@ export default function MaintenancePage() {
                                 </DialogTrigger>
                                 <DialogContent className="max-w-4xl">
                                     <DialogHeader>
-                                    <DialogTitle>Automated Response Draft</DialogTitle>
+                                        <DialogTitle>Automated Response Draft</DialogTitle>
+                                        <DialogDescription>
+                                            AI-generated response draft for the maintenance request. Review and edit as needed.
+                                        </DialogDescription>
                                     </DialogHeader>
                                     <MaintenanceResponseGenerator
                                     request={request}
