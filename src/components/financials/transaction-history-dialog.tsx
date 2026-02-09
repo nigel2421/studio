@@ -9,7 +9,7 @@ import { Download, Loader2, PlusCircle, Edit2 } from 'lucide-react';
 import { Tenant, Payment, Property, LedgerEntry, WaterMeterReading } from '@/lib/types';
 import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings } from '@/lib/data';
 import { AddPaymentDialog } from './add-payment-dialog';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,9 +43,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
             try {
                 // Rent module should not show water bills, so we don't fetch/pass them
                 const payments = await getPaymentHistory(tenant.id);
-                setAllTenantPayments(payments); 
-                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, undefined, { includeWater: false });
-                setLedger(generatedLedger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+                setAllTenantPayments(payments);
+                const asOf = tenant.lease?.endDate ? parseISO(tenant.lease.endDate) : new Date();
+                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
+                setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {
