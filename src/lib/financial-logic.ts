@@ -125,7 +125,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         billingStartDate = startOfMonth(leaseStartDate);
     }
     
-    const lastBilledDate = tenant.lease.lastBilledPeriod
+    const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
         ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
         : null;
 
@@ -269,8 +269,11 @@ export function generateLedger(
         const isHomeowner = tenant.residentType === 'Homeowner';
         const chargeType = isHomeowner ? 'Service Charge' : 'Rent';
         
-        if ((chargeType === 'Rent' && !finalOptions.includeRent) || (chargeType === 'Service Charge' && !finalOptions.includeServiceCharge)) {
-            return; 
+        if (
+            (chargeType === 'Rent' && !finalOptions.includeRent) ||
+            (chargeType === 'Service Charge' && !finalOptions.includeServiceCharge)
+        ) {
+            return;
         }
 
         const monthlyCharge = isHomeowner ? (unit?.serviceCharge || 0) : (tenant.lease.rent || 0);
@@ -290,8 +293,8 @@ export function generateLedger(
                 billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
             }
             
-            const lastBilledDate = tenant.lease.lastBilledPeriod
-                ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
+            const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
+                ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02'))
                 : null;
 
             const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
@@ -299,7 +302,7 @@ export function generateLedger(
             let loopDate = firstBillableMonth;
             const endOfPeriod = asOfDate;
 
-            while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
+            while (loopDate <= endOfPeriod) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
                     monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [], type: chargeType });
