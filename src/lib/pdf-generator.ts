@@ -719,3 +719,104 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
 };
 
+export const generateDashboardReportPDF = (
+    stats: { title: string; value: string | number }[],
+    financialData: { name: string; amount: number }[],
+    rentBreakdown: { unitType: string; smRent?: number; landlordRent?: number }[],
+    maintenanceBreakdown: { status: string; count: number }[],
+    orientationBreakdown: { name: string; value: number }[]
+) => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    addHeader(doc, 'Dashboard Report');
+
+    let yPos = 45;
+
+    // Stats Section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Key Statistics', 14, yPos);
+    yPos += 8;
+
+    autoTable(doc, {
+        startY: yPos,
+        body: stats.map(s => [s.title, s.value.toString()]),
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Financial Overview
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Overview', 14, yPos);
+    yPos += 8;
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Category', 'Amount']],
+        body: financialData.map(f => [f.name, `Ksh ${f.amount.toLocaleString()}`]),
+        theme: 'striped',
+        headStyles: { fillColor: [51, 65, 85] },
+        columnStyles: { 1: { halign: 'right' } },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+    
+    // Rent Revenue Breakdown
+    if (rentBreakdown.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Rent Revenue by Ownership', 14, yPos);
+        yPos += 8;
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Unit Type', 'SM Units', 'Landlord Units']],
+            body: rentBreakdown.map(r => [r.unitType, `Ksh ${(r.smRent || 0).toLocaleString()}`, `Ksh ${(r.landlordRent || 0).toLocaleString()}`]),
+            theme: 'striped',
+            headStyles: { fillColor: [51, 65, 85] },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Maintenance Overview
+    if (maintenanceBreakdown.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Maintenance Requests', 14, yPos);
+        yPos += 8;
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Status', 'Count']],
+            body: maintenanceBreakdown.map(m => [m.status, m.count.toString()]),
+            theme: 'grid',
+            headStyles: { fillColor: [51, 65, 85] },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+     // Orientation Overview
+    if (orientationBreakdown.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Units by Orientation', 14, yPos);
+        yPos += 8;
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Orientation', 'Count']],
+            body: orientationBreakdown.map(o => [o.name, o.value.toString()]),
+            theme: 'grid',
+            headStyles: { fillColor: [51, 65, 85] },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+
+    doc.save(`dashboard_report_${dateStr.replace(/, /g, '_')}.pdf`);
+};
+

@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { EditPaymentDialog, EditFormValues } from '@/components/financials/edit-payment-dialog';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ConfirmOwnerWaterPaymentDialog } from '@/components/financials/confirm-owner-water-payment-dialog';
 import {

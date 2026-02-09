@@ -372,7 +372,7 @@ export function generateLedger(
     });
 
     const combined = [...allCharges, ...allPaymentsAndAdjustments].sort((a, b) => {
-        const dateDiff = a.date.getTime() - b.date.getTime();
+        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (dateDiff !== 0) return dateDiff;
         if (a.charge > 0 && b.payment > 0) return -1;
         if (a.payment > 0 && b.charge > 0) return 1;
