@@ -583,153 +583,15 @@ export const generateTenantStatementPDF = (
     doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
-
-export const generateArrearsServiceChargeInvoicePDF = (
-    owner: PropertyOwner | Landlord,
-    invoiceDetails: {
-        month: string;
-        items: { description: string; amount: number; }[];
-        totalDue: number;
-    }
-): string => {
-    const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-
-    addHeader(doc, 'Service Charge Invoice');
-    
-    // Owner Details
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(owner.name, 14, 50);
-    doc.setFont('helvetica', 'normal');
-    doc.text(owner.email, 14, 56);
-    
-    // Invoice Details
-    doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
-    doc.text(`For: ${invoiceDetails.month}`, 196, 56, { align: 'right' });
-
-    let yPos = 70;
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Outstanding Service Charges for Vacant Unit', 14, yPos);
-    yPos += 8;
-
-    const body = invoiceDetails.items.map(item => [item.description, formatCurrency(item.amount)]);
-
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Description', 'Amount']],
-        body,
-        theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
-        foot: [[{ content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } }, formatCurrency(invoiceDetails.totalDue)]],
-        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
-        columnStyles: {
-            1: { halign: 'right' }
-        },
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-    doc.setTextColor(40);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
-
-    return doc.output('datauristring').split(',')[1];
-};
-
-
-export const generateDashboardReportPDF = (
-    stats: { title: string, value: string | number }[],
-    financialData: { name: string, amount: number }[],
-    rentBreakdown: { unitType: string, smRent?: number, landlordRent?: number }[],
-    maintenanceBreakdown: { status: string, count: number }[],
-    orientationBreakdown: { name: string, value: number }[]
-) => {
-    const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    addHeader(doc, 'Dashboard Report');
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${dateStr}`, 196, 48, { align: 'right' });
-
-    let yPos = 55;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Key Performance Indicators', 14, yPos);
-    yPos += 5;
-    autoTable(doc, {
-        startY: yPos,
-        body: stats.map(s => [s.title, s.value]),
-        theme: 'plain',
-        styles: { fontSize: 10 },
-        columnStyles: { 0: { fontStyle: 'bold' } },
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Financial Overview', 14, yPos);
-    yPos += 5;
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Category', 'Amount (Ksh)']],
-        body: financialData.map(d => [d.name, d.amount.toLocaleString()]),
-        theme: 'striped',
-        headStyles: { fillColor: [41, 102, 182] },
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Rent Revenue Breakdown', 14, yPos);
-    yPos += 5;
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Unit Type', 'SM Units (Ksh)', 'Landlord Units (Ksh)']],
-        body: rentBreakdown.map(d => [d.unitType, (d.smRent || 0).toLocaleString(), (d.landlordRent || 0).toLocaleString()]),
-        theme: 'striped',
-        headStyles: { fillColor: [22, 163, 74] },
-    });
-
-    doc.addPage();
-    yPos = 20;
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Maintenance Request Status', 14, yPos);
-    yPos += 5;
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Status', 'Count']],
-        body: maintenanceBreakdown.map(d => [d.status, d.count]),
-        theme: 'striped',
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Unit Orientation Breakdown', 14, yPos);
-    yPos += 5;
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Orientation', 'Count']],
-        body: orientationBreakdown.map(d => [d.name, d.value]),
-        theme: 'striped',
-    });
-
-    doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
 export const generateVacantServiceChargeInvoicePDF = (
     owner: PropertyOwner | Landlord,
-    unit: Unit,
-    property: Property,
-    arrearsDetail: { month: string, amount: number, status: string }[],
-    totalDue: number,
+    unitsWithArrears: {
+        unit: Unit;
+        property: Property;
+        arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[];
+        totalDue: number;
+    }[],
+    grandTotalDue: number
 ): void => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
@@ -749,29 +611,44 @@ export const generateVacantServiceChargeInvoicePDF = (
     
     // Invoice Details
     doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
-    doc.text(`For Unit: ${unit.name} (${property.name})`, 196, 56, { align: 'right' });
+    doc.text(`For: Vacant Unit Service Charges`, 196, 56, { align: 'right' });
 
     let yPos = 70;
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Outstanding Service Charges for Vacant Unit', 14, yPos);
+    doc.text('Outstanding Service Charges for Vacant Units', 14, yPos);
     yPos += 8;
 
-    const body = arrearsDetail.filter(d => d.status === 'Pending').map(d => [d.month, formatCurrency(d.amount)]);
+    const body: (string | { content: string, styles: any })[][] = [];
+
+    unitsWithArrears.forEach(item => {
+        body.push([
+            { content: `${item.property.name} - Unit ${item.unit.name}`, styles: { fontStyle: 'bold' } },
+            '' // empty for amount on the unit row
+        ]);
+        item.arrearsDetail.filter(d => d.status === 'Pending').forEach(detail => {
+            body.push([
+                { content: `  - ${detail.month}`, styles: {} },
+                formatCurrency(detail.amount)
+            ]);
+        });
+    });
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Month', 'Amount Due']],
+        head: [['Description', 'Amount Due']],
         body,
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] },
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
         foot: [[
             { content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', halign: 'right' } }
+            { content: formatCurrency(grandTotalDue), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0] },
-        columnStyles: { 1: { halign: 'right' } },
+        columnStyles: {
+            1: { halign: 'right' }
+        },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
@@ -779,5 +656,5 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.setFont('helvetica', 'normal');
     doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
 
-    doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_${unit.name}.pdf`);
+    doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
 };

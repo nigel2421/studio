@@ -69,7 +69,6 @@ export default function ServiceChargesPage() {
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
 
   const [activeTab, setActiveTab] = useState('client-occupied');
-  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
   const fetchData = async () => {
@@ -113,14 +112,14 @@ export default function ServiceChargesPage() {
         allTenants,
         allPayments,
         allLandlords,
-        selectedMonth
+        new Date()
     );
 
     setSelfManagedAccounts(clientOccupiedServiceChargeAccounts);
     setManagedVacantAccounts(managedVacantServiceChargeAccounts);
     setArrearsAccounts(vacantArrears);
 
-  }, [loading, selectedMonth, allProperties, allOwners, allTenants, allPayments, allLandlords]);
+  }, [loading, allProperties, allOwners, allTenants, allPayments, allLandlords]);
 
   const {
       filteredSelfManagedAccounts,
@@ -137,7 +136,10 @@ export default function ServiceChargesPage() {
       return {
           filteredSelfManagedAccounts: selfManagedAccounts.filter(a => a.propertyId === selectedPropertyId),
           filteredManagedVacantAccounts: managedVacantAccounts.filter(a => a.propertyId === selectedPropertyId),
-          filteredArrearsAccounts: arrearsAccounts.filter(a => a.propertyId === selectedPropertyId),
+          filteredArrearsAccounts: arrearsAccounts.map(ownerArrears => ({
+              ...ownerArrears,
+              units: ownerArrears.units.filter(u => u.propertyId === selectedPropertyId)
+          })).filter(ownerArrears => ownerArrears.units.length > 0)
       };
   }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
   
@@ -147,7 +149,7 @@ export default function ServiceChargesPage() {
         return {
             title: 'Arrears Summary',
             stats: [
-                { title: 'Units in Arrears', value: filteredArrearsAccounts.length, icon: Building2 },
+                { title: 'Owners in Arrears', value: filteredArrearsAccounts.length, icon: Building2 },
                 { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
             ]
         }
@@ -379,10 +381,18 @@ export default function ServiceChargesPage() {
     }
   }
 
-  const handleGenerateInvoice = async (arrears: VacantArrearsAccount) => {
+  const handleGenerateInvoice = async (group: VacantArrearsAccount) => {
     const { generateVacantServiceChargeInvoicePDF } = await import('@/lib/pdf-generator');
-    generateVacantServiceChargeInvoicePDF(arrears.owner, arrears.unit, arrears.property, arrears.arrearsDetail, arrears.totalDue);
-    toast({ title: 'Invoice Generated', description: `Invoice for ${arrears.unitName} has been downloaded.` });
+    
+    const unitsWithArrears = group.units.map(u => ({
+        unit: u.unit,
+        property: u.property,
+        arrearsDetail: u.arrearsDetail,
+        totalDue: u.totalDue
+    }));
+
+    generateVacantServiceChargeInvoicePDF(group.owner, unitsWithArrears, group.totalDue);
+    toast({ title: 'Invoice Generated', description: `Invoice for ${group.ownerName} has been downloaded.` });
   };
 
 
@@ -426,9 +436,8 @@ export default function ServiceChargesPage() {
     if (!searchTerm) return filteredArrearsAccounts;
     const lowercasedFilter = searchTerm.toLowerCase();
     return filteredArrearsAccounts.filter(acc =>
-        acc.propertyName.toLowerCase().includes(lowercasedFilter) ||
-        acc.unitName.toLowerCase().includes(lowercasedFilter) ||
-        acc.ownerName?.toLowerCase().includes(lowercasedFilter)
+        acc.ownerName.toLowerCase().includes(lowercasedFilter) ||
+        acc.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
   }, [filteredArrearsAccounts, searchTerm]);
 
@@ -475,7 +484,7 @@ export default function ServiceChargesPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
-                <p className="text-muted-foreground">Track service charge payments for all client-owned units for {format(selectedMonth, 'MMMM yyyy')}.</p>
+                <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                   <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
@@ -592,7 +601,7 @@ export default function ServiceChargesPage() {
             allProperties={allProperties}
             allTenants={allTenants}
             allPayments={allPayments}
-            selectedMonth={selectedMonth}
+            selectedMonth={new Date()}
             paymentStatusForMonth={statusForHistory}
             onDataChange={fetchData}
         />
@@ -769,20 +778,36 @@ const VacantArrearsTab = ({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {arrears.map(acc => (
-                            <TableRow key={`${acc.propertyId}-${acc.unitName}`}>
+                        {arrears.map(group => (
+                            <TableRow key={group.ownerId}>
                                 <TableCell>
-                                    <div className="font-medium">{acc.ownerName}</div>
+                                    <div className="font-medium">{group.ownerName}</div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="font-medium">{acc.propertyName}</div>
-                                    <div className="text-sm text-muted-foreground">Unit {acc.unitName}</div>
+                                    {group.units.map(unit => (
+                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0">
+                                            <div className="font-medium">{unit.propertyName}</div>
+                                            <div className="text-sm text-muted-foreground">Unit {unit.unitName}</div>
+                                        </div>
+                                    ))}
                                 </TableCell>
-                                <TableCell>{new Date(acc.unitHandoverDate).toLocaleDateString()}</TableCell>
-                                <TableCell>{acc.monthsInArrears}</TableCell>
-                                <TableCell>Ksh {acc.totalDue.toLocaleString()}</TableCell>
+                                <TableCell>
+                                    {group.units.map(unit => (
+                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0 h-[38px] flex items-center">
+                                            {new Date(unit.unitHandoverDate).toLocaleDateString()}
+                                        </div>
+                                    ))}
+                                </TableCell>
+                                <TableCell>
+                                    {group.units.map(unit => (
+                                        <div key={unit.unitName} className="py-1 first:pt-0 last:pb-0 h-[38px] flex items-center">
+                                            {unit.monthsInArrears}
+                                        </div>
+                                    ))}
+                                </TableCell>
+                                <TableCell className="font-bold">Ksh {group.totalDue.toLocaleString()}</TableCell>
                                 <TableCell className="text-right">
-                                    <Button size="sm" variant="destructive" onClick={() => onGenerateInvoice(acc)}>
+                                    <Button size="sm" variant="destructive" onClick={() => onGenerateInvoice(group)}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Generate Invoice
                                     </Button>
@@ -812,22 +837,3 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
-
-    
-
-    
-
-    
-
-
-
-    
-
-    
-
-    
-
-
-
-
-    

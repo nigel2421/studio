@@ -24,7 +24,7 @@ export interface GroupedServiceChargeAccount {
   paymentStatus: 'Paid' | 'Pending' | 'N/A';
 }
 
-export interface VacantArrearsAccount {
+interface SingleUnitVacantArrearsAccount {
     ownerId: string;
     ownerName: string;
     propertyId: string;
@@ -37,6 +37,24 @@ export interface VacantArrearsAccount {
     unit: Unit;
     owner: PropertyOwner | Landlord;
     property: Property;
+}
+
+export interface VacantArrearsAccount {
+    ownerId: string;
+    ownerName: string;
+    owner: PropertyOwner | Landlord;
+    totalDue: number;
+    units: {
+        propertyId: string;
+        propertyName: string;
+        unitName: string;
+        unitHandoverDate: string;
+        monthsInArrears: number;
+        totalDue: number;
+        arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[];
+        unit: Unit;
+        property: Property;
+    }[];
 }
 
 export function groupAccounts(accounts: ServiceChargeAccount[]): GroupedServiceChargeAccount[] {
@@ -251,7 +269,7 @@ export function processServiceChargeData(
 
 
     // --- Vacant Units in Arrears Logic ---
-    const vacantArrears: VacantArrearsAccount[] = [];
+    const individualArrears: SingleUnitVacantArrearsAccount[] = [];
 
     const liableUnits = allProperties.flatMap(p => 
       p.units
@@ -302,7 +320,7 @@ export function processServiceChargeData(
       const totalPaid = paymentsForUnit.reduce((sum, p) => sum + p.amount, 0);
 
       let totalBilled = 0;
-      const arrearsDetail: VacantArrearsAccount['arrearsDetail'] = [];
+      const arrearsDetail: { month: string, amount: number, status: 'Paid' | 'Pending' }[] = [];
       let loopDate = firstBillableMonth;
       const startOfToday = startOfMonth(today);
 
@@ -334,7 +352,7 @@ export function processServiceChargeData(
         .reduce((sum, d) => sum + d.amount, 0);
 
       if (finalTotalDue > 0) {
-        vacantArrears.push({
+        individualArrears.push({
           ownerId: owner.id,
           ownerName: owner.name,
           propertyId: unit.property.id,
@@ -350,6 +368,34 @@ export function processServiceChargeData(
         });
       }
     });
+
+    const groupedArrearsMap = new Map<string, VacantArrearsAccount>();
+    individualArrears.forEach(arrear => {
+        if (!groupedArrearsMap.has(arrear.ownerId)) {
+            groupedArrearsMap.set(arrear.ownerId, {
+                ownerId: arrear.ownerId,
+                ownerName: arrear.ownerName,
+                owner: arrear.owner,
+                totalDue: 0,
+                units: [],
+            });
+        }
+        const group = groupedArrearsMap.get(arrear.ownerId)!;
+        group.totalDue += arrear.totalDue;
+        group.units.push({
+            propertyId: arrear.propertyId,
+            propertyName: arrear.propertyName,
+            unitName: arrear.unitName,
+            unitHandoverDate: arrear.unitHandoverDate,
+            monthsInArrears: arrear.monthsInArrears,
+            totalDue: arrear.totalDue,
+            arrearsDetail: arrear.arrearsDetail,
+            unit: arrear.unit,
+            property: arrear.property,
+        });
+    });
+
+    const vacantArrears = Array.from(groupedArrearsMap.values());
 
     return {
         clientOccupiedServiceChargeAccounts,
