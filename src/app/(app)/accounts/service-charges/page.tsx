@@ -72,14 +72,6 @@ export default function ServiceChargesPage() {
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
-  const handlePrevMonth = () => {
-    setSelectedMonth(currentMonth => subMonths(currentMonth, 1));
-  };
-
-  const handleNextMonth = () => {
-    setSelectedMonth(currentMonth => addMonths(currentMonth, 1));
-  };
-
   const fetchData = async () => {
     try {
       const [propertiesData, ownersData, tenantsData, paymentsData, landlordsData] = await Promise.all([
@@ -161,32 +153,40 @@ export default function ServiceChargesPage() {
         }
     }
     
-    const accounts = activeTab === 'client-occupied' 
+    const baseAccounts = activeTab === 'client-occupied' 
         ? filteredSelfManagedAccounts 
         : filteredManagedVacantAccounts;
 
-    const relevantAccounts = accounts.filter(acc => acc.paymentStatus !== 'N/A');
-    const totalUnits = relevantAccounts.length;
+    const statusFilter = activeTab === 'client-occupied' ? smStatusFilter : mvStatusFilter;
 
-    const paidAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Paid');
-    const pendingAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Pending');
+    // Financial totals should reflect the entire tab, not the filter
+    const paidAccounts = baseAccounts.filter(a => a.paymentStatus === 'Paid');
+    const pendingAccounts = baseAccounts.filter(a => a.paymentStatus === 'Pending');
 
     const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
     const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
-
     const totalCharged = totalPaid + totalPending;
     const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
     
+    // Unit count and its title should reflect the filter
+    const finalFilteredAccounts = statusFilter === 'all'
+      ? baseAccounts
+      : baseAccounts.filter(a => a.paymentStatus === statusFilter);
+      
+    const baseTitle = activeTab === 'client-occupied' ? 'Client Occupied' : 'Managed Vacant';
+    const filterTitle = statusFilter !== 'all' ? ` ${statusFilter}` : '';
+    const unitCountTitle = `${baseTitle}${filterTitle} Units`;
+
     return {
-        title: activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units',
+        title: 'Dynamic Title', // This isn't used anymore
         stats: [
-             { title: 'Billable Units', value: totalUnits, icon: Building2 },
+             { title: unitCountTitle, value: finalFilteredAccounts.length, icon: Building2 },
              { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
              { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
-             { title: 'Paid Percentage', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
+             { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
         ]
     };
-  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts]);
+  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts, smStatusFilter, mvStatusFilter]);
 
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
@@ -445,21 +445,39 @@ export default function ServiceChargesPage() {
     setMvCurrentPage(1);
   }, []);
 
+  const statusFilterNode = useMemo(() => {
+      if (activeTab === 'arrears') return null;
+
+      const isSm = activeTab === 'client-occupied';
+      const filterValue = isSm ? smStatusFilter : mvStatusFilter;
+      const handler = isSm ? handleSmStatusFilterChange : handleMvStatusFilterChange;
+      
+      return (
+        <Select value={filterValue} onValueChange={handler}>
+            <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="Paid">Paid</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="N/A">Not Billable</SelectItem>
+            </SelectContent>
+        </Select>
+      );
+
+  }, [activeTab, smStatusFilter, mvStatusFilter, handleSmStatusFilterChange, handleMvStatusFilterChange]);
+
   return (
     <div>
       <div className="sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-6 -mt-6">
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
-                <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
+                <p className="text-muted-foreground">Track service charge payments for all client-owned units for {format(selectedMonth, 'MMMM yyyy')}.</p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-                      <span className="font-semibold text-center w-32">{format(selectedMonth, 'MMMM yyyy')}</span>
-                      <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
-                  </div>
                   <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                       <SelectTrigger className="w-full sm:w-[240px]">
                           <SelectValue placeholder="Filter by property..." />
@@ -471,6 +489,7 @@ export default function ServiceChargesPage() {
                           ))}
                       </SelectContent>
                   </Select>
+                  {statusFilterNode}
               </div>
             </div>
             
@@ -516,8 +535,6 @@ export default function ServiceChargesPage() {
                 accounts={paginatedSmAccounts}
                 onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
                 onViewHistory={handleOpenHistoryDialog}
-                statusFilter={smStatusFilter}
-                onStatusFilterChange={handleSmStatusFilterChange}
                 currentPage={smCurrentPage}
                 pageSize={smPageSize}
                 totalPages={smTotalPages}
@@ -533,8 +550,6 @@ export default function ServiceChargesPage() {
                 accounts={paginatedMvAccounts}
                 onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
                 onViewHistory={handleOpenHistoryDialog}
-                statusFilter={mvStatusFilter}
-                onStatusFilterChange={handleMvStatusFilterChange}
                 currentPage={mvCurrentPage}
                 pageSize={mvPageSize}
                 totalPages={mvTotalPages}
@@ -592,8 +607,6 @@ const ServiceChargeStatusTable = ({
     accounts,
     onConfirmPayment,
     onViewHistory,
-    statusFilter,
-    onStatusFilterChange,
     currentPage,
     pageSize,
     totalPages,
@@ -606,8 +619,6 @@ const ServiceChargeStatusTable = ({
     accounts: GroupedServiceChargeAccount[];
     onConfirmPayment: (acc: ServiceChargeAccount) => void;
     onViewHistory: (group: GroupedServiceChargeAccount) => void;
-    statusFilter: 'all' | 'Paid' | 'Pending' | 'N/A';
-    onStatusFilterChange: (status: 'all' | 'Paid' | 'Pending' | 'N/A') => void;
     currentPage: number;
     pageSize: number;
     totalPages: number;
@@ -635,19 +646,6 @@ const ServiceChargeStatusTable = ({
             <CardHeader>
                 <CardTitle>{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>
-                <div className="flex justify-end">
-                    <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value="Paid">Paid</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="N/A">Not Billable</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
