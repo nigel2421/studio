@@ -53,6 +53,7 @@ const createTransporter = () => {
 // Callable function to send a payment receipt
 export const sendPaymentReceipt = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    cors: true
 }, async (request: CallableRequest) => {
     const { tenantEmail, tenantName, amount, date, propertyName, unitName, notes, tenantId } = request.data;
 
@@ -116,6 +117,7 @@ export const sendPaymentReceipt = onCall({
 // Callable function to send a custom email announcement
 export const sendCustomEmail = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    cors: true
 }, async (request: CallableRequest) => {
     const { recipients, subject, body, attachment } = request.data;
 
@@ -174,6 +176,7 @@ export const sendCustomEmail = onCall({
 
 export const checkAndSendLeaseReminders = onCall({
     secrets: ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"],
+    cors: true
 }, async (request: CallableRequest) => {
     const tenantsRef = db.collection('tenants');
     const propertiesRef = db.collection('properties');
@@ -299,3 +302,4 @@ export const checkAndSendLeaseReminders = onCall({
 
     return { success: true, message: message };
 });
+ 
