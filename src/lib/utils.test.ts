@@ -14,6 +14,7 @@ const mockLink = {
   click: jest.fn(),
   setAttribute: jest.fn(),
   style: { visibility: '' },
+  download: '', // The presence of this property is checked in the function
 };
 const mockAppendChild = jest.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any);
 const mockRemoveChild = jest.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any);

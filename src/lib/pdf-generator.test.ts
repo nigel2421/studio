@@ -52,8 +52,8 @@ describe('PDF Generation', () => {
             if (options && !options.includeWater) { // Rent ledger
                 return {
                     ledger: [
-                        { id: 'charge1', date: '2023-01-01', description: 'Rent for Jan', charge: 20000, payment: 0, balance: 20000 },
-                        { id: 'payment1', date: '2023-01-05', description: 'Payment Received', charge: 0, payment: 20000, balance: 0 },
+                        { id: 'charge1', date: '2023-01-01', description: 'Rent for Jan', charge: 20000, payment: 0, balance: 20000, forMonth: 'Jan 2023' },
+                        { id: 'payment1', date: '2023-01-05', description: 'Payment Received', charge: 0, payment: 20000, balance: 0, forMonth: 'Jan 2023' },
                     ],
                     finalDueBalance: 0,
                     finalAccountBalance: 0,
@@ -62,7 +62,7 @@ describe('PDF Generation', () => {
              if (options && !options.includeRent) { // Water ledger
                 return {
                      ledger: [
-                        { id: 'water1', date: '2023-01-15', description: 'Water Bill for Jan', charge: 500, payment: 0, balance: 500 },
+                        { id: 'water1', date: '2023-01-15', description: 'Water Bill for Jan', charge: 500, payment: 0, balance: 500, forMonth: 'Jan 2023' },
                     ],
                     finalDueBalance: 500,
                     finalAccountBalance: 0,

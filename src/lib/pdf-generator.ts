@@ -568,7 +568,7 @@ export const generateTenantStatementPDF = (
 
     let yPos = isWaterContext ? 60 : 80;
 
-    if (context === 'rent') {
+    if (context === 'rent' || context === 'full') {
         const rentTableBody = rentLedger.map(t => [
             t.date,
             t.forMonth || '',
@@ -593,9 +593,10 @@ export const generateTenantStatementPDF = (
         const balanceLabel = tenant.residentType === 'Homeowner' ? 'Service Charge Balance:' : 'Rent Balance:';
         doc.text(balanceLabel, 140, yPos);
         doc.text(rentDue > 0 ? formatCurrency(rentDue) : `${formatCurrency(rentCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 10; // Add space for the next table if it's a full report
     }
     
-    if (context === 'water') {
+    if (context === 'water' || context === 'full') {
         const waterTableBody = waterLedger.map(entry => {
             let readingDetails = { unit: entry.description, prior: '', current: '', rate: '' };
             if (entry.id.startsWith('charge-water-')) {

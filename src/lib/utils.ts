@@ -16,9 +16,9 @@ export function downloadCSV<T extends Record<string, any>>(data: T[], filename: 
     headers.join(','), // Header row
     ...data.map(row =>
       headers.map(header => {
-        const cell = row[header] === null || row[header] === undefined ? '' : row[header];
-        // Handle strings that might contain commas or newlines
-        if (typeof cell === 'string' && (cell.includes(',') || cell.includes('\n'))) {
+        const cell = row[header] === null || row[header] === undefined ? '' : String(row[header]);
+        // Handle strings that might contain commas, newlines, or quotes
+        if (cell.includes(',') || cell.includes('\n') || cell.includes('"')) {
           return `"${cell.replace(/"/g, '""')}"`;
         }
         return cell;
