@@ -191,6 +191,7 @@ async function getCollection<T>(collectionOrQuery: string | Query, queryConstrai
     return querySnapshot.docs.map(doc => postToJSON<T>(doc));
 }
 
+
 export async function getPaginatedCollection<T>(
     collectionName: string,
     options: { pageSize: number; lastDocId?: string; sortField?: string; sortOrder?: 'asc' | 'desc'; filters?: any[] }
@@ -312,8 +313,7 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc));
+        return getCollection<WaterMeterReading>(q);
     }, 120000); // 2 min cache
 }
 
