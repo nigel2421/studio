@@ -230,8 +230,9 @@ export function generateLedger(
     allTenantWaterReadings: WaterMeterReading[],
     owner?: PropertyOwner | Landlord | null,
     asOfDate: Date = new Date(),
-    options: { includeRent?: boolean, includeServiceCharge?: boolean, includeWater?: boolean } = { includeRent: true, includeServiceCharge: true, includeWater: true }
+    options: { includeRent?: boolean, includeServiceCharge?: boolean, includeWater?: boolean } = {}
 ): { ledger: LedgerEntry[], finalDueBalance: number, finalAccountBalance: number } {
+    const finalOptions = { includeRent: true, includeServiceCharge: true, includeWater: true, ...options };
 
     let ownerUnits: (Unit & { propertyId: string; propertyName: string; })[] = [];
 
@@ -252,7 +253,7 @@ export function generateLedger(
 
     let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string, priorReading?: number, currentReading?: number, consumption?: number, rate?: number, unitName?: string }[] = [];
 
-    if (tenant.residentType === 'Tenant' && options.includeRent) {
+    if (tenant.residentType === 'Tenant' && finalOptions.includeRent) {
         const leaseStartDate = parseISO(tenant.lease.startDate);
         if (tenant.securityDeposit && tenant.securityDeposit > 0) {
             allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
@@ -266,14 +267,13 @@ export function generateLedger(
 
     ownerUnits.forEach(unit => {
         const isHomeowner = tenant.residentType === 'Homeowner';
-        const finalOptions = { includeRent: true, includeServiceCharge: true, includeWater: true, ...options };
-
-        if ((!isHomeowner && !finalOptions.includeRent) || (isHomeowner && !finalOptions.includeServiceCharge)) {
-            return;
+        const chargeType = isHomeowner ? 'Service Charge' : 'Rent';
+        
+        if ((chargeType === 'Rent' && !finalOptions.includeRent) || (chargeType === 'Service Charge' && !finalOptions.includeServiceCharge)) {
+            return; 
         }
 
         const monthlyCharge = isHomeowner ? (unit?.serviceCharge || 0) : (tenant.lease.rent || 0);
-        const chargeType = isHomeowner ? 'Service Charge' : 'Rent';
 
         if (monthlyCharge > 0) {
             let billingStartDate: Date;
@@ -308,13 +308,14 @@ export function generateLedger(
 
     monthlyChargesMap.forEach((value, key) => {
         const chargeDate = parseISO(key + '-01');
-        const description = `${value.type} for Units: ${value.unitNames.join(', ')}`;
+        const unitText = value.unitNames.length > 1 ? 'Units' : 'Unit';
+        const description = `${value.type} for ${unitText}: ${value.unitNames.join(', ')}`;
         allCharges.push({
             id: `charge-${key}`, date: chargeDate, description, charge: value.charge, payment: 0, forMonth: format(chargeDate, 'MMM yyyy'),
         });
     });
 
-    if (options.includeWater && allTenantWaterReadings) {
+    if (finalOptions.includeWater && allTenantWaterReadings) {
       allTenantWaterReadings.forEach(reading => {
           allCharges.push({
               id: `charge-water-${reading.id}`,
@@ -333,9 +334,9 @@ export function generateLedger(
     }
 
     const paymentsToInclude = allTenantPayments.filter(p => {
-        if (p.type === 'Water') return !!options.includeWater;
-        if (p.type === 'Rent' || p.type === 'Deposit') return !!options.includeRent;
-        if (p.type === 'ServiceCharge') return !!options.includeServiceCharge;
+        if (p.type === 'Water') return !!finalOptions.includeWater;
+        if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
+        if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
         return true; // Adjustments, etc.
     });
 
