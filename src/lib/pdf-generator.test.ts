@@ -1,4 +1,5 @@
 
+
 import { generateTenantStatementPDF } from './pdf-generator';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,9 +58,19 @@ describe('PDF Generation', () => {
             units: [{ name: 'U1', unitType: 'One Bedroom', status: 'rented', ownership: 'Landlord' }]
         }];
         
-        // Mock generateLedger to return predictable data
         mockGenerateLedger.mockImplementation((tenant, payments, properties, waterReadings, owner, asOf, options) => {
-            if (options && !options.includeWater) { // Rent ledger for 'full' or 'rent' context
+            // Water-only call
+            if (options && options.includeRent === false) { 
+                return {
+                     ledger: [
+                        { id: 'water1', date: '2023-01-15', description: 'Water Bill for Jan', charge: 500, payment: 0, balance: 500, forMonth: 'Jan 2023' },
+                    ],
+                    finalDueBalance: 500,
+                    finalAccountBalance: 0,
+                }
+            }
+            // Rent/SC only call
+            if (options && options.includeWater === false) {
                 return {
                     ledger: [
                         { id: 'charge1', date: '2023-01-01', description: 'Rent for Jan', charge: 20000, payment: 0, balance: 20000, forMonth: 'Jan 2023' },
@@ -69,15 +80,7 @@ describe('PDF Generation', () => {
                     finalAccountBalance: 0,
                 };
             }
-             if (options && !options.includeRent) { // Water ledger
-                return {
-                     ledger: [
-                        { id: 'water1', date: '2023-01-15', description: 'Water Bill for Jan', charge: 500, payment: 0, balance: 500, forMonth: 'Jan 2023' },
-                    ],
-                    finalDueBalance: 500,
-                    finalAccountBalance: 0,
-                }
-            }
+            // Default fallback
             return { ledger: [], finalDueBalance: 0, finalAccountBalance: 0 };
         });
 

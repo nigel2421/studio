@@ -1,5 +1,4 @@
 
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry } from '@/lib/types';
@@ -563,7 +562,7 @@ export const generateTenantStatementPDF = (
 
     const asOf = new Date(); // Always generate statements up to the current date
 
-    const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeWater: false });
+    const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, [], undefined, asOf, { includeWater: false });
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeRent: false, includeServiceCharge: false });
 
     let yPos = isWaterContext ? 60 : 80;

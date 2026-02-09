@@ -302,7 +302,7 @@ export function generateLedger(
             let loopDate = firstBillableMonth;
             const endOfPeriod = startOfMonth(asOfDate); // Bill up to the start of the current month being viewed
 
-            while (loopDate <= endOfPeriod) {
+            while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
                     monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [], type: chargeType });
@@ -347,7 +347,15 @@ export function generateLedger(
         if (p.type === 'Water') return !!finalOptions.includeWater;
         if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
         if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
-        return true; // Adjustments, etc.
+        if (p.type === 'Adjustment' || p.type === 'Reversal') {
+             // Adjustments/Reversals should only be included if their main category is included
+            if (finalOptions.includeRent || finalOptions.includeServiceCharge) {
+                // Heuristic: If it's a water-only ledger, exclude general adjustments
+                return finalOptions.includeWater ? false : true;
+            }
+            return false;
+        }
+        return false; // Exclude 'Other' unless specified
     });
 
     const allPaymentsAndAdjustments = paymentsToInclude.map(p => {
