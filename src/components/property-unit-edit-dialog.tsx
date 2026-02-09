@@ -106,7 +106,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl flex flex-col max-h-[90vh] p-0">
+            <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh] p-0">
                 <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle>Edit Unit: {unit?.name}</DialogTitle>
                     <DialogDescription>
@@ -117,7 +117,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">
                         <ScrollArea className="flex-1 px-6">
                            <div className="py-4 space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="status"

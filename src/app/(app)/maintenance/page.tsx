@@ -24,11 +24,12 @@ import { getMaintenanceRequests, getTenants, getProperties, updateMaintenanceReq
 import type { MaintenanceRequest, Tenant, Property } from '@/lib/types';
 import { MaintenanceResponseGenerator } from '@/components/maintenance-response-generator';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, Wrench, ChevronDown } from 'lucide-react';
+import { Search, Wrench, ChevronDown, Edit } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 
 export default function MaintenancePage() {
@@ -114,7 +115,7 @@ export default function MaintenancePage() {
         </div>
         <Card>
             <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <CardTitle>All Requests</CardTitle>
                         <CardDescription>Browse all submitted requests from tenants.</CardDescription>
@@ -130,72 +131,129 @@ export default function MaintenancePage() {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Tenant</TableHead>
-                        <TableHead>Property</TableHead>
-                        <TableHead>Issue</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {paginatedRequests.map((request) => {
-                        const tenant = getTenant(request.tenantId);
-                        const property = getProperty(request.propertyId);
-                        return (
-                        <TableRow key={request.id}>
-                            <TableCell>{request.date}</TableCell>
-                            <TableCell>{tenant?.name}</TableCell>
-                            <TableCell>{property?.name}</TableCell>
-                            <TableCell>{request.details}</TableCell>
-                            <TableCell>
-                               <DropdownMenu>
-                                   <DropdownMenuTrigger asChild>
-                                       <Button variant="ghost" size="sm" className="capitalize flex gap-1">
-                                            <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
-                                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                       </Button>
-                                   </DropdownMenuTrigger>
-                                   <DropdownMenuContent>
-                                       <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'New')}>New</DropdownMenuItem>
-                                       <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'In Progress')}>In Progress</DropdownMenuItem>
-                                       <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'Completed')}>Completed</DropdownMenuItem>
-                                   </DropdownMenuContent>
-                               </DropdownMenu>
-                            </TableCell>
-                            <TableCell className="text-right">
-                            {tenant && property && (
-                                <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                    Draft Response
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl">
-                                    <DialogHeader>
-                                        <DialogTitle>Automated Response Draft</DialogTitle>
-                                        <DialogDescription>
-                                            AI-generated response draft for the maintenance request. Review and edit as needed.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <MaintenanceResponseGenerator
-                                    request={request}
-                                    tenant={tenant}
-                                    property={property}
-                                    />
-                                </DialogContent>
-                                </Dialog>
-                            )}
-                            </TableCell>
-                        </TableRow>
-                        );
-                    })}
-                    </TableBody>
-                </Table>
+            <CardContent className="p-0 md:p-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4 p-4">
+                {paginatedRequests.map((request) => {
+                  const tenant = getTenant(request.tenantId);
+                  const property = getProperty(request.propertyId);
+                  return (
+                    <Card key={request.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-base">{tenant?.name || 'Unknown Tenant'}</CardTitle>
+                            <CardDescription>{property?.name} &bull; {format(new Date(request.date), 'PPP')}</CardDescription>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="capitalize flex gap-1 text-xs">
+                                  <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'New')}>New</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'In Progress')}>In Progress</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'Completed')}>Completed</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{request.details}</p>
+                      </CardContent>
+                      <CardFooter>
+                        {tenant && property && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="w-full">
+                                <Edit className="mr-2 h-4 w-4" /> Draft Response
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-4xl">
+                              <DialogHeader>
+                                  <DialogTitle>Automated Response Draft</DialogTitle>
+                                  <DialogDescription>
+                                      AI-generated response draft for the maintenance request. Review and edit as needed.
+                                  </DialogDescription>
+                              </DialogHeader>
+                              <MaintenanceResponseGenerator request={request} tenant={tenant} property={property} />
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <Table className="hidden md:table">
+                  <TableHeader>
+                  <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property</TableHead>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                  {paginatedRequests.map((request) => {
+                      const tenant = getTenant(request.tenantId);
+                      const property = getProperty(request.propertyId);
+                      return (
+                      <TableRow key={request.id}>
+                          <TableCell>{new Date(request.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{tenant?.name}</TableCell>
+                          <TableCell>{property?.name}</TableCell>
+                          <TableCell className="max-w-xs truncate">{request.details}</TableCell>
+                          <TableCell>
+                             <DropdownMenu>
+                                 <DropdownMenuTrigger asChild>
+                                     <Button variant="ghost" size="sm" className="capitalize flex gap-1">
+                                          <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
+                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                     </Button>
+                                 </DropdownMenuTrigger>
+                                 <DropdownMenuContent>
+                                     <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'New')}>New</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'In Progress')}>In Progress</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => handleStatusChange(request.id, 'Completed')}>Completed</DropdownMenuItem>
+                                 </DropdownMenuContent>
+                             </DropdownMenu>
+                          </TableCell>
+                          <TableCell className="text-right">
+                          {tenant && property && (
+                              <Dialog>
+                              <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                  Draft Response
+                                  </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl">
+                                  <DialogHeader>
+                                      <DialogTitle>Automated Response Draft</DialogTitle>
+                                      <DialogDescription>
+                                          AI-generated response draft for the maintenance request. Review and edit as needed.
+                                      </DialogDescription>
+                                  </DialogHeader>
+                                  <MaintenanceResponseGenerator
+                                  request={request}
+                                  tenant={tenant}
+                                  property={property}
+                                  />
+                              </DialogContent>
+                              </Dialog>
+                          )}
+                          </TableCell>
+                      </TableRow>
+                      );
+                  })}
+                  </TableBody>
+              </Table>
             </CardContent>
              <div className="p-4 border-t">
                 <PaginationControls

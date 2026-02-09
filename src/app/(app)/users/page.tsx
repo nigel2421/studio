@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { getUsers, updateUserRole } from '@/lib/data';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
@@ -100,6 +100,28 @@ export default function UsersPage() {
     return <div>Loading...</div>; // Or a more sophisticated loading/access denied component
   }
 
+  const RoleSelector = ({ user }: { user: UserProfile }) => {
+    if (!editableRoles.includes(user.role)) {
+      return <Badge variant="secondary" className="capitalize">{user.role}</Badge>;
+    }
+    
+    return (
+      <Select
+        defaultValue={user.role}
+        onValueChange={(newRole) => handleRoleChange(user.id, newRole as UserRole)}
+      >
+        <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectValue placeholder="Select a role" />
+        </SelectTrigger>
+        <SelectContent>
+          {editableRoles.map(role => (
+            <SelectItem key={role} value={role} className="capitalize">{role.replace('-', ' ')}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -129,8 +151,25 @@ export default function UsersPage() {
                 </Button>
             </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 md:p-6">
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4 p-4">
+            {paginatedUsers.map((user) => (
+              <Card key={user.id}>
+                <CardHeader>
+                  <CardTitle className="text-base">{user.name || <span className="italic text-muted-foreground">Not set</span>}</CardTitle>
+                  <CardDescription>{user.email}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Label className="text-xs text-muted-foreground">Role</Label>
+                  <RoleSelector user={user} />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -144,23 +183,7 @@ export default function UsersPage() {
                   <TableCell>{user.name || <span className="text-muted-foreground italic">Not set</span>}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    {editableRoles.includes(user.role) ? (
-                       <Select
-                         defaultValue={user.role}
-                         onValueChange={(newRole) => handleRoleChange(user.id, newRole as UserRole)}
-                       >
-                         <SelectTrigger className="w-[180px]">
-                           <SelectValue placeholder="Select a role" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {editableRoles.map(role => (
-                             <SelectItem key={role} value={role} className="capitalize">{role.replace('-', ' ')}</SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                    ) : (
-                        <Badge variant="secondary" className="capitalize">{user.role}</Badge>
-                    )}
+                    <RoleSelector user={user} />
                   </TableCell>
                 </TableRow>
               ))}

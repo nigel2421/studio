@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { getTenants, getProperties, archiveTenant, getPaymentHistory, getTenantWaterReadings } from "@/lib/data";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Edit, Trash, FileArchive, Search, FileDown, Users, Home, Percent, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash, FileArchive, Search, FileDown, Users, Home, Percent, Loader2, DollarSign, Building } from "lucide-react";
 import { Tenant, Property } from '@/lib/types';
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { downloadCSV } from "@/lib/utils";
@@ -140,7 +140,7 @@ export default function TenantsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between w-full">
+            <div className="flex flex-col md:flex-row md:items-center justify-between w-full gap-4">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">Residents</h2>
                     <p className="text-muted-foreground">Manage tenants and homeowners across your portfolio.</p>
@@ -163,7 +163,7 @@ export default function TenantsPage() {
                 )}
             </div>
             
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Total Tenants</CardTitle>
@@ -182,7 +182,7 @@ export default function TenantsPage() {
                         <div className="text-2xl font-bold">{homeowners.length}</div>
                     </CardContent>
                 </Card>
-                 <Card>
+                 <Card className="col-span-2 md:col-span-1">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Portfolio Occupancy</CardTitle>
                         <Percent className="h-4 w-4 text-muted-foreground" />
@@ -198,7 +198,7 @@ export default function TenantsPage() {
                     <CardTitle>Tenant Directory</CardTitle>
                     <CardDescription>A list of all active tenants in your properties.</CardDescription>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-4 gap-4">
-                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full">
                             <div className="relative w-full sm:w-64">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -224,8 +224,41 @@ export default function TenantsPage() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                    <Table>
+                <CardContent className="p-0 md:p-6">
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4 p-4">
+                        {paginatedTenants.map(tenant => (
+                            <Card key={tenant.id}>
+                                <CardHeader>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <CardTitle>{tenant.name}</CardTitle>
+                                            <CardDescription>{tenant.email}</CardDescription>
+                                        </div>
+                                        <TenantActions tenant={tenant} onArchive={() => handleArchive(tenant.id)} isConsultant={isInvestmentConsultant} onExport={() => handleExportStatement(tenant)} />
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-muted-foreground">Property</p>
+                                        <p className="font-medium">{getPropertyName(tenant.propertyId)} / {tenant.unitName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-muted-foreground">Rent</p>
+                                        <p className="font-medium">Ksh {(tenant.lease?.rent || 0).toLocaleString()}</p>
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
+                                        {tenant.lease?.paymentStatus || 'N/A'}
+                                    </Badge>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <Table className="hidden md:table">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Name</TableHead>
@@ -240,23 +273,14 @@ export default function TenantsPage() {
                                 <TableRow key={tenant.id}>
                                     <TableCell>
                                         <div className="font-medium">{tenant.name}</div>
-                                        <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                            {tenant.email}
-                                        </div>
+                                        <div className="text-sm text-muted-foreground">{tenant.email}</div>
                                     </TableCell>
                                     <TableCell>
                                         <div>{getPropertyName(tenant.propertyId)}</div>
                                         <div className="text-sm text-muted-foreground">Unit: {tenant.unitName}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium">
-                                                Ksh {(tenant.lease?.rent || 0).toLocaleString()}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground uppercase">
-                                                Rent
-                                            </span>
-                                        </div>
+                                        <div className="font-medium">Ksh {(tenant.lease?.rent || 0).toLocaleString()}</div>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant={getPaymentStatusVariant(tenant.lease?.paymentStatus)}>
@@ -264,59 +288,7 @@ export default function TenantsPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {isInvestmentConsultant ? (
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm"
-                                                onClick={() => handleExportStatement(tenant)}
-                                                disabled={generatingPdfFor === tenant.id}
-                                            >
-                                                {generatingPdfFor === tenant.id ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <FileDown className="mr-2 h-4 w-4" />
-                                                )}
-                                                Export Statement
-                                            </Button>
-                                        ) : (
-                                            <div className="flex items-center justify-end gap-2">
-                                                <TenantActions tenant={tenant} />
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                            <span className="sr-only">Open menu</span>
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={`/tenants/edit/${tenant.id}`}>
-                                                                <Edit className="mr-2 h-4 w-4" /> Edit
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                                    <Trash className="mr-2 h-4 w-4" /> Archive
-                                                                </DropdownMenuItem>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        This action will archive the occupant and mark their unit as vacant. You can view archived records later.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleArchive(tenant.id)}>Continue</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        )}
+                                        <TenantActions tenant={tenant} onArchive={() => handleArchive(tenant.id)} isConsultant={isInvestmentConsultant} onExport={() => handleExportStatement(tenant)} />
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -342,5 +314,58 @@ export default function TenantsPage() {
                 </div>
             </Card>
         </div>
+    );
+}
+
+// Refactored TenantActions to pass down archive handler
+const TenantActions = ({ tenant, onArchive, isConsultant, onExport }: { tenant: Tenant, onArchive: () => void, isConsultant: boolean, onExport: () => void }) => {
+    
+    if (isConsultant) {
+        return (
+             <Button variant="outline" size="sm" onClick={onExport}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export Statement
+            </Button>
+        )
+    }
+    
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <Link href={`/tenants/edit/${tenant.id}`}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit
+                    </Link>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={onExport}>
+                    <FileDown className="mr-2 h-4 w-4" /> Export Statement
+                </DropdownMenuItem>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <Trash className="mr-2 h-4 w-4" /> Archive
+                        </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action will archive the occupant and mark their unit as vacant. You can view archived records later.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={onArchive}>Continue</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

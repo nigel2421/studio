@@ -310,7 +310,7 @@ export function AddPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger}
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Add Payment Record</DialogTitle>
           {tenantForDisplay && <DialogDescription>For {tenantForDisplay.name} - Unit {tenantForDisplay.unitName}</DialogDescription>}
@@ -318,7 +318,7 @@ export function AddPaymentDialog({
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             {!tenant && (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="development">Development</Label>
                     <Select onValueChange={setSelectedProperty} value={selectedProperty}>

@@ -16,15 +16,5 @@ export function TenantActions({ tenant }: { tenant: Tenant }) {
     });
   };
 
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => handleSendReminder(tenant.name)}
-      disabled={!tenant.lease || tenant.lease.paymentStatus === 'Paid'}
-    >
-      <Bell className="mr-2 h-4 w-4" />
-      Send Reminder
-    </Button>
-  );
+  return null;
 }
