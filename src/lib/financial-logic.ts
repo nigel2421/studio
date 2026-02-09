@@ -297,9 +297,9 @@ export function generateLedger(
             const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
             
             let loopDate = firstBillableMonth;
-            const startOfCurrentMonth = startOfMonth(asOfDate);
+            const endOfPeriod = asOfDate;
 
-            while (isBefore(loopDate, startOfCurrentMonth) || isSameMonth(loopDate, startOfCurrentMonth)) {
+            while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
                 const monthKey = format(loopDate, 'yyyy-MM');
                 if (!monthlyChargesMap.has(monthKey)) {
                     monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [], type: chargeType });

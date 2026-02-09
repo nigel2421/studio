@@ -319,8 +319,7 @@ export async function addTenant(data: {
 
     const initialDue = rent + (securityDeposit || 0) + (waterDeposit || 0);
 
-    // For homeowners, service charge billing start date is determined by handover date
-    let lastBilledPeriod = format(new Date(leaseStartDate), 'yyyy-MM');
+    let lastBilledPeriod: string;
     if (residentType === 'Homeowner' && unit.handoverDate) {
         const handoverDate = new Date(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
@@ -335,6 +334,9 @@ export async function addTenant(data: {
         }
         // Last billed period is the month *before* the first billable one.
         lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
+    } else {
+        // For Tenants, set last billed to month *before* lease start
+        lastBilledPeriod = format(addMonths(new Date(leaseStartDate), -1), 'yyyy-MM');
     }
 
 
@@ -1787,6 +1789,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 

@@ -44,9 +44,9 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 // Rent module should not show water bills, so we don't fetch/pass them
                 const payments = await getPaymentHistory(tenant.id);
                 setAllTenantPayments(payments);
-                const asOf = tenant.lease?.endDate ? parseISO(tenant.lease.endDate) : new Date();
+                const asOf = new Date();
                 const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
-                setLedger(generatedLedger);
+                setLedger(generatedLedger.sort((a,b) => a.date.localeCompare(b.date)));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {
