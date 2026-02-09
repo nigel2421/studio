@@ -38,7 +38,7 @@ export default function TenantDashboardPage() {
     const [properties, setProperties] = useState<Property[]>([]);
     const [rentLedger, setRentLedger] = useState<LedgerEntry[]>([]);
     const [waterLedger, setWaterLedger] = useState<LedgerEntry[]>([]);
-    const [balances, setBalances] = useState({ due: 0, credit: 0 });
+    const [balances, setBalances] = useState({ rentDue: 0, rentCredit: 0, waterDue: 0, waterCredit: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [activeTenantTab, setActiveTenantTab] = useState<'rent' | 'water'>('rent');
 
@@ -55,13 +55,12 @@ export default function TenantDashboardPage() {
                 setWaterReadings(waterData);
                 setProperties(propertiesData);
                 if(tenantDetails) {
-                    const { ledger: fullLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, paymentData, propertiesData, waterData);
-                    const { ledger: rentOnlyLedger } = generateLedger(tenantDetails, paymentData, propertiesData, [], undefined, undefined, { includeWater: false });
-                    const { ledger: waterOnlyLedger } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, undefined, undefined, { includeRent: false, includeServiceCharge: false });
+                    const { ledger: rentOnlyLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenantDetails, paymentData, propertiesData, [], undefined, undefined, { includeWater: false });
+                    const { ledger: waterOnlyLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, undefined, undefined, { includeRent: false, includeServiceCharge: false });
 
                     setRentLedger(rentOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                     setWaterLedger(waterOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                    setBalances({ due: finalDueBalance, credit: finalAccountBalance });
+                    setBalances({ rentDue, rentCredit, waterDue, waterCredit });
                 }
                 setIsLoading(false);
             }).catch(err => {
@@ -86,7 +85,6 @@ export default function TenantDashboardPage() {
         if (!tenantDetails) return;
         toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
         try {
-            // We can reuse the payments and properties already in state
             generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, activeTenantTab);
         } catch(e) {
             console.error("Error generating PDF:", e);
@@ -110,37 +108,6 @@ export default function TenantDashboardPage() {
             default: return 'outline';
         }
     };
-
-    const { dueDateLabel, dueDateString, dueDateStatus } = useMemo(() => {
-        if (!tenantDetails?.lease) {
-            return { dueDateLabel: 'Next Rent Due', dueDateString: 'N/A', dueDateStatus: 'Pending' as const };
-        }
-        
-        const { paymentStatus, lastBilledPeriod } = tenantDetails.lease;
-
-        // If status is Overdue or Pending, it refers to the last billed month.
-        if (paymentStatus === 'Overdue' || paymentStatus === 'Pending') {
-            const lastBilledMonth = lastBilledPeriod ? parseISO(lastBilledPeriod + '-01T12:00:00Z') : new Date();
-            return {
-                dueDateLabel: 'Payment Due For',
-                dueDateString: format(lastBilledMonth, 'MMMM yyyy'),
-                dueDateStatus: paymentStatus,
-            };
-        }
-        
-        // Status is 'Paid', so show next month's details
-        const today = new Date();
-        const lastBilledDate = lastBilledPeriod ? parseISO(lastBilledPeriod + '-01T12:00:00Z') : today;
-        const nextBillingMonth = addMonths(startOfMonth(lastBilledDate), 1);
-        
-        return {
-            dueDateLabel: 'Next Payment Due',
-            dueDateString: format(nextBillingMonth, 'MMMM yyyy'),
-            dueDateStatus: paymentStatus,
-        };
-
-    }, [tenantDetails]);
-
 
     if (isLoading || authIsLoading) {
       return (
@@ -192,122 +159,133 @@ export default function TenantDashboardPage() {
 
     return (
         <div className="space-y-8">
-            <header className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
-                    {tenantDetails ? (
-                        <p className="text-muted-foreground">
-                            Unit {tenantDetails.unitName} &bull; Rent: Ksh {tenantDetails.lease.rent.toLocaleString()}
-                        </p>
-                    ) : (
-                        <p className="text-muted-foreground">Here is an overview of your account.</p>
-                    )}
-                </div>
-                <div className="flex items-center gap-2">
-                     <Button onClick={handleGenerateStatement} variant="outline">
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Download Statement
-                    </Button>
-                    <Button onClick={handleSignOut} variant="outline">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                    </Button>
-                </div>
-            </header>
-
-            {tenantDetails && (
-                <div>
-                    <h2 className="text-2xl font-semibold mb-4">Financial Overview</h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Monthly Rent</CardTitle>
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">Ksh {tenantDetails.lease.rent.toLocaleString()}</div>
-                                <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
-                                    {tenantDetails.lease.paymentStatus}
-                                </Badge>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
-                                <Droplets className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {latestWaterReading ? (
-                                    <>
-                                        <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">
-                                            {latestWaterReading.consumption} units consumed
-                                        </p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="text-xl font-bold">Not Available</div>
-                                        <p className="text-xs text-muted-foreground">No recent reading.</p>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
-                         <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
-                                <AlertCircle className="h-4 w-4 text-red-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-red-600">Ksh {(balances.due).toLocaleString()}</div>
-                                <p className="text-xs text-muted-foreground">Total outstanding amount</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Excess Credit</CardTitle>
-                                <PlusCircle className="h-4 w-4 text-green-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-green-600">Ksh {(balances.credit).toLocaleString()}</div>
-                                <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{dueDateLabel}</CardTitle>
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{dueDateString}</div>
-                                {dueDateStatus && (
-                                    <Badge variant={getPaymentStatusVariant(dueDateStatus)} className="mt-1">
-                                        {dueDateStatus}
-                                    </Badge>
-                                )}
-                            </CardContent>
-                        </Card>
+            <Tabs value={activeTenantTab} onValueChange={(value) => setActiveTenantTab(value as any)} className="space-y-8">
+                <header className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold">Welcome, {userProfile?.name || 'Tenant'}</h1>
+                        {tenantDetails ? (
+                            <p className="text-muted-foreground">
+                                Unit {tenantDetails.unitName} &bull; Rent: Ksh {tenantDetails.lease.rent.toLocaleString()}
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground">Here is an overview of your account.</p>
+                        )}
                     </div>
-                </div>
-            )}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Transaction History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Tabs defaultValue="rent" onValueChange={(value) => setActiveTenantTab(value as 'rent' | 'water')}>
+                    <div className="flex items-center gap-2">
                         <TabsList>
-                            <TabsTrigger value="rent">Rent Ledger</TabsTrigger>
-                            <TabsTrigger value="water">Water Bills</TabsTrigger>
+                            <TabsTrigger value="rent">Rent</TabsTrigger>
+                            <TabsTrigger value="water">Water</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="rent" className="mt-4">
-                            {renderLedgerTable(rentLedger)}
-                        </TabsContent>
-                         <TabsContent value="water" className="mt-4">
-                            {renderLedgerTable(waterLedger)}
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
+                        <Button onClick={handleGenerateStatement} variant="outline">
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Download Statement
+                        </Button>
+                        <Button onClick={handleSignOut} variant="outline">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Sign Out
+                        </Button>
+                    </div>
+                </header>
+
+                <TabsContent value="rent">
+                     {tenantDetails && (
+                        <div className="space-y-8">
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Monthly Rent</CardTitle>
+                                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-2xl font-bold">Ksh {tenantDetails.lease.rent.toLocaleString()}</div>
+                                        <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
+                                            {tenantDetails.lease.paymentStatus}
+                                        </Badge>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Rent Due Balance</CardTitle>
+                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-2xl font-bold text-red-600">Ksh {(balances.rentDue).toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Total outstanding rent</p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Rent Account Credit</CardTitle>
+                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-2xl font-bold text-green-600">Ksh {(balances.rentCredit).toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                             <Card>
+                                <CardHeader><CardTitle>Rent Transaction History</CardTitle></CardHeader>
+                                <CardContent>{renderLedgerTable(rentLedger)}</CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </TabsContent>
+
+                 <TabsContent value="water">
+                     {tenantDetails && (
+                        <div className="space-y-8">
+                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
+                                        <Droplets className="h-4 w-4 text-muted-foreground" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        {latestWaterReading ? (
+                                            <>
+                                                <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {latestWaterReading.consumption} units consumed
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="text-xl font-bold">Not Available</div>
+                                                <p className="text-xs text-muted-foreground">No recent reading.</p>
+                                            </>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Water Bill Due Balance</CardTitle>
+                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-2xl font-bold text-red-600">Ksh {(balances.waterDue).toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Total pending water bills</p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                        <CardTitle className="text-sm font-medium">Water Credit Balance</CardTitle>
+                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-2xl font-bold text-green-600">Ksh {(balances.waterCredit).toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <Card>
+                                <CardHeader><CardTitle>Water Bill Transaction History</CardTitle></CardHeader>
+                                <CardContent>{renderLedgerTable(waterLedger)}</CardContent>
+                            </Card>
+                        </div>
+                     )}
+                </TabsContent>
+            </Tabs>
             <div className='px-2 space-y-2 mt-8'>
                 <Button variant="destructive" className="w-full" onClick={handleMoveOutNotice}>
                     Submit 1-Month Move Out Notice

@@ -16,8 +16,6 @@ import {
 } from '@/components/ui/table';
 import { generateLedger } from '@/lib/financial-logic';
 import { PaginationControls } from '../ui/pagination-controls';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
@@ -27,10 +25,9 @@ interface ClientLandlordDashboardProps {
     units: (Unit & { propertyName: string })[];
     owner: PropertyOwner | Landlord | null;
     activeTab: 'service-charge' | 'water';
-    onTabChange: (tab: 'service-charge' | 'water') => void;
 }
 
-export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner, activeTab, onTabChange }: ClientLandlordDashboardProps) {
+export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings, allProperties, units, owner, activeTab }: ClientLandlordDashboardProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
@@ -38,17 +35,17 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
         if (!tenantDetails) {
             return { serviceChargeLedger: [], waterLedger: [], finalDueBalance: 0, finalAccountBalance: 0 };
         }
-        // Generate full ledger for balances
-        const { ledger: fullLedger, finalDueBalance, finalAccountBalance } = generateLedger(tenantDetails, payments, allProperties, waterReadings, owner);
-        // Generate specific ledgers for display
-        const { ledger: scLedger } = generateLedger(tenantDetails, payments, allProperties, waterReadings, owner, undefined, { includeWater: false, includeRent: false, includeServiceCharge: true });
-        const { ledger: wLedger } = generateLedger(tenantDetails, payments, allProperties, waterReadings, owner, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
+        const { ledger: scLedger, finalDueBalance: scDue, finalAccountBalance: scCredit } = generateLedger(tenantDetails, payments, allProperties, [], owner, undefined, { includeWater: false, includeRent: false, includeServiceCharge: true });
+        const { ledger: wLedger, finalDueBalance: wDue, finalAccountBalance: wCredit } = generateLedger(tenantDetails, payments, allProperties, waterReadings, owner, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
+
+        const combinedDue = scDue + wDue;
+        const combinedCredit = scCredit + wCredit;
 
         return {
             serviceChargeLedger: scLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
             waterLedger: wLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-            finalDueBalance,
-            finalAccountBalance
+            finalDueBalance: combinedDue,
+            finalAccountBalance: combinedCredit
         };
     }, [tenantDetails, payments, allProperties, waterReadings, owner]);
     
@@ -123,111 +120,147 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
             </div>
         );
     }
+    
+    const serviceChargeCards = (
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Monthly Service Charge</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">Ksh {monthlyServiceCharge.toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">For {units.length} unit(s)</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Total outstanding amount</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
+                    <PlusCircle className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                </CardContent>
+            </Card>
+        </>
+    );
+
+    const waterBillCards = (
+        <>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
+                    <Droplets className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                    <CardContent>
+                    {latestWaterReading ? (
+                        <>
+                            <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground">
+                                {latestWaterReading.consumption} units consumed
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-xl font-bold">Not Available</div>
+                            <p className="text-xs text-muted-foreground">No recent reading.</p>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Total outstanding amount</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
+                    <PlusCircle className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
+                </CardContent>
+            </Card>
+        </>
+    );
 
     return (
         <div className="space-y-8">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Monthly Service Charge</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <TabsContent value="service-charge" className="m-0">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {serviceChargeCards}
+                </div>
+                 <Card className="mt-8">
+                    <CardHeader>
+                        <CardTitle>Your Units & Monthly Service Charge</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Ksh {monthlyServiceCharge.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">For {units.length} unit(s)</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Latest Water Bill</CardTitle>
-                        <Droplets className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                     <CardContent>
-                        {latestWaterReading ? (
-                            <>
-                                <div className="text-2xl font-bold">Ksh {latestWaterReading.amount.toLocaleString()}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    {latestWaterReading.consumption} units consumed
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <div className="text-xl font-bold">Not Available</div>
-                                <p className="text-xs text-muted-foreground">No recent reading.</p>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Total outstanding amount</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Account Credit</CardTitle>
-                        <PlusCircle className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
-                    </CardContent>
-                </Card>
-            </div>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Your Units & Monthly Service Charge</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Property</TableHead>
-                                <TableHead>Unit Name</TableHead>
-                                <TableHead className="text-right">Monthly Service Charge</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {units.map(unit => (
-                                <TableRow key={unit.name}>
-                                    <TableCell>{unit.propertyName}</TableCell>
-                                    <TableCell>{unit.name}</TableCell>
-                                    <TableCell className="text-right">Ksh {(unit.serviceCharge || 0).toLocaleString()}</TableCell>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Property</TableHead>
+                                    <TableHead>Unit Name</TableHead>
+                                    <TableHead className="text-right">Monthly Service Charge</TableHead>
                                 </TableRow>
-                            ))}
-                             <TableRow className="font-bold bg-muted">
-                                <TableCell colSpan={2}>Total Monthly Service Charge</TableCell>
-                                <TableCell className="text-right">Ksh {monthlyServiceCharge.toLocaleString()}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Transaction History</CardTitle>
-                    <CardDescription>A summary of your recent charges and payments.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Tabs defaultValue={activeTab} onValueChange={(value) => onTabChange(value as 'service-charge' | 'water')}>
-                        <TabsList className="px-6 border-b w-full justify-start rounded-none">
-                            <TabsTrigger value="service-charge">Service Charge</TabsTrigger>
-                            <TabsTrigger value="water">Water Bills</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="service-charge">
-                            {renderLedgerTable(serviceChargeLedger)}
-                        </TabsContent>
-                        <TabsContent value="water">
-                             {renderLedgerTable(waterLedger)}
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
+                            </TableHeader>
+                            <TableBody>
+                                {units.map(unit => (
+                                    <TableRow key={unit.name}>
+                                        <TableCell>{unit.propertyName}</TableCell>
+                                        <TableCell>{unit.name}</TableCell>
+                                        <TableCell className="text-right">Ksh {(unit.serviceCharge || 0).toLocaleString()}</TableCell>
+                                    </TableRow>
+                                ))}
+                                <TableRow className="font-bold bg-muted">
+                                    <TableCell colSpan={2}>Total Monthly Service Charge</TableCell>
+                                    <TableCell className="text-right">Ksh {monthlyServiceCharge.toLocaleString()}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+                 <Card className="mt-8">
+                    <CardHeader>
+                        <CardTitle>Transaction History</CardTitle>
+                        <CardDescription>A summary of your recent charges and payments.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {renderLedgerTable(serviceChargeLedger)}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="water" className="m-0">
+                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {waterBillCards}
+                </div>
+                <Card className="mt-8">
+                    <CardHeader>
+                        <CardTitle>Transaction History</CardTitle>
+                        <CardDescription>A summary of your recent charges and payments.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {renderLedgerTable(waterLedger)}
+                    </CardContent>
+                </Card>
+            </TabsContent>
         </div>
     );
 }
