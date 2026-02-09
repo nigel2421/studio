@@ -159,12 +159,13 @@ export const generateOwnerServiceChargeStatementPDF = (
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const isWaterContext = context === 'water';
+    const isServiceChargeContext = context === 'service-charge';
 
-    addHeader(doc, isWaterContext ? 'Water Bill Statement' : 'Resident Statement');
+    addHeader(doc, isWaterContext ? 'Water Bill Statement' : 'STATEMENT');
 
     const ownerUnits = allProperties.flatMap(p =>
         p.units
-            .filter(u => 'assignedUnits' in owner ? (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+            .filter(u => 'assignedUnits' in owner ? (owner as PropertyOwner).assignedUnits.some((au) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
             .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
     );
 
@@ -178,6 +179,29 @@ export const generateOwnerServiceChargeStatementPDF = (
     doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
     doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
+
+    let yPos = 80;
+    
+    if (isServiceChargeContext) {
+        const unitsYStart = 48;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Your Units:', 14, unitsYStart);
+        
+        let unitYPos = unitsYStart + 6;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+
+        ownerUnits.slice(0, 5).forEach(unit => {
+            const charge = unit.serviceCharge || 0;
+            const line = `- ${unit.propertyName} ${unit.name} (${unit.unitType}): Service Charge KSh ${charge.toLocaleString()} pm`;
+            doc.text(line, 14, unitYPos);
+            unitYPos += 5;
+        });
+        
+        yPos = Math.max(yPos, unitYPos + 6);
+    }
+
 
     const tenant = allTenants.find(t => 
         t.residentType === 'Homeowner' && 
@@ -197,8 +221,6 @@ export const generateOwnerServiceChargeStatementPDF = (
     
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, tenantPayments, allProperties, tenantWaterReadings, owner, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
-    let yPos = 80;
-
     const filterLedgerByDate = (ledger: LedgerEntry[]) => ledger.filter(entry => {
         try {
             const entryDate = parseISO(entry.date);
@@ -212,7 +234,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text('Service Charge Statement', 14, yPos);
-        yPos += 2;
+        yPos += 8;
 
         const serviceChargeTableBody = filterLedgerByDate(serviceChargeLedger).map(t => [
             t.date, t.forMonth || '', t.description, t.charge > 0 ? formatCurrency(t.charge) : '', t.payment > 0 ? formatCurrency(t.payment) : '', t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
