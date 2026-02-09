@@ -14,12 +14,51 @@ import {
     Lease
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths, parseISO } from "date-fns";
 
 const WATER_RATE = 150; // Ksh per unit
+
+function postToJSON<T>(doc: DocumentSnapshot): T {
+    const data = doc.data();
+    if (!data) {
+        return { id: doc.id } as T;
+    }
+    
+    // This is a generic way to convert all Firestore Timestamps in an object to ISO strings.
+    const convertObjectTimestamps = (obj: any): any => {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+
+        // Firestore Timestamps have a toDate method
+        if (typeof obj.toDate === 'function') {
+            return obj.toDate().toISOString();
+        }
+
+        // If it's an array, recursively convert its elements
+        if (Array.isArray(obj)) {
+            return obj.map(convertObjectTimestamps);
+        }
+        
+        // If it's an object, recursively convert its properties
+        const newObj: { [key: string]: any } = {};
+        for (const key of Object.keys(obj)) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                newObj[key] = convertObjectTimestamps(obj[key]);
+            }
+        }
+        
+        return newObj;
+    };
+    
+    const serializedData = convertObjectTimestamps(data);
+
+    return { id: doc.id, ...serializedData } as T;
+}
+
 
 export async function logActivity(action: string, userEmail?: string | null) {
     const user = auth.currentUser;
@@ -138,13 +177,13 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 export async function getLogs(): Promise<Log[]> {
     const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(1000));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log));
+    return querySnapshot.docs.map(doc => postToJSON<Log>(doc));
 }
 
 async function getCollection<T>(collectionName: string, queryConstraints: any[] = []): Promise<T[]> {
     const q = query(collection(db, collectionName), ...queryConstraints);
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+    return querySnapshot.docs.map(doc => postToJSON<T>(doc));
 }
 
 export async function getPaginatedCollection<T>(
@@ -170,7 +209,7 @@ export async function getPaginatedCollection<T>(
     const q = query(collection(db, collectionName), ...constraints);
     const querySnapshot = await getDocs(q);
 
-    const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+    const items = querySnapshot.docs.map(doc => postToJSON<T>(doc));
     const lastDocId = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1].id : null;
 
     return { items, lastDocId };
@@ -181,7 +220,7 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as T;
+        return postToJSON<T>(docSnap);
     } else {
         return null;
     }
@@ -242,15 +281,13 @@ export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
             where('createdAt', '>=', ninetyDaysAgo),
             orderBy('createdAt', 'desc')
         );
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+        return getCollection<MaintenanceRequest>(q as any);
     }, 120000);
 }
 
 export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
     const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    return getCollection<MaintenanceRequest>(q as any);
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
@@ -264,15 +301,13 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
         where('tenantId', '==', tenantId),
         orderBy('createdAt', 'desc')
     );
-    const readingsSnapshot = await getDocs(readingsQuery);
-    return readingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+    return getCollection<WaterMeterReading>(readingsQuery as any);
 }
 
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+        return getCollection<WaterMeterReading>(q as any);
     }, 120000);
 }
 
@@ -288,7 +323,7 @@ export async function getLatestWaterReading(propertyId: string, unitName: string
     if (querySnapshot.empty) {
         return null;
     }
-    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as WaterMeterReading;
+    return postToJSON<WaterMeterReading>(querySnapshot.docs[0]);
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
@@ -528,7 +563,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     const userProfileRef = doc(db, 'users', userId);
     const docSnap = await getDoc(userProfileRef);
     if (docSnap.exists()) {
-        const userProfile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
+        const userProfile = postToJSON<UserProfile>(docSnap);
 
         if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
             const tenantDetails = await getTenant(userProfile.tenantId);
@@ -576,10 +611,7 @@ export async function getTenantMaintenanceRequests(tenantId: string): Promise<Ma
         where("tenantId", "==", tenantId),
         orderBy('createdAt', 'desc')
     );
-    const querySnapshot = await getDocs(q);
-    const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
-
-    return requests;
+    return getCollection<MaintenanceRequest>(q as any);
 }
 
 export async function addWaterMeterReading(data: {
@@ -684,8 +716,7 @@ export async function getPaymentHistory(tenantId: string, options?: { startDate?
         ...constraints,
         orderBy('date', 'desc')
     );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+    return getCollection<Payment>(q as any);
 }
 
 export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
@@ -716,7 +747,7 @@ export async function getPropertyWaterReadings(propertyId: string): Promise<Wate
 
     const snapshots = await Promise.all(fetchPromises);
     const readings: WaterMeterReading[] = snapshots.flatMap(snapshot =>
-        snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading))
+        snapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc))
     );
 
     return readings;
@@ -728,8 +759,7 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
         where('propertyId', '==', propertyId),
         orderBy('createdAt', 'desc')
     );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+    return getCollection<MaintenanceRequest>(q as any);
 }
 
 export async function batchProcessPayments(
@@ -791,7 +821,7 @@ export async function batchProcessPayments(
                 status: 'Paid',
                 paymentMethod: entry.paymentMethod,
                 transactionId: entry.transactionId,
-                createdAt: new Date(),
+                createdAt: new Date().toISOString(),
             };
 
             if (entry.type === 'Water' && entry.waterReadingId) {
@@ -1135,7 +1165,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                                             items: [{ description: 'Vacant Unit Service Charge', amount: scAmount }],
                                             date: today.toISOString(),
                                             status: 'Pending',
-                                            createdAt: today
+                                            createdAt: today.toISOString()
                                         } as ServiceChargeStatement
                                     });
                                 }
@@ -1169,7 +1199,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
             if (keyTenantIds.length > 0) {
                 // Fetch Payments
                 const paymentsSnapshot = await getDocs(query(collection(db, 'payments'), where('tenantId', 'in', keyTenantIds.slice(0, 30)))); // Limit 30 for 'in' query constraint
-                const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+                const payments = paymentsSnapshot.docs.map(doc => postToJSON<Payment>(doc));
 
                 documents.push(...payments.map(p => {
                     const t = keyTenants.find(kt => kt.id === p.tenantId);
@@ -1186,7 +1216,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
 
                 // Fetch Water Bills
                 const waterSnapshot = await getDocs(query(collection(db, 'waterReadings'), where('tenantId', 'in', keyTenantIds.slice(0, 30))));
-                const readings = waterSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+                const readings = waterSnapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc));
 
                 documents.push(...readings.map(r => {
                     const t = keyTenants.find(kt => kt.id === r.tenantId);
@@ -1216,8 +1246,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                 orderBy('date', 'desc'),
                 limit(20)
             );
-            const paymentsSnapshot = await getDocs(paymentsQuery);
-            const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+            const payments = await getCollection<Payment>(paymentsQuery as any);
 
             documents.push(...payments.map(p => ({
                 id: p.id,
@@ -1236,8 +1265,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                 orderBy('date', 'desc'),
                 limit(10)
             );
-            const waterSnapshot = await getDocs(waterQuery);
-            const readings = waterSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+            const readings = await getCollection<WaterMeterReading>(waterQuery as any);
 
             documents.push(...readings.map(r => ({
                 id: r.id,
@@ -1266,7 +1294,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                         items: [{ description: 'General Maintenance', amount: tenant.lease.serviceCharge * 0.7 }, { description: 'Security', amount: tenant.lease.serviceCharge * 0.3 }],
                         date: d.toISOString(),
                         status: 'Paid',
-                        createdAt: d
+                        createdAt: d.toISOString()
                     };
 
                     documents.push({
@@ -1655,8 +1683,7 @@ export async function getAllPayments(limitCount: number = 50): Promise<Payment[]
             orderBy('date', 'desc'),
             limit(limitCount)
         );
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        return getCollection<Payment>(q as any);
     }, 120000); // 2 minutes cache
 }
 
@@ -1675,24 +1702,14 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<voi
 }
 
 export async function getTasks(): Promise<Task[]> {
-    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'asc')); // FIFO
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = data.createdAt;
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : createdAt
-        } as Task;
-    });
+    return getCollection<Task>('tasks', [orderBy('createdAt', 'asc')]);
 }
 
 // Real-time listener functions
 export function listenToProperties(callback: (properties: Property[]) => void): () => void {
     const q = query(collection(db, 'properties'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const properties = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
+        const properties = querySnapshot.docs.map(doc => postToJSON<Property>(doc));
 
         const desiredOrder = [
             'Midtown Apartments',
@@ -1726,7 +1743,7 @@ export function listenToProperties(callback: (properties: Property[]) => void): 
 export function listenToTenants(callback: (tenants: Tenant[]) => void): () => void {
     const q = query(collection(db, 'tenants'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const tenants = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tenant));
+        const tenants = querySnapshot.docs.map(doc => postToJSON<Tenant>(doc));
         callback(tenants);
     }, (error) => {
         console.error("Error listening to tenants:", error);
@@ -1737,7 +1754,7 @@ export function listenToTenants(callback: (tenants: Tenant[]) => void): () => vo
 export function listenToMaintenanceRequests(callback: (requests: MaintenanceRequest[]) => void): () => void {
     const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceRequest));
+        const requests = querySnapshot.docs.map(doc => postToJSON<MaintenanceRequest>(doc));
         callback(requests);
     }, (error) => {
         console.error("Error listening to maintenance requests:", error);
@@ -1748,7 +1765,7 @@ export function listenToMaintenanceRequests(callback: (requests: MaintenanceRequ
 export function listenToPayments(callback: (payments: Payment[]) => void): () => void {
     const q = query(collection(db, 'payments'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const payments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        const payments = querySnapshot.docs.map(doc => postToJSON<Payment>(doc));
         callback(payments);
     }, (error) => {
         console.error("Error listening to payments:", error);
@@ -1759,15 +1776,7 @@ export function listenToPayments(callback: (payments: Payment[]) => void): () =>
 export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     const q = query(collection(db, 'tasks'), orderBy('createdAt', 'asc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const tasks = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            const createdAt = data.createdAt;
-            return {
-                id: doc.id,
-                ...data,
-                createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : createdAt
-            } as Task;
-        });
+        const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
         callback(tasks);
     }, (error) => {
         console.error("Error listening to tasks:", error);
@@ -1791,7 +1800,7 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
   
       // 1. Create the reversal transaction
       const reversalPaymentRef = doc(collection(db, "payments"));
-      const reversalPayment: Omit<Payment, 'id'> = {
+      const reversalPayment: Omit<Payment, 'id'|'createdAt'> & {createdAt: Date} = {
         tenantId: oldPayment.tenantId,
         amount: -oldPayment.amount,
         date: oldPayment.date, 
@@ -1837,7 +1846,6 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
 export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all-pending', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), where('status', '==', 'Pending'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
+        return getCollection<WaterMeterReading>(q as any);
     }, 120000); // 2 min cache
 }

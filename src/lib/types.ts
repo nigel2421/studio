@@ -93,7 +93,7 @@ export type WaterMeterReading = {
   rate: number;
   amount: number;
   date: string;
-  createdAt: Date;
+  createdAt: string;
   status?: 'Paid' | 'Pending';
   paymentId?: string;
 };
@@ -135,7 +135,7 @@ export type Payment = {
   // Optional fields for more detailed tracking
   paymentMethod: (typeof paymentMethods)[number];
   transactionId: string;
-  createdAt: Date;
+  createdAt: string;
   reference?: string;
   waterReadingId?: string;
   editHistory?: {
@@ -180,7 +180,7 @@ export type ServiceChargeStatement = {
   items: { description: string; amount: number }[];
   date: string;
   status: 'Paid' | 'Pending';
-  createdAt: Date;
+  createdAt: string;
 };
 
 export type DocumentType = 'Rent Receipt' | 'Water Bill' | 'Service Charge';
@@ -287,5 +287,5 @@ export type MaintenanceRequest = {
   date: string;
   status: 'New' | 'In Progress' | 'Completed';
   urgency: 'low' | 'medium' | 'high';
-  createdAt: any; // Firestore Timestamp
+  createdAt: string;
 };
