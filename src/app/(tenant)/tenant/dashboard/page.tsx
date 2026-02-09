@@ -23,7 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { generateTenantStatementPDF } from '@/lib/pdf-generator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
@@ -85,6 +84,7 @@ export default function TenantDashboardPage() {
         if (!tenantDetails) return;
         toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
         try {
+            const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
             generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, activeTenantTab);
         } catch(e) {
             console.error("Error generating PDF:", e);
@@ -300,3 +300,5 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
+
+    

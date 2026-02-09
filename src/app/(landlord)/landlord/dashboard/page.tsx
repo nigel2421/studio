@@ -14,7 +14,6 @@ import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown, g
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
-import { generateTenantStatementPDF, generateOwnerServiceChargeStatementPDF, generateLandlordStatementPDF } from '@/lib/pdf-generator';
 import { useLoading } from '@/hooks/useLoading';
 import { isWithinInterval } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -159,9 +158,11 @@ export default function UniversalOwnerDashboardPage() {
         startPdfLoading('Generating Statement...');
         try {
             if (dashboardType === 'homeowner') {
+                const { generateOwnerServiceChargeStatementPDF } = await import('@/lib/pdf-generator');
                 const allWaterReadings = await getAllWaterReadings();
-                await generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, startDate, endDate, activeOwnerTab);
+                generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, startDate, endDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
+                const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
                 const allProperties = await getProperties();
                 const allTenants = await getTenants();
                 
@@ -279,3 +280,5 @@ export default function UniversalOwnerDashboardPage() {
         </div>
     );
 }
+
+    
