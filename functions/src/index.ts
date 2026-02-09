@@ -299,5 +299,3 @@ export const checkAndSendLeaseReminders = onCall({
 
     return { success: true, message: message };
 });
-
-    
