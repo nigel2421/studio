@@ -162,7 +162,7 @@ export const generateOwnerServiceChargeStatementPDF = (
 
     const ownerUnits = allProperties.flatMap(p =>
         p.units
-            .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some((au: { propertyId: string; unitNames: string[]; }) => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
+            .filter(u => 'assignedUnits' in owner ? owner.assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name)) : u.landlordId === owner.id)
             .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
     );
 
@@ -312,6 +312,68 @@ export const generateOwnerServiceChargeStatementPDF = (
     doc.text(finalBalance > 0 ? formatCurrency(finalBalance) : `${formatCurrency(Math.abs(finalBalance))} Cr`, 196, yPos, { align: 'right' });
     
     doc.save(`service_charge_statement_${owner.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const generateArrearsServiceChargeInvoicePDF = (
+    owner: PropertyOwner | Landlord,
+    invoiceDetails: {
+        month: string;
+        items: { description: string; amount: number }[];
+        totalDue: number;
+    }
+): string => {
+    const doc = new jsPDF();
+    const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    addHeader(doc, 'Service Charge Invoice');
+    
+    // Owner Details
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(owner.name, 14, 50);
+    doc.setFont('helvetica', 'normal');
+    doc.text(owner.email, 14, 56);
+    
+    // Invoice Details
+    doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
+    doc.text(`For: ${invoiceDetails.month}`, 196, 56, { align: 'right' });
+
+    let yPos = 70;
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Outstanding Service Charges', 14, yPos);
+    yPos += 8;
+
+    const body = invoiceDetails.items.map(item => [item.description, formatCurrency(item.amount)]);
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Description', 'Amount Due']],
+        body,
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        foot: [[
+            { content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: formatCurrency(invoiceDetails.totalDue), styles: { fontStyle: 'bold', halign: 'right' } }
+        ]],
+        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0] },
+        columnStyles: {
+            1: { halign: 'right' }
+        },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.setTextColor(40);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
+
+    // Return as base64 string for email attachment
+    return doc.output('datauristring').split(',')[1];
 };
 
 
@@ -658,3 +720,4 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
 };
+
