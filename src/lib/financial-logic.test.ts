@@ -210,7 +210,7 @@ describe('Financial Logic', () => {
             expect(chargeDescriptions).toContain('Water Deposit');
             
             // Should have charges for Oct, Nov, Dec, Jan
-            expect(ledger.filter(l => l.description.startsWith('Rent for Units') && l.charge > 0)).toHaveLength(4);
+            expect(ledger.filter(l => l.description.startsWith('Rent for Unit') && l.charge > 0)).toHaveLength(4);
             
             // The last entry should reflect the balance after all charges and payments up to that point
             const lastEntry = ledger[ledger.length - 1];

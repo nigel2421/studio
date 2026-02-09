@@ -290,7 +290,13 @@ export function generateLedger(
                 billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
             }
             
-            let loopDate = billingStartDate;
+            const lastBilledDate = tenant.lease.lastBilledPeriod
+                ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
+                : null;
+
+            const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
+            
+            let loopDate = firstBillableMonth;
             const startOfCurrentMonth = startOfMonth(asOfDate);
 
             while (isBefore(loopDate, startOfCurrentMonth) || isSameMonth(loopDate, startOfCurrentMonth)) {
@@ -310,6 +316,7 @@ export function generateLedger(
         const chargeDate = parseISO(key + '-01');
         const unitText = value.unitNames.length > 1 ? 'Units' : 'Unit';
         const description = `${value.type} for ${unitText}: ${value.unitNames.join(', ')}`;
+
         allCharges.push({
             id: `charge-${key}`, date: chargeDate, description, charge: value.charge, payment: 0, forMonth: format(chargeDate, 'MMM yyyy'),
         });
@@ -372,7 +379,9 @@ export function generateLedger(
     });
 
     const combined = [...allCharges, ...allPaymentsAndAdjustments].sort((a, b) => {
-        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date);
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date);
+        const dateDiff = dateA.getTime() - dateB.getTime();
         if (dateDiff !== 0) return dateDiff;
         if (a.charge > 0 && b.payment > 0) return -1;
         if (a.payment > 0 && b.charge > 0) return 1;
