@@ -68,7 +68,7 @@ export async function getUsers(): Promise<UserProfile[]> {
 
         // Find units associated with this owner
         properties.forEach(p => {
-            p.units.forEach(u => {
+            (p.units || []).forEach(u => {
                 let isOwned = false;
                 // Check if owned via landlordId
                 if (u.landlordId === owner.id) {
@@ -674,7 +674,7 @@ export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
 export async function getPropertyWaterReadings(propertyId: string): Promise<WaterMeterReading[]> {
     const property = await getProperty(propertyId);
     if (!property) return [];
-    const unitNames = property.units.map(u => u.name);
+    const unitNames = (property.units || []).map(u => u.name);
 
     // chunk into groups of 30 for the 'in' query
     const chunks = [];
@@ -1074,7 +1074,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
             if (landlord) {
                 const allProps = await getProperties();
                 allProps.forEach(p => {
-                    p.units.forEach(u => {
+                    (p.units || []).forEach(u => {
                         if (u.landlordId === landlord.id) {
                             associatedUnitNames.push(u.name);
                             if (!associatedPropertyIds.includes(p.id)) associatedPropertyIds.push(p.id);
@@ -1584,7 +1584,7 @@ export async function getLandlordPropertiesAndUnits(landlordId: string): Promise
     const result: { property: Property, units: Unit[] }[] = [];
 
     allProperties.forEach(p => {
-        const units = p.units.filter(u => u.landlordId === landlordId || (p.landlordId === landlordId));
+        const units = (p.units || []).filter(u => u.landlordId === landlordId || (p.landlordId === landlordId));
         if (units.length > 0) {
             result.push({ property: p, units: units });
         }
@@ -1788,6 +1788,7 @@ export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaterMeterReading));
 }
+
 
 
 

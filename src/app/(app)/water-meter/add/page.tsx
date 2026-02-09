@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance } from '@/lib/data';
-import type { Property, WaterMeterReading, Tenant, Payment } from '@/lib/types';
+import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance, getLandlords, getPropertyOwners, addPayment } from '@/lib/data';
+import type { Property, WaterMeterReading, Tenant, Payment, Landlord, PropertyOwner, Unit } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, PlusCircle, Edit2 } from 'lucide-react';
+import { Loader2, Search, PlusCircle, Edit2, User, ChevronDown } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
@@ -23,14 +23,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { EditPaymentDialog, EditFormValues } from '@/components/financials/edit-payment-dialog';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { ConfirmOwnerWaterPaymentDialog } from '@/components/financials/confirm-owner-water-payment-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 
 interface WaterReadingRecord extends WaterMeterReading {
     tenantName?: string;
     propertyName?: string;
+    ownerId?: string;
+    ownerName?: string;
 }
+
+interface OwnerBill {
+    owner: PropertyOwner | Landlord;
+    readings: WaterReadingRecord[];
+    totalDue: number;
+}
+
 
 export default function MegarackPage() {
   const router = useRouter();
@@ -39,6 +54,8 @@ export default function MegarackPage() {
   // Common state
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
+  const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
   const { userProfile } = useAuth();
   
   // State for Add Form
@@ -62,6 +79,7 @@ export default function MegarackPage() {
 
   // State for Records Table
   const [allReadings, setAllReadings] = useState<WaterReadingRecord[]>([]);
+  const [ownerBills, setOwnerBills] = useState<OwnerBill[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [recordsSelectedProperty, setRecordsSelectedProperty] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Pending'>('all');
@@ -76,14 +94,25 @@ export default function MegarackPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const { startLoading, stopLoading, isLoading: isActionLoading } = useLoading();
+  
+  // State for Consolidated Payment
+  const [isConsolidatedPaymentOpen, setIsConsolidatedPaymentOpen] = useState(false);
+  const [selectedOwnerBill, setSelectedOwnerBill] = useState<OwnerBill | null>(null);
 
 
   // Combined data fetching
   const fetchData = async () => {
         setLoadingRecords(true);
-        const [propsData, tenantsData] = await Promise.all([getProperties(true), getTenants()]);
+        const [propsData, tenantsData, landlordsData, ownersData] = await Promise.all([
+            getProperties(true),
+            getTenants(),
+            getLandlords(),
+            getPropertyOwners()
+        ]);
         setProperties(propsData);
         setTenants(tenantsData);
+        setAllLandlords(landlordsData);
+        setAllOwners(ownersData);
 
         const allReadingsData = (await Promise.all(propsData.map(p => getPropertyWaterReadings(p.id))))
             .flat()
@@ -104,6 +133,55 @@ export default function MegarackPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (loadingRecords) return;
+
+    // Process Owner Bills
+    const ownerByUnitMap = new Map<string, PropertyOwner>();
+    allOwners.forEach(o => {
+        o.assignedUnits?.forEach(au => {
+            au.unitNames.forEach(unitName => {
+                ownerByUnitMap.set(`${au.propertyId}-${unitName}`, o);
+            });
+        });
+    });
+
+    const pendingReadings = allReadings.filter(r => (r.status === 'Pending' || r.status === undefined));
+    const billsByOwner = new Map<string, { owner: PropertyOwner | Landlord, readings: WaterReadingRecord[] }>();
+
+    pendingReadings.forEach(reading => {
+        let owner: Landlord | PropertyOwner | undefined;
+        const property = properties.find(p => p.id === reading.propertyId);
+        const unit = property?.units.find(u => u.name === reading.unitName);
+
+        if (unit?.landlordId) {
+            owner = allLandlords.find(l => l.id === unit.landlordId);
+        } else {
+            owner = ownerByUnitMap.get(`${reading.propertyId}-${reading.unitName}`);
+        }
+        
+        if (owner) {
+            if (!billsByOwner.has(owner.id)) {
+                billsByOwner.set(owner.id, { owner, readings: [] });
+            }
+            const ownerData = billsByOwner.get(owner.id)!;
+            ownerData.readings.push({
+                ...reading,
+                ownerId: owner.id,
+                ownerName: owner.name,
+            });
+        }
+    });
+
+    const ownerBillsData = Array.from(billsByOwner.values()).map(data => ({
+        ...data,
+        totalDue: data.readings.reduce((sum, r) => sum + r.amount, 0),
+    })).filter(data => data.readings.length > 0);
+
+    setOwnerBills(ownerBillsData);
+
+}, [allReadings, loadingRecords, allOwners, allLandlords, properties]);
 
   const handlePaymentAdded = () => {
       fetchData();
@@ -174,7 +252,7 @@ export default function MegarackPage() {
       });
       toast({ title: "Reading Added", description: `Water meter reading for unit ${selectedUnit} has been saved.` });
       // Switch to records tab after successful submission
-      const recordsTab = document.querySelector('button[data-state="inactive"][value="records"]');
+      const recordsTab = document.querySelector('button[data-state="inactive"][value="all-records"]');
       if (recordsTab instanceof HTMLElement) {
           recordsTab.click();
       }
@@ -201,6 +279,63 @@ export default function MegarackPage() {
               description: 'Could not find an active tenant for this water reading.',
           });
       }
+  };
+  
+  const handleOpenConsolidatedPayment = (ownerBill: OwnerBill) => {
+      setSelectedOwnerBill(ownerBill);
+      setIsConsolidatedPaymentOpen(true);
+  };
+  
+  const handleConfirmConsolidatedPayment = async (paymentData: { amount: number, date: Date, paymentMethod: Payment['paymentMethod'], transactionId: string }) => {
+    if (!selectedOwnerBill) return;
+    
+    startLoading('Processing consolidated payment...');
+    try {
+        const batch = writeBatch(db);
+        let amountToAllocate = paymentData.amount;
+        const readingsToPay = selectedOwnerBill.readings.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Create one main payment record for the consolidated amount
+        const primaryTenantId = readingsToPay[0].tenantId;
+        const mainPaymentRef = doc(collection(db, 'payments'));
+        const mainPaymentPayload = {
+            tenantId: primaryTenantId,
+            amount: paymentData.amount,
+            date: format(paymentData.date, 'yyyy-MM-dd'),
+            type: 'Water' as const,
+            status: 'Paid' as const,
+            notes: `Consolidated water payment for ${selectedOwnerBill.owner.name}. Covers ${readingsToPay.length} bill(s).`,
+            paymentMethod: paymentData.paymentMethod,
+            transactionId: paymentData.transactionId,
+            createdAt: new Date(),
+        };
+        batch.set(mainPaymentRef, mainPaymentPayload);
+
+        // Update each water reading record
+        for (const reading of readingsToPay) {
+            if (amountToAllocate >= reading.amount) {
+                const readingRef = doc(db, 'waterReadings', reading.id);
+                batch.update(readingRef, { status: 'Paid', paymentId: mainPaymentRef.id });
+                amountToAllocate -= reading.amount;
+            } else {
+                // Handle partial payment if necessary, for now we assume full payment of oldest bills
+                console.warn(`Partial payment detected. Not enough funds to cover bill for unit ${reading.unitName} dated ${reading.date}.`);
+                break;
+            }
+        }
+        
+        await batch.commit();
+
+        toast({ title: 'Payment Successful', description: `Consolidated payment for ${selectedOwnerBill.owner.name} recorded.` });
+        fetchData(); // Refresh all data
+        setIsConsolidatedPaymentOpen(false);
+
+    } catch (error) {
+        console.error("Error processing consolidated payment:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process consolidated payment.' });
+    } finally {
+        stopLoading();
+    }
   };
 
   const handleEditClick = async (reading: WaterReadingRecord) => {
@@ -278,18 +413,87 @@ export default function MegarackPage() {
 
   return (
     <>
-    <Tabs defaultValue="records" className="space-y-4">
+    <Tabs defaultValue="owner-bills" className="space-y-4">
         <div className="flex items-center justify-between">
              <div>
                 <h2 className="text-3xl font-bold tracking-tight">Megarack - Water Management</h2>
                 <p className="text-muted-foreground">Manage water meter readings and billing records.</p>
             </div>
             <TabsList>
-                <TabsTrigger value="records">Records</TabsTrigger>
+                <TabsTrigger value="owner-bills">Owner Bills</TabsTrigger>
+                <TabsTrigger value="all-records">All Records</TabsTrigger>
                 <TabsTrigger value="add">Add Reading</TabsTrigger>
             </TabsList>
         </div>
-        <TabsContent value="records">
+        <TabsContent value="owner-bills">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Consolidated Owner Bills</CardTitle>
+                    <CardDescription>Pending water bills grouped by owner for easy consolidated payments.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {loadingRecords ? (
+                         <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : ownerBills.length > 0 ? (
+                        <div className="space-y-4">
+                           {ownerBills.map(bill => (
+                               <Collapsible key={bill.owner.id} className="border rounded-lg">
+                                   <div className="flex items-center justify-between p-4">
+                                       <div className="flex items-center gap-4">
+                                            <div className="p-2 bg-muted rounded-full">
+                                                <User className="h-5 w-5 text-muted-foreground" />
+                                            </div>
+                                            <div>
+                                               <h4 className="font-semibold">{bill.owner.name}</h4>
+                                               <p className="text-sm text-muted-foreground">{bill.readings.length} pending bill(s)</p>
+                                            </div>
+                                       </div>
+                                       <div className="flex items-center gap-4">
+                                            <div>
+                                               <p className="text-sm text-muted-foreground text-right">Total Due</p>
+                                               <p className="font-bold text-lg text-destructive text-right">Ksh {bill.totalDue.toLocaleString()}</p>
+                                            </div>
+                                            <Button onClick={() => handleOpenConsolidatedPayment(bill)}>Record Payment</Button>
+                                            <CollapsibleTrigger asChild>
+                                               <Button variant="ghost" size="sm">
+                                                   <ChevronDown className="h-4 w-4" />
+                                                   <span className="sr-only">Toggle details</span>
+                                               </Button>
+                                           </CollapsibleTrigger>
+                                       </div>
+                                   </div>
+                                   <CollapsibleContent className="px-4 pb-4">
+                                       <Table>
+                                           <TableHeader>
+                                               <TableRow>
+                                                   <TableHead>Unit</TableHead>
+                                                   <TableHead>Reading Date</TableHead>
+                                                   <TableHead>Consumption</TableHead>
+                                                   <TableHead className="text-right">Amount Due</TableHead>
+                                               </TableRow>
+                                           </TableHeader>
+                                           <TableBody>
+                                               {bill.readings.map(r => (
+                                                   <TableRow key={r.id}>
+                                                       <TableCell>{r.unitName} ({r.propertyName})</TableCell>
+                                                       <TableCell>{format(new Date(r.date), 'PPP')}</TableCell>
+                                                       <TableCell>{r.consumption} units</TableCell>
+                                                       <TableCell className="text-right">Ksh {r.amount.toLocaleString()}</TableCell>
+                                                   </TableRow>
+                                               ))}
+                                           </TableBody>
+                                       </Table>
+                                   </CollapsibleContent>
+                               </Collapsible>
+                           ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-16 text-muted-foreground">No owners with pending water bills found.</div>
+                    )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="all-records">
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -331,12 +535,7 @@ export default function MegarackPage() {
                             <TableRow>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Name</TableHead>
-                                <TableHead>Prior Reading</TableHead>
-                                <TableHead>Current Reading</TableHead>
-                                <TableHead>Units Consumed</TableHead>
                                 <TableHead>Payable Amount</TableHead>
-                                <TableHead>Paid Amount</TableHead>
-                                <TableHead>Balance</TableHead>
                                 <TableHead>Payment Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -351,8 +550,6 @@ export default function MegarackPage() {
                             ) : paginatedReadings.length > 0 ? (
                                 paginatedReadings.map(reading => {
                                     const isPaid = (reading.status || 'Pending') === 'Paid';
-                                    const paidAmount = isPaid ? reading.amount : 0;
-                                    const balance = isPaid ? 0 : reading.amount;
                                     return (
                                     <TableRow key={reading.id}>
                                         <TableCell className="font-medium">
@@ -360,12 +557,7 @@ export default function MegarackPage() {
                                             <div className="text-xs text-muted-foreground">{reading.propertyName}</div>
                                         </TableCell>
                                         <TableCell>{reading.tenantName}</TableCell>
-                                        <TableCell>{reading.priorReading}</TableCell>
-                                        <TableCell>{reading.currentReading}</TableCell>
-                                        <TableCell className="font-semibold">{reading.consumption} units</TableCell>
                                         <TableCell>Ksh {reading.amount.toLocaleString()}</TableCell>
-                                        <TableCell className="text-green-600">Ksh {paidAmount.toLocaleString()}</TableCell>
-                                        <TableCell className="font-semibold text-red-600">Ksh {balance.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <Badge variant={isPaid ? 'default' : 'destructive'}>
                                                 {reading.status || 'Pending'}
@@ -533,6 +725,16 @@ export default function MegarackPage() {
         onOpenChange={setIsEditDialogOpen}
         onSave={handleSaveEdit}
     />
+    
+    {selectedOwnerBill && (
+        <ConfirmOwnerWaterPaymentDialog
+            isOpen={isConsolidatedPaymentOpen}
+            onClose={() => setIsConsolidatedPaymentOpen(false)}
+            ownerBill={selectedOwnerBill}
+            onConfirm={handleConfirmConsolidatedPayment}
+            isSaving={isActionLoading}
+        />
+    )}
     </>
   );
 }

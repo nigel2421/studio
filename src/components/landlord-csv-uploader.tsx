@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -24,7 +25,6 @@ interface CsvData {
   name: string;
   email: string;
   phone: string;
-  bankAccount?: string;
 }
 
 interface Props {
