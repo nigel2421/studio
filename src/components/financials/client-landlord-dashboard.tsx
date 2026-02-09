@@ -32,21 +32,27 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    const { serviceChargeLedger, waterLedger, finalDueBalance, finalAccountBalance } = useMemo(() => {
+    const { 
+        serviceChargeLedger, 
+        waterLedger, 
+        serviceChargeDue, 
+        serviceChargeCredit, 
+        waterDue, 
+        waterCredit 
+    } = useMemo(() => {
         if (!tenantDetails) {
-            return { serviceChargeLedger: [], waterLedger: [], finalDueBalance: 0, finalAccountBalance: 0 };
+            return { serviceChargeLedger: [], waterLedger: [], serviceChargeDue: 0, serviceChargeCredit: 0, waterDue: 0, waterCredit: 0 };
         }
         const { ledger: scLedger, finalDueBalance: scDue, finalAccountBalance: scCredit } = generateLedger(tenantDetails, payments, allProperties, [], owner, undefined, { includeWater: false, includeRent: false, includeServiceCharge: true });
         const { ledger: wLedger, finalDueBalance: wDue, finalAccountBalance: wCredit } = generateLedger(tenantDetails, payments, allProperties, waterReadings, owner, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
-        const combinedDue = scDue + wDue;
-        const combinedCredit = scCredit + wCredit;
-
         return {
             serviceChargeLedger: scLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
             waterLedger: wLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-            finalDueBalance: combinedDue,
-            finalAccountBalance: combinedCredit
+            serviceChargeDue: scDue,
+            serviceChargeCredit: scCredit,
+            waterDue: wDue,
+            waterCredit: wCredit,
         };
     }, [tenantDetails, payments, allProperties, waterReadings, owner]);
     
@@ -203,12 +209,12 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
             </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Due Balance</CardTitle>
+                    <CardTitle className="text-sm font-medium">Service Charge Due</CardTitle>
                     <AlertCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold text-red-600">Ksh {(finalDueBalance || 0).toLocaleString()}</div>
-                    <p className="text-xs text-muted-foreground">Total outstanding amount</p>
+                    <div className="text-2xl font-bold text-red-600">Ksh {(serviceChargeDue || 0).toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Outstanding service charge</p>
                 </CardContent>
             </Card>
             <Card>
@@ -217,7 +223,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     <PlusCircle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Ksh {(finalAccountBalance || 0).toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-green-600">Ksh {(serviceChargeCredit || 0).toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                 </CardContent>
             </Card>
@@ -226,11 +232,11 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
 
     return (
         <div className="space-y-8">
-            <TabsContent value="service-charge" className="m-0">
+            <TabsContent value="service-charge" className="m-0 space-y-8">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {serviceChargeCards}
                 </div>
-                 <Card className="mt-8">
+                 <Card>
                     <CardHeader>
                         <CardTitle>Your Units & Monthly Service Charge</CardTitle>
                     </CardHeader>
@@ -259,7 +265,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                         </Table>
                     </CardContent>
                 </Card>
-                 <Card className="mt-8">
+                 <Card>
                     <CardHeader>
                         <CardTitle>Transaction History</CardTitle>
                         <CardDescription>A summary of your recent charges and payments.</CardDescription>

@@ -113,18 +113,28 @@ export default function UniversalOwnerDashboardPage() {
                 });
             } else if (isClient) {
                 setDashboardType('homeowner');
-                const homeownerTenantProfile = allTenants.find(t => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
-                
-                const relevantTenantIds = allTenants.filter(t => t.userId === userProfile.id || t.email === userProfile.email).map(t => t.id);
-                
-                const [paymentData, waterData] = await Promise.all([
-                    homeownerTenantProfile ? getTenantPayments(homeownerTenantProfile.id) : Promise.resolve([]),
-                    homeownerTenantProfile ? getTenantWaterReadings(homeownerTenantProfile.id) : Promise.resolve([]),
-                ]);
+                const homeownerTenantProfiles = allTenants.filter(t => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
+                const primaryTenantProfile = homeownerTenantProfiles.length > 0 ? homeownerTenantProfiles[0] : null;
+
+                const tenantIds = homeownerTenantProfiles.map(t => t.id);
+
+                let paymentData: Payment[] = [];
+                let waterData: WaterMeterReading[] = [];
+
+                if (tenantIds.length > 0) {
+                    const paymentPromises = tenantIds.map(id => getTenantPayments(id));
+                    const waterPromises = tenantIds.map(id => getTenantWaterReadings(id));
+                    
+                    const paymentResults = await Promise.all(paymentPromises);
+                    const waterResults = await Promise.all(waterPromises);
+
+                    paymentData = paymentResults.flat();
+                    waterData = waterResults.flat();
+                }
 
                 setViewData({
                     owner: owner,
-                    tenantDetails: homeownerTenantProfile,
+                    tenantDetails: primaryTenantProfile, // Pass the primary one for ledger generation context
                     payments: paymentData,
                     waterReadings: waterData,
                     allProperties: allProperties,
