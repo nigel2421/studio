@@ -14,7 +14,7 @@ import {
     Lease
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths, parseISO } from "date-fns";
@@ -180,8 +180,13 @@ export async function getLogs(): Promise<Log[]> {
     return querySnapshot.docs.map(doc => postToJSON<Log>(doc));
 }
 
-async function getCollection<T>(collectionName: string, queryConstraints: any[] = []): Promise<T[]> {
-    const q = query(collection(db, collectionName), ...queryConstraints);
+async function getCollection<T>(collectionOrQuery: string | Query, queryConstraints: any[] = []): Promise<T[]> {
+    let q: Query;
+    if (typeof collectionOrQuery === 'string') {
+        q = query(collection(db, collectionOrQuery), ...queryConstraints);
+    } else {
+        q = collectionOrQuery;
+    }
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => postToJSON<T>(doc));
 }
@@ -281,13 +286,13 @@ export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
             where('createdAt', '>=', ninetyDaysAgo),
             orderBy('createdAt', 'desc')
         );
-        return getCollection<MaintenanceRequest>(q as any);
+        return getCollection<MaintenanceRequest>(q);
     }, 120000);
 }
 
 export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
     const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
-    return getCollection<MaintenanceRequest>(q as any);
+    return getCollection<MaintenanceRequest>(q);
 }
 
 export async function getProperty(id: string): Promise<Property | null> {
@@ -301,14 +306,15 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
         where('tenantId', '==', tenantId),
         orderBy('createdAt', 'desc')
     );
-    return getCollection<WaterMeterReading>(readingsQuery as any);
+    return getCollection<WaterMeterReading>(readingsQuery);
 }
 
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
-        return getCollection<WaterMeterReading>(q as any);
-    }, 120000);
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc));
+    }, 120000); // 2 min cache
 }
 
 export async function getLatestWaterReading(propertyId: string, unitName: string): Promise<WaterMeterReading | null> {
@@ -611,7 +617,7 @@ export async function getTenantMaintenanceRequests(tenantId: string): Promise<Ma
         where("tenantId", "==", tenantId),
         orderBy('createdAt', 'desc')
     );
-    return getCollection<MaintenanceRequest>(q as any);
+    return getCollection<MaintenanceRequest>(q);
 }
 
 export async function addWaterMeterReading(data: {
@@ -716,7 +722,7 @@ export async function getPaymentHistory(tenantId: string, options?: { startDate?
         ...constraints,
         orderBy('date', 'desc')
     );
-    return getCollection<Payment>(q as any);
+    return getCollection<Payment>(q);
 }
 
 export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
@@ -759,7 +765,7 @@ export async function getPropertyMaintenanceRequests(propertyId: string): Promis
         where('propertyId', '==', propertyId),
         orderBy('createdAt', 'desc')
     );
-    return getCollection<MaintenanceRequest>(q as any);
+    return getCollection<MaintenanceRequest>(q);
 }
 
 export async function batchProcessPayments(
@@ -1246,7 +1252,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                 orderBy('date', 'desc'),
                 limit(20)
             );
-            const payments = await getCollection<Payment>(paymentsQuery as any);
+            const payments = await getCollection<Payment>(paymentsQuery);
 
             documents.push(...payments.map(p => ({
                 id: p.id,
@@ -1265,7 +1271,7 @@ export async function getFinancialDocuments(userId: string, role: UserRole): Pro
                 orderBy('date', 'desc'),
                 limit(10)
             );
-            const readings = await getCollection<WaterMeterReading>(waterQuery as any);
+            const readings = await getCollection<WaterMeterReading>(waterQuery);
 
             documents.push(...readings.map(r => ({
                 id: r.id,
@@ -1683,7 +1689,7 @@ export async function getAllPayments(limitCount: number = 50): Promise<Payment[]
             orderBy('date', 'desc'),
             limit(limitCount)
         );
-        return getCollection<Payment>(q as any);
+        return getCollection<Payment>(q);
     }, 120000); // 2 minutes cache
 }
 
@@ -1846,6 +1852,6 @@ export async function voidPayment(paymentId: string, reason: string, editorId: s
 export async function getAllPendingWaterBills(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all-pending', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), where('status', '==', 'Pending'));
-        return getCollection<WaterMeterReading>(q as any);
+        return getCollection<WaterMeterReading>(q);
     }, 120000); // 2 min cache
 }
