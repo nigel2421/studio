@@ -50,7 +50,6 @@ const createMockTenant = (overrides: MockTenantOverrides = {}): Tenant => {
         endDate: '2024-01-01',
         rent: 20000,
         paymentStatus: 'Paid',
-        lastBilledPeriod: '2023-12',
     };
 
     const defaultTenant: Omit<Tenant, 'lease'> = {
