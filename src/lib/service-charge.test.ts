@@ -214,9 +214,12 @@ describe('Service Charge Logic', () => {
         
         expect(vacantArrears).toHaveLength(1);
         const arrearsAccount = vacantArrears[0];
-        expect(arrearsAccount.unitName).toBe('C301');
-        expect(arrearsAccount.monthsInArrears).toBe(3); 
-        expect(arrearsAccount.totalDue).toBe(4500); // 1500 * 3
+        // The individual `arrearsAccount` is no longer a single unit, but a group.
+        expect(arrearsAccount.ownerId).toBe('landlord-1');
+        expect(arrearsAccount.totalDue).toBe(4500);
+        expect(arrearsAccount.units).toHaveLength(1);
+        expect(arrearsAccount.units[0].monthsInArrears).toBe(3); 
+        expect(arrearsAccount.units[0].totalDue).toBe(4500); // 1500 * 3
     });
 
     test('should correctly group multiple accounts for one owner', () => {
@@ -237,5 +240,28 @@ describe('Service Charge Logic', () => {
         expect(bobGroup?.units).toHaveLength(2);
         expect(bobGroup?.totalServiceCharge).toBe(6000);
         expect(bobGroup?.paymentStatus).toBe('Pending'); // Because B201 is pending
+    });
+
+    test('should group multiple vacant units in arrears for the same owner', () => {
+        const handoverDate = '2024-01-11';
+        const mockLandlords = [createMockLandlord('landlord-1', 'Charlie')];
+        const mockUnits = [
+            createMockUnit('C301', { ownership: 'Landlord', status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', handoverDate, serviceCharge: 1500, landlordId: 'landlord-1' }),
+            createMockUnit('C302', { ownership: 'Landlord', status: 'vacant', managementStatus: 'Rented for Clients', handoverStatus: 'Handed Over', handoverDate, serviceCharge: 2000, landlordId: 'landlord-1' })
+        ];
+        const mockProperties = [createMockProperty('prop-1', mockUnits)];
+        const may2024 = parseISO('2024-05-15');
+
+        const { vacantArrears } = processServiceChargeData(mockProperties, [], [], [], mockLandlords, may2024);
+
+        expect(vacantArrears).toHaveLength(1);
+        const charlieGroup = vacantArrears[0];
+        expect(charlieGroup.ownerId).toBe('landlord-1');
+        expect(charlieGroup.units).toHaveLength(2);
+        expect(charlieGroup.units.map(u => u.unitName).sort()).toEqual(['C301', 'C302']);
+        // Each unit has 3 months of arrears (Mar, Apr, May)
+        expect(charlieGroup.units[0].totalDue).toBe(4500); // 1500 * 3
+        expect(charlieGroup.units[1].totalDue).toBe(6000); // 2000 * 3
+        expect(charlieGroup.totalDue).toBe(10500); // 4500 + 6000
     });
 });

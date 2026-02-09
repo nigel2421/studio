@@ -1,12 +1,13 @@
+
 import { getTenantsInArrears, getLandlordArrearsBreakdown } from './arrears';
 import { getTenants, getProperties, getAllPendingWaterBills } from './data';
-import { Tenant, Property, Unit } from './types';
+import { Tenant, Property, Unit, WaterMeterReading } from './types';
 
 // Mock the data fetching functions
 jest.mock('./data', () => ({
   getTenants: jest.fn(),
   getProperties: jest.fn(),
-  getAllPendingWaterBills: jest.fn().mockResolvedValue([]),
+  getAllPendingWaterBills: jest.fn(),
 }));
 
 const mockGetTenants = getTenants as jest.Mock;
@@ -36,6 +37,21 @@ const createMockTenant = (id: string, dueBalance: number, propertyId = 'prop-1',
   },
   accountBalance: 0,
   dueBalance,
+});
+
+const createMockWaterBill = (tenantId: string, amount: number): WaterMeterReading => ({
+    id: `water-${tenantId}`,
+    tenantId,
+    amount,
+    propertyId: 'prop-1',
+    unitName: 'A1',
+    priorReading: 100,
+    currentReading: 110,
+    consumption: 10,
+    rate: 150,
+    date: '2024-01-15',
+    createdAt: new Date(),
+    status: 'Pending'
 });
 
 const createMockUnit = (name: string, landlordId?: string, handoverStatus: 'Handed Over' | 'Pending Hand Over' = 'Handed Over', serviceCharge = 1000): Unit => ({
@@ -72,6 +88,19 @@ describe('Arrears Logic', () => {
 
             expect(result).toHaveLength(2);
             expect(result.map(r => r.tenant.id)).toEqual(['3', '1']); // Sorted by arrears descending
+        });
+
+        it('should exclude pending water bills from rent arrears calculation', async () => {
+            // Tenant has 6500 total due, but 1500 is for water. Rent arrears should be 5000.
+            const tenants = [createMockTenant('1', 6500)];
+            const waterBills = [createMockWaterBill('1', 1500)];
+            mockGetTenants.mockResolvedValue(tenants);
+            mockGetAllPendingWaterBills.mockResolvedValue(waterBills);
+
+            const result = await getTenantsInArrears();
+            
+            expect(result).toHaveLength(1);
+            expect(result[0].arrears).toBe(5000);
         });
 
         it('should return an empty array when no tenants are in arrears', async () => {

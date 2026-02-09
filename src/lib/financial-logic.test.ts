@@ -1,6 +1,7 @@
 
+
 import { generateLedger, reconcileMonthlyBilling, validatePayment } from './financial-logic';
-import { Tenant, Unit, Payment, Property, Lease, PropertyOwner, Landlord } from './types';
+import { Tenant, Unit, Payment, Property, Lease, PropertyOwner, Landlord, WaterMeterReading } from './types';
 import { parseISO, format, addMonths } from 'date-fns';
 
 // Define a more specific type for the overrides to help TypeScript
@@ -114,6 +115,21 @@ const createMockPayment = (overrides: Partial<Payment>): Payment => ({
     ...overrides,
 });
 
+const createMockWaterReading = (tenantId: string, date: string, amount: number): WaterMeterReading => ({
+    id: `water-${Math.random()}`,
+    tenantId,
+    propertyId: 'prop-1',
+    unitName: 'Test Unit',
+    priorReading: 100,
+    currentReading: 110,
+    consumption: 10,
+    rate: 150,
+    amount,
+    date,
+    createdAt: new Date(),
+    status: 'Pending',
+});
+
 
 describe('Financial Logic', () => {
 
@@ -200,6 +216,35 @@ describe('Financial Logic', () => {
             const lastEntry = ledger[ledger.length - 1];
             expect(lastEntry.balance).toBe(0);
             expect(finalDueBalance).toBe(0);
+        });
+        
+        it('should only include rent ledger items when specified', () => {
+            const tenant = createMockTenant();
+            const payments = [
+                createMockPayment({ type: 'Rent', amount: 20000 }),
+                createMockPayment({ type: 'Water', amount: 1500 }),
+            ];
+            const waterReadings = [createMockWaterReading(tenant.id, '2023-01-15', 1500)];
+
+            const { ledger } = generateLedger(tenant, payments, [mockProperty], waterReadings, undefined, new Date(), { includeWater: false });
+
+            expect(ledger.some(l => l.description.includes('Water Bill'))).toBe(false);
+            expect(ledger.some(l => l.description.includes('Rent for Unit'))).toBe(true);
+        });
+
+        it('should only include water ledger items when specified', () => {
+            const tenant = createMockTenant();
+            const payments = [
+                createMockPayment({ type: 'Rent', amount: 20000 }),
+                createMockPayment({ type: 'Water', amount: 1500 }),
+            ];
+            const waterReadings = [createMockWaterReading(tenant.id, '2023-01-15', 1500)];
+
+            const { ledger } = generateLedger(tenant, payments, [mockProperty], waterReadings, undefined, new Date(), { includeRent: false, includeServiceCharge: false });
+
+            expect(ledger.some(l => l.description.includes('Water Bill'))).toBe(true);
+            expect(ledger.some(l => l.description.includes('Rent for Unit'))).toBe(false);
+            expect(ledger.filter(l => l.charge > 0).length).toBe(1); // Only one charge (water)
         });
     });
 
