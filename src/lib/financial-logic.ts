@@ -295,12 +295,12 @@ export function generateLedger(
             
             const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
                 ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02'))
-                : null;
+                : addMonths(billingStartDate, -1); // If never billed, start from the month before billing starts
 
-            const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
+            const firstBillableMonth = addMonths(lastBilledDate, 1);
             
             let loopDate = firstBillableMonth;
-            const endOfPeriod = asOfDate;
+            const endOfPeriod = startOfMonth(asOfDate); // Bill up to the start of the current month being viewed
 
             while (loopDate <= endOfPeriod) {
                 const monthKey = format(loopDate, 'yyyy-MM');

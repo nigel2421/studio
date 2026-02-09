@@ -30,6 +30,15 @@ describe('PDF Generation', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         (jsPDF as unknown as jest.Mock).mockImplementation(() => mockJsPDFInstance);
+        (autoTable as jest.Mock).mockImplementation((doc: any, options: any) => {
+            // Simulate autotable adding its height to the doc object
+            // This is a simplified simulation
+            if (options && options.body && options.body.length > 0) {
+                 doc.lastAutoTable = {
+                    finalY: (options.startY || 0) + (options.body.length * 10) + 20, // Dummy height calculation
+                };
+            }
+        });
     });
 
     it('generateTenantStatementPDF should generate a PDF with correct ledger data', () => {
@@ -50,7 +59,7 @@ describe('PDF Generation', () => {
         
         // Mock generateLedger to return predictable data
         mockGenerateLedger.mockImplementation((tenant, payments, properties, waterReadings, owner, asOf, options) => {
-            if (options && options.includeRent && !options.includeWater) { // Rent ledger
+            if (options && !options.includeWater) { // Rent ledger for 'full' or 'rent' context
                 return {
                     ledger: [
                         { id: 'charge1', date: '2023-01-01', description: 'Rent for Jan', charge: 20000, payment: 0, balance: 20000, forMonth: 'Jan 2023' },

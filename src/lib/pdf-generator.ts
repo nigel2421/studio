@@ -561,7 +561,7 @@ export const generateTenantStatementPDF = (
     doc.setFontSize(10);
     doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
 
-    const asOf = tenant.lease?.endDate ? parseISO(tenant.lease.endDate) : new Date();
+    const asOf = new Date(); // Always generate statements up to the current date
 
     const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeWater: false });
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeRent: false, includeServiceCharge: false });
@@ -578,16 +578,21 @@ export const generateTenantStatementPDF = (
             t.balance < 0 ? `${formatCurrency(Math.abs(t.balance))} Cr` : formatCurrency(t.balance)
         ]);
 
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
-            body: rentTableBody,
-            theme: 'striped',
-            headStyles: { fillColor: [37, 99, 235] },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
-        });
-        
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+        if (rentTableBody.length > 0) {
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Date', 'For Month', 'Description', 'Charge', 'Payment', 'Balance']],
+                body: rentTableBody,
+                theme: 'striped',
+                headStyles: { fillColor: [37, 99, 235] },
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 10;
+        } else {
+             doc.text("No rent or service charge transactions for this period.", 14, yPos);
+             yPos += 10;
+        }
+
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         const balanceLabel = tenant.residentType === 'Homeowner' ? 'Service Charge Balance:' : 'Rent Balance:';
@@ -622,16 +627,21 @@ export const generateTenantStatementPDF = (
             ];
         });
         
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Date', 'For Month', 'Unit', 'Prior Rd', 'Current Rd', 'Rate', 'Amount', 'Payment', 'Balance']],
-            body: waterTableBody,
-            theme: 'striped',
-            headStyles: { fillColor: [21, 128, 61] },
-            columnStyles: { 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } }
-        });
+        if (waterTableBody.length > 0) {
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Date', 'For Month', 'Unit', 'Prior Rd', 'Current Rd', 'Rate', 'Amount', 'Payment', 'Balance']],
+                body: waterTableBody,
+                theme: 'striped',
+                headStyles: { fillColor: [21, 128, 61] },
+                columnStyles: { 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } }
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 10;
+        } else {
+            doc.text("No water transactions for this period.", 14, yPos);
+            yPos += 10;
+        }
 
-        yPos = (doc as any).lastAutoTable.finalY + 10;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text('Water Bill Balance:', 140, yPos);
