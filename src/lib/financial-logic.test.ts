@@ -59,7 +59,7 @@ const createMockTenant = (overrides: MockTenantOverrides = {}): Tenant => {
         phone: '123',
         idNumber: '123',
         propertyId: 'prop-1',
-        unitName: 'Test Unit',
+        unitName: 'A1',
         agent: 'Susan',
         status: 'active',
         residentType: 'Tenant',
@@ -218,14 +218,15 @@ describe('Financial Logic', () => {
         });
         
         it('should only include rent ledger items when specified', () => {
-            const tenant = createMockTenant();
+            const tenant = createMockTenant({ unitName: 'A1'});
             const payments = [
-                createMockPayment({ type: 'Rent', amount: 20000 }),
-                createMockPayment({ type: 'Water', amount: 1500 }),
+                createMockPayment({ type: 'Rent', amount: 20000, tenantId: tenant.id }),
+                createMockPayment({ type: 'Water', amount: 1500, tenantId: tenant.id }),
             ];
             const waterReadings = [createMockWaterReading(tenant.id, '2023-01-15', 1500)];
+            const mockPropertyForTest = createMockProperty('prop-1', [createMockUnit({ name: 'A1', rentAmount: 20000 })]);
 
-            const { ledger } = generateLedger(tenant, payments, [mockProperty], waterReadings, undefined, new Date(), { includeWater: false });
+            const { ledger } = generateLedger(tenant, payments, [mockPropertyForTest], waterReadings, undefined, new Date(), { includeWater: false });
 
             expect(ledger.some(l => l.description.includes('Water Bill'))).toBe(false);
             expect(ledger.some(l => l.description.includes('Rent for Unit'))).toBe(true);
