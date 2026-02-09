@@ -68,7 +68,7 @@ export default function ServiceChargesPage() {
   const [ownerForHistory, setOwnerForHistory] = useState<PropertyOwner | Landlord | null>(null);
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
 
-
+  const [activeTab, setActiveTab] = useState('client-occupied');
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
 
@@ -149,21 +149,44 @@ export default function ServiceChargesPage() {
       };
   }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
   
-  const stats = useMemo(() => {
-      const relevantAccounts = [...filteredSelfManagedAccounts, ...filteredManagedVacantAccounts].filter(acc => acc.paymentStatus !== 'N/A');
-      const totalUnits = relevantAccounts.length;
+  const displayedStats = useMemo(() => {
+    if (activeTab === 'arrears') {
+        const totalArrears = filteredArrearsAccounts.reduce((sum, acc) => sum + acc.totalDue, 0);
+        return {
+            title: 'Arrears Summary',
+            stats: [
+                { title: 'Units in Arrears', value: filteredArrearsAccounts.length, icon: Building2 },
+                { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
+            ]
+        }
+    }
+    
+    const accounts = activeTab === 'client-occupied' 
+        ? filteredSelfManagedAccounts 
+        : filteredManagedVacantAccounts;
 
-      const paidAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Paid');
-      const pendingAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Pending');
+    const relevantAccounts = accounts.filter(acc => acc.paymentStatus !== 'N/A');
+    const totalUnits = relevantAccounts.length;
 
-      const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
-      const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+    const paidAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Paid');
+    const pendingAccounts = relevantAccounts.filter(a => a.paymentStatus === 'Pending');
 
-      const totalCharged = totalPaid + totalPending;
-      const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
+    const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+    const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
 
-      return { totalUnits, totalPaid, totalPending, paidPercentage };
-  }, [filteredSelfManagedAccounts, filteredManagedVacantAccounts]);
+    const totalCharged = totalPaid + totalPending;
+    const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
+    
+    return {
+        title: activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units',
+        stats: [
+             { title: 'Billable Units', value: totalUnits, icon: Building2 },
+             { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
+             { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
+             { title: 'Paid Percentage', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
+        ]
+    };
+  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts]);
 
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
@@ -423,139 +446,117 @@ export default function ServiceChargesPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
-          <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-                <span className="font-semibold text-center w-32">{format(selectedMonth, 'MMMM yyyy')}</span>
-                <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
+    <div>
+      <div className="sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-6 -mt-6">
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Client Service Charges</h2>
+                <p className="text-muted-foreground">Track service charge payments for all client-owned units.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+                      <span className="font-semibold text-center w-32">{format(selectedMonth, 'MMMM yyyy')}</span>
+                      <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                  <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                      <SelectTrigger className="w-full sm:w-[240px]">
+                          <SelectValue placeholder="Filter by property..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Properties</SelectItem>
+                          {allProperties.map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+              </div>
             </div>
-             <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder="Filter by property..." />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Properties</SelectItem>
-                    {allProperties.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {(displayedStats.stats || []).map((stat, index) => (
+                    <Card key={index}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                        <stat.icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                        <div className="text-2xl font-bold">{stat.value}</div>
+                        </CardContent>
+                    </Card>
+                ))}
+                {displayedStats.stats.length === 2 && <div className="hidden md:block lg:col-span-2" />}
+            </div>
         </div>
-      </div>
-      
-       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Billable Client Units</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUnits}</div>
-              <p className="text-xs text-muted-foreground">Total billable client-owned units</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Paid Service Charge</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Ksh {stats.totalPaid.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total service charge collected</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Service Charge</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Ksh {stats.totalPending.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total service charge pending</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Paid Percentage</CardTitle>
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.paidPercentage.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">Of total billable charges</p>
-            </CardContent>
-          </Card>
       </div>
 
-      <Tabs defaultValue="client-occupied">
-        <div className="flex justify-between items-center">
-            <TabsList>
-                <TabsTrigger value="client-occupied">Client Occupied</TabsTrigger>
-                <TabsTrigger value="managed-vacant">Managed Vacant</TabsTrigger>
-                <TabsTrigger value="arrears">Vacant Units in Arrears</TabsTrigger>
-            </TabsList>
-            <div className="relative w-full sm:w-[300px]">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Search by unit, owner..."
-                    className="pl-9"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
-        </div>
-        <TabsContent value="client-occupied">
-           <ServiceChargeStatusTable
-              title="Client Occupied Unit Service Charges"
-              description="Payments for units currently occupied and managed by clients."
-              accounts={paginatedSmAccounts}
-              onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
-              onViewHistory={handleOpenHistoryDialog}
-              statusFilter={smStatusFilter}
-              onStatusFilterChange={handleSmStatusFilterChange}
-              currentPage={smCurrentPage}
-              pageSize={smPageSize}
-              totalPages={smTotalPages}
-              onPageChange={setSmCurrentPage}
-              onPageSizeChange={setSmPageSize}
-              totalItems={finalFilteredSelfManaged.length}
-            />
-        </TabsContent>
-        <TabsContent value="managed-vacant">
+      <div className="mt-6">
+        <Tabs defaultValue="client-occupied" onValueChange={setActiveTab}>
+          <div className="flex justify-between items-center">
+              <TabsList>
+                  <TabsTrigger value="client-occupied">Client Occupied</TabsTrigger>
+                  <TabsTrigger value="managed-vacant">Managed Vacant</TabsTrigger>
+                  <TabsTrigger value="arrears">Vacant Units in Arrears</TabsTrigger>
+              </TabsList>
+              <div className="relative w-full sm:w-[300px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                      placeholder="Search by unit, owner..."
+                      className="pl-9"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+              </div>
+          </div>
+          <TabsContent value="client-occupied">
             <ServiceChargeStatusTable
-              title="Managed Vacant Unit Service Charges"
-              description="Service charge payments for handed-over vacant units managed by Eracov."
-              accounts={paginatedMvAccounts}
-              onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
-              onViewHistory={handleOpenHistoryDialog}
-              statusFilter={mvStatusFilter}
-              onStatusFilterChange={handleMvStatusFilterChange}
-              currentPage={mvCurrentPage}
-              pageSize={mvPageSize}
-              totalPages={mvTotalPages}
-              onPageChange={setMvCurrentPage}
-              onPageSizeChange={setMvPageSize}
-              totalItems={finalFilteredManagedVacant.length}
-            />
-        </TabsContent>
-        <TabsContent value="arrears">
-           <VacantArrearsTab
-              arrears={paginatedArrears}
-              onGenerateInvoice={handleGenerateInvoice}
-              currentPage={arrearsCurrentPage}
-              pageSize={arrearsPageSize}
-              totalPages={arrearsTotalPages}
-              onPageChange={setArrearsCurrentPage}
-              onPageSizeChange={setArrearsPageSize}
-              totalItems={finalFilteredArrears.length}
-            />
-        </TabsContent>
-      </Tabs>
+                title="Client Occupied Unit Service Charges"
+                description="Payments for units currently occupied and managed by clients."
+                accounts={paginatedSmAccounts}
+                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
+                onViewHistory={handleOpenHistoryDialog}
+                statusFilter={smStatusFilter}
+                onStatusFilterChange={handleSmStatusFilterChange}
+                currentPage={smCurrentPage}
+                pageSize={smPageSize}
+                totalPages={smTotalPages}
+                onPageChange={setSmCurrentPage}
+                onPageSizeChange={setSmPageSize}
+                totalItems={finalFilteredSelfManaged.length}
+              />
+          </TabsContent>
+          <TabsContent value="managed-vacant">
+              <ServiceChargeStatusTable
+                title="Managed Vacant Unit Service Charges"
+                description="Service charge payments for handed-over vacant units managed by Eracov."
+                accounts={paginatedMvAccounts}
+                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
+                onViewHistory={handleOpenHistoryDialog}
+                statusFilter={mvStatusFilter}
+                onStatusFilterChange={handleMvStatusFilterChange}
+                currentPage={mvCurrentPage}
+                pageSize={mvPageSize}
+                totalPages={mvTotalPages}
+                onPageChange={setMvCurrentPage}
+                onPageSizeChange={setMvPageSize}
+                totalItems={finalFilteredManagedVacant.length}
+              />
+          </TabsContent>
+          <TabsContent value="arrears">
+            <VacantArrearsTab
+                arrears={paginatedArrears}
+                onGenerateInvoice={handleGenerateInvoice}
+                currentPage={arrearsCurrentPage}
+                pageSize={arrearsPageSize}
+                totalPages={arrearsTotalPages}
+                onPageChange={setArrearsCurrentPage}
+                onPageSizeChange={setArrearsPageSize}
+                totalItems={finalFilteredArrears.length}
+              />
+          </TabsContent>
+        </Tabs>
+      </div>
       
       {ownerForPayment && (
         <ConfirmOwnerPaymentDialog
@@ -829,3 +830,6 @@ const VacantArrearsTab = ({
     
 
 
+
+
+    
