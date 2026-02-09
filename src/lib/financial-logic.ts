@@ -127,7 +127,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     
     const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
         ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
-        : null;
+        : addMonths(billingStartDate, -1);
 
     // The first month we should even consider billing for.
     // If they've been billed before, it's the month after that bill.
@@ -293,11 +293,7 @@ export function generateLedger(
                 billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
             }
             
-            const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
-                ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02'))
-                : addMonths(billingStartDate, -1); // If never billed, start from the month before billing starts
-
-            const firstBillableMonth = addMonths(lastBilledDate, 1);
+            const firstBillableMonth = billingStartDate;
             
             let loopDate = firstBillableMonth;
             const endOfPeriod = startOfMonth(asOfDate); // Bill up to the start of the current month being viewed
