@@ -18,6 +18,7 @@ import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { useLoading } from '@/hooks/useLoading';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const { isLoading, startLoading, stopLoading } = useLoading();
+  const { toast } = useToast();
   
   const allLandlordOwnedUnits = useMemo(() => {
     return properties.flatMap(p => 
@@ -91,6 +93,14 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (name.length > 100) {
+        toast({
+            variant: "destructive",
+            title: "Name Too Long",
+            description: "The landlord name cannot exceed 100 characters.",
+        });
+        return;
+    }
     startLoading(landlord ? 'Updating Landlord...' : 'Adding Landlord...');
     try {
       const landlordData: Landlord = {
@@ -123,7 +133,7 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor="landlord-name">Full Name</Label>
-                    <Input id="landlord-name" value={name} onChange={(e) => setName(e.target.value)} required />
+                    <Input id="landlord-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="landlord-phone">Phone</Label>

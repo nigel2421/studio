@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Property, PropertyOwner, Unit } from '@/lib/types';
 import { useLoading } from '@/hooks/useLoading';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
     isOpen: boolean;
@@ -31,6 +32,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
     });
     const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
     const { startLoading, stopLoading, isLoading } = useLoading();
+    const { toast } = useToast();
 
     useEffect(() => {
         if (isOpen) {
@@ -62,6 +64,14 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.name.length > 100) {
+            toast({
+                variant: "destructive",
+                title: "Name Too Long",
+                description: "The owner name cannot exceed 100 characters.",
+            });
+            return;
+        }
         startLoading('Saving Property Owner Details...');
         try {
             await onSave(formData, selectedUnits);
@@ -95,6 +105,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 required
+                                maxLength={100}
                             />
                         </div>
                         <div className="grid gap-2">
