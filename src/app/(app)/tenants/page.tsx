@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { TenantActions } from './tenant-actions';
 import { Input } from '@/components/ui/input';
 import { useLoading } from '@/hooks/useLoading';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
