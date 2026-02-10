@@ -1,8 +1,7 @@
 
-import { Suspense } from 'react';
+import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2 } from "lucide-react";
@@ -18,40 +17,43 @@ import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart"
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
-import { Loader2 } from 'lucide-react';
 
-async function DashboardContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
+// This ensures the page is always rendered dynamically on the server
+export const dynamic = 'force-dynamic';
+
+const getDashboardData = async (propId: string) => {
+    try {
+        const [selectedProperty, tenants, maintenanceRequests] = await Promise.all([
+            getProperty(propId),
+            getTenants({ propertyId: propId }),
+            getMaintenanceRequests({ propertyId: propId }),
+        ]);
+
+        if (!selectedProperty) {
+            return null;
+        }
+
+        const tenantIds = tenants.map(t => t.id);
+        const payments = await getPaymentsForTenants(tenantIds);
+
+        return {
+            selectedProperty,
+            tenants,
+            maintenanceRequests,
+            payments,
+        };
+    } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        return null;
+    }
+};
+
+export default async function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
     const propertyId = searchParams?.propertyId;
     
     const allProperties = await getProperties();
+    // Default to the first property if no ID is in the URL
     const selectedPropertyId = propertyId || allProperties[0]?.id || null;
-
-    const getDashboardData = async (propId: string) => {
-        try {
-            const [selectedProperty, tenants, maintenanceRequests] = await Promise.all([
-                getProperty(propId),
-                getTenants({ propertyId: propId }),
-                getMaintenanceRequests({ propertyId: propId }),
-            ]);
-
-            if (!selectedProperty) {
-                return null;
-            }
-
-            const tenantIds = tenants.map(t => t.id);
-            const payments = await getPaymentsForTenants(tenantIds);
-
-            return {
-                selectedProperty,
-                tenants,
-                maintenanceRequests,
-                payments,
-            };
-        } catch (error) {
-            console.error("Failed to fetch dashboard data:", error);
-            return null;
-        }
-    };
 
     const data = selectedPropertyId ? await getDashboardData(selectedPropertyId) : null;
     const isInvestmentConsultant = false; 
@@ -165,40 +167,5 @@ async function DashboardContent({ searchParams }: { searchParams?: { propertyId?
                 </div>
             )}
         </div>
-    );
-}
-
-// A simple skeleton loader
-function DashboardSkeleton() {
-    return (
-        <div className="flex flex-col gap-8">
-            <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                    <div className="h-8 w-64 bg-muted rounded-md animate-pulse" />
-                    <div className="h-4 w-80 bg-muted rounded-md animate-pulse" />
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="h-10 w-72 bg-muted rounded-md animate-pulse" />
-                    <div className="h-9 w-36 bg-muted rounded-md animate-pulse" />
-                </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
-                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
-                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
-                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
-            </div>
-             <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        </div>
-    );
-}
-
-export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
-    return (
-        <Suspense fallback={<DashboardSkeleton />}>
-            <DashboardContent searchParams={searchParams} />
-        </Suspense>
     );
 }
