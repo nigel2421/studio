@@ -1,4 +1,6 @@
 
+
+import { Suspense } from 'react';
 import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -17,8 +19,8 @@ import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart"
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
+import { Skeleton } from '@/components/ui/skeleton';
 
-// This ensures the page is always rendered dynamically on the server
 export const dynamic = 'force-dynamic';
 
 const getDashboardData = async (propId: string) => {
@@ -48,11 +50,34 @@ const getDashboardData = async (propId: string) => {
     }
 };
 
-export default async function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
+function DashboardSkeleton() {
+    return (
+        <div className="flex flex-col gap-8">
+            <div className="flex items-center justify-between">
+                <div>
+                    <Skeleton className="h-8 w-64 mb-2" />
+                    <Skeleton className="h-4 w-80" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Skeleton className="h-10 w-[280px]" />
+                    <Skeleton className="h-10 w-[180px]" />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+            </div>
+            <div className="grid gap-8 md:grid-cols-2">
+                <Skeleton className="h-80" />
+                <Skeleton className="h-80" />
+            </div>
+        </div>
+    );
+}
+
+async function DashboardContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
     const propertyId = searchParams?.propertyId;
     
     const allProperties = await getProperties();
-    // Default to the first property if no ID is in the URL
     const selectedPropertyId = propertyId || allProperties[0]?.id || null;
 
     const data = selectedPropertyId ? await getDashboardData(selectedPropertyId) : null;
@@ -169,3 +194,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
         </div>
     );
 }
+
+
+export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
+    return (
+        <Suspense fallback={<DashboardSkeleton />}>
+            <DashboardContent searchParams={searchParams} />
+        </Suspense>
+    );
+}
+
