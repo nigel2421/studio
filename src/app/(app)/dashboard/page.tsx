@@ -167,9 +167,6 @@ async function DashboardPageContent({ propertyId }: { propertyId: string | null 
     );
 }
 
-// Revalidate the data for this page at most once per hour
-export const revalidate = 3600;
-
 export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
 
     return (
