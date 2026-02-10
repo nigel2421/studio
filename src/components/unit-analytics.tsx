@@ -64,6 +64,8 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
         }
       });
 
+      const occupiedByTenant = new Set(tenants.map(t => t.unitName));
+
       // Populate the analytics data
       filteredUnits.forEach(unit => {
         const floorNumber = parseFloorFromUnitName(unit.name);
@@ -74,26 +76,22 @@ export function UnitAnalytics({ property, tenants }: UnitAnalyticsProps) {
 
         floorData.totalUnits++;
 
-        // Logic now primarily relies on the unit's own status field for accuracy
-        switch (unit.status) {
-          case 'vacant':
-            floorData.vacant++;
-            break;
-          case 'client occupied':
-            floorData.clientOccupied++;
-            break;
-          case 'rented':
-          case 'airbnb': // Treat Airbnb as a rented category for this analysis
+        if (occupiedByTenant.has(unit.name)) {
             if (unit.ownership === 'SM') {
-              floorData.rentedSM++;
+                floorData.rentedSM++;
             } else if (unit.ownership === 'Landlord') {
-              floorData.rentedLandlord++;
+                floorData.rentedLandlord++;
             }
-            break;
-          default:
-            // This case handles any units that might not have a status or have an unknown one.
-            // You could log this or handle it as a separate category if needed.
-            break;
+        } else if (unit.status === 'client occupied') {
+            floorData.clientOccupied++;
+        } else if (unit.status === 'airbnb') {
+             if (unit.ownership === 'SM') {
+                floorData.rentedSM++;
+            } else if (unit.ownership === 'Landlord') {
+                floorData.rentedLandlord++;
+            }
+        } else {
+            floorData.vacant++;
         }
       });
       
