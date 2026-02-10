@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -175,8 +176,8 @@ export default function LandlordsPage() {
 
 
   const totalInvestorLandlords = useMemo(() => {
-    return investorLandlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
-  }, [investorLandlords]);
+    return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
+  }, [landlords]);
 
   const totalManagedUnits = useMemo(() => {
     let count = 0;
