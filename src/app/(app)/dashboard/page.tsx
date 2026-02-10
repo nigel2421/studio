@@ -20,7 +20,7 @@ import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Loader2 } from 'lucide-react';
 
-async function DashboardPageContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
+export default async function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
     const propertyId = searchParams?.propertyId;
     
     // If no propertyId is in the URL, default to the first property in the list for a better initial experience.
@@ -168,12 +168,4 @@ async function DashboardPageContent({ searchParams }: { searchParams?: { propert
             )}
         </div>
     );
-}
-
-export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
-    return (
-        <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>}>
-            <DashboardPageContent searchParams={searchParams} />
-        </Suspense>
-    )
 }
