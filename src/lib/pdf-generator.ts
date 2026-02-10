@@ -208,7 +208,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     
     if (associatedTenants.length === 0) {
         doc.text("Could not find any associated resident accounts for this owner.", 14, 80);
-        doc.save(`service_charge_statement_error_${owner.name.replace(/ /g, '_')}.pdf`);
+        doc.save(`service_charge_statement_error_${owner.name.toLowerCase().replace(/ /g, '_')}.pdf`);
         return;
     }
 
@@ -307,7 +307,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
     }
     
-    doc.save(`statement_${owner.name.replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`statement_${owner.name.toLowerCase().replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
 export const generateArrearsServiceChargeInvoicePDF = (
@@ -518,7 +518,7 @@ export const generateLandlordStatementPDF = (
     }
 
 
-    doc.save(`landlord_statement_${landlord.name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`landlord_statement_${landlord.name.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
 export const generateTenantStatementPDF = (
@@ -647,7 +647,7 @@ export const generateTenantStatementPDF = (
         doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
     }
 
-    doc.save(`statement_${tenant.name.replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`statement_${tenant.name.toLowerCase().replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
 export const generateVacantServiceChargeInvoicePDF = (
@@ -738,7 +738,7 @@ export const generateVacantServiceChargeInvoicePDF = (
     doc.setFont('helvetica', 'normal');
     doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
 
-    doc.save(`service_charge_invoice_${owner.name.replace(/ /g, '_')}_vacant_units.pdf`);
+    doc.save(`service_charge_invoice_${owner.name.toLowerCase().replace(/ /g, '_')}_vacant_units.pdf`);
 };
 
 export const generateDashboardReportPDF = (
