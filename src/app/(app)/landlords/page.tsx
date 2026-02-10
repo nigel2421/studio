@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -45,6 +44,7 @@ export default function LandlordsPage() {
   const [landlordForStatement, setLandlordForStatement] = useState<Landlord | null>(null);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [landlordToDelete, setLandlordToDelete] = useState<Landlord | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -78,10 +78,10 @@ export default function LandlordsPage() {
     fetchData();
   }, []);
 
-  // Reset pagination when property changes
+  // Reset pagination when property or search query changes
   useEffect(() => {
     setLandlordCurrentPage(1);
-  }, [selectedPropertyId]);
+  }, [selectedPropertyId, searchQuery]);
 
   const investorLandlordIds = useMemo(() => {
     const ids = new Set<string>();
@@ -161,6 +161,18 @@ export default function LandlordsPage() {
     
     return investorLandlords.filter(l => landlordIdsInProperty.has(l.id));
   }, [selectedPropertyId, properties, investorLandlords, investorLandlordIds]);
+  
+  const filteredLandlords = useMemo(() => {
+    if (!searchQuery) {
+      return landlordsForSelectedProperty;
+    }
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return landlordsForSelectedProperty.filter(landlord => 
+      landlord.name.toLowerCase().includes(lowercasedQuery) ||
+      landlord.email.toLowerCase().includes(lowercasedQuery)
+    );
+  }, [landlordsForSelectedProperty, searchQuery]);
+
 
   const totalInvestorLandlords = useMemo(() => {
     return investorLandlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
@@ -181,10 +193,10 @@ export default function LandlordsPage() {
 
   const paginatedLandlords = useMemo(() => {
     const start = (landlordCurrentPage - 1) * landlordPageSize;
-    return landlordsForSelectedProperty.slice(start, start + landlordPageSize);
-  }, [landlordsForSelectedProperty, landlordCurrentPage, landlordPageSize]);
+    return filteredLandlords.slice(start, start + landlordPageSize);
+  }, [filteredLandlords, landlordCurrentPage, landlordPageSize]);
 
-  const landlordTotalPages = Math.ceil(landlordsForSelectedProperty.length / landlordPageSize);
+  const landlordTotalPages = Math.ceil(filteredLandlords.length / landlordPageSize);
 
   const unassignedUnitsToShow = useMemo(() => {
       const PREVIEW_COUNT = 14;
@@ -409,6 +421,15 @@ export default function LandlordsPage() {
               )}
 
               <div className="space-y-6">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search landlords by name or email..."
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
                 <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                   {paginatedLandlords.map((landlord) => {
                     const assignedUnits = (landlordUnitsMap.get(landlord.id) || []).filter(u => u.propertyId === selectedPropertyId);
@@ -472,9 +493,9 @@ export default function LandlordsPage() {
                       </Card>
                     )
                   })}
-                  {landlordsForSelectedProperty.length === 0 && !isLoading && (
+                  {filteredLandlords.length === 0 && !isLoading && (
                       <div className="md:col-span-3 text-center py-10">
-                          <p className="text-muted-foreground">No landlords found for {selectedProperty?.name}.</p>
+                          <p className="text-muted-foreground">No landlords found matching your search.</p>
                       </div>
                   )}
                 </div>
@@ -484,7 +505,7 @@ export default function LandlordsPage() {
                     currentPage={landlordCurrentPage}
                     totalPages={landlordTotalPages}
                     pageSize={landlordPageSize}
-                    totalItems={landlordsForSelectedProperty.length}
+                    totalItems={filteredLandlords.length}
                     onPageChange={setLandlordCurrentPage}
                     onPageSizeChange={setLandlordPageSize}
                   />

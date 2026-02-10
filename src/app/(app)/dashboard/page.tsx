@@ -10,17 +10,35 @@ import { MaintenanceRequest, Tenant, Property, Payment } from "@/lib/types";
 import { UnitAnalytics } from "@/components/unit-analytics";
 import { StatusAnalytics } from "@/components/status-analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FinancialOverviewChart } from "@/components/dashboard/financial-overview-chart";
-import { OccupancyOverviewChart } from "@/components/dashboard/occupancy-overview-chart";
-import { MaintenanceOverviewChart } from "@/components/dashboard/maintenance-overview-chart";
-import { OrientationOverviewChart } from "@/components/dashboard/orientation-overview-chart";
-import { RentBreakdownChart } from "@/components/dashboard/rent-breakdown-chart";
 import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Skeleton } from '@/components/ui/skeleton';
+import dynamicImport from 'next/dynamic';
 
 export const dynamic = 'force-dynamic';
+
+
+const FinancialOverviewChart = dynamicImport(() => import('@/components/dashboard/financial-overview-chart').then(mod => mod.FinancialOverviewChart), {
+    loading: () => <Skeleton className="h-[300px]" />,
+});
+
+const OccupancyOverviewChart = dynamicImport(() => import('@/components/dashboard/occupancy-overview-chart').then(mod => mod.OccupancyOverviewChart), {
+    loading: () => <Skeleton className="h-[300px]" />,
+});
+
+const MaintenanceOverviewChart = dynamicImport(() => import('@/components/dashboard/maintenance-overview-chart').then(mod => mod.MaintenanceOverviewChart), {
+    loading: () => <Skeleton className="h-[300px]" />,
+});
+
+const OrientationOverviewChart = dynamicImport(() => import('@/components/dashboard/orientation-overview-chart').then(mod => mod.OrientationOverviewChart), {
+    loading: () => <Skeleton className="h-[300px]" />,
+});
+
+const RentBreakdownChart = dynamicImport(() => import('@/components/dashboard/rent-breakdown-chart').then(mod => mod.RentBreakdownChart), {
+    loading: () => <Skeleton className="h-[300px]" />,
+});
+
 
 const getDashboardData = async (propId: string) => {
     try {
@@ -192,8 +210,8 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
 export default async function DashboardPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const searchParams = await props.searchParams;
-  const propertyId = searchParams?.propertyId as string | undefined;
+  const resolvedParams = await props.searchParams;
+  const propertyId = resolvedParams?.propertyId as string | undefined;
 
   const allProperties = await getProperties();
   const selectedPropertyId = propertyId || allProperties[0]?.id || null;

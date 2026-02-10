@@ -93,8 +93,15 @@ async function getAllUsers(): Promise<UserProfile[]> {
     return cacheService.getOrFetch('users', 'all', () => getCollection<UserProfile>('users'), 300000);
 }
 
-export async function getUsers(): Promise<UserProfile[]> {
-    const [users, properties, landlords, propertyOwners] = await Promise.all([
+export async function getUsers(
+    options: {
+        searchQuery?: string;
+        roleFilters?: UserRole[];
+        page?: number;
+        pageSize?: number;
+    } = {}
+): Promise<{ users: UserProfile[]; totalCount: number }> {
+    const [allUsers, properties, landlords, propertyOwners] = await Promise.all([
         getAllUsers(),
         getProperties(),
         getLandlords(),
@@ -141,18 +148,45 @@ export async function getUsers(): Promise<UserProfile[]> {
         }
     }
 
-    return users.map(user => {
+    const allUsersWithDynamicRoles = allUsers.map(user => {
         const ownerId = user.landlordId || user.propertyOwnerId;
         if (ownerId) {
             if (clientIds.has(ownerId)) {
-                return { ...user, role: 'homeowner' };
+                return { ...user, role: 'homeowner' as UserRole };
             }
             if (investorIds.has(ownerId)) {
-                return { ...user, role: 'landlord' };
+                return { ...user, role: 'landlord' as UserRole };
             }
         }
         return user;
     });
+
+    // Filtering
+    const { searchQuery, roleFilters } = options;
+    let filteredUsers = allUsersWithDynamicRoles;
+
+    if (searchQuery) {
+        const lowercasedQuery = searchQuery.toLowerCase();
+        filteredUsers = filteredUsers.filter(user =>
+            (user.name && user.name.toLowerCase().includes(lowercasedQuery)) ||
+            user.email.toLowerCase().includes(lowercasedQuery)
+        );
+    }
+
+    if (roleFilters && roleFilters.length > 0) {
+        filteredUsers = filteredUsers.filter(user => roleFilters.includes(user.role));
+    }
+
+    const totalCount = filteredUsers.length;
+
+    // Pagination
+    if (options.page && options.pageSize) {
+        const start = (options.page - 1) * options.pageSize;
+        const end = start + options.pageSize;
+        filteredUsers = filteredUsers.slice(start, end);
+    }
+
+    return { users: filteredUsers, totalCount };
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
@@ -176,8 +210,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 
 export async function getLogs(): Promise<Log[]> {
     const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(1000));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => postToJSON<Log>(doc));
+    return getCollection<Log>(q);
 }
 
 async function getCollection<T>(collectionOrQuery: string | Query, queryConstraints: any[] = []): Promise<T[]> {

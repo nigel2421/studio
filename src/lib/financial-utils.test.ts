@@ -1,3 +1,4 @@
+
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -68,7 +69,7 @@ const createMockPayment = (overrides: Partial<Payment> = {}): Payment => ({
     date: '2023-01-05',
     type: 'Rent',
     status: 'Paid',
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     paymentMethod: 'M-Pesa',
     transactionId: 'TEST12345',
     ...overrides,

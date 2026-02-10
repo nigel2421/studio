@@ -64,7 +64,7 @@ describe('Data Logic in `data.ts`', () => {
             });
 
             // Act
-            const users = await data.getUsers();
+            const { users } = await data.getUsers();
 
             // Assert
             expect(users).toHaveLength(1);
@@ -88,7 +88,7 @@ describe('Data Logic in `data.ts`', () => {
             });
 
             // Act
-            const users = await data.getUsers();
+            const { users } = await data.getUsers();
 
             // Assert
             expect(users).toHaveLength(1);
@@ -113,7 +113,7 @@ describe('Data Logic in `data.ts`', () => {
             });
 
             // Act
-            const users = await data.getUsers();
+            const { users } = await data.getUsers();
 
             // Assert
             expect(users).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('Data Logic in `data.ts`', () => {
             });
 
             // Act
-            const users = await data.getUsers();
+            const { users } = await data.getUsers();
 
             // Assert
             expect(users).toHaveLength(1);

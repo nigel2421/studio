@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getProperties, getPropertyOwners, getTenants, getAllPayments, findOrCreateHomeownerTenant, addPayment, getLandlords } from '@/lib/data';
+import { getProperties, getPropertyOwners, getTenants, getAllPaymentsForReport, findOrCreateHomeownerTenant, addPayment, getLandlords } from '@/lib/data';
 import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -77,7 +77,7 @@ export default function ServiceChargesPage() {
         getProperties(),
         getPropertyOwners(),
         getTenants(),
-        getAllPayments(),
+        getAllPaymentsForReport(),
         getLandlords(),
       ]);
       
@@ -829,3 +829,5 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    

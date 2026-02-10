@@ -74,7 +74,7 @@ const createMockPayment = (tenantId: string, amount: number, type: Payment['type
     rentForMonth,
     paymentMethod: 'M-Pesa',
     transactionId: `TRANS${Math.random()}`,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
 });
 
 

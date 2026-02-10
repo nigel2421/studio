@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -176,7 +177,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
-            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, await getAllWaterReadings(), startDate, endDate);
+            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, await getAllWaterReadings(), startDate, endDate, 'service-charge');
             setIsStatementOptionsOpen(false);
             toast({ title: 'Statement Downloaded', description: 'Your PDF statement has been generated.' });
         } catch (error) {
@@ -294,3 +295,5 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         </>
     );
 }
+
+    

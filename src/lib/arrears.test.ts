@@ -50,7 +50,7 @@ const createMockWaterBill = (tenantId: string, amount: number): WaterMeterReadin
     consumption: 10,
     rate: 150,
     date: '2024-01-15',
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     status: 'Pending'
 });
 

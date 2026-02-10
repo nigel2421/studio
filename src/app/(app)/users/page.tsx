@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -24,7 +25,8 @@ const editableRoles: UserRole[] = ['admin', 'agent', 'viewer', 'water-meter-read
 const allFilterableRoles: UserRole[] = [...editableRoles, 'tenant', 'landlord', 'homeowner'];
 
 export default function UsersPage() {
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   
   const { user, userProfile, isLoading: isAuthLoading } = useAuth();
@@ -33,13 +35,11 @@ export default function UsersPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  // Read filters from URL
-  const roleFilters = useMemo(() => searchParams.getAll('role') as UserRole[], [searchParams]);
-  const searchQuery = useMemo(() => searchParams.get('search') || '', [searchParams]);
-  const currentPage = useMemo(() => Number(searchParams.get('page')) || 1, [searchParams]);
-
-  // State for controlled inputs
+  const roleFilters = useMemo(() => (searchParams?.getAll('role') as UserRole[]) ?? [], [searchParams]);
+  const searchQuery = useMemo(() => searchParams?.get('search') || '', [searchParams]);
+  const currentPage = useMemo(() => Number(searchParams?.get('page')) || 1, [searchParams]);
   const [pageSize, setPageSize] = useState(10);
+  
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
@@ -50,36 +50,42 @@ export default function UsersPage() {
     }
   }, [user, userProfile, isAuthLoading, router, isAdmin]);
   
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(() => {
     if (isAdmin) {
       setIsLoadingUsers(true);
-      try {
-        const userData = await getUsers();
-        setAllUsers(userData);
-      } catch (error) {
+      getUsers({
+        searchQuery,
+        roleFilters,
+        page: currentPage,
+        pageSize,
+      }).then(({ users: userData, totalCount: newTotalCount }) => {
+        setUsers(userData);
+        setTotalCount(newTotalCount);
+      }).catch(error => {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load users.'});
-      } finally {
+      }).finally(() => {
         setIsLoadingUsers(false);
-      }
+      });
     }
-  }, [isAdmin, toast]);
+  }, [isAdmin, searchQuery, roleFilters, currentPage, pageSize, toast]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Debounce search input
   useEffect(() => {
       const handler = setTimeout(() => {
           if (localSearch !== searchQuery) {
-              const params = new URLSearchParams(searchParams.toString());
+              const params = new URLSearchParams(searchParams?.toString() ?? '');
               if (localSearch) {
                   params.set('search', localSearch);
               } else {
                   params.delete('search');
               }
               params.set('page', '1');
-              router.replace(`${pathname}?${params.toString()}`);
+              if (pathname) {
+                router.replace(`${pathname}?${params.toString()}`);
+              }
           }
       }, 300);
 
@@ -89,7 +95,7 @@ export default function UsersPage() {
   }, [localSearch, searchQuery, pathname, router, searchParams]);
 
   const handleRoleToggle = useCallback((role: UserRole) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
     const existingRoles = params.getAll('role');
     if (existingRoles.includes(role)) {
         const newRoles = existingRoles.filter(r => r !== role);
@@ -99,11 +105,15 @@ export default function UsersPage() {
         params.append('role', role);
     }
     params.set('page', '1');
-    router.replace(`${pathname}?${params.toString()}`);
+    if (pathname) {
+        router.replace(`${pathname}?${params.toString()}`);
+    }
   }, [pathname, router, searchParams]);
   
   const clearFilters = () => {
-      router.replace(pathname);
+      if (pathname) {
+        router.replace(pathname);
+      }
       setLocalSearch('');
   };
 
@@ -121,18 +131,10 @@ export default function UsersPage() {
     }
   };
   
-  const filteredUsers = useMemo(() => {
-    return allUsers.filter(user => {
-      const roleMatch = roleFilters.length === 0 || roleFilters.includes(user.role);
-      const searchMatch = !searchQuery ||
-        (user.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
-      return roleMatch && searchMatch;
-    });
-  }, [allUsers, roleFilters, searchQuery]);
-  
-  const handleDownloadCSV = () => {
-    const dataToExport = filteredUsers.map(user => ({
+  const handleDownloadCSV = async () => {
+    // Fetch all users for export, ignoring pagination
+    const { users: allFilteredUsers } = await getUsers({ searchQuery, roleFilters });
+    const dataToExport = allFilteredUsers.map((user: UserProfile) => ({
       Name: user.name || 'N/A',
       Email: user.email,
       Role: user.role,
@@ -140,9 +142,7 @@ export default function UsersPage() {
     downloadCSV(dataToExport, 'users_list.csv');
   };
 
-  const totalPages = Math.ceil(filteredUsers.length / pageSize);
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
+  const totalPages = Math.ceil(totalCount / pageSize);
   const isFiltered = roleFilters.length > 0 || searchQuery;
 
   if (isAuthLoading || !isAdmin) {
@@ -226,7 +226,7 @@ export default function UsersPage() {
                         </Button>
                     )}
                 </div>
-                <Button variant="outline" size="sm" onClick={handleDownloadCSV} disabled={filteredUsers.length === 0}>
+                <Button variant="outline" size="sm" onClick={handleDownloadCSV}>
                   <Download className="mr-2 h-4 w-4" />
                   Export CSV
                 </Button>
@@ -241,7 +241,7 @@ export default function UsersPage() {
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-4 p-4">
-                {paginatedUsers.map((user) => (
+                {users.map((user) => (
                   <Card key={user.id}>
                     <CardHeader>
                       <CardTitle className="text-base">{user.name || <span className="italic text-muted-foreground">Not set</span>}</CardTitle>
@@ -265,7 +265,7 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedUsers.map((user) => (
+                  {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.name || <span className="text-muted-foreground italic">Not set</span>}</TableCell>
                       <TableCell>{user.email}</TableCell>
@@ -284,8 +284,8 @@ export default function UsersPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={filteredUsers.length}
-            onPageChange={(p) => router.replace(`${pathname}?${new URLSearchParams({...Object.fromEntries(searchParams.entries()), page: String(p)})}`)}
+            totalItems={totalCount}
+            onPageChange={(p) => router.replace(`${pathname}?${new URLSearchParams({...Object.fromEntries(searchParams ? searchParams.entries() : []), page: String(p)})}`)}
             onPageSizeChange={setPageSize}
           />
         </div>
