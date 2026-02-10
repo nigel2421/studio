@@ -1,3 +1,4 @@
+
 import { Suspense } from 'react';
 import { DashboardStats } from "@/components/dashboard-stats";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -19,7 +20,9 @@ import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Loader2 } from 'lucide-react';
 
-async function DashboardPageContent({ propertyId }: { propertyId: string | null }) {
+async function DashboardPageContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
+    const propertyId = searchParams?.propertyId;
+    
     // If no propertyId is in the URL, default to the first property in the list for a better initial experience.
     const allProperties = await getProperties();
     const selectedPropertyId = propertyId || allProperties[0]?.id || null;
@@ -168,10 +171,9 @@ async function DashboardPageContent({ propertyId }: { propertyId: string | null 
 }
 
 export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
-
     return (
         <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8" /></div>}>
-            <DashboardPageContent propertyId={searchParams?.propertyId || null} />
+            <DashboardPageContent searchParams={searchParams} />
         </Suspense>
     )
 }
