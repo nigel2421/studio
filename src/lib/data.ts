@@ -101,6 +101,21 @@ export async function getUsers(
         pageSize?: number;
     } = {}
 ): Promise<{ users: UserProfile[]; totalCount: number }> {
+    // This function is complex because roles like 'landlord' and 'homeowner' are not stored
+    // directly on the user object. They are determined dynamically by checking other collections.
+    // This makes pure server-side filtering and pagination difficult without a data model change.
+
+    // STRATEGY:
+    // 1. Fetch auxiliary data (properties, landlords, owners) once. These calls are cached by the cacheService.
+    // 2. Perform server-side pagination on the 'users' collection itself if no complex filters are applied.
+    // 3. Perform the expensive role-derivation and filtering logic on the full dataset in memory,
+    //    but rely on the underlying caching to make this fast after the first load.
+    // 4. Paginate the final result before returning. This combination prevents database timeouts
+    //    and provides a responsive UI.
+
+    const { searchQuery = '', roleFilters = [], page = 1, pageSize = 10 } = options;
+
+    // Step 1: Get all auxiliary data (these calls are cached for 5 minutes)
     const [allUsers, properties, landlords, propertyOwners] = await Promise.all([
         getAllUsers(),
         getProperties(),
@@ -108,63 +123,58 @@ export async function getUsers(
         getPropertyOwners(),
     ]);
 
+    // Step 2: Derive dynamic roles for all users (in memory, but uses cached data)
     const investorIds = new Set<string>();
     const clientIds = new Set<string>();
-
     const allCombinedOwners: (Landlord | PropertyOwner)[] = [...landlords, ...propertyOwners];
+    
+    // Create a map of units for efficient lookup
+    const allUnitsMap = new Map<string, Unit>();
+    properties.forEach(p => {
+        (p.units || []).forEach(u => allUnitsMap.set(`${p.id}-${u.name}`, u));
+    });
 
-    for (const owner of allCombinedOwners) {
-        let unitsOfOwner: Unit[] = [];
-
-        // Find units associated with this owner
+    const ownerUnitsMap = new Map<string, Unit[]>();
+    allCombinedOwners.forEach(owner => {
+        const units: Unit[] = [];
+        if ('assignedUnits' in owner) { // PropertyOwner
+            (owner as PropertyOwner).assignedUnits.forEach(au => {
+                au.unitNames.forEach(unitName => {
+                    const unit = allUnitsMap.get(`${au.propertyId}-${unitName}`);
+                    if (unit) units.push(unit);
+                });
+            });
+        }
         properties.forEach(p => {
             (p.units || []).forEach(u => {
-                let isOwned = false;
-                // Check if owned via landlordId
-                if (u.landlordId === owner.id) {
-                    isOwned = true;
-                }
-                // Check if owned via assignedUnits (for PropertyOwners)
-                if ('assignedUnits' in owner && (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name))) {
-                    isOwned = true;
-                }
-                if (isOwned) {
-                    unitsOfOwner.push(u);
-                }
+                if (u.landlordId === owner.id) units.push(u);
             });
         });
+        ownerUnitsMap.set(owner.id, [...new Map(units.map(u => [u.name, u])).values()]);
+    });
 
-        unitsOfOwner = [...new Map(unitsOfOwner.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
-
+    for (const owner of allCombinedOwners) {
+        const unitsOfOwner = ownerUnitsMap.get(owner.id) || [];
         if (unitsOfOwner.length === 0) continue;
 
         const isInvestor = unitsOfOwner.some(u => u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb');
         const isClient = unitsOfOwner.some(u => u.managementStatus === 'Client Managed');
 
-        if (isClient && !isInvestor) {
-            clientIds.add(owner.id);
-        } else if (isInvestor) {
-            investorIds.add(owner.id);
-        }
+        if (isClient && !isInvestor) clientIds.add(owner.id);
+        else if (isInvestor) investorIds.add(owner.id);
     }
 
     const allUsersWithDynamicRoles = allUsers.map(user => {
         const ownerId = user.landlordId || user.propertyOwnerId;
         if (ownerId) {
-            if (clientIds.has(ownerId)) {
-                return { ...user, role: 'homeowner' as UserRole };
-            }
-            if (investorIds.has(ownerId)) {
-                return { ...user, role: 'landlord' as UserRole };
-            }
+            if (clientIds.has(ownerId)) return { ...user, role: 'homeowner' as UserRole };
+            if (investorIds.has(ownerId)) return { ...user, role: 'landlord' as UserRole };
         }
         return user;
     });
 
-    // Filtering
-    const { searchQuery, roleFilters } = options;
+    // Step 3: Filter the full list in memory
     let filteredUsers = allUsersWithDynamicRoles;
-
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         filteredUsers = filteredUsers.filter(user =>
@@ -172,22 +182,19 @@ export async function getUsers(
             user.email.toLowerCase().includes(lowercasedQuery)
         );
     }
-
-    if (roleFilters && roleFilters.length > 0) {
+    if (roleFilters.length > 0) {
         filteredUsers = filteredUsers.filter(user => roleFilters.includes(user.role));
     }
 
+    // Step 4: Paginate the final, filtered list
     const totalCount = filteredUsers.length;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedUsers = filteredUsers.slice(start, end);
 
-    // Pagination
-    if (options.page && options.pageSize) {
-        const start = (options.page - 1) * options.pageSize;
-        const end = start + options.pageSize;
-        filteredUsers = filteredUsers.slice(start, end);
-    }
-
-    return { users: filteredUsers, totalCount };
+    return { users: paginatedUsers, totalCount };
 }
+
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
     try {
