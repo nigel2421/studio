@@ -209,9 +209,12 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 }
 
 export async function getLogs(): Promise<Log[]> {
-    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(1000));
-    return getCollection<Log>(q);
+    return cacheService.getOrFetch('logs', 'all', () => {
+        const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(1000));
+        return getCollection<Log>(q);
+    }, 120000);
 }
+
 
 async function getCollection<T>(collectionOrQuery: string | Query, queryConstraints: any[] = []): Promise<T[]> {
     let q: Query;
@@ -346,22 +349,28 @@ export async function getMaintenanceRequests(options: { propertyId?: string } = 
 }
 
 export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
-    const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
-    return getCollection<MaintenanceRequest>(q);
+    return cacheService.getOrFetch('maintenanceRequests', 'all-report', () => {
+        const q = query(collection(db, 'maintenanceRequests'), orderBy('createdAt', 'desc'));
+        return getCollection<MaintenanceRequest>(q);
+    }, 300000);
 }
 
+
 export async function getProperty(id: string): Promise<Property | null> {
-    return getDocument<Property>('properties', id);
+    return cacheService.getOrFetch('properties', id, () => getDocument<Property>('properties', id), 60000);
 }
+
 
 export async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
     if (!tenantId) return [];
-    const readingsQuery = query(
-        collection(db, 'waterReadings'),
-        where('tenantId', '==', tenantId),
-        orderBy('createdAt', 'desc')
-    );
-    return getCollection<WaterMeterReading>(readingsQuery);
+    return cacheService.getOrFetch('waterReadings', `tenant-${tenantId}`, () => {
+        const readingsQuery = query(
+            collection(db, 'waterReadings'),
+            where('tenantId', '==', tenantId),
+            orderBy('createdAt', 'desc')
+        );
+        return getCollection<WaterMeterReading>(readingsQuery);
+    }, 120000);
 }
 
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
@@ -387,11 +396,11 @@ export async function getLatestWaterReading(propertyId: string, unitName: string
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
-    return getDocument<Tenant>('tenants', id);
+    return cacheService.getOrFetch('tenants', id, () => getDocument<Tenant>('tenants', id), 60000);
 }
 
 export async function getPayment(id: string): Promise<Payment | null> {
-    return getDocument<Payment>('payments', id);
+    return cacheService.getOrFetch('payments', id, () => getDocument<Payment>('payments', id), 60000);
 }
 
 export async function addTenant(data: {
@@ -620,19 +629,22 @@ export async function createUserProfile(userId: string, email: string, role: Use
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-    const userProfileRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(userProfileRef);
-    if (docSnap.exists()) {
-        const userProfile = postToJSON<UserProfile>(docSnap);
+    return cacheService.getOrFetch('userProfiles', userId, async () => {
+        const userProfileRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userProfileRef);
+        if (docSnap.exists()) {
+            const userProfile = postToJSON<UserProfile>(docSnap);
 
-        if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
-            const tenantDetails = await getTenant(userProfile.tenantId);
-            userProfile.tenantDetails = tenantDetails ?? undefined;
+            if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
+                const tenantDetails = await getTenant(userProfile.tenantId);
+                userProfile.tenantDetails = tenantDetails ?? undefined;
+            }
+            return userProfile;
         }
-        return userProfile;
-    }
-    return null;
+        return null;
+    }, 60000);
 }
+
 
 export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'id' | 'date' | 'status' | 'createdAt'>) {
     try {
@@ -666,13 +678,16 @@ export async function updateMaintenanceRequestStatus(requestId: string, status: 
 }
 
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
-    const q = query(
-        collection(db, "maintenanceRequests"),
-        where("tenantId", "==", tenantId),
-        orderBy('createdAt', 'desc')
-    );
-    return getCollection<MaintenanceRequest>(q);
+    return cacheService.getOrFetch('maintenanceRequests', `tenant-${tenantId}`, () => {
+        const q = query(
+            collection(db, "maintenanceRequests"),
+            where("tenantId", "==", tenantId),
+            orderBy('createdAt', 'desc')
+        );
+        return getCollection<MaintenanceRequest>(q);
+    }, 120000);
 }
+
 
 export async function addWaterMeterReading(data: {
     propertyId: string;
@@ -763,20 +778,23 @@ export async function addWaterMeterReading(data: {
 }
 
 export async function getPaymentHistory(tenantId: string, options?: { startDate?: string, endDate?: string }): Promise<Payment[]> {
-    const constraints = [where("tenantId", "==", tenantId)];
-    if (options?.startDate) {
-        constraints.push(where("date", ">=", options.startDate));
-    }
-    if (options?.endDate) {
-        constraints.push(where("date", "<=", options.endDate));
-    }
+    const cacheKey = `paymentHistory-${tenantId}-${options?.startDate || 'none'}-${options?.endDate || 'none'}`;
+    return cacheService.getOrFetch('payments', cacheKey, () => {
+        const constraints = [where("tenantId", "==", tenantId)];
+        if (options?.startDate) {
+            constraints.push(where("date", ">=", options.startDate));
+        }
+        if (options?.endDate) {
+            constraints.push(where("date", "<=", options.endDate));
+        }
 
-    const q = query(
-        collection(db, "payments"),
-        ...constraints,
-        orderBy('date', 'desc')
-    );
-    return getCollection<Payment>(q);
+        const q = query(
+            collection(db, "payments"),
+            ...constraints,
+            orderBy('date', 'desc')
+        );
+        return getCollection<Payment>(q);
+    }, 120000);
 }
 
 export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
@@ -803,32 +821,31 @@ export async function getPaymentsForTenants(tenantIds: string[]): Promise<Paymen
 }
 
 export async function getPropertyWaterReadings(propertyId: string): Promise<WaterMeterReading[]> {
-    const property = await getProperty(propertyId);
-    if (!property) return [];
-    const unitNames = (property.units || []).map(u => u.name);
+    return cacheService.getOrFetch('waterReadings', `property-${propertyId}`, async () => {
+        const property = await getProperty(propertyId);
+        if (!property) return [];
+        const unitNames = (property.units || []).map(u => u.name);
 
-    // chunk into groups of 30 for the 'in' query
-    const chunks = [];
-    for (let i = 0; i < unitNames.length; i += 30) {
-        chunks.push(unitNames.slice(i, i + 30));
-    }
+        const chunks = [];
+        for (let i = 0; i < unitNames.length; i += 30) {
+            chunks.push(unitNames.slice(i, i + 30));
+        }
 
-    const fetchPromises = chunks.map(chunk => {
-        const q = query(
-            collection(db, 'waterReadings'),
-            where('propertyId', '==', propertyId),
-            where('unitName', 'in', chunk),
-            orderBy('date', 'desc')
+        const fetchPromises = chunks.map(chunk => {
+            const q = query(
+                collection(db, 'waterReadings'),
+                where('propertyId', '==', propertyId),
+                where('unitName', 'in', chunk),
+                orderBy('date', 'desc')
+            );
+            return getDocs(q);
+        });
+
+        const snapshots = await Promise.all(fetchPromises);
+        return snapshots.flatMap(snapshot =>
+            snapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc))
         );
-        return getDocs(q);
-    });
-
-    const snapshots = await Promise.all(fetchPromises);
-    const readings: WaterMeterReading[] = snapshots.flatMap(snapshot =>
-        snapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc))
-    );
-
-    return readings;
+    }, 120000);
 }
 
 export async function getPropertyMaintenanceRequests(propertyId: string): Promise<MaintenanceRequest[]> {
@@ -1195,7 +1212,7 @@ export async function bulkUpdateUnitsFromCSV(
 // Landlord Functions
 
 export async function getCommunications(): Promise<Communication[]> {
-    return getCollection<Communication>('communications');
+    return cacheService.getOrFetch('communications', 'all', () => getCollection<Communication>('communications'), 120000);
 }
 
 export async function getLandlords(): Promise<Landlord[]> {
@@ -1203,7 +1220,7 @@ export async function getLandlords(): Promise<Landlord[]> {
 }
 
 export async function getLandlord(landlordId: string): Promise<Landlord | null> {
-    return getDocument<Landlord>('landlords', landlordId);
+    return cacheService.getOrFetch('landlords', landlordId, () => getDocument<Landlord>('landlords', landlordId), 60000);
 }
 
 export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
@@ -1403,7 +1420,7 @@ export async function getPropertyOwners(): Promise<PropertyOwner[]> {
 }
 
 export async function getPropertyOwner(ownerId: string): Promise<PropertyOwner | null> {
-    return getDocument<PropertyOwner>('propertyOwners', ownerId);
+    return cacheService.getOrFetch('propertyOwners', ownerId, () => getDocument<PropertyOwner>('propertyOwners', ownerId), 60000);
 }
 
 export async function deletePropertyOwner(ownerId: string): Promise<void> {
@@ -1551,7 +1568,7 @@ export async function getLandlordPropertiesAndUnits(landlordId: string): Promise
 }
 
 export async function getAllPaymentsForReport(): Promise<Payment[]> {
-    return getCollection<Payment>('payments');
+    return cacheService.getOrFetch('payments', 'all-report', () => getCollection<Payment>('payments'), 300000);
 }
 
 export async function getAllPayments(limitCount: number = 50): Promise<Payment[]> {
@@ -1586,7 +1603,9 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<voi
 }
 
 export async function getTasks(): Promise<Task[]> {
-    return getCollection<Task>('tasks', [orderBy('createdAt', 'asc')]);
+    return cacheService.getOrFetch('tasks', 'all', () => {
+        return getCollection<Task>('tasks', [orderBy('createdAt', 'asc')]);
+    }, 60000);
 }
 
 // Real-time listener functions
