@@ -1,5 +1,4 @@
 
-
 import { Suspense } from 'react';
 import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -74,12 +73,7 @@ function DashboardSkeleton() {
     );
 }
 
-async function DashboardContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
-    const propertyId = searchParams?.propertyId;
-    
-    const allProperties = await getProperties();
-    const selectedPropertyId = propertyId || allProperties[0]?.id || null;
-
+async function DashboardContent({ allProperties, selectedPropertyId }: { allProperties: Property[], selectedPropertyId: string | null }) {
     const data = selectedPropertyId ? await getDashboardData(selectedPropertyId) : null;
     const isInvestmentConsultant = false; 
 
@@ -195,12 +189,15 @@ async function DashboardContent({ searchParams }: { searchParams?: { propertyId?
     );
 }
 
+export default async function DashboardPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+    const propertyId = searchParams?.propertyId as string | undefined;
 
-export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
+    const allProperties = await getProperties();
+    const selectedPropertyId = propertyId || allProperties[0]?.id || null;
+    
     return (
         <Suspense fallback={<DashboardSkeleton />}>
-            <DashboardContent searchParams={searchParams} />
+            <DashboardContent allProperties={allProperties} selectedPropertyId={selectedPropertyId} />
         </Suspense>
     );
 }
-
