@@ -189,15 +189,21 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
     );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
-    const propertyId = searchParams?.propertyId as string | undefined;
+export default async function DashboardPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const searchParams = await props.searchParams;
+  const propertyId = searchParams?.propertyId as string | undefined;
 
-    const allProperties = await getProperties();
-    const selectedPropertyId = propertyId || allProperties[0]?.id || null;
-    
-    return (
-        <Suspense fallback={<DashboardSkeleton />}>
-            <DashboardContent allProperties={allProperties} selectedPropertyId={selectedPropertyId} />
-        </Suspense>
-    );
+  const allProperties = await getProperties();
+  const selectedPropertyId = propertyId || allProperties[0]?.id || null;
+
+  return (
+    <Suspense key={selectedPropertyId} fallback={<DashboardSkeleton />}>
+      <DashboardContent
+        allProperties={allProperties}
+        selectedPropertyId={selectedPropertyId}
+      />
+    </Suspense>
+  );
 }
