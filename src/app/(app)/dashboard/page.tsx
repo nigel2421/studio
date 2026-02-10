@@ -20,14 +20,14 @@ import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Loader2 } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
     const propertyId = searchParams?.propertyId;
     
-    // If no propertyId is in the URL, default to the first property in the list for a better initial experience.
     const allProperties = await getProperties();
     const selectedPropertyId = propertyId || allProperties[0]?.id || null;
 
-    // Helper function to fetch all data for a specific property in parallel.
     const getDashboardData = async (propId: string) => {
         try {
             const [selectedProperty, tenants, maintenanceRequests] = await Promise.all([
@@ -56,7 +56,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
     };
 
     const data = selectedPropertyId ? await getDashboardData(selectedPropertyId) : null;
-    const isInvestmentConsultant = false; // This needs to be passed down or checked differently. For now, assume not.
+    const isInvestmentConsultant = false; 
 
     return (
         <div className="flex flex-col gap-8">
