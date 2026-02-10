@@ -20,9 +20,7 @@ import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Loader2 } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
+async function DashboardContent({ searchParams }: { searchParams?: { propertyId?: string } }) {
     const propertyId = searchParams?.propertyId;
     
     const allProperties = await getProperties();
@@ -167,5 +165,40 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
                 </div>
             )}
         </div>
+    );
+}
+
+// A simple skeleton loader
+function DashboardSkeleton() {
+    return (
+        <div className="flex flex-col gap-8">
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="h-8 w-64 bg-muted rounded-md animate-pulse" />
+                    <div className="h-4 w-80 bg-muted rounded-md animate-pulse" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="h-10 w-72 bg-muted rounded-md animate-pulse" />
+                    <div className="h-9 w-36 bg-muted rounded-md animate-pulse" />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
+                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
+                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
+                <div className="h-28 bg-card rounded-lg border p-4 animate-pulse" />
+            </div>
+             <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        </div>
+    );
+}
+
+export default function DashboardPage({ searchParams }: { searchParams?: { propertyId?: string } }) {
+    return (
+        <Suspense fallback={<DashboardSkeleton />}>
+            <DashboardContent searchParams={searchParams} />
+        </Suspense>
     );
 }
