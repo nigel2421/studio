@@ -11,9 +11,6 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   moduleDirectories: ['node_modules', '<rootDir>/'],
   moduleNameMapper: {
-    '^yaml$': '<rootDir>/node_modules/yaml/dist/index.js',
-    '^jsonpath-plus$': '<rootDir>/node_modules/jsonpath-plus/dist/index-node-cjs.cjs',
-    '^jspdf$': '<rootDir>/node_modules/jspdf/dist/jspdf.node.min.js',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [

@@ -41,6 +41,7 @@
     "dotenv": "^16.4.5",
     "embla-carousel-react": "^8.1.7",
     "firebase": "^12.8.0",
+    "firebase-functions": "^7.0.5",
     "genkit": "^1.28.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",

@@ -1,5 +1,11 @@
 {
   "projects": {
     "default": "studio-3511865139-8f049"
+  },
+  "targets": {},
+  "etags": {
+    "studio-3511865139-8f049": {
+      "extensionInstances": {}
+    }
   }
 }
