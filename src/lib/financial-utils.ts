@@ -153,7 +153,7 @@ export function generateLandlordDisplayTransactions(
 
     sortedPayments.forEach(payment => {
         const tenant = tenants.find(t => t.id === payment.tenantId);
-        if (!tenant || payment.type === 'Deposit') {
+        if (!tenant || payment.type === 'Deposit' || payment.type === 'Water') {
             return;
         }
 
