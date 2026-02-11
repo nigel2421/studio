@@ -7,10 +7,6 @@ This README will guide you through the process of using the generated JavaScript
 
 # Table of Contents
 - [**Overview**](#generated-javascript-readme)
-- [**Architecture Diagram**](#architecture-diagram)
-- [**Business Logic**](#business-logic)
-- [**Security & RBAC**](#security--rbac)
-- [**Common Patterns & Best Practices**](#common-patterns--best-practices)
 - [**Accessing the connector**](#accessing-the-connector)
   - [*Connecting to the local Emulator*](#connecting-to-the-local-emulator)
 - [**Queries**](#queries)
@@ -19,76 +15,6 @@ This README will guide you through the process of using the generated JavaScript
 - [**Mutations**](#mutations)
   - [*AddNewMaintenanceRequest*](#addnewmaintenancerequest)
   - [*UpdateLeaseTerms*](#updateleaseterms)
-
-# Architecture Diagram
-This SDK interacts with the backend through a clear, secure, and modern architecture. To ensure that browser extensions (like ad-blockers) do not interfere with critical database operations, mutations are executed within Next.js Server Actions.
-
-**Frontend (React/Next.js) -> Next.js Server Action -> Data Connect SDK -> PostgreSQL**
-
-1.  **Frontend**: The user interacts with the React application.
-2.  **Server Action**: An event (e.g., button click) triggers a Server Action.
-3.  **Data Connect SDK**: The Server Action calls the appropriate function from this SDK.
-4.  **PostgreSQL**: The SDK communicates with the underlying PostgreSQL database via Data Connect.
-
-# Business Logic
-
-### Deduction Hierarchy & Payouts
-The core financial logic revolves around calculating the net payout for landlords. The system uses the `GetTenantPayments` query to fetch payment data and calculates the final amount based on the following hierarchy:
-
-`Net Payout = Total Rent - Management Fee - Service Charge`
-
-Landlords receive their funds only after the payment status in the data returned by `GetTenantPayments` is marked as **completed**.
-
-### Service Charge Distinction
-The system handles service charges differently based on the unit's management type:
--   **Landlord-Managed Units**: For units managed by Eracov on behalf of a landlord, the service charge is automatically deducted from the gross rent collected before the net payout is calculated.
--   **Homeowner (Self-Managed) Units**: For units managed by the owner themselves, the service charge is not tied to rent. It is billed and tracked separately through the utility billing module, and mutations related to it should be triggered from there.
-
-# Security & RBAC
-Access to Data Connect operations is restricted based on user roles. This ensures data integrity and privacy.
-
-| Operation                | Allowed Roles                  | Reason                                |
-| ------------------------ | ------------------------------ | ------------------------------------- |
-| `UpdateLeaseTerms`       | Admin, Accounts                | Financial and legally binding action. |
-| `GetTenantPayments`      | Admin, Landlord, Tenant        | Privacy of financial data.            |
-| `AddNewMaintenanceRequest` | Tenant, Agent, Homeowner       | Operational reporting.                |
-
-# Common Patterns & Best Practices
-
-### 1. Handling Asynchronous Props (Next.js 15+)
-Server Components in Next.js 15 receive `searchParams` as a Promise. You must `await` it before using its values to fetch data.
-
-```typescript
-// Correct pattern for Server Components
-export default async function Page({ searchParams: searchParamsProp }) {
-  const searchParams = await searchParamsProp;
-  const propertyId = searchParams.propertyId || 'default-id';
-
-  // Now, use the resolved ID to fetch data
-  const propertiesRef = listPropertiesRef({ id: propertyId });
-  const { data } = await executeQuery(propertiesRef);
-
-  return <Display data={data} />;
-}
-```
-
-### 2. Server-Side Execution for Mutations
-To prevent browser extensions (like ad-blockers) from blocking critical operations, always execute mutations within Next.js Server Actions. This moves the logic from the client to the server, making it more reliable and secure.
-
-```typescript
-// In your app/actions.ts file
-'use server';
-import { addNewMaintenanceRequest } from '@dataconnect/generated';
-
-export async function submitMaintenanceRequest(vars) {
-  try {
-    const { data } = await addNewMaintenanceRequest(vars);
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: 'Failed to submit request.' };
-  }
-}
-```
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `example`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -598,5 +524,3 @@ executeMutation(ref).then((response) => {
 });
 ```
 
-> [!NOTE]
-> **Developer Note:** When updating lease terms for a Landlord-managed unit, ensure the `serviceCharge` field is reconciled within the total rent amount. For Homeowner units, the service charge mutation should be triggered separately via the utility billing module.
