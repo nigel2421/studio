@@ -92,11 +92,11 @@ export function AppSidebar() {
   
   const visibleNavItems = navItems.filter(item => {
     if (isAgent) {
-        const agentHidden = ['/documents', '/accounts', '/accounts/arrears', '/accounts/service-charges'];
+        const agentHidden = ['/accounts', '/accounts/arrears', '/accounts/service-charges'];
         if (agentHidden.includes(item.href)) return false;
     }
     if (isInvestmentConsultant) {
-        const allowedRoutes = ['/dashboard', '/properties', '/tenants', '/documents'];
+        const allowedRoutes = ['/dashboard', '/properties', '/tenants'];
         if (!allowedRoutes.includes(item.href)) return false;
     }
     return true;
