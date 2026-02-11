@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance, getLandlords, getPropertyOwners, addPayment } from '@/lib/data';
+import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance, getLandlords, getPropertyOwners, addPayment, getWaterReadingsAndTenants } from '@/lib/data';
 import type { Property, WaterMeterReading, Tenant, Payment, Landlord, PropertyOwner, Unit } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, PlusCircle, Edit2, User, ChevronDown } from 'lucide-react';
+import { Loader2, Search, PlusCircle, Edit2, User, ChevronDown, Mail } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
@@ -31,6 +31,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { performSendWaterBills } from '@/app/actions';
 
 
 interface WaterReadingRecord extends WaterMeterReading {
@@ -98,6 +110,10 @@ export default function MegarackPage() {
   // State for Consolidated Payment
   const [isConsolidatedPaymentOpen, setIsConsolidatedPaymentOpen] = useState(false);
   const [selectedOwnerBill, setSelectedOwnerBill] = useState<OwnerBill | null>(null);
+  
+  // State for Bulk Actions
+  const [selectedReadings, setSelectedReadings] = useState<string[]>([]);
+  const [isConfirmSendOpen, setIsConfirmSendOpen] = useState(false);
 
 
   // Combined data fetching
@@ -391,6 +407,33 @@ export default function MegarackPage() {
         stopLoading();
     }
   };
+  
+  const handleSendBills = async () => {
+    if (!userProfile?.id) return;
+    setIsConfirmSendOpen(false);
+    startLoading(`Sending ${selectedReadings.length} bill(s)...`);
+    try {
+        const result = await performSendWaterBills(selectedReadings, userProfile.id);
+        if (result.success) {
+            toast({ title: 'Bills Sent', description: `${result.sentCount} water bill(s) have been successfully emailed.` });
+            setSelectedReadings([]);
+        } else {
+            toast({ variant: 'destructive', title: 'Sending Failed', description: result.error });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        stopLoading();
+    }
+  }
+  
+  const toggleSelectAll = () => {
+    if (selectedReadings.length === paginatedReadings.length) {
+        setSelectedReadings([]);
+    } else {
+        setSelectedReadings(paginatedReadings.map(r => r.id));
+    }
+  };
 
   const filteredReadings = useMemo(() => {
     return allReadings.filter(r => {
@@ -497,15 +540,23 @@ export default function MegarackPage() {
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="relative w-full sm:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by unit or tenant..."
-                                className="pl-10"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                       <div className="flex-1 flex flex-wrap items-center gap-2">
+                           {selectedReadings.length > 0 && (
+                                <Button size="sm" onClick={() => setIsConfirmSendOpen(true)}>
+                                    <Mail className="mr-2 h-4 w-4" />
+                                    Send {selectedReadings.length} Bill(s)
+                                </Button>
+                           )}
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by unit or tenant..."
+                                    className="pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                       </div>
                         <div className="flex items-center gap-4 w-full sm:w-auto">
                             <Select value={recordsSelectedProperty} onValueChange={setRecordsSelectedProperty}>
                                 <SelectTrigger className="w-full sm:w-[200px]">
@@ -533,17 +584,28 @@ export default function MegarackPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12 text-center">
+                                    <Checkbox
+                                        checked={selectedReadings.length === paginatedReadings.length && paginatedReadings.length > 0}
+                                        onCheckedChange={toggleSelectAll}
+                                    />
+                                </TableHead>
+                                <TableHead>Date</TableHead>
                                 <TableHead>Unit</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Payable Amount</TableHead>
-                                <TableHead>Payment Status</TableHead>
+                                <TableHead>Tenant</TableHead>
+                                <TableHead className="text-right">Prior Rd.</TableHead>
+                                <TableHead className="text-right">Current Rd.</TableHead>
+                                <TableHead className="text-right">Consump.</TableHead>
+                                <TableHead className="text-right">Rate</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loadingRecords ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-24 text-center">
+                                    <TableCell colSpan={11} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
@@ -551,13 +613,25 @@ export default function MegarackPage() {
                                 paginatedReadings.map(reading => {
                                     const isPaid = (reading.status || 'Pending') === 'Paid';
                                     return (
-                                    <TableRow key={reading.id}>
-                                        <TableCell className="font-medium">
-                                            <div>{reading.unitName}</div>
-                                            <div className="text-xs text-muted-foreground">{reading.propertyName}</div>
+                                    <TableRow key={reading.id} data-state={selectedReadings.includes(reading.id) ? 'selected' : ''}>
+                                         <TableCell className="text-center">
+                                            <Checkbox
+                                                checked={selectedReadings.includes(reading.id)}
+                                                onCheckedChange={(checked) => {
+                                                    setSelectedReadings(prev => 
+                                                        checked ? [...prev, reading.id] : prev.filter(id => id !== reading.id)
+                                                    );
+                                                }}
+                                            />
                                         </TableCell>
+                                        <TableCell>{format(new Date(reading.date), 'dd/MM/yy')}</TableCell>
+                                        <TableCell className="font-medium">{reading.unitName}</TableCell>
                                         <TableCell>{reading.tenantName}</TableCell>
-                                        <TableCell>Ksh {reading.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">{reading.priorReading}</TableCell>
+                                        <TableCell className="text-right">{reading.currentReading}</TableCell>
+                                        <TableCell className="text-right font-medium">{reading.consumption} units</TableCell>
+                                        <TableCell className="text-right">@{reading.rate}</TableCell>
+                                        <TableCell className="text-right font-bold">Ksh {reading.amount.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <Badge variant={isPaid ? 'default' : 'destructive'}>
                                                 {reading.status || 'Pending'}
@@ -567,12 +641,12 @@ export default function MegarackPage() {
                                             {isPaid ? (
                                                 <Button size="sm" variant="outline" onClick={() => handleEditClick(reading)}>
                                                     <Edit2 className="mr-2 h-4 w-4" />
-                                                    Edit Payment
+                                                    Edit
                                                 </Button>
                                             ) : (
                                                 <Button size="sm" variant="default" onClick={() => handleRecordPaymentClick(reading)}>
                                                     <PlusCircle className="mr-2 h-4 w-4" />
-                                                    Record Payment
+                                                    Pay
                                                 </Button>
                                             )}
                                         </TableCell>
@@ -581,7 +655,7 @@ export default function MegarackPage() {
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-24 text-center">
+                                    <TableCell colSpan={11} className="h-24 text-center">
                                         No records found for the selected filters.
                                     </TableCell>
                                 </TableRow>
@@ -735,6 +809,25 @@ export default function MegarackPage() {
             isSaving={isActionLoading}
         />
     )}
+    
+    <AlertDialog open={isConfirmSendOpen} onOpenChange={setIsConfirmSendOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Sending Bills</AlertDialogTitle>
+                <AlertDialogDescription>
+                    You are about to email water bills to {selectedReadings.length} resident(s). Are you sure you want to proceed?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSendBills} disabled={isActionLoading}>
+                    {isActionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm & Send
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
+

@@ -14,7 +14,7 @@ import {
     Lease
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths, parseISO } from "date-fns";
@@ -378,6 +378,29 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
         );
         return getCollection<WaterMeterReading>(readingsQuery);
     }, 120000);
+}
+
+export async function getWaterReadingsAndTenants(readingIds: string[]): Promise<{reading: WaterMeterReading, tenant: Tenant | null}[]> {
+    if (readingIds.length === 0) return [];
+    
+    const readingsQuery = query(collection(db, 'waterReadings'), where(documentId(), 'in', readingIds));
+    const readingsSnap = await getDocs(readingsQuery);
+    const readings = readingsSnap.docs.map(doc => postToJSON<WaterMeterReading>(doc));
+
+    const tenantIds = [...new Set(readings.map(r => r.tenantId))];
+    
+    if (tenantIds.length === 0) {
+        return readings.map(reading => ({ reading, tenant: null }));
+    }
+
+    const tenantsQuery = query(collection(db, 'tenants'), where(documentId(), 'in', tenantIds));
+    const tenantsSnap = await getDocs(tenantsQuery);
+    const tenantsMap = new Map(tenantsSnap.docs.map(doc => [doc.id, postToJSON<Tenant>(doc)]));
+
+    return readings.map(reading => ({
+        reading,
+        tenant: tenantsMap.get(reading.tenantId) || null,
+    }));
 }
 
 export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {

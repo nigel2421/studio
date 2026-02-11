@@ -1,8 +1,9 @@
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
-import { logCommunication, getTenant } from '@/lib/data';
-import { Communication, Landlord, PropertyOwner } from '@/lib/types';
+import { logCommunication, getTenant, getWaterReadingsAndTenants } from '@/lib/data';
+import { Communication, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
+import { format } from 'date-fns';
 
 
 export async function performSendCustomEmail(
@@ -133,7 +134,7 @@ export async function performSendServiceChargeInvoice(
 
     const subject = `Service Charge Invoice: ${invoiceDetails.month}`;
     const body = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+        <div style="font-family: sans-serif; max-w: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
             <p>Dear ${ownerName},</p>
             <p>Please find your service charge invoice for your outstanding balance attached to this email.</p>
             <p>A summary of the invoice is below:</p>
@@ -161,5 +162,59 @@ export async function performSendServiceChargeInvoice(
   } catch (error: any) {
     console.error("Error sending service charge invoice:", error);
     return { success: false, error: error.message || 'Failed to send invoice.' };
+  }
+}
+
+export async function performSendWaterBills(readingIds: string[], senderId: string) {
+  try {
+    if (readingIds.length === 0) {
+      return { success: false, error: 'No bills selected.' };
+    }
+    
+    const billsToSend = await getWaterReadingsAndTenants(readingIds);
+    let sentCount = 0;
+
+    for (const { reading, tenant } of billsToSend) {
+      if (!tenant?.email) {
+        console.warn(`Skipping bill for unit ${reading.unitName} as tenant email is missing.`);
+        continue;
+      }
+      
+      const subject = `Your Water Bill for ${format(new Date(reading.date), 'MMMM yyyy')}`;
+      const body = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+              <h2 style="color: #333; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Water Bill</h2>
+              <p>Dear ${tenant.name},</p>
+              <p>Please find your water bill for unit <strong>${reading.unitName}</strong> for the period ending ${format(new Date(reading.date), 'PPP')}.</p>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                  <tr style="background-color: #f9f9f9;"><td style="padding: 10px; border: 1px solid #ddd;">Prior Reading:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.priorReading} units</td></tr>
+                  <tr><td style="padding: 10px; border: 1px solid #ddd;">Current Reading:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.currentReading} units</td></tr>
+                  <tr style="background-color: #f9f9f9;"><td style="padding: 10px; border: 1px solid #ddd;">Consumption:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.consumption} units</td></tr>
+                  <tr><td style="padding: 10px; border: 1px solid #ddd;">Rate:</td><td style="padding: 10px; border: 1px solid #ddd;">Ksh ${reading.rate.toLocaleString()}/unit</td></tr>
+                  <tr style="background-color: #f0f0f0; font-weight: bold;"><td style="padding: 12px; border: 1px solid #ddd;">Total Amount Due:</td><td style="padding: 12px; border: 1px solid #ddd;">Ksh ${reading.amount.toLocaleString()}</td></tr>
+              </table>
+              <p style="margin-top: 25px; font-size: 0.9em; color: #555;">Please make your payment via M-Pesa or Bank Transfer. If you have any questions, please contact us.</p>
+              <p style="margin-top: 20px; text-align: center; color: #888; font-size: 0.8em;">Sincerely,<br>The Eracov Properties Team</p>
+          </div>
+      `;
+      
+      await performSendCustomEmail(
+          [tenant.email],
+          subject,
+          body,
+          senderId,
+          {
+              relatedTenantId: tenant.id,
+              type: 'automation',
+              subType: 'Water Bill',
+          }
+      );
+      sentCount++;
+    }
+
+    return { success: true, sentCount };
+  } catch (error: any) {
+    console.error("Error sending water bills:", error);
+    return { success: false, error: error.message || 'An unexpected error occurred while sending bills.' };
   }
 }
