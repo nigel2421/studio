@@ -11,7 +11,8 @@ import {
     OwnershipType,
     ManagementStatus,
     HandoverStatus,
-    Lease
+    Lease,
+    MaintenanceStatus
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
@@ -332,14 +333,13 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
 
 export async function getMaintenanceRequests(options: { propertyId?: string } = {}): Promise<MaintenanceRequest[]> {
     const { propertyId } = options;
-    const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'last90days';
+    const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'all';
     
     return cacheService.getOrFetch('maintenanceRequests', cacheKey, async () => {
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
         const constraints: any[] = [
-            where('createdAt', '>=', ninetyDaysAgo.toISOString()),
             orderBy('createdAt', 'desc')
         ];
 
@@ -676,26 +676,36 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 
-export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'id' | 'date' | 'status' | 'createdAt'>) {
+export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'id' | 'date' | 'createdAt' | 'updatedAt' | 'status'>) {
     try {
+        const now = new Date().toISOString();
         await addDoc(collection(db, 'maintenanceRequests'), {
             ...request,
-            date: new Date().toISOString().split('T')[0],
-            createdAt: serverTimestamp(),
+            date: now,
+            createdAt: now,
+            updatedAt: now,
             status: 'New',
         });
         cacheService.clear('maintenanceRequests');
-        await logActivity(`Submitted maintenance request`);
+        await logActivity(`Submitted maintenance request: "${request.title}"`);
     } catch (error: any) {
         console.error("Error adding maintenance request:", error);
         throw new Error("Failed to submit maintenance request. Please try again later.");
     }
 }
 
-export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceRequest['status']) {
+export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceStatus) {
     try {
         const requestRef = doc(db, 'maintenanceRequests', requestId);
-        await updateDoc(requestRef, { status });
+        const updateData: { status: MaintenanceStatus, updatedAt: string, completedAt?: string } = {
+            status,
+            updatedAt: new Date().toISOString()
+        };
+        if (status === 'Completed' || status === 'Cancelled') {
+            updateData.completedAt = new Date().toISOString();
+        }
+        await updateDoc(requestRef, updateData);
+
         cacheService.clear('maintenanceRequests');
         await logActivity(`Updated maintenance request ${requestId} to ${status}`);
     } catch (error: any) {

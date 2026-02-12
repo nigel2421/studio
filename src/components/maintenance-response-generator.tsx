@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -32,8 +33,10 @@ export function MaintenanceResponseGenerator({ request, tenant, property }: Prop
     const input = {
       tenantName: tenant.name,
       propertyAddress: property.address,
-      requestDetails: request.details,
-      urgency: request.urgency,
+      title: request.title,
+      description: request.description,
+      category: request.category,
+      priority: request.priority,
     };
 
     try {
@@ -67,8 +70,10 @@ export function MaintenanceResponseGenerator({ request, tenant, property }: Prop
         <CardContent className="text-sm space-y-2">
           <p><strong>Tenant:</strong> {tenant.name}</p>
           <p><strong>Property:</strong> {property.name} ({property.address})</p>
-          <p><strong>Urgency:</strong> <span className="capitalize">{request.urgency}</span></p>
-          <p><strong>Request:</strong> {request.details}</p>
+          <p><strong>Title:</strong> {request.title}</p>
+          <p><strong>Category:</strong> {request.category}</p>
+          <p><strong>Priority:</strong> <span className="capitalize">{request.priority}</span></p>
+          <p><strong>Request:</strong> {request.description}</p>
         </CardContent>
       </Card>
 

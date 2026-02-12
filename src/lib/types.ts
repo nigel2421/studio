@@ -279,13 +279,26 @@ export type Log = {
   timestamp: string;
 };
 
+export const maintenanceCategories = ['Plumbing', 'Electrical', 'HVAC', 'General', 'Appliance', 'Other'] as const;
+export type MaintenanceCategory = (typeof maintenanceCategories)[number];
+
+export const maintenancePriorities = ['Low', 'Medium', 'High', 'Urgent'] as const;
+export type MaintenancePriority = (typeof maintenancePriorities)[number];
+
+export const maintenanceStatuses = ['New', 'In Progress', 'Completed', 'Cancelled'] as const;
+export type MaintenanceStatus = (typeof maintenanceStatuses)[number];
+
 export type MaintenanceRequest = {
   id: string;
   tenantId: string;
   propertyId: string;
-  details: string;
-  date: string;
-  status: 'New' | 'In Progress' | 'Completed';
-  urgency: 'low' | 'medium' | 'high';
+  title: string;
+  description: string;
+  category: MaintenanceCategory;
+  priority: MaintenancePriority;
+  status: MaintenanceStatus;
+  date: string; // Submission date, matches createdAt
   createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
 };

@@ -1,5 +1,71 @@
-
 {
-  "maintenanceRequests": [],
-  "properties": []
+  "entities": {
+    "maintenanceRequest": {
+      "title": "Maintenance Request",
+      "description": "A request for maintenance submitted by a tenant.",
+      "type": "object",
+      "properties": {
+        "propertyId": {
+          "type": "string",
+          "description": "The ID of the property."
+        },
+        "tenantId": {
+          "type": "string",
+          "description": "The ID of the tenant who submitted the request."
+        },
+        "title": {
+          "type": "string",
+          "description": "A brief title for the maintenance issue."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the maintenance issue."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the maintenance request.",
+          "enum": ["Plumbing", "Electrical", "HVAC", "General", "Appliance", "Other"]
+        },
+        "priority": {
+          "type": "string",
+          "description": "The priority level of the request.",
+          "enum": ["Low", "Medium", "High", "Urgent"]
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the request.",
+          "enum": ["New", "In Progress", "Completed", "Cancelled"]
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the request was submitted."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "completedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+      },
+      "required": ["propertyId", "tenantId", "title", "description", "category", "priority", "status", "date", "createdAt", "updatedAt"]
+    }
+  },
+  "auth": {
+    "providers": []
+  },
+  "firestore": {
+    "/maintenanceRequests/{maintenanceRequestId}": {
+      "schema": {
+        "$ref": "#/entities/maintenanceRequest"
+      },
+      "description": "Stores all maintenance requests from tenants."
+    }
+  }
 }

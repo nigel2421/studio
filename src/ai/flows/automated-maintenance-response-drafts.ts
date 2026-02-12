@@ -10,12 +10,15 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { vertexAI } from '@genkit-ai/google-genai';
+import { maintenanceCategories, maintenancePriorities } from '@/lib/types';
 
 const MaintenanceRequestInputSchema = z.object({
   tenantName: z.string().describe('The name of the tenant making the request.'),
   propertyAddress: z.string().describe('The address of the property.'),
-  requestDetails: z.string().describe('Detailed description of the maintenance request.'),
-  urgency: z.enum(['high', 'medium', 'low']).describe('The urgency of the request.'),
+  title: z.string().describe('The title of the maintenance request.'),
+  description: z.string().describe('Detailed description of the maintenance request.'),
+  category: z.enum(maintenanceCategories).describe('The category of the request.'),
+  priority: z.enum(maintenancePriorities).describe('The priority of the request.'),
 });
 export type MaintenanceRequestInput = z.infer<typeof MaintenanceRequestInputSchema>;
 
@@ -42,8 +45,10 @@ const maintenanceResponseDraftFlow = ai.defineFlow(
 
 Tenant Name: ${input.tenantName}
 Property Address: ${input.propertyAddress}
-Request Details: ${input.requestDetails}
-Urgency: ${input.urgency}
+Request Title: ${input.title}
+Request Category: ${input.category}
+Request Details: ${input.description}
+Priority: ${input.priority}
 
 Draft a response to the tenant acknowledging their request, providing an estimated timeline for resolution, and any relevant instructions.
 Also, suggest any additional actions that might be needed, such as contacting a plumber, electrician, or other outside resource.`,

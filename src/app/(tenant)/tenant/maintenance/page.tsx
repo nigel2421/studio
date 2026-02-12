@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,13 +16,16 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { addMaintenanceRequest, getTenantMaintenanceRequests } from '@/lib/data';
-import type { MaintenanceRequest } from '@/lib/types';
+import type { MaintenanceRequest, MaintenanceCategory, MaintenancePriority, MaintenanceStatus } from '@/lib/types';
+import { maintenanceCategories, maintenancePriorities } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  details: z.string().min(10, 'Please provide more details about the issue.'),
-  urgency: z.enum(['low', 'medium', 'high'], {
-    required_error: 'You need to select an urgency level.',
+  title: z.string().min(5, 'Please provide a short, descriptive title.').max(100, 'Title is too long.'),
+  description: z.string().min(10, 'Please provide more details about the issue.'),
+  category: z.enum(maintenanceCategories, { required_error: 'Please select a category.' }),
+  priority: z.enum(maintenancePriorities, {
+    required_error: 'You need to select a priority level.',
   }),
 });
 
@@ -36,8 +40,10 @@ export default function MaintenancePage() {
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-        details: '',
-        urgency: 'medium',
+            title: '',
+            description: '',
+            category: 'General',
+            priority: 'Medium',
         },
     });
 
@@ -86,7 +92,7 @@ export default function MaintenancePage() {
         }
     };
 
-    const getStatusVariant = (status: MaintenanceRequest['status']) => {
+    const getStatusVariant = (status: MaintenanceStatus) => {
         switch (status) {
         case 'New': return 'destructive';
         case 'In Progress': return 'secondary';
@@ -106,40 +112,73 @@ export default function MaintenancePage() {
                 <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <FormField
-                    control={form.control}
-                    name="details"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Issue Details</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Describe the issue in detail..." {...field} rows={5} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Issue Title</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g., Leaking Kitchen Sink" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
                     <FormField
-                    control={form.control}
-                    name="urgency"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Urgency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select urgency level" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Issue Description</FormLabel>
+                                <FormControl>
+                                    <Textarea placeholder="Describe the issue in detail..." {...field} rows={5} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="category"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Category</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a category" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {maintenanceCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="priority"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Priority</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select priority level" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {maintenancePriorities.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                     <Button type="submit" disabled={form.formState.isSubmitting}>
                     {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Submit Request
@@ -164,6 +203,7 @@ export default function MaintenancePage() {
                     <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Issue</TableHead>
+                        <TableHead>Priority</TableHead>
                         <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -171,7 +211,12 @@ export default function MaintenancePage() {
                     {requests.map(req => (
                         <TableRow key={req.id}>
                         <TableCell>{new Date(req.date).toLocaleDateString()}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{req.details}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{req.title}</TableCell>
+                        <TableCell>
+                            <Badge variant={req.priority === 'High' || req.priority === 'Urgent' ? 'destructive' : 'outline'}>
+                                {req.priority}
+                            </Badge>
+                        </TableCell>
                         <TableCell className="text-right">
                             <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
                         </TableCell>
