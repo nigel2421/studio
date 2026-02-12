@@ -25,21 +25,23 @@ const editableRoles: UserRole[] = ['admin', 'agent', 'viewer', 'water-meter-read
 const allFilterableRoles: UserRole[] = [...editableRoles, 'tenant', 'landlord', 'homeowner'];
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  
   const { user, userProfile, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const roleFilters = useMemo(() => (searchParams?.getAll('role') as UserRole[]) ?? [], [searchParams]);
-  const searchQuery = useMemo(() => searchParams?.get('search') || '', [searchParams]);
-  const currentPage = useMemo(() => Number(searchParams?.get('page')) || 1, [searchParams]);
+  // Directly get values from searchParams. No need for useMemo here.
+  const roleFilters = searchParams?.getAll('role') as UserRole[] ?? [];
+  const searchQuery = searchParams?.get('search') || '';
+  const currentPage = Number(searchParams?.get('page')) || 1;
+
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [pageSize, setPageSize] = useState(10);
   
+  // Local state for the input field
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
@@ -72,7 +74,15 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+  
+  // Sync URL search query to local input state
+  useEffect(() => {
+    if (searchQuery !== localSearch) {
+      setLocalSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
+  // Debounced effect to update URL from local search input
   useEffect(() => {
       const handler = setTimeout(() => {
           if (localSearch !== searchQuery) {
@@ -83,9 +93,7 @@ export default function UsersPage() {
                   params.delete('search');
               }
               params.set('page', '1');
-              if (pathname) {
-                router.replace(`${pathname}?${params.toString()}`);
-              }
+              router.replace(`${pathname}?${params.toString()}`);
           }
       }, 300);
 
@@ -105,15 +113,11 @@ export default function UsersPage() {
         params.append('role', role);
     }
     params.set('page', '1');
-    if (pathname) {
-        router.replace(`${pathname}?${params.toString()}`);
-    }
+    router.replace(`${pathname}?${params.toString()}`);
   }, [pathname, router, searchParams]);
   
   const clearFilters = () => {
-      if (pathname) {
-        router.replace(pathname);
-      }
+      router.replace(pathname);
       setLocalSearch('');
   };
 

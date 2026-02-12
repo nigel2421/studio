@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -26,6 +27,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 const navItems = [
   { href: '/tenant/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -39,6 +41,12 @@ export function TenantSidebar() {
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, isMobile, setOpenMobile]);
+
   const isActive = (href: string) => pathname === href;
 
   const handleSignOut = async () => {
@@ -47,9 +55,7 @@ export function TenantSidebar() {
   };
 
   const handleLinkClick = () => {
-    if (isMobile) {
-      setOpenMobile(false);
-    }
+    // Auto-collapse is now handled by the useEffect watching pathname
   }
 
   return (

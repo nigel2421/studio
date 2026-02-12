@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -72,6 +73,12 @@ export function AppSidebar() {
   const { user, userProfile } = useAuth();
   const { startLoading } = useLoading();
 
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, isMobile, setOpenMobile]);
+
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'nigel2421@gmail.com';
   const isAgent = userProfile?.role === 'agent';
   const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
@@ -85,9 +92,7 @@ export function AppSidebar() {
 
   const handleLinkClick = (label: string) => {
     startLoading(`Loading ${label}...`);
-    if (isMobile) {
-      setOpenMobile(false);
-    }
+    // Auto-collapse on mobile is now handled by the useEffect watching pathname
   }
   
   const visibleNavItems = navItems.filter(item => {
