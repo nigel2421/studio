@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -240,7 +241,7 @@ export default function ClientsPage() {
             throw new Error("Owner not found");
         }
         
-        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, allWaterReadings, startDate, endDate);
+        generateOwnerServiceChargeStatementPDF(owner, allProperties, allTenants, allPayments, allWaterReadings, startDate, endDate, 'service-charge');
         
         setIsStatementDialogOpen(false);
     } catch (error: any) {
