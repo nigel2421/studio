@@ -182,7 +182,7 @@ export async function performSendWaterBills(readingIds: string[], senderId: stri
       
       const subject = `Your Water Bill for ${format(new Date(reading.date), 'MMMM yyyy')}`;
       const body = `
-          <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+          <div style="font-family: sans-serif; max-w: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
               <h2 style="color: #333; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Water Bill</h2>
               <p>Dear ${tenant.name},</p>
               <p>Please find your water bill for unit <strong>${reading.unitName}</strong> for the period ending ${format(new Date(reading.date), 'PPP')}.</p>
