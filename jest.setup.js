@@ -1,10 +1,25 @@
-// Optional: configure or set up a testing framework before each test
-// if you delete this file, remove `setupFilesAfterEnv` from `jest.config.js`
+'use strict';
 
-// Used for __tests__/testing-library.js
-// Learn more: https://github.com/testing-library/jest-dom
-import '@testing-library/jest-dom'
+console.log('jest.setup.js loaded');
 
-import { TextEncoder, TextDecoder } from 'util';
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder;
+jest.mock('jspdf', () => ({
+  __esModule: true,
+  jsPDF: jest.fn().mockImplementation(() => {
+    console.log('jsPDF mock constructor called');
+    return {
+      text: jest.fn(),
+      setFontSize: jest.fn(),
+      setFont: jest.fn(),
+      setDrawColor: jest.fn(),
+      line: jest.fn(),
+      save: jest.fn(),
+      setTextColor: jest.fn(),
+      lastAutoTable: { finalY: 0 },
+    };
+  }),
+}));
+
+jest.mock('jspdf-autotable', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
