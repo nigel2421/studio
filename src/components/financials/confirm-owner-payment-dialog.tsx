@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -110,7 +109,7 @@ export function ConfirmOwnerPaymentDialog({
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="payment-date">Payment Date</Label>
-                             <DatePicker value={date} onChange={(d) => {if(d) setDate(d)}} />
+                             <DatePicker id="payment-date" value={date} onChange={(d) => {if(d) setDate(d)}} />
                         </div>
                     </div>
                     <div className="space-y-2">

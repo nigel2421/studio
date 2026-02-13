@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -425,7 +424,7 @@ export function AddPaymentDialog({
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
-                          <DatePicker value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
+                          <DatePicker id={`date-${entry.id}`} value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
                         </div>
                      </div>
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

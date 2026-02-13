@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/popover';
 
 interface DatePickerProps {
+  id?: string;
   value: Date | undefined;
   onChange: (date: Date | undefined) => void;
   className?: string;
@@ -24,6 +25,7 @@ interface DatePickerProps {
 const DATE_FORMAT = "d MMMM yyyy";
 
 export function DatePicker({
+  id,
   value,
   onChange,
   className,
@@ -69,6 +71,7 @@ export function DatePicker({
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen} modal={true}>
       <div className={cn('relative w-full', className)}>
         <Input
+          id={id}
           type="text"
           placeholder={DATE_FORMAT.toLowerCase()}
           value={inputValue}

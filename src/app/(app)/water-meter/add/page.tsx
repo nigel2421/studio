@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -730,7 +729,7 @@ export default function MegarackPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="reading-date">Reading Date</Label>
-                        <DatePicker value={readingDate} onChange={setReadingDate} />
+                        <DatePicker id="reading-date" value={readingDate} onChange={setReadingDate} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -830,4 +829,3 @@ export default function MegarackPage() {
     </>
   );
 }
-

@@ -175,7 +175,7 @@ export default function AddTenantPage() {
             <div>
               <Label htmlFor="property">Property</Label>
               <Select onValueChange={setSelectedProperty} value={selectedProperty}>
-                <SelectTrigger>
+                <SelectTrigger id="property">
                   <SelectValue placeholder="Select a property" />
                 </SelectTrigger>
                 <SelectContent>
@@ -188,7 +188,7 @@ export default function AddTenantPage() {
             <div>
               <Label htmlFor="unit">Unit</Label>
               <Select onValueChange={setUnitName} value={unitName} disabled={!selectedProperty}>
-                <SelectTrigger>
+                <SelectTrigger id="unit">
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
                 <SelectContent>
@@ -203,7 +203,7 @@ export default function AddTenantPage() {
             <div>
               <Label htmlFor="agent">Agent/Point of Contact</Label>
               <Select onValueChange={(value) => setAgent(value as Agent)} value={agent}>
-                <SelectTrigger>
+                <SelectTrigger id="agent">
                   <SelectValue placeholder="Select a contact" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,7 +225,7 @@ export default function AddTenantPage() {
                 </div>
                 <div>
                     <Label htmlFor="leaseStartDate">Lease Start Date</Label>
-                    <DatePicker value={leaseStartDate} onChange={setLeaseStartDate} />
+                    <DatePicker id="leaseStartDate" value={leaseStartDate} onChange={setLeaseStartDate} />
                 </div>
             </div>
 

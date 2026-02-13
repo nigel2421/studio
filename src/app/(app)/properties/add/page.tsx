@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -83,7 +82,7 @@ export default function AddPropertyPage() {
                  <div className="md:col-span-1">
                     <Label htmlFor={`unit-type-${index}`}>Unit Type</Label>
                     <Select value={unit.unitType} onValueChange={(value) => handleUnitChange(index, 'unitType', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger id={`unit-type-${index}`}>
                             <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -96,7 +95,7 @@ export default function AddPropertyPage() {
                  <div className="md:col-span-1">
                     <Label htmlFor={`ownership-${index}`}>Ownership</Label>
                      <Select value={unit.ownership} onValueChange={(value) => handleUnitChange(index, 'ownership', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger id={`ownership-${index}`}>
                             <SelectValue placeholder="Select ownership" />
                         </SelectTrigger>
                         <SelectContent>
@@ -109,7 +108,7 @@ export default function AddPropertyPage() {
                  <div className="md:col-span-1">
                     <Label htmlFor={`unit-orientation-${index}`}>Orientation</Label>
                     <Select onValueChange={(value) => handleUnitChange(index, 'unitOrientation', value as UnitOrientation)}>
-                        <SelectTrigger>
+                        <SelectTrigger id={`unit-orientation-${index}`}>
                             <SelectValue placeholder="Select orientation" />
                         </SelectTrigger>
                         <SelectContent>
@@ -122,7 +121,7 @@ export default function AddPropertyPage() {
                  <div className="md:col-span-1">
                     <Label htmlFor={`management-status-${index}`}>Management Status</Label>
                      <Select value={unit.managementStatus} onValueChange={(value) => handleUnitChange(index, 'managementStatus', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger id={`management-status-${index}`}>
                             <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
