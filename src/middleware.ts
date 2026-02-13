@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// The matcher is empty, so this middleware will not run on any requests.
+// The matcher is set to all paths to ensure the middleware manifest is always generated.
 export const config = {
-  matcher: [],
+  matcher: ['/:path*'],
 }
