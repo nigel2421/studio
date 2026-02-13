@@ -3,17 +3,18 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { MaintenanceRequest } from '@/lib/types';
+import type { MaintenanceRequest, MaintenanceStatus } from '@/lib/types';
 import { useMemo } from 'react';
 
 interface MaintenanceOverviewChartProps {
   maintenanceRequests: MaintenanceRequest[];
 }
 
-const COLORS: Record<MaintenanceRequest['status'], string> = {
+const COLORS: Record<MaintenanceStatus, string> = {
     'New': 'hsl(var(--destructive))',
     'In Progress': 'hsl(var(--accent))',
     'Completed': 'hsl(var(--primary))',
+    'Cancelled': 'hsl(var(--muted))',
 };
 
 export function MaintenanceOverviewChart({ maintenanceRequests }: MaintenanceOverviewChartProps) {
@@ -27,6 +28,7 @@ export function MaintenanceOverviewChart({ maintenanceRequests }: MaintenanceOve
       { status: 'New', count: statusCounts['New'] || 0 },
       { status: 'In Progress', count: statusCounts['In Progress'] || 0 },
       { status: 'Completed', count: statusCounts['Completed'] || 0 },
+      { status: 'Cancelled', count: statusCounts['Cancelled'] || 0 },
     ];
   }, [maintenanceRequests]);
 
