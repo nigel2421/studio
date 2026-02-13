@@ -179,7 +179,7 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
                                         <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-muted/30 rounded-lg transition-colors">
                                             <div className="flex flex-col min-w-0 flex-1 mr-4">
                                                 <span className="font-medium truncate">{data.tenants.find(t => t.id === req.tenantId)?.name || 'Unknown'} - <span className="text-muted-foreground">{data.selectedProperty?.name}</span></span>
-                                                <span className="text-sm text-muted-foreground truncate">{req.details}</span>
+                                                <span className="text-sm text-muted-foreground truncate">{req.description}</span>
                                             </div>
                                             <span className="text-xs sm:text-sm font-medium whitespace-nowrap bg-muted px-2 py-1 rounded-full">{new Date(req.date).toLocaleDateString()}</span>
                                         </li>
