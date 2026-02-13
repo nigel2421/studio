@@ -93,7 +93,9 @@ export default function UsersPage() {
                   params.delete('search');
               }
               params.set('page', '1');
-              router.replace(`${pathname}?${params.toString()}`);
+              if (pathname) {
+                router.replace(`${pathname}?${params.toString()}`);
+              }
           }
       }, 300);
 
@@ -113,11 +115,15 @@ export default function UsersPage() {
         params.append('role', role);
     }
     params.set('page', '1');
-    router.replace(`${pathname}?${params.toString()}`);
+    if (pathname) {
+        router.replace(`${pathname}?${params.toString()}`);
+    }
   }, [pathname, router, searchParams]);
   
   const clearFilters = () => {
-      router.replace(pathname);
+      if (pathname) {
+        router.replace(pathname);
+      }
       setLocalSearch('');
   };
 
@@ -289,7 +295,13 @@ export default function UsersPage() {
             totalPages={totalPages}
             pageSize={pageSize}
             totalItems={totalCount}
-            onPageChange={(p) => router.replace(`${pathname}?${new URLSearchParams({...Object.fromEntries(searchParams ? searchParams.entries() : []), page: String(p)})}`)}
+            onPageChange={(p) => {
+                const params = new URLSearchParams(searchParams?.toString() ?? '');
+                params.set('page', String(p));
+                if (pathname) {
+                    router.replace(`${pathname}?${params.toString()}`);
+                }
+            }}
             onPageSizeChange={setPageSize}
           />
         </div>
