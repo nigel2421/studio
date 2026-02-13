@@ -169,12 +169,12 @@ export default function ArrearsPage() {
   }) => (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <CardTitle>{title} ({totalItems})</CardTitle>
                 <CardDescription>{description}</CardDescription>
             </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <div className="relative w-full sm:w-[300px]">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -186,13 +186,48 @@ export default function ArrearsPage() {
                 </div>
                   <Button variant="outline" size="sm" onClick={() => downloadCSV(data.map(d => ({ Name: d.tenant.name, Email: d.tenant.email, Property: getPropertyName(d.tenant.propertyId), Unit: d.tenant.unitName, Arrears: d.arrears })), csvFileName)}>
                     <FileDown className="mr-2 h-4 w-4" />
-                    Export CSV
+                    Export
                 </Button>
             </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
+        {/* Mobile View */}
+        <div className="md:hidden">
+            {paginatedData.map(({ tenant, arrears }) => {
+                const status = notificationStatus[tenant.id] || 'idle';
+                const buttonState = getButtonState(status);
+                return (
+                    <div key={tenant.id} className="border-b p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <div className="font-medium">{tenant.name}</div>
+                                <div className="text-sm text-muted-foreground">{tenant.email}</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="font-bold text-red-600">Ksh {arrears.toLocaleString()}</div>
+                                <div className="text-xs text-muted-foreground">Arrears</div>
+                            </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                            {getPropertyName(tenant.propertyId)} - Unit {tenant.unitName}
+                        </div>
+                        <Button
+                            size="sm"
+                            variant={buttonState.variant}
+                            disabled={buttonState.disabled}
+                            onClick={() => handleSendReminder(tenant)}
+                            className="w-full h-11 text-base"
+                        >
+                            <Bell className="mr-2 h-4 w-4" />
+                            {buttonState.text}
+                        </Button>
+                    </div>
+                );
+            })}
+        </div>
+        {/* Desktop View */}
+        <Table className="hidden md:table">
             <TableHeader>
                 <TableRow>
                     <TableHead>Resident</TableHead>
@@ -269,12 +304,12 @@ export default function ArrearsPage() {
 
   return (
     <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">Rent & Service Charge Arrears</h2>
                 <p className="text-muted-foreground">A list of all residents with outstanding balances.</p>
             </div>
-            <Card className="p-4">
+            <Card className="p-4 w-full md:w-auto">
                 <div className="text-sm font-medium text-muted-foreground">Total Combined Arrears</div>
                 <div className="text-2xl font-bold text-red-600">Ksh {totalArrears.toLocaleString()}</div>
             </Card>

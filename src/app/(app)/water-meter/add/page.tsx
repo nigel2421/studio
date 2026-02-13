@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -456,7 +457,7 @@ export default function MegarackPage() {
   return (
     <>
     <Tabs defaultValue="owner-bills" className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
              <div>
                 <h2 className="text-3xl font-bold tracking-tight">Megarack - Water Management</h2>
                 <p className="text-muted-foreground">Manage water meter readings and billing records.</p>
@@ -480,7 +481,7 @@ export default function MegarackPage() {
                         <div className="space-y-4">
                            {ownerBills.map(bill => (
                                <Collapsible key={bill.owner.id} className="border rounded-lg">
-                                   <div className="flex items-center justify-between p-4">
+                                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4">
                                        <div className="flex items-center gap-4">
                                             <div className="p-2 bg-muted rounded-full">
                                                 <User className="h-5 w-5 text-muted-foreground" />
@@ -490,18 +491,20 @@ export default function MegarackPage() {
                                                <p className="text-sm text-muted-foreground">{bill.readings.length} pending bill(s)</p>
                                             </div>
                                        </div>
-                                       <div className="flex items-center gap-4">
-                                            <div>
-                                               <p className="text-sm text-muted-foreground text-right">Total Due</p>
-                                               <p className="font-bold text-lg text-destructive text-right">Ksh {bill.totalDue.toLocaleString()}</p>
+                                       <div className="flex flex-col md:flex-row items-end md:items-center gap-4 w-full md:w-auto">
+                                            <div className="text-right">
+                                               <p className="text-sm text-muted-foreground">Total Due</p>
+                                               <p className="font-bold text-lg text-destructive">Ksh {bill.totalDue.toLocaleString()}</p>
                                             </div>
-                                            <Button onClick={() => handleOpenConsolidatedPayment(bill)}>Record Payment</Button>
-                                            <CollapsibleTrigger asChild>
-                                               <Button variant="ghost" size="sm">
-                                                   <ChevronDown className="h-4 w-4" />
-                                                   <span className="sr-only">Toggle details</span>
-                                               </Button>
-                                           </CollapsibleTrigger>
+                                            <div className="flex items-center gap-2">
+                                                <Button onClick={() => handleOpenConsolidatedPayment(bill)} className="w-full md:w-auto">Record Payment</Button>
+                                                <CollapsibleTrigger asChild>
+                                                   <Button variant="ghost" size="sm">
+                                                       <ChevronDown className="h-4 w-4" />
+                                                       <span className="sr-only">Toggle details</span>
+                                                   </Button>
+                                               </CollapsibleTrigger>
+                                            </div>
                                        </div>
                                    </div>
                                    <CollapsibleContent className="px-4 pb-4">
@@ -698,7 +701,7 @@ export default function MegarackPage() {
                     </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="floor">Floor</Label>
                         <Select onValueChange={setSelectedFloor} value={selectedFloor} disabled={!formSelectedProperty}>
@@ -732,7 +735,7 @@ export default function MegarackPage() {
                         <DatePicker id="reading-date" value={readingDate} onChange={setReadingDate} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="prior-reading">Prior Reading</Label>
                         <div className="relative">

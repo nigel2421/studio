@@ -97,7 +97,7 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
                         {data?.selectedProperty?.name || 'Portfolio Dashboard'}
@@ -106,7 +106,7 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
                         {data?.selectedProperty ? "Here's a summary of this property today." : "Select a property to view its dashboard."}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                     <PropertySelector properties={allProperties} selectedPropertyId={selectedPropertyId} />
                     <ExportPdfButton propertyId={selectedPropertyId} propertyName={data?.selectedProperty?.name} />
                 </div>

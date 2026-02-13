@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -151,7 +152,7 @@ export default function AddTenantPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -161,7 +162,7 @@ export default function AddTenantPage() {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="phone">Phone Number</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
@@ -171,7 +172,7 @@ export default function AddTenantPage() {
               <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} required />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="property">Property</Label>
               <Select onValueChange={setSelectedProperty} value={selectedProperty}>
@@ -199,7 +200,7 @@ export default function AddTenantPage() {
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="agent">Agent/Point of Contact</Label>
               <Select onValueChange={(value) => setAgent(value as Agent)} value={agent}>
@@ -218,7 +219,7 @@ export default function AddTenantPage() {
               <Input id="rent" type="number" value={rent} onChange={(e) => setRent(Number(e.target.value))} required />
             </div>
           </div>
-           <div className="grid grid-cols-2 gap-4">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="securityDeposit">Security Deposit Amount (Ksh)</Label>
                     <Input id="securityDeposit" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(Number(e.target.value) || 0)} />
