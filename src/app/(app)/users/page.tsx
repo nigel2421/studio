@@ -31,10 +31,11 @@ export default function UsersPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  // Directly get values from searchParams. No need for useMemo here.
-  const roleFilters = searchParams?.getAll('role') as UserRole[] ?? [];
-  const searchQuery = searchParams?.get('search') || '';
-  const currentPage = Number(searchParams?.get('page')) || 1;
+  const { roleFilters, searchQuery, currentPage } = useMemo(() => ({
+    roleFilters: searchParams?.getAll('role') as UserRole[] ?? [],
+    searchQuery: searchParams?.get('search') || '',
+    currentPage: Number(searchParams?.get('page')) || 1,
+  }), [searchParams]);
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [totalCount, setTotalCount] = useState(0);
