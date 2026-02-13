@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: [
+    '@genkit-ai/core',
+    '@genkit-ai/firebase',
+    '@genkit-ai/google-genai',
+    'genkit',
+    'dotprompt',
+    'yaml',
+    'jsonpath-plus',
+  ],
   allowedDevOrigins: ["https://*.cloudworkstations.dev"],
   /* config options here */
   images: {
