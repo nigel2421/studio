@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getTenants, getProperties, getAllPayments } from '@/lib/data';
+import { getTenants, getProperties, getAllPaymentsForReport } from '@/lib/data';
 import type { Tenant, Property, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -45,7 +45,7 @@ export default function AccountsPage() {
       const [tenantsData, propertiesData, paymentsData] = await Promise.all([
         getTenants(), 
         getProperties(),
-        getAllPayments(),
+        getAllPaymentsForReport(),
       ]);
       setResidents(tenantsData);
       setProperties(propertiesData);

@@ -1613,21 +1613,569 @@ export async function getAllPaymentsForReport(): Promise<Payment[]> {
     return cacheService.getOrFetch('payments', 'all-report', () => getCollection<Payment>('payments'), 300000);
 }
 
-export async function getAllPayments(limitCount: number = 50): Promise<Payment[]> {
-    const cacheKey = `last90days-limit${limitCount}`;
-    return cacheService.getOrFetch('payments', cacheKey, async () => {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
+export async function addPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>, taskId?: string): Promise<void> {
+    const { tenantId, amount, date, notes, rentForMonth, type } = paymentData;
+    const entries = [{
+        amount,
+        date,
+        notes,
+        rentForMonth,
+        type,
+        paymentMethod: paymentData.paymentMethod,
+        transactionId: paymentData.transactionId,
+    }];
+    await batchProcessPayments(tenantId, entries, taskId);
+}
 
-        const q = query(
-            collection(db, 'payments'),
-            where('date', '>=', dateStr),
-            orderBy('date', 'desc'),
-            limit(limitCount)
-        );
-        return getCollection<Payment>(q);
-    }, 120000); // 2 minutes cache
+export async function updatePayment(
+    paymentId: string,
+    updates: { amount: number; date: string; notes?: string },
+    reason: string,
+    editorId: string
+) {
+    const paymentRef = doc(db, 'payments', paymentId);
+
+    await runTransaction(db, async (transaction) => {
+        const paymentSnap = await transaction.get(paymentRef);
+        if (!paymentSnap.exists()) {
+            throw new Error("Payment to edit not found.");
+        }
+        const oldPayment = paymentSnap.data() as Payment;
+
+        const historyEntry = {
+            editedAt: new Date().toISOString(),
+            editedBy: editorId,
+            reason: reason,
+            previousValues: {
+                amount: oldPayment.amount,
+                date: oldPayment.date,
+                notes: oldPayment.notes,
+            },
+        };
+
+        const newEditHistory = [...(oldPayment.editHistory || []), historyEntry];
+
+        transaction.update(paymentRef, {
+            ...updates,
+            editHistory: newEditHistory
+        });
+    });
+
+    cacheService.clear('payments');
+    await logActivity(`Edited payment ${paymentId}. Reason: ${reason}`);
+}
+
+export async function forceRecalculateTenantBalance(tenantId: string) {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) {
+        console.error("Tenant not found for recalculation.");
+        return;
+    }
+
+    const allPayments = await getPaymentHistory(tenantId);
+    const allTenantWaterReadings = await getTenantWaterReadings(tenantId);
+    const allProperties = await getProperties();
+
+    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, allPayments, allProperties, allTenantWaterReadings);
+
+    const tenantRef = doc(db, 'tenants', tenantId);
+    await updateDoc(tenantRef, {
+        dueBalance: finalDueBalance,
+        accountBalance: finalAccountBalance,
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
+    });
+    cacheService.clear('tenants');
+}
+
+export async function runMonthlyReconciliation(): Promise<void> {
+    const tenantsRef = collection(db, 'tenants');
+    const tenantsSnap = await getDocs(tenantsRef);
+    const today = new Date();
+
+    const allProperties = await getProperties();
+    const propertiesMap = new Map(allProperties.map(p => [p.id, p]));
+
+    const batch = writeBatch(db);
+
+    for (const tenantDoc of tenantsSnap.docs) {
+        const tenant = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
+        const property = propertiesMap.get(tenant.propertyId);
+        const unit = property?.units.find(u => u.name === tenant.unitName);
+        const updates = reconcileMonthlyBilling(tenant, unit, today);
+
+        if (updates && Object.keys(updates).length > 0) {
+            batch.update(tenantDoc.ref, updates);
+        }
+    }
+
+    await batch.commit();
+    cacheService.clear('tenants');
+    await logActivity(`Monthly reconciliation completed for ${tenantsSnap.size} tenants.`);
+}
+
+export async function bulkUpdateUnitsFromCSV(
+    propertyId: string,
+    data: Record<string, string>[]
+): Promise<{ updatedCount: number; createdCount: number; errors: string[] }> {
+    const errors: string[] = [];
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    const property = await getProperty(propertyId);
+    if (!property) {
+        return { updatedCount: 0, createdCount: 0, errors: [`Property with ID "${propertyId}" not found.`] };
+    }
+
+    const unitsMap = new Map(property.units.map(u => [u.name, u]));
+    const updatedUnits = [...property.units];
+
+    for (const [index, row] of data.entries()) {
+        const { UnitName, Status, Ownership, UnitType, UnitOrientation, ManagementStatus, HandoverStatus, HandoverDate, RentAmount, ServiceCharge, BaselineReading } = row;
+
+        if (!UnitName) {
+            continue;
+        }
+
+        let unitData: Partial<Unit> = {};
+
+        if (Status !== undefined && Status.trim() !== '') {
+            if (!unitStatuses.includes(Status as any)) { errors.push(`Row ${index + 2}: Invalid Status "${Status}".`); continue; }
+            unitData.status = Status as UnitStatus;
+        }
+        if (Ownership !== undefined && Ownership.trim() !== '') {
+            if (!ownershipTypes.includes(Ownership as any)) { errors.push(`Row ${index + 2}: Invalid Ownership "${Ownership}".`); continue; }
+            unitData.ownership = Ownership as OwnershipType;
+        }
+        if (UnitType !== undefined && UnitType.trim() !== '') {
+            if (!unitTypes.includes(UnitType as any)) { errors.push(`Row ${index + 2}: Invalid UnitType "${UnitType}".`); continue; }
+            unitData.unitType = UnitType as UnitType;
+        }
+        if (UnitOrientation !== undefined && UnitOrientation.trim() !== '') {
+            if (!unitOrientations.includes(UnitOrientation as any)) { errors.push(`Row ${index + 2}: Invalid UnitOrientation "${UnitOrientation}".`); continue; }
+            unitData.unitOrientation = UnitOrientation as UnitOrientation;
+        }
+        if (ManagementStatus !== undefined && ManagementStatus.trim() !== '') {
+            if (!managementStatuses.includes(ManagementStatus as any)) { errors.push(`Row ${index + 2}: Invalid ManagementStatus "${ManagementStatus}".`); continue; }
+            unitData.managementStatus = ManagementStatus as ManagementStatus;
+        }
+        if (HandoverStatus !== undefined && HandoverStatus.trim() !== '') {
+            if (!handoverStatuses.includes(HandoverStatus as any)) { errors.push(`Row ${index + 2}: Invalid HandoverStatus "${HandoverStatus}".`); continue; }
+            unitData.handoverStatus = HandoverStatus as HandoverStatus;
+            if (HandoverStatus === 'Handed Over' && !HandoverDate && (!unitsMap.has(UnitName) || !unitsMap.get(UnitName)!.handoverDate)) {
+                unitData.handoverDate = new Date().toISOString().split('T')[0];
+            }
+        }
+        if (HandoverDate !== undefined && HandoverDate.trim() !== '') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(HandoverDate)) { errors.push(`Row ${index + 2}: Invalid HandoverDate format "${HandoverDate}". Use YYYY-MM-DD.`); continue; }
+            unitData.handoverDate = HandoverDate;
+        }
+        if (RentAmount !== undefined && RentAmount.trim() !== '') {
+            const rent = Number(RentAmount);
+            if (isNaN(rent) || rent < 0) { errors.push(`Row ${index + 2}: Invalid RentAmount "${RentAmount}".`); continue; }
+            unitData.rentAmount = rent;
+        }
+        if (ServiceCharge !== undefined && ServiceCharge.trim() !== '') {
+            const charge = Number(ServiceCharge);
+            if (isNaN(charge) || charge < 0) { errors.push(`Row ${index + 2}: Invalid ServiceCharge "${ServiceCharge}".`); continue; }
+            unitData.serviceCharge = charge;
+        }
+        if (BaselineReading !== undefined && BaselineReading.trim() !== '') {
+            const reading = Number(BaselineReading);
+            if (isNaN(reading) || reading < 0) { errors.push(`Row ${index + 2}: Invalid BaselineReading "${BaselineReading}".`); continue; }
+            unitData.baselineReading = reading;
+        }
+
+        const unitIndex = updatedUnits.findIndex(u => u.name === UnitName);
+        if (unitIndex !== -1) {
+            updatedUnits[unitIndex] = { ...updatedUnits[unitIndex], ...unitData };
+            updatedCount++;
+        } else {
+            const newUnit: Unit = {
+                name: UnitName,
+                status: (unitData.status || 'vacant') as UnitStatus,
+                ownership: (unitData.ownership || 'SM') as OwnershipType,
+                unitType: (unitData.unitType || 'Studio') as UnitType,
+                ...unitData,
+            };
+            updatedUnits.push(newUnit);
+            createdCount++;
+        }
+    }
+
+    if (errors.length > 0) {
+        return { updatedCount: 0, createdCount: 0, errors };
+    }
+
+    if (updatedCount > 0 || createdCount > 0) {
+        await updateProperty(propertyId, { units: updatedUnits });
+        await logActivity(`Bulk processed ${updatedCount} updates and ${createdCount} creations for property ${property.name} via CSV.`);
+    }
+
+    return { updatedCount, createdCount, errors: [] };
+}
+
+
+
+// Landlord Functions
+
+export async function getCommunications(): Promise<Communication[]> {
+    return cacheService.getOrFetch('communications', 'all', () => getCollection<Communication>('communications'), 120000);
+}
+
+export async function getLandlords(): Promise<Landlord[]> {
+    return cacheService.getOrFetch('landlords', 'all', () => getCollection<Landlord>('landlords'), 300000);
+}
+
+export async function getLandlord(landlordId: string): Promise<Landlord | null> {
+    return cacheService.getOrFetch('landlords', landlordId, () => getDocument<Landlord>('landlords', landlordId), 60000);
+}
+
+export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
+    const landlordRef = doc(db, 'landlords', landlord.id);
+    const batch = writeBatch(db);
+
+    let finalLandlordData: Partial<Landlord> = { ...landlord };
+
+    // --- Auth User & Profile Linking ---
+    if (landlord.email && landlord.phone && !landlord.userId) {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where("email", "==", landlord.email), limit(1));
+        const userSnap = await getDocs(q);
+
+        if (!userSnap.empty) {
+            // User with this email already exists, link them.
+            const existingUser = userSnap.docs[0];
+            finalLandlordData.userId = existingUser.id;
+            await setDoc(existingUser.ref, { role: 'landlord', landlordId: landlord.id }, { merge: true });
+        } else {
+            // No user exists, create a new one.
+            const appName = 'landlord-creation-app-' + Date.now();
+            let secondaryApp;
+            try {
+                secondaryApp = initializeApp(firebaseConfig, appName);
+                const secondaryAuth = getAuth(secondaryApp);
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, landlord.email, landlord.phone);
+                const userId = userCredential.user.uid;
+                finalLandlordData.userId = userId;
+
+                await createUserProfile(userId, landlord.email, 'landlord', { name: landlord.name, landlordId: landlord.id });
+                await logActivity(`Created landlord user: ${landlord.email}`);
+            } catch (error: any) {
+                if (error.code !== 'auth/email-already-in-use') {
+                    console.error("Error creating landlord auth user:", error);
+                    throw new Error("Failed to create landlord login credentials.");
+                }
+            } finally {
+                if (secondaryApp) await deleteApp(secondaryApp);
+            }
+        }
+    }
+    // --- End Auth Logic ---
+    
+    if (finalLandlordData.userId === undefined) {
+        delete finalLandlordData.userId;
+    }
+
+    // Set/update the landlord document itself
+    batch.set(landlordRef, finalLandlordData, { merge: true });
+
+    const properties = await getProperties();
+    for (const prop of properties) {
+        let needsUpdate = false;
+        const newUnits = prop.units.map(unit => {
+            if (unit.ownership !== 'Landlord') return unit;
+
+            const shouldBeAssigned = assignedUnitNames.includes(unit.name);
+            const isAssigned = unit.landlordId === landlord.id;
+
+            if (shouldBeAssigned && !isAssigned) {
+                needsUpdate = true;
+                return { ...unit, landlordId: landlord.id };
+            }
+            if (!shouldBeAssigned && isAssigned) {
+                needsUpdate = true;
+                const { landlordId: _, ...rest } = unit; // Remove landlordId
+                return rest as Unit;
+            }
+            return unit;
+        });
+
+        if (needsUpdate) {
+            const propRef = doc(db, 'properties', prop.id);
+            batch.update(propRef, { units: newUnits });
+        }
+    }
+
+
+    await batch.commit();
+    cacheService.clear('landlords');
+    cacheService.clear('properties');
+    await logActivity(`Updated landlord and assignments for: ${landlord.name}`);
+}
+
+export async function addLandlordsFromCSV(data: { name: string; email: string; phone: string; bankAccount?: string }[]): Promise<{ added: number; skipped: number }> {
+    const landlordsRef = collection(db, 'landlords');
+    const batch = writeBatch(db);
+    let added = 0;
+    let skipped = 0;
+
+    const existingLandlordsSnap = await getDocs(query(landlordsRef));
+    const existingEmails = new Set(existingLandlordsSnap.docs.map(doc => doc.data().email));
+
+    for (const landlordData of data) {
+        if (!landlordData.email || existingEmails.has(landlordData.email)) {
+            skipped++;
+            continue;
+        }
+
+        const newLandlordRef = doc(landlordsRef);
+        const landlordWithId = {
+            ...landlordData,
+            id: newLandlordRef.id,
+        };
+
+        batch.set(newLandlordRef, landlordWithId);
+        existingEmails.add(landlordData.email);
+        added++;
+    }
+
+    await batch.commit();
+    if (added > 0) {
+        cacheService.clear('landlords');
+        await logActivity(`Bulk added ${added} landlords via CSV.`);
+    }
+    return { added, skipped };
+}
+
+export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Unit, propertyId: string): Promise<Tenant> {
+    const tenantsRef = collection(db, 'tenants');
+    const q = query(
+        tenantsRef,
+        where("propertyId", "==", propertyId),
+        where("unitName", "==", unit.name),
+        where("residentType", "==", "Homeowner"),
+        limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Tenant;
+    }
+
+    const serviceCharge = unit.serviceCharge || 0;
+    const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
+    const handoverDay = handoverDate.getDate();
+
+    let lastBilledPeriod: string;
+    let firstBillableMonth: Date;
+
+    if (handoverDay <= 10) {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+    } else {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+    }
+    lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
+
+
+    const newTenantData = {
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone,
+        idNumber: 'N/A',
+        propertyId: propertyId,
+        unitName: unit.name,
+        agent: 'Susan' as const,
+        status: 'active' as const,
+        residentType: 'Homeowner' as const,
+        lease: {
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
+            rent: 0,
+            serviceCharge: serviceCharge,
+            paymentStatus: 'Paid' as const, // Start as paid, reconciliation will create first charge.
+            lastBilledPeriod: lastBilledPeriod, // Set to month before first charge
+        },
+        securityDeposit: 0,
+        waterDeposit: 0,
+        dueBalance: 0, // Start with zero balance
+        accountBalance: 0,
+        userId: owner.userId,
+    };
+
+    const tenantDocRef = await addDoc(tenantsRef, newTenantData);
+    cacheService.clear('tenants');
+    await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
+
+    // Also update the User profile if it exists and doesn't have a tenantId yet.
+    // We don't want to overwrite a primary tenantId if they are also a tenant elsewhere.
+    if (owner.userId) {
+        const userRef = doc(db, 'users', owner.userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && !userSnap.data().tenantId) {
+            await updateDoc(userRef, { tenantId: tenantDocRef.id });
+            cacheService.clear('users');
+        }
+    }
+
+    return { id: tenantDocRef.id, ...newTenantData } as Tenant;
+}
+
+
+// Property Owner (Client) Functions
+export async function getPropertyOwners(): Promise<PropertyOwner[]> {
+    return cacheService.getOrFetch('propertyOwners', 'all', () => getCollection<PropertyOwner>('propertyOwners'), 300000);
+}
+
+export async function getPropertyOwner(ownerId: string): Promise<PropertyOwner | null> {
+    return cacheService.getOrFetch('propertyOwners', ownerId, () => getDocument<PropertyOwner>('propertyOwners', ownerId), 60000);
+}
+
+export async function deletePropertyOwner(ownerId: string): Promise<void> {
+    const owner = await getPropertyOwner(ownerId);
+    if (!owner) {
+        throw new Error("Property Owner not found.");
+    }
+
+    const batch = writeBatch(db);
+
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    batch.delete(ownerRef);
+
+    if (owner.userId) {
+        const userRef = doc(db, 'users', owner.userId);
+        batch.update(userRef, {
+            propertyOwnerId: deleteField(),
+            role: 'viewer'
+        });
+    }
+
+    await batch.commit();
+    cacheService.clear('propertyOwners');
+    cacheService.clear('users');
+    await logActivity(`Deleted property owner: ${owner.name} (${owner.email})`);
+}
+
+export async function deleteLandlord(landlordId: string): Promise<void> {
+    if (landlordId === 'soil_merchants_internal') {
+        throw new Error("Cannot delete the internal Soil Merchants profile.");
+    }
+
+    const landlord = await getLandlord(landlordId);
+    if (!landlord) {
+        throw new Error("Landlord not found.");
+    }
+
+    const batch = writeBatch(db);
+    const properties = await getProperties();
+
+    for (const prop of properties) {
+        let needsUpdate = false;
+        const newUnits = prop.units.map(unit => {
+            if (unit.landlordId === landlordId) {
+                needsUpdate = true;
+                const { landlordId: _, ...rest } = unit;
+                return rest as Unit;
+            }
+            return unit;
+        });
+
+        if (needsUpdate) {
+            const propRef = doc(db, 'properties', prop.id);
+            batch.update(propRef, { units: newUnits });
+        }
+    }
+
+    const landlordRef = doc(db, 'landlords', landlordId);
+    batch.delete(landlordRef);
+
+    if (landlord.userId) {
+        const userRef = doc(db, 'users', landlord.userId);
+        batch.update(userRef, {
+            landlordId: deleteField(),
+            role: 'viewer'
+        });
+    }
+
+    await batch.commit();
+    cacheService.clear('landlords');
+    cacheService.clear('properties');
+    cacheService.clear('users');
+    await logActivity(`Deleted landlord: ${landlord.name} (${landlord.email})`);
+}
+
+export async function updatePropertyOwner(
+    ownerId: string,
+    data: Partial<PropertyOwner> & { email: string; phone: string; name: string }
+): Promise<void> {
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    let userId = data.userId;
+
+    if (data.email && data.phone && !userId) {
+        const appName = 'owner-creation-app-' + Date.now();
+        let secondaryApp;
+        try {
+            secondaryApp = initializeApp(firebaseConfig, appName);
+        } catch (e) {
+            secondaryApp = getApp(appName);
+        }
+
+        const secondaryAuth = getAuth(secondaryApp);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.phone);
+            userId = userCredential.user.uid;
+
+            await createUserProfile(userId, data.email, 'homeowner', {
+                name: data.name,
+                propertyOwnerId: ownerId,
+            });
+            await logActivity(`Created property owner user: ${data.email}`);
+        } catch (error: any) {
+            if (error.code !== 'auth/email-already-in-use') {
+                console.error("Error creating property owner auth user:", error);
+                throw new Error("Failed to create property owner login credentials.");
+            } else {
+                console.log("Email for property owner already in use, skipping auth creation.");
+            }
+        } finally {
+            if (secondaryApp) {
+                await deleteApp(secondaryApp);
+            }
+        }
+    }
+
+    const finalData: { [key: string]: any } = { ...data };
+    const resolvedUserId = userId || data.userId;
+
+    if (resolvedUserId) {
+        finalData.userId = resolvedUserId;
+    } else {
+        delete finalData.userId;
+    }
+
+    await setDoc(ownerRef, finalData, { merge: true });
+    cacheService.clear('propertyOwners');
+    if (userId) {
+        cacheService.clear('users');
+    }
+    await logActivity(`Updated property owner details: ${data.name || ownerId}`);
+}
+
+export async function getLandlordPropertiesAndUnits(landlordId: string): Promise<{ property: Property, units: Unit[] }[]> {
+    const allProperties = await getProperties();
+    const result: { property: Property, units: Unit[] }[] = [];
+
+    allProperties.forEach(p => {
+        const units = (p.units || []).filter(u => u.landlordId === landlordId || (p.landlordId === landlordId));
+        if (units.length > 0) {
+            result.push({ property: p, units: units });
+        }
+    });
+
+    return result;
+}
+
+export async function getAllPaymentsForReport(): Promise<Payment[]> {
+    return cacheService.getOrFetch('payments', 'all-report', () => getCollection<Payment>('payments'), 300000);
 }
 
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
