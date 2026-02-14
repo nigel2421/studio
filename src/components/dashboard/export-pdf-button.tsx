@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -142,7 +141,7 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
       }
 
     return (
-        <Button variant="outline" onClick={handleExportPDF} disabled={isLoading || !propertyId}>
+        <Button className="w-full sm:w-auto" variant="outline" onClick={handleExportPDF} disabled={isLoading || !propertyId}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
             Export PDF Report
         </Button>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -31,7 +30,7 @@ export function PropertySelector({ properties, selectedPropertyId }: PropertySel
 
     return (
         <Select onValueChange={handleSelect} value={selectedPropertyId || ''}>
-            <SelectTrigger className="w-[280px]">
+            <SelectTrigger className="w-full sm:w-[280px]">
                 <SelectValue placeholder="Select a property..." />
             </SelectTrigger>
             <SelectContent>

@@ -1,8 +1,8 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
+import { useSidebar } from '@/components/ui/sidebar';
 
 const titleMap: { [key: string]: string } = {
   '/dashboard': 'Dashboard',
@@ -25,6 +25,7 @@ const titleMap: { [key: string]: string } = {
 
 export function AppHeader() {
   const pathname = usePathname() || '/';
+  const { isMobile } = useSidebar();
   // Normalize path by removing trailing slash (except for base /)
   const normalizedPath = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
   const title = titleMap[normalizedPath] || 'Eracov Properties';
@@ -32,7 +33,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
       <div className="flex items-center gap-2">
-        <SidebarTrigger />
+        <SidebarTrigger className={!isMobile ? "md:hidden" : ""} />
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
       </div>
     </header>
