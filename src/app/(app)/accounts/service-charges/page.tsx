@@ -120,43 +120,42 @@ export default function ServiceChargesPage() {
     setArrearsAccounts(vacantArrears);
 
   }, [loading, allProperties, allOwners, allTenants, allPayments, allLandlords]);
-
-  const {
-      filteredSelfManagedAccounts,
-      filteredManagedVacantAccounts,
-      filteredArrearsAccounts
-  } = useMemo(() => {
-      if (selectedPropertyId === 'all') {
-          return {
-              filteredSelfManagedAccounts: selfManagedAccounts,
-              filteredManagedVacantAccounts: managedVacantAccounts,
-              filteredArrearsAccounts: arrearsAccounts,
-          };
-      }
-      return {
-          filteredSelfManagedAccounts: selfManagedAccounts.filter(a => a.propertyId === selectedPropertyId),
-          filteredManagedVacantAccounts: managedVacantAccounts.filter(a => a.propertyId === selectedPropertyId),
-          filteredArrearsAccounts: arrearsAccounts.map(ownerArrears => ({
-              ...ownerArrears,
-              units: ownerArrears.units.filter(u => u.propertyId === selectedPropertyId)
-          })).filter(ownerArrears => ownerArrears.units.length > 0)
-      };
-  }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
   
+  const propertyFilteredData = useMemo(() => {
+    const sm = selectedPropertyId === 'all' ? selfManagedAccounts : selfManagedAccounts.filter(a => a.propertyId === selectedPropertyId);
+    const mv = selectedPropertyId === 'all' ? managedVacantAccounts : managedVacantAccounts.filter(a => a.propertyId === selectedPropertyId);
+    const arrears = selectedPropertyId === 'all' 
+      ? arrearsAccounts 
+      : arrearsAccounts.map(ownerArrears => ({
+          ...ownerArrears,
+          units: ownerArrears.units.filter(u => u.propertyId === selectedPropertyId)
+        })).filter(ownerArrears => ownerArrears.units.length > 0);
+    
+    return {
+      statsSM: sm,
+      statsMV: mv,
+      statsArrears: arrears,
+      tableSM: groupAccounts(sm),
+      tableMV: groupAccounts(mv),
+      tableArrears: arrears,
+    };
+  }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
+
+
   const displayedStats = useMemo(() => {
     if (activeTab === 'arrears') {
-        const totalArrears = filteredArrearsAccounts.reduce((sum, acc) => sum + acc.totalDue, 0);
+        const totalArrears = propertyFilteredData.statsArrears.reduce((sum, acc) => sum + acc.totalDue, 0);
         return {
             stats: [
-                { title: 'Owners with Arrears', value: filteredArrearsAccounts.length.toString(), icon: Building2 },
+                { title: 'Owners with Arrears', value: propertyFilteredData.statsArrears.length.toString(), icon: Building2 },
                 { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
             ]
         }
     }
     
     const baseAccounts = activeTab === 'client-occupied' 
-        ? filteredSelfManagedAccounts 
-        : filteredManagedVacantAccounts;
+        ? propertyFilteredData.statsSM 
+        : propertyFilteredData.statsMV;
 
     const paidAccounts = baseAccounts.filter(a => a.paymentStatus === 'Paid');
     const pendingAccounts = baseAccounts.filter(a => a.paymentStatus === 'Pending');
@@ -177,7 +176,7 @@ export default function ServiceChargesPage() {
              { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
         ]
     };
-  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts]);
+  }, [activeTab, propertyFilteredData]);
 
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
@@ -385,12 +384,8 @@ export default function ServiceChargesPage() {
   };
 
 
-  const filteredGroupedSmAccounts = useMemo(() => groupAccounts(filteredSelfManagedAccounts), [filteredSelfManagedAccounts]);
-  const filteredGroupedMvAccounts = useMemo(() => groupAccounts(filteredManagedVacantAccounts), [filteredManagedVacantAccounts]);
-
-
   const finalFilteredSelfManaged = useMemo(() => {
-    let accounts = filteredGroupedSmAccounts;
+    let accounts = propertyFilteredData.tableSM;
     if (smStatusFilter !== 'all') {
       accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
     }
@@ -400,13 +395,13 @@ export default function ServiceChargesPage() {
         group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
         group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [filteredGroupedSmAccounts, searchTerm, smStatusFilter]);
+  }, [propertyFilteredData.tableSM, searchTerm, smStatusFilter]);
   
   const smTotalPages = Math.ceil(finalFilteredSelfManaged.length / smPageSize);
   const paginatedSmAccounts = finalFilteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
 
   const finalFilteredManagedVacant = useMemo(() => {
-    let accounts = filteredGroupedMvAccounts;
+    let accounts = propertyFilteredData.tableMV;
     if (mvStatusFilter !== 'all') {
         accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
     }
@@ -416,19 +411,19 @@ export default function ServiceChargesPage() {
         group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
         group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [filteredGroupedMvAccounts, searchTerm, mvStatusFilter]);
+  }, [propertyFilteredData.tableMV, searchTerm, mvStatusFilter]);
 
   const mvTotalPages = Math.ceil(finalFilteredManagedVacant.length / mvPageSize);
   const paginatedMvAccounts = finalFilteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
   
   const finalFilteredArrears = useMemo(() => {
-    if (!searchTerm) return filteredArrearsAccounts;
+    if (!searchTerm) return propertyFilteredData.tableArrears;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return filteredArrearsAccounts.filter(acc =>
+    return propertyFilteredData.tableArrears.filter(acc =>
         acc.ownerName.toLowerCase().includes(lowercasedFilter) ||
         acc.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [filteredArrearsAccounts, searchTerm]);
+  }, [propertyFilteredData.tableArrears, searchTerm]);
 
   const arrearsTotalPages = Math.ceil(finalFilteredArrears.length / arrearsPageSize);
   const paginatedArrears = finalFilteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
@@ -818,6 +813,8 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     
 
