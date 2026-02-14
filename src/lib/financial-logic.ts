@@ -343,14 +343,11 @@ export function generateLedger(
         if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
         if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
         if (p.type === 'Adjustment' || p.type === 'Reversal') {
-             // Adjustments/Reversals should only be included if their main category is included
-            if (finalOptions.includeRent || finalOptions.includeServiceCharge) {
-                // Heuristic: If it's a water-only ledger, exclude general adjustments
-                return finalOptions.includeWater ? false : true;
-            }
-            return false;
+            // Adjustments are general. Only include them in the rent/SC ledger, NOT the water ledger.
+            // This prevents a general credit from being applied to a water bill.
+            return (!!finalOptions.includeRent || !!finalOptions.includeServiceCharge) && !finalOptions.includeWater;
         }
-        return false; // Exclude 'Other' unless specified
+        return false; // Exclude 'Other' by default
     });
 
     const allPaymentsAndAdjustments = paymentsToInclude.map(p => {
