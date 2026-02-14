@@ -5,16 +5,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "maintenanceRequests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "propertyId",
           "order": "ASCENDING"
         },

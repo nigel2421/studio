@@ -1,15 +1,24 @@
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
   // This middleware is intentionally left empty.
-  // It exists solely to force Next.js to generate a middleware manifest,
-  // which resolves a "Cannot find module" build error.
+  // It exists to ensure Next.js build process works correctly.
   return NextResponse.next()
 }
 
-// The matcher is set to all paths to ensure the middleware manifest is always generated.
+// See "Matching Paths" below to learn more
 export const config = {
-  matcher: ['/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 }
