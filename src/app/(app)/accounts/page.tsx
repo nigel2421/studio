@@ -25,6 +25,7 @@ import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { generateLedger, getRecommendedPaymentStatus } from '@/lib/financial-logic';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function AccountsPage() {
   const [residents, setResidents] = useState<Tenant[]>([]);
@@ -34,6 +35,7 @@ export default function AccountsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -126,11 +128,18 @@ export default function AccountsPage() {
     { title: "Portfolio Occupancy", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
   ];
 
-  const filteredTenants = displayTenants.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTenants = useMemo(() => {
+    return displayTenants.filter(t => {
+      const searchMatch =
+        t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const statusMatch = statusFilter === 'all' || t.lease?.paymentStatus === statusFilter;
+      
+      return searchMatch && statusMatch;
+    });
+  }, [displayTenants, searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredTenants.length / pageSize);
   const paginatedTenants = filteredTenants.slice(
@@ -174,14 +183,27 @@ export default function AccountsPage() {
               <CardTitle>Tenant Financial Status</CardTitle>
               <CardDescription>Detailed list of tenant lease and payment information.</CardDescription>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 gap-4">
-                <div className="relative w-full sm:w-[300px]">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search tenant, unit or email..."
-                    className="pl-9"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative w-full sm:w-[300px]">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search tenant, unit or email..."
+                        className="pl-9"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="Paid">Paid</SelectItem>
+                        <SelectItem value="Pending">Pending</SelectItem>
+                        <SelectItem value="Overdue">Overdue</SelectItem>
+                      </SelectContent>
+                    </Select>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'financial_status.csv')}>
                   <DollarSign className="mr-2 h-4 w-4" />
