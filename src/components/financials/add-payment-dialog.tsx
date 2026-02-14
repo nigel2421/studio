@@ -156,23 +156,8 @@ export function AddPaymentDialog({
             amount = getDefaultAmount(type, tenantForDisplay);
         }
 
-        let rentForMonthDefault = format(new Date(), 'yyyy-MM');
-        if (tenantForDisplay && tenantForDisplay.lease.lastBilledPeriod) {
-            const monthlyCharge = tenantForDisplay.residentType === 'Homeowner' ? (tenantForDisplay.lease.serviceCharge || 0) : (tenantForDisplay.lease.rent || 0);
-            const lastBilledDate = new Date(tenantForDisplay.lease.lastBilledPeriod + '-02');
-            const dueBalance = tenantForDisplay.dueBalance || 0;
-
-            if (dueBalance <= 0) {
-                // No due balance, so payment is for the month after the last billed one.
-                rentForMonthDefault = format(addMonths(lastBilledDate, 1), 'yyyy-MM');
-            } else if (monthlyCharge > 0) {
-                // There is a due balance. Estimate the oldest unpaid month.
-                const monthsDue = Math.ceil(dueBalance / monthlyCharge);
-                const oldestDueDate = addMonths(lastBilledDate, -(monthsDue - 1));
-                rentForMonthDefault = format(oldestDueDate, 'yyyy-MM');
-            }
-        }
-
+        const rentForMonthDefault = format(new Date(), 'yyyy-MM');
+        
         const initialEntry: PaymentEntry = {
             id: Date.now(),
             amount,
@@ -202,7 +187,7 @@ export function AddPaymentDialog({
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
     const d = new Date();
     d.setDate(1);
-    d.setMonth(d.getMonth() - i + 2);
+    d.setMonth(d.getMonth() - i);
     return {
       value: format(d, 'yyyy-MM'),
       label: format(d, 'MMMM yyyy'),
@@ -471,3 +456,5 @@ export function AddPaymentDialog({
     </Dialog>
   );
 }
+
+    

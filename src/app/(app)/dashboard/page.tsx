@@ -21,22 +21,27 @@ export const dynamic = 'force-dynamic';
 
 const FinancialOverviewChart = dynamicImport(() => import('@/components/dashboard/financial-overview-chart').then(mod => mod.FinancialOverviewChart), {
     loading: () => <Skeleton className="h-[300px]" />,
+    ssr: false,
 });
 
 const OccupancyOverviewChart = dynamicImport(() => import('@/components/dashboard/occupancy-overview-chart').then(mod => mod.OccupancyOverviewChart), {
     loading: () => <Skeleton className="h-[300px]" />,
+    ssr: false,
 });
 
 const MaintenanceOverviewChart = dynamicImport(() => import('@/components/dashboard/maintenance-overview-chart').then(mod => mod.MaintenanceOverviewChart), {
     loading: () => <Skeleton className="h-[300px]" />,
+    ssr: false,
 });
 
 const OrientationOverviewChart = dynamicImport(() => import('@/components/dashboard/orientation-overview-chart').then(mod => mod.OrientationOverviewChart), {
     loading: () => <Skeleton className="h-[300px]" />,
+    ssr: false,
 });
 
 const RentBreakdownChart = dynamicImport(() => import('@/components/dashboard/rent-breakdown-chart').then(mod => mod.RentBreakdownChart), {
     loading: () => <Skeleton className="h-[300px]" />,
+    ssr: false,
 });
 
 
