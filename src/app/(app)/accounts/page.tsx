@@ -24,7 +24,7 @@ import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { reconcileMonthlyBilling } from '@/lib/financial-logic';
+import { generateLedger, getRecommendedPaymentStatus } from '@/lib/financial-logic';
 
 export default function AccountsPage() {
   const [residents, setResidents] = useState<Tenant[]>([]);
@@ -62,33 +62,33 @@ export default function AccountsPage() {
   const displayTenants = useMemo(() => {
     if (!tenantsOnly.length || !properties.length) return [];
 
-    const propertiesMap = new Map(properties.map(p => [p.id, p]));
-    
-    return tenantsOnly.map(tenant => {
-        const property = propertiesMap.get(tenant.propertyId);
-        const unit = property?.units.find(u => u.name === tenant.unitName);
-        const updates = reconcileMonthlyBilling(tenant, unit, new Date());
-
-        const updatedTenant = { ...tenant, lease: { ...tenant.lease } };
-
-        if (updates.dueBalance !== undefined) {
-            updatedTenant.dueBalance = updates.dueBalance;
+    const paymentsByTenant = new Map<string, Payment[]>();
+    payments.forEach(p => {
+        if (!paymentsByTenant.has(p.tenantId)) {
+            paymentsByTenant.set(p.tenantId, []);
         }
-        if (updates.accountBalance !== undefined) {
-            updatedTenant.accountBalance = updates.accountBalance;
-        }
-        if (updates['lease.paymentStatus'] !== undefined) {
-            updatedTenant.lease.paymentStatus = updates['lease.paymentStatus'];
-        }
-        if (updates['lease.lastBilledPeriod'] !== undefined) {
-            updatedTenant.lease.lastBilledPeriod = updates['lease.lastBilledPeriod'];
-        }
-        
-        let chargeArrears = updatedTenant.dueBalance || 0;
-
-        return { ...updatedTenant, chargeArrears };
+        paymentsByTenant.get(p.tenantId)!.push(p);
     });
-  }, [tenantsOnly, properties]);
+
+    return tenantsOnly.map(tenant => {
+        const tenantPayments = paymentsByTenant.get(tenant.id) || [];
+        // Note: we pass an empty array for water readings as this page only deals with rent/service charges.
+        const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, tenantPayments, properties, [], undefined, new Date(), { includeWater: false });
+
+        const updatedTenant = {
+            ...tenant,
+            dueBalance: finalDueBalance,
+            accountBalance: finalAccountBalance,
+            chargeArrears: finalDueBalance, // Use this for the arrears column
+            lease: {
+                ...tenant.lease,
+                paymentStatus: getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
+            }
+        };
+
+        return updatedTenant;
+    });
+  }, [tenantsOnly, properties, payments]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
