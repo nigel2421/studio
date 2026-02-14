@@ -1,10 +1,11 @@
+
 'use strict';
 
 console.log('jest.setup.js loaded');
 
 jest.mock('jspdf', () => ({
   __esModule: true,
-  jsPDF: jest.fn().mockImplementation(() => {
+  default: jest.fn().mockImplementation(() => {
     console.log('jsPDF mock constructor called');
     return {
       text: jest.fn(),

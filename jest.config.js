@@ -3,7 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.[tj]sx?$': 'ts-jest',
   },
   moduleNameMapper: {
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
@@ -11,7 +11,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(@genkit-ai/.*|genkit|dotprompt|yaml|jsonpath-plus)/)',
+    "/node_modules/(?!(@genkit-ai|genkit|dotprompt|yaml|jsonpath-plus)/)"
   ],
   clearMocks: true,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],

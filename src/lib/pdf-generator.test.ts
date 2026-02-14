@@ -6,10 +6,6 @@ import autoTable from 'jspdf-autotable';
 import { Tenant, Payment, Property, WaterMeterReading } from './types';
 import * as financialLogic from './financial-logic';
 
-// Mock the dependencies
-jest.mock('jspdf');
-jest.mock('jspdf-autotable');
-
 // Mock the financial logic dependency
 jest.mock('./financial-logic', () => ({
     generateLedger: jest.fn(),
@@ -30,7 +26,14 @@ describe('PDF Generation', () => {
     
     beforeEach(() => {
         jest.clearAllMocks();
+        // The global mock from jest.setup.js is used, so we just clear it.
+        // We don't need to re-implement the mock here.
+        (jsPDF as unknown as jest.Mock).mockClear();
+        (autoTable as jest.Mock).mockClear();
+
+        // If you need to restore the mock implementation for this test suite specifically because other tests might change it:
         (jsPDF as unknown as jest.Mock).mockImplementation(() => mockJsPDFInstance);
+
         (autoTable as jest.Mock).mockImplementation((doc: any, options: any) => {
             // Simulate autotable adding its height to the doc object
             // This is a simplified simulation
