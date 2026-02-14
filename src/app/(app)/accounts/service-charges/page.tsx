@@ -147,9 +147,8 @@ export default function ServiceChargesPage() {
     if (activeTab === 'arrears') {
         const totalArrears = filteredArrearsAccounts.reduce((sum, acc) => sum + acc.totalDue, 0);
         return {
-            title: 'Arrears Summary',
             stats: [
-                { title: 'Owners in Arrears', value: filteredArrearsAccounts.length, icon: Building2 },
+                { title: 'Owners with Arrears', value: filteredArrearsAccounts.length.toString(), icon: Building2 },
                 { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
             ]
         }
@@ -159,9 +158,6 @@ export default function ServiceChargesPage() {
         ? filteredSelfManagedAccounts 
         : filteredManagedVacantAccounts;
 
-    const statusFilter = activeTab === 'client-occupied' ? smStatusFilter : mvStatusFilter;
-
-    // Financial totals should reflect the entire tab, not the filter
     const paidAccounts = baseAccounts.filter(a => a.paymentStatus === 'Paid');
     const pendingAccounts = baseAccounts.filter(a => a.paymentStatus === 'Pending');
 
@@ -170,25 +166,18 @@ export default function ServiceChargesPage() {
     const totalCharged = totalPaid + totalPending;
     const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
     
-    // Unit count and its title should reflect the filter
-    const finalFilteredAccounts = statusFilter === 'all'
-      ? baseAccounts
-      : baseAccounts.filter(a => a.paymentStatus === statusFilter);
-      
-    const baseTitle = activeTab === 'client-occupied' ? 'Client Occupied' : 'Managed Vacant';
-    const filterTitle = statusFilter !== 'all' ? ` ${statusFilter}` : '';
-    const unitCountTitle = `${baseTitle}${filterTitle} Units`;
+    const unitCountTitle = activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units';
+    const unitCount = baseAccounts.length;
 
     return {
-        title: 'Dynamic Title', // This isn't used anymore
         stats: [
-             { title: unitCountTitle, value: finalFilteredAccounts.length, icon: Building2 },
+             { title: unitCountTitle, value: unitCount.toString(), icon: Building2 },
              { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
              { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
              { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
         ]
     };
-  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts, smStatusFilter, mvStatusFilter]);
+  }, [activeTab, filteredSelfManagedAccounts, filteredManagedVacantAccounts, filteredArrearsAccounts]);
 
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
@@ -539,7 +528,7 @@ export default function ServiceChargesPage() {
           </div>
           <TabsContent value="client-occupied">
             <ServiceChargeStatusTable
-                title="Client Occupied Unit Service Charges"
+                title="Client Occupied Units"
                 description="Payments for units currently occupied and managed by clients."
                 accounts={paginatedSmAccounts}
                 onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
@@ -554,7 +543,7 @@ export default function ServiceChargesPage() {
           </TabsContent>
           <TabsContent value="managed-vacant">
               <ServiceChargeStatusTable
-                title="Managed Vacant Unit Service Charges"
+                title="Managed Vacant Units"
                 description="Service charge payments for handed-over vacant units managed by Eracov."
                 accounts={paginatedMvAccounts}
                 onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
@@ -829,5 +818,7 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     
