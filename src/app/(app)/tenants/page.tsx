@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -52,6 +51,7 @@ export default function TenantsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
     const { userProfile } = useAuth();
     const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
     const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
@@ -107,9 +107,10 @@ export default function TenantsPage() {
              const propertyMatch = selectedPropertyId === 'all' || tenant.propertyId === selectedPropertyId;
              const searchMatch = tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 tenant.email.toLowerCase().includes(searchQuery.toLowerCase());
-            return propertyMatch && searchMatch;
+            const statusMatch = statusFilter === 'all' || tenant.lease?.paymentStatus === statusFilter;
+            return propertyMatch && searchMatch && statusMatch;
         });
-    }, [tenants, searchQuery, selectedPropertyId]);
+    }, [tenants, searchQuery, selectedPropertyId, statusFilter]);
 
 
     const totalPages = Math.ceil(filteredTenants.length / pageSize);
@@ -214,6 +215,17 @@ export default function TenantsPage() {
                                 <SelectContent>
                                     <SelectItem value="all">All Properties</SelectItem>
                                     {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="w-full sm:w-[180px]">
+                                    <SelectValue placeholder="Filter by status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="Paid">Paid</SelectItem>
+                                    <SelectItem value="Pending">Pending</SelectItem>
+                                    <SelectItem value="Overdue">Overdue</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
