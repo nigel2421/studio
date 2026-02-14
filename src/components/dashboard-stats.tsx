@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -9,6 +10,7 @@ import {
 import { Users, Building2, Wrench, AlertCircle, Building, Briefcase, BedDouble, UserCog, Home, Percent } from "lucide-react";
 import type { Tenant, Property, MaintenanceRequest, Payment, Unit } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
+import { cn } from "@/lib/utils";
 
 interface DashboardStatsProps {
   tenants: Tenant[];
@@ -29,13 +31,9 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
 
   const occupiedUnits = (() => {
     const occupiedUnitIdentifiers = new Set<string>();
-
-    // Add units that have a tenant
     tenants.forEach(tenant => {
       occupiedUnitIdentifiers.add(`${tenant.propertyId}-${tenant.unitName}`);
     });
-
-    // Add units that are marked as occupied by their status (e.g., airbnb, client occupied)
     properties.forEach(property => {
       if (Array.isArray(property.units)) {
         property.units.forEach(unit => {
@@ -45,7 +43,6 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
         });
       }
     });
-
     return occupiedUnitIdentifiers.size;
   })();
 
@@ -66,42 +63,61 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     if (p.type === 'Deposit') return sum;
     const tenant = tenantMap.get(p.tenantId);
     if (!tenant) return sum;
-
     const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-    
     const breakdown = calculateTransactionBreakdown(p, unit, tenant);
     return sum + breakdown.managementFee;
   }, 0);
 
   const stats = [
-    { title: "Total Tenants", value: totalTenants, icon: Users, color: "text-blue-500" },
-    { title: "Total Units", value: totalUnits, icon: Building, color: "text-green-500" },
-    { title: "Occupied Units", value: occupiedUnits, icon: Building2, color: "text-purple-500" },
-    { title: "Vacant Units", value: vacantUnits, icon: Home, color: "text-gray-500" },
-    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, color: "text-indigo-500" },
-    { title: "Recent Mgmt. Revenue (90d)", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, color: "text-emerald-500" },
-    { title: "Pending Maintenance (90d)", value: pendingMaintenance, icon: Wrench, color: "text-yellow-500" },
-    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, color: "text-red-500" },
+    { title: "Total Tenants", value: totalTenants, icon: Users, variant: 'default' },
+    { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, variant: 'success' },
+    { title: "Vacant Units", value: vacantUnits, icon: Home, variant: 'default' },
+    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, variant: 'danger' },
+    { title: "Pending Maint.", value: pendingMaintenance, icon: Wrench, variant: 'warning' },
+    { title: "Mgmt. Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, variant: 'success' },
   ];
 
+  const variantStyles = {
+    default: {
+      card: 'bg-card',
+      icon: 'text-muted-foreground',
+      value: 'text-foreground'
+    },
+    success: {
+      card: 'bg-green-500/5 border-green-500/20',
+      icon: 'text-green-600',
+      value: 'text-green-900'
+    },
+    warning: {
+      card: 'bg-yellow-500/5 border-yellow-500/20',
+      icon: 'text-yellow-600',
+      value: 'text-yellow-900'
+    },
+    danger: {
+      card: 'bg-red-500/5 border-red-500/20',
+      icon: 'text-red-600',
+      value: 'text-red-900'
+    },
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-      {stats.map((stat, index) => (
-        <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">
-              {stat.title}
-            </CardTitle>
-            <stat.icon className={`h-4 w-4 text-muted-foreground ${stat.color}`} />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-xl font-bold">{stat.value}</div>
-            <p className="text-xs text-muted-foreground">
-              {/* Additional context if needed */}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {stats.map((stat, index) => {
+        const styles = variantStyles[stat.variant as keyof typeof variantStyles] || variantStyles.default;
+        return (
+          <Card key={index} className={cn(styles.card)}>
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                {stat.title}
+              </CardTitle>
+              <stat.icon className={cn('h-4 w-4', styles.icon)} />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className={cn("text-2xl font-bold", styles.value)}>{stat.value}</div>
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
