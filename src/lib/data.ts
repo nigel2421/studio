@@ -478,11 +478,13 @@ export async function addTenant(data: {
             // Handover after 10th waives next month, billing starts month after.
             firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
         }
-        // Last billed period is the month *before* the first billable one.
+        // Last billed period is the month *before* the first billable one. This is correct as initial due is 0.
         lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
     } else {
-        // For Tenants, set last billed to month *before* lease start
-        lastBilledPeriod = format(addMonths(new Date(leaseStartDate), -1), 'yyyy-MM');
+        // For Tenants: Since we include the first month's rent in initialDue, we set
+        // lastBilledPeriod to the month of the lease start. This prevents the reconciliation
+        // logic from double-billing the first month.
+        lastBilledPeriod = format(new Date(leaseStartDate), 'yyyy-MM');
     }
 
 
