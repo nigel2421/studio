@@ -1,5 +1,4 @@
 
-
 import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord, WaterMeterReading } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore } from 'date-fns';
 

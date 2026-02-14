@@ -9,7 +9,7 @@ import type { Tenant, Payment, Property, LedgerEntry, WaterMeterReading } from '
 import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2, FileDown } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
-import { generateLedger } from '@/lib/financial-logic';
+import { generateLedger, getRecommendedPaymentStatus } from '@/lib/financial-logic';
 import {
     Table,
     TableBody,
@@ -99,6 +99,12 @@ export default function TenantDashboardPage() {
             duration: 5000,
         });
     };
+
+    const rentPaymentStatus = useMemo(() => {
+        if (!tenantDetails) return 'Pending';
+        // Use the realtime calculated balance, not the one from the (potentially stale) tenant object
+        return getRecommendedPaymentStatus({ dueBalance: balances.rentDue });
+    }, [balances.rentDue, tenantDetails]);
 
     const getPaymentStatusVariant = (status: Tenant['lease']['paymentStatus']) => {
         switch (status) {
@@ -319,8 +325,8 @@ export default function TenantDashboardPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="text-2xl font-bold">Ksh {tenantDetails.lease.rent.toLocaleString()}</div>
-                                        <Badge variant={getPaymentStatusVariant(tenantDetails.lease.paymentStatus)} className="mt-1">
-                                            {tenantDetails.lease.paymentStatus}
+                                        <Badge variant={getPaymentStatusVariant(rentPaymentStatus)} className="mt-1">
+                                            {rentPaymentStatus}
                                         </Badge>
                                     </CardContent>
                                 </Card>
@@ -372,5 +378,3 @@ export default function TenantDashboardPage() {
         </div>
     );
 }
-
-    
