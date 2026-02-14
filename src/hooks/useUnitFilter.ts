@@ -36,16 +36,16 @@ export function useUnitFilter(properties: Property[]) {
     });
   }, [selectedFloor, selectedProperty, properties]);
 
-  // Reset floor and unit when property changes
+  // Reset floor and unit when property or properties list changes
   useEffect(() => {
     setSelectedFloor('');
     setSelectedUnit('');
-  }, [selectedProperty]);
+  }, [selectedProperty, properties]);
 
-  // Reset unit when floor changes
+  // Reset unit when floor or floor list changes
   useEffect(() => {
     setSelectedUnit('');
-  }, [selectedFloor]);
+  }, [selectedFloor, floors]);
 
   return {
     selectedProperty,
