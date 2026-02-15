@@ -1,0 +1,8 @@
+
+> nextn@0.1.0 typecheck
+> tsc --noEmit
+
+src/app/(app)/landlords/page.tsx(226,47): error TS2554: Expected 1 arguments, but got 2.
+src/app/(app)/water-meter/add/page.tsx(390,13): error TS2554: Expected 2 arguments, but got 4.
+src/components/financials/owner-transaction-history-dialog.tsx(124,123): error TS2554: Expected 2 arguments, but got 4.
+src/components/financials/transaction-history-dialog.tsx(85,13): error TS2554: Expected 2 arguments, but got 4.

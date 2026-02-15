@@ -25,7 +25,7 @@ function postToJSON<T>(doc: DocumentSnapshot): T {
     if (!data) {
         return { id: doc.id } as T;
     }
-    
+
     const convertObjectTimestamps = (obj: any): any => {
         if (obj === null || typeof obj !== 'object') {
             return obj;
@@ -38,17 +38,17 @@ function postToJSON<T>(doc: DocumentSnapshot): T {
         if (Array.isArray(obj)) {
             return obj.map(convertObjectTimestamps);
         }
-        
+
         const newObj: { [key: string]: any } = {};
         for (const key of Object.keys(obj)) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 newObj[key] = convertObjectTimestamps(obj[key]);
             }
         }
-        
+
         return newObj;
     };
-    
+
     const serializedData = convertObjectTimestamps(data);
 
     return { id: doc.id, ...serializedData } as T;
@@ -156,7 +156,7 @@ export async function getUsers(
     const investorIds = new Set<string>();
     const clientIds = new Set<string>();
     const allCombinedOwners: (Landlord | PropertyOwner)[] = [...landlords, ...propertyOwners];
-    
+
     const allUnitsMap = new Map<string, Unit>();
     properties.forEach(p => {
         (p.units || []).forEach(u => allUnitsMap.set(`${p.id}-${u.name}`, u));
@@ -281,7 +281,7 @@ export async function getPaginatedCollection<T>(
 export async function getTenants(options: { propertyId?: string; limit?: number } = {}): Promise<Tenant[]> {
     const { propertyId, limit: limitCount } = options;
     const cacheKey = propertyId ? `prop-${propertyId}` : (limitCount ? `limit-${limitCount}` : 'all');
-    
+
     const ttl = propertyId ? 60000 : 300000;
 
     return cacheService.getOrFetch('tenants', cacheKey, () => {
@@ -303,7 +303,7 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
 export async function getMaintenanceRequests(options: { propertyId?: string } = {}): Promise<MaintenanceRequest[]> {
     const { propertyId } = options;
     const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'all';
-    
+
     return cacheService.getOrFetch('maintenanceRequests', cacheKey, async () => {
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
@@ -349,15 +349,15 @@ export async function getTenantWaterReadings(tenantId: string): Promise<WaterMet
     }, 120000);
 }
 
-export async function getWaterReadingsAndTenants(readingIds: string[]): Promise<{reading: WaterMeterReading, tenant: Tenant | null}[]> {
+export async function getWaterReadingsAndTenants(readingIds: string[]): Promise<{ reading: WaterMeterReading, tenant: Tenant | null }[]> {
     if (readingIds.length === 0) return [];
-    
+
     const readingsQuery = query(collection(db, 'waterReadings'), where(documentId(), 'in', readingIds));
     const readingsSnap = await getDocs(readingsQuery);
     const readings = readingsSnap.docs.map(doc => postToJSON<WaterMeterReading>(doc));
 
     const tenantIds = [...new Set(readings.map(r => r.tenantId))];
-    
+
     if (tenantIds.length === 0) {
         return readings.map(reading => ({ reading, tenant: null }));
     }
@@ -615,7 +615,7 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
     const propertyRef = doc(db, 'properties', propertyId);
     await updateDoc(propertyRef, data);
-    cacheService.clear('properties'); 
+    cacheService.clear('properties');
     await logActivity(`Updated property: ID ${propertyId}`);
 }
 
@@ -779,17 +779,17 @@ export async function addWaterMeterReading(data: {
 
     let tenantForReading: Tenant | null = null;
     const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', propertyId), where('unitName', '==', unitName), limit(1)));
-    
+
     if (!tenantsSnapshot.empty) {
         tenantForReading = { id: tenantsSnapshot.docs[0].id, ...tenantsSnapshot.docs[0].data() } as Tenant;
     } else {
         const allOwners = await getPropertyOwners();
         const allLandlords = await getLandlords();
-        
+
         let owner: PropertyOwner | Landlord | undefined;
 
         const foundOwner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === propertyId && au.unitNames.includes(unitName)));
-        if(foundOwner) {
+        if (foundOwner) {
             owner = foundOwner;
         }
 
@@ -814,7 +814,7 @@ export async function addWaterMeterReading(data: {
     if (!tenantForReading) {
         throw new Error(`Could not find or create a resident record for unit ${unitName} to bill.`);
     }
-    
+
     const originalTenant = tenantForReading;
 
     const consumption = currentReading - data.priorReading;
@@ -981,7 +981,7 @@ export async function batchProcessPayments(
                 const readingRef = doc(db, 'waterReadings', entry.waterReadingId);
                 transaction.update(readingRef, { status: 'Paid', paymentId: paymentDocRef.id });
             }
-            
+
             transaction.set(paymentDocRef, paymentPayload);
 
             if (entry.type !== 'Water') {
@@ -1068,14 +1068,252 @@ export async function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise
 
 
 export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
-  const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
-  
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
-    const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
-    callback(tasks);
-  }, (error) => {
-      console.error("Error listening to tasks:", error);
-  });
+    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
 
-  return unsubscribe;
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
+        callback(tasks);
+    }, (error) => {
+        console.error("Error listening to tasks:", error);
+    });
+
+    return unsubscribe;
 }
+
+export async function getAllPaymentsForReport(): Promise<Payment[]> {
+    return cacheService.getOrFetch('payments', 'all-report', () => {
+        const q = query(collection(db, 'payments'), orderBy('date', 'desc'));
+        return getCollection<Payment>(q);
+    }, 300000);
+}
+
+export async function addPayment(data: Omit<Payment, 'id' | 'createdAt'>): Promise<void> {
+    await batchProcessPayments(data.tenantId, [{
+        ...data,
+    }]);
+}
+
+export async function updatePayment(paymentId: string, data: Partial<Payment>, reason?: string, userId?: string): Promise<void> {
+    const paymentRef = doc(db, 'payments', paymentId);
+    const paymentDocSnap = await getDoc(paymentRef);
+    if (!paymentDocSnap.exists()) throw new Error("Payment not found");
+    const payment = postToJSON<Payment>(paymentDocSnap);
+
+    const updates: any = { ...data };
+
+    if (reason && userId) {
+        const historyEntry = {
+            editedAt: new Date().toISOString(),
+            editedBy: userId,
+            reason: reason,
+            previousValues: {
+                amount: payment.amount,
+                date: payment.date,
+                notes: payment.notes
+            }
+        };
+        updates.editHistory = arrayUnion(historyEntry);
+    }
+
+    await updateDoc(paymentRef, updates);
+    cacheService.clear('payments');
+
+    if (payment.tenantId) {
+        await forceRecalculateTenantBalance(payment.tenantId);
+    }
+}
+
+export async function forceRecalculateTenantBalance(tenantId: string): Promise<void> {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) return;
+
+    const property = await getProperty(tenant.propertyId);
+    const unit = property?.units.find(u => u.name === tenant.unitName);
+
+    const [payments, waterReadings] = await Promise.all([
+        getTenantPayments(tenantId),
+        getTenantWaterReadings(tenantId)
+    ]);
+
+    const properties = await getProperties();
+    let owner: PropertyOwner | Landlord | null = null;
+    if (tenant.residentType === 'Homeowner') {
+        const allOwners = await getPropertyOwners();
+        const allLandlords = await getLandlords();
+        owner = allOwners.find(o => o.assignedUnits?.some(au => au.propertyId === tenant.propertyId && au.unitNames.includes(tenant.unitName))) ||
+            allLandlords.find(l => l.id === unit?.landlordId) || null;
+    }
+
+    const { finalDueBalance, finalAccountBalance } = generateLedger(
+        tenant,
+        payments,
+        properties,
+        waterReadings,
+        owner
+    );
+
+    const updatedStatus = getRecommendedPaymentStatus({ dueBalance: finalDueBalance });
+
+    await updateDoc(doc(db, 'tenants', tenantId), {
+        dueBalance: finalDueBalance,
+        accountBalance: finalAccountBalance,
+        'lease.paymentStatus': updatedStatus
+    });
+    cacheService.clear('tenants');
+}
+
+export async function addOrUpdateLandlord(landlord: Partial<Landlord>, assignedUnitNames?: string[]): Promise<void> {
+    const landlordId = landlord.id || doc(collection(db, 'landlords')).id;
+    const finalLandlord = { ...landlord, id: landlordId };
+
+    if (landlord.id) {
+        await updateDoc(doc(db, 'landlords', landlord.id), landlord);
+    } else {
+        await setDoc(doc(db, 'landlords', landlordId), {
+            ...finalLandlord,
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    if (assignedUnitNames) {
+        // Update units to point to this landlord
+        const properties = await getProperties();
+        const batch = writeBatch(db);
+        let propertyUpdated = false;
+
+        for (const property of properties) {
+            let unitsUpdated = false;
+            const updatedUnits = property.units.map(unit => {
+                if (assignedUnitNames.includes(unit.name)) {
+                    if (unit.landlordId !== landlordId) {
+                        unitsUpdated = true;
+                        propertyUpdated = true;
+                        return { ...unit, landlordId: landlordId };
+                    }
+                } else if (unit.landlordId === landlordId) {
+                    unitsUpdated = true;
+                    propertyUpdated = true;
+                    const newUnit = { ...unit };
+                    delete newUnit.landlordId;
+                    return newUnit;
+                }
+                return unit;
+            });
+
+            if (unitsUpdated) {
+                batch.update(doc(db, 'properties', property.id), { units: updatedUnits });
+            }
+        }
+
+        if (propertyUpdated) {
+            await batch.commit();
+            cacheService.clear('properties');
+        }
+    }
+
+    cacheService.clear('landlords');
+}
+
+export async function deleteLandlord(id: string): Promise<void> {
+    await deleteDoc(doc(db, 'landlords', id));
+    cacheService.clear('landlords');
+}
+
+export async function updatePropertyOwner(id: string, data: Partial<PropertyOwner>): Promise<void> {
+    await updateDoc(doc(db, 'propertyOwners', id), data);
+    cacheService.clear('propertyOwners');
+}
+
+export async function deletePropertyOwner(id: string): Promise<void> {
+    await deleteDoc(doc(db, 'propertyOwners', id));
+    cacheService.clear('propertyOwners');
+}
+
+export async function getCommunications(): Promise<Communication[]> {
+    return cacheService.getOrFetch('communications', 'all', () => {
+        const q = query(collection(db, 'communications'), orderBy('timestamp', 'desc'));
+        return getCollection<Communication>(q);
+    }, 60000);
+}
+
+export async function addLandlordsFromCSV(landlords: any[]): Promise<{ added: number, skipped: number }> {
+    const existing = await getLandlords();
+    const existingEmails = new Set(existing.map(l => l.email.toLowerCase()));
+
+    let added = 0;
+    let skipped = 0;
+
+    const batch = writeBatch(db);
+    for (const data of landlords) {
+        if (existingEmails.has(data.email.toLowerCase())) {
+            skipped++;
+            continue;
+        }
+        const docRef = doc(collection(db, 'landlords'));
+        batch.set(docRef, {
+            ...data,
+            createdAt: new Date().toISOString(),
+        });
+        added++;
+        existingEmails.add(data.email.toLowerCase());
+    }
+
+    if (added > 0) {
+        await batch.commit();
+        cacheService.clear('landlords');
+    }
+
+    return { added, skipped };
+}
+
+export async function bulkUpdateUnitsFromCSV(propertyId: string, csvData: any[]): Promise<{ updatedCount: number, createdCount: number, errors: string[] }> {
+    const property = await getProperty(propertyId);
+    if (!property) throw new Error("Property not found");
+
+    let updatedCount = 0;
+    let createdCount = 0;
+    const errors: string[] = [];
+
+    const updatedUnits = [...property.units];
+
+    for (const row of csvData) {
+        try {
+            const unitName = row.UnitName || row.name;
+            if (!unitName) {
+                errors.push("Missing UnitName for row");
+                continue;
+            }
+
+            const existingIndex = updatedUnits.findIndex(u => u.name === unitName);
+            const unitData: Partial<Unit> = {
+                name: unitName,
+                status: (row.Status?.toLowerCase() as UnitStatus) || 'vacant',
+                ownership: (row.Ownership as OwnershipType) || 'Landlord',
+                unitType: (row.UnitType as UnitType) || 'One Bedroom',
+                unitOrientation: (row.UnitOrientation as UnitOrientation) || 'FOREST.RD',
+                managementStatus: (row.ManagementStatus as ManagementStatus) || 'Rented for Clients',
+                handoverStatus: (row.HandoverStatus as HandoverStatus) || 'Not Handed Over',
+                handoverDate: row.HandoverDate || null,
+                rentAmount: parseFloat(row.RentAmount) || 0,
+                serviceCharge: parseFloat(row.ServiceCharge) || 0,
+                landlordId: row.LandlordId || null,
+            };
+
+            if (existingIndex >= 0) {
+                updatedUnits[existingIndex] = { ...updatedUnits[existingIndex], ...unitData };
+                updatedCount++;
+            } else {
+                updatedUnits.push(unitData as Unit);
+                createdCount++;
+            }
+        } catch (e: any) {
+            errors.push(`Error processing row: ${e.message}`);
+        }
+    }
+
+    await updateDoc(doc(db, 'properties', propertyId), { units: updatedUnits });
+    cacheService.clear('properties');
+
+    return { updatedCount, createdCount, errors };
+}
+

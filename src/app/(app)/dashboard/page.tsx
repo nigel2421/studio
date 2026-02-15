@@ -14,35 +14,11 @@ import { OrientationAnalytics } from "@/components/orientation-analytics";
 import { PropertySelector } from "@/components/dashboard/property-selector";
 import { ExportPdfButton } from "@/components/dashboard/export-pdf-button";
 import { Skeleton } from '@/components/ui/skeleton';
-import dynamicImport from 'next/dynamic';
+import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 
 export const dynamic = 'force-dynamic';
 
 
-const FinancialOverviewChart = dynamicImport(() => import('@/components/dashboard/financial-overview-chart').then(mod => mod.FinancialOverviewChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
-
-const OccupancyOverviewChart = dynamicImport(() => import('@/components/dashboard/occupancy-overview-chart').then(mod => mod.OccupancyOverviewChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
-
-const MaintenanceOverviewChart = dynamicImport(() => import('@/components/dashboard/maintenance-overview-chart').then(mod => mod.MaintenanceOverviewChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
-
-const OrientationOverviewChart = dynamicImport(() => import('@/components/dashboard/orientation-overview-chart').then(mod => mod.OrientationOverviewChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
-
-const RentBreakdownChart = dynamicImport(() => import('@/components/dashboard/rent-breakdown-chart').then(mod => mod.RentBreakdownChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
 
 
 const getDashboardData = async (propId: string) => {
@@ -98,7 +74,7 @@ function DashboardSkeleton() {
 
 async function DashboardContent({ allProperties, selectedPropertyId }: { allProperties: Property[], selectedPropertyId: string | null }) {
     const data = selectedPropertyId ? await getDashboardData(selectedPropertyId) : null;
-    const isInvestmentConsultant = false; 
+    const isInvestmentConsultant = false;
 
     return (
         <div className="flex flex-col gap-8">
@@ -126,19 +102,12 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
                         payments={data.payments}
                     />
 
-                    <div className="grid gap-8 md:grid-cols-2">
-                        <FinancialOverviewChart payments={data.payments} tenants={data.tenants} />
-                        <OccupancyOverviewChart properties={[data.selectedProperty]} tenants={data.tenants} />
-                    </div>
-
-                    <div className="grid gap-8 md:grid-cols-2">
-                        <MaintenanceOverviewChart maintenanceRequests={data.maintenanceRequests} />
-                        <OrientationOverviewChart properties={[data.selectedProperty]} />
-                    </div>
-
-                    <div className="grid gap-8">
-                        <RentBreakdownChart payments={data.payments} tenants={data.tenants} properties={[data.selectedProperty]} />
-                    </div>
+                    <DashboardCharts
+                        payments={data.payments}
+                        tenants={data.tenants}
+                        selectedProperty={data.selectedProperty}
+                        maintenanceRequests={data.maintenanceRequests}
+                    />
 
                     <Card>
                         <CardHeader>
@@ -213,20 +182,20 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
 }
 
 export default async function DashboardPage(props: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const resolvedParams = await props.searchParams;
-  const propertyId = resolvedParams?.propertyId as string | undefined;
+    const resolvedParams = await props.searchParams;
+    const propertyId = resolvedParams?.propertyId as string | undefined;
 
-  const allProperties = await getProperties();
-  const selectedPropertyId = propertyId || allProperties[0]?.id || null;
+    const allProperties = await getProperties();
+    const selectedPropertyId = propertyId || allProperties[0]?.id || null;
 
-  return (
-    <Suspense key={selectedPropertyId} fallback={<DashboardSkeleton />}>
-      <DashboardContent
-        allProperties={allProperties}
-        selectedPropertyId={selectedPropertyId}
-      />
-    </Suspense>
-  );
+    return (
+        <Suspense key={selectedPropertyId} fallback={<DashboardSkeleton />}>
+            <DashboardContent
+                allProperties={allProperties}
+                selectedPropertyId={selectedPropertyId}
+            />
+        </Suspense>
+    );
 }
