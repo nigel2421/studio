@@ -31,9 +31,11 @@ import {
 
 
 export default function ServiceChargesPage() {
-  const [selfManagedAccounts, setSelfManagedAccounts] = useState<ServiceChargeAccount[]>([]);
-  const [managedVacantAccounts, setManagedVacantAccounts] = useState<ServiceChargeAccount[]>([]);
-  const [arrearsAccounts, setArrearsAccounts] = useState<VacantArrearsAccount[]>([]);
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
+  const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
+  const [allTenants, setAllTenants] = useState<Tenant[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,12 +51,6 @@ export default function ServiceChargesPage() {
   const [arrearsCurrentPage, setArrearsCurrentPage] = useState(1);
   const [arrearsPageSize, setArrearsPageSize] = useState(10);
   
-  const [allProperties, setAllProperties] = useState<Property[]>([]);
-  const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
-  const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
-  const [allTenants, setAllTenants] = useState<Tenant[]>([]);
-  const [allPayments, setAllPayments] = useState<Payment[]>([]);
-
   const { startLoading, stopLoading, isLoading: isSaving } = useLoading();
   const { toast } = useToast();
 
@@ -63,7 +59,6 @@ export default function ServiceChargesPage() {
   const [accountsForPayment, setAccountsForPayment] = useState<ServiceChargeAccount[]>([]);
   const [totalBalanceForDialog, setTotalBalanceForDialog] = useState(0);
 
-  
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [ownerForHistory, setOwnerForHistory] = useState<PropertyOwner | Landlord | null>(null);
   const [statusForHistory, setStatusForHistory] = useState<'Paid' | 'Pending' | 'N/A' | null>(null);
@@ -98,10 +93,20 @@ export default function ServiceChargesPage() {
     setLoading(true);
     fetchData();
   }, []);
+  
+  const serviceChargeProperties = useMemo(() => {
+    const relevantPropertyIds = new Set<string>();
+    allProperties.forEach(p => {
+        if (p.units.some(u => (u.managementStatus === 'Client Managed' || u.managementStatus === 'Rented for Clients') && u.serviceCharge && u.serviceCharge > 0)) {
+            relevantPropertyIds.add(p.id);
+        }
+    });
+    return allProperties.filter(p => relevantPropertyIds.has(p.id));
+  }, [allProperties]);
 
-  useEffect(() => {
-    if (loading) return;
 
+  const processedData = useMemo(() => {
+    if (loading) return { clientOccupied: [], managedVacant: [], arrears: [] };
     const {
         clientOccupiedServiceChargeAccounts,
         managedVacantServiceChargeAccounts,
@@ -114,72 +119,113 @@ export default function ServiceChargesPage() {
         allLandlords,
         new Date()
     );
-
-    setSelfManagedAccounts(clientOccupiedServiceChargeAccounts);
-    setManagedVacantAccounts(managedVacantServiceChargeAccounts);
-    setArrearsAccounts(vacantArrears);
-
+    return { 
+        clientOccupied: groupAccounts(clientOccupiedServiceChargeAccounts),
+        managedVacant: groupAccounts(managedVacantServiceChargeAccounts),
+        arrears: vacantArrears
+    };
   }, [loading, allProperties, allOwners, allTenants, allPayments, allLandlords]);
-  
-  const propertyFilteredData = useMemo(() => {
-    const sm = selectedPropertyId === 'all'
-      ? selfManagedAccounts
-      : selfManagedAccounts.filter(a => a.propertyId === selectedPropertyId);
-    const mv = selectedPropertyId === 'all'
-      ? managedVacantAccounts
-      : managedVacantAccounts.filter(a => a.propertyId === selectedPropertyId);
-    const arrears = selectedPropertyId === 'all'
-      ? arrearsAccounts
-      : arrearsAccounts.map(ownerArrears => ({
-          ...ownerArrears,
-          units: ownerArrears.units.filter(u => u.propertyId === selectedPropertyId),
-        })).filter(ownerArrears => ownerArrears.units.length > 0);
-    
-    return { selfManaged: sm, managedVacant: mv, arrears };
-  }, [selectedPropertyId, selfManagedAccounts, managedVacantAccounts, arrearsAccounts]);
-
-  const groupedData = useMemo(() => ({
-    selfManaged: groupAccounts(propertyFilteredData.selfManaged),
-    managedVacant: groupAccounts(propertyFilteredData.managedVacant),
-  }), [propertyFilteredData]);
-
 
   const displayedStats = useMemo(() => {
-    if (activeTab === 'arrears') {
-        const totalArrears = propertyFilteredData.arrears.reduce((sum, acc) => sum + acc.totalDue, 0);
-        return {
-            stats: [
-                { title: 'Owners with Arrears', value: propertyFilteredData.arrears.length.toString(), icon: Building2 },
-                { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
-            ]
-        }
+      let sourceAccounts: ServiceChargeAccount[] = [];
+      if(activeTab === 'client-occupied') sourceAccounts = processedData.clientOccupied.flatMap(g => g.units);
+      if(activeTab === 'managed-vacant') sourceAccounts = processedData.managedVacant.flatMap(g => g.units);
+
+      if (activeTab === 'arrears') {
+          const filteredArrears = selectedPropertyId === 'all'
+            ? processedData.arrears
+            : processedData.arrears.filter(a => a.units.some(u => u.propertyId === selectedPropertyId));
+          const totalArrears = filteredArrears.reduce((sum, acc) => sum + acc.totalDue, 0);
+          return {
+              stats: [
+                  { title: 'Owners with Arrears', value: filteredArrears.length.toString(), icon: Building2 },
+                  { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
+              ]
+          }
+      }
+      
+      const filteredSource = selectedPropertyId === 'all'
+          ? sourceAccounts
+          : sourceAccounts.filter(a => a.propertyId === selectedPropertyId);
+  
+      const paidAccounts = filteredSource.filter(a => a.paymentStatus === 'Paid');
+      const pendingAccounts = filteredSource.filter(a => a.paymentStatus === 'Pending');
+  
+      const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+      const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+      const totalCharged = totalPaid + totalPending;
+      const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
+      
+      const unitCountTitle = activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units';
+      const unitCount = filteredSource.length;
+  
+      return {
+          stats: [
+               { title: unitCountTitle, value: unitCount.toString(), icon: Building2 },
+               { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
+               { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
+               { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
+          ]
+      };
+  }, [activeTab, selectedPropertyId, processedData]);
+  
+  const finalFilteredSelfManaged = useMemo(() => {
+    let accounts = processedData.clientOccupied;
+    if (selectedPropertyId && selectedPropertyId !== 'all') {
+      accounts = accounts.filter(group => group.units.some(u => u.propertyId === selectedPropertyId));
     }
-    
-    const baseAccounts = activeTab === 'client-occupied' 
-        ? propertyFilteredData.selfManaged 
-        : propertyFilteredData.managedVacant;
+    if (smStatusFilter !== 'all') {
+      accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
+    }
+    if (searchTerm) {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        accounts = accounts.filter(group =>
+            group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
+            group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
+        );
+    }
+    return accounts;
+  }, [processedData.clientOccupied, searchTerm, smStatusFilter, selectedPropertyId]);
 
-    const paidAccounts = baseAccounts.filter(a => a.paymentStatus === 'Paid');
-    const pendingAccounts = baseAccounts.filter(a => a.paymentStatus === 'Pending');
+  const finalFilteredManagedVacant = useMemo(() => {
+    let accounts = processedData.managedVacant;
+    if (selectedPropertyId && selectedPropertyId !== 'all') {
+        accounts = accounts.filter(group => group.units.some(u => u.propertyId === selectedPropertyId));
+    }
+    if (mvStatusFilter !== 'all') {
+        accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
+    }
+    if (searchTerm) {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        accounts = accounts.filter(group =>
+            group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
+            group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
+        );
+    }
+    return accounts;
+  }, [processedData.managedVacant, searchTerm, mvStatusFilter, selectedPropertyId]);
 
-    const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
-    const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
-    const totalCharged = totalPaid + totalPending;
-    const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
-    
-    const unitCountTitle = activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units';
-    const unitCount = baseAccounts.length;
+  const finalFilteredArrears = useMemo(() => {
+    let accounts = processedData.arrears;
+     if (selectedPropertyId && selectedPropertyId !== 'all') {
+        accounts = accounts.filter(ownerArrears => ownerArrears.units.some(u => u.propertyId === selectedPropertyId));
+    }
+    if (!searchTerm) return accounts;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return accounts.filter(acc =>
+        acc.ownerName.toLowerCase().includes(lowercasedFilter) ||
+        acc.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [processedData.arrears, searchTerm, selectedPropertyId]);
 
-    return {
-        stats: [
-             { title: unitCountTitle, value: unitCount.toString(), icon: Building2 },
-             { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
-             { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
-             { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
-        ]
-    };
-  }, [activeTab, propertyFilteredData]);
+  const smTotalPages = Math.ceil(finalFilteredSelfManaged.length / smPageSize);
+  const paginatedSmAccounts = finalFilteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
 
+  const mvTotalPages = Math.ceil(finalFilteredManagedVacant.length / mvPageSize);
+  const paginatedMvAccounts = finalFilteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
+
+  const arrearsTotalPages = Math.ceil(finalFilteredArrears.length / arrearsPageSize);
+  const paginatedArrears = finalFilteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
 
   const handleOpenHistoryDialog = (group: GroupedServiceChargeAccount) => {
     let ownerForDialog: PropertyOwner | Landlord | undefined;
@@ -194,7 +240,7 @@ export default function ServiceChargesPage() {
     }
   };
 
-  const handleOpenOwnerPaymentDialog = async (account: ServiceChargeAccount, source: 'client-occupied' | 'managed-vacant') => {
+  const handleOpenOwnerPaymentDialog = async (account: ServiceChargeAccount) => {
     if (!account.ownerId) {
         toast({ variant: 'destructive', title: 'Error', description: 'This unit is not assigned to an owner.' });
         return;
@@ -288,9 +334,9 @@ export default function ServiceChargesPage() {
         });
         const totalBalanceDue = runningBalance > 0 ? runningBalance : 0;
         
-        const sourceAccounts = source === 'client-occupied' ? selfManagedAccounts : managedVacantAccounts;
-
-        const ownerAccounts = sourceAccounts.filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
+        const ownerAccounts = [ ...processedData.clientOccupied, ...processedData.managedVacant]
+            .flatMap(g => g.units)
+            .filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
         
         if (totalBalanceDue <= 0) {
             toast({ title: "No Pending Charges", description: "This owner has no outstanding balance." });
@@ -379,52 +425,7 @@ export default function ServiceChargesPage() {
     generateVacantServiceChargeInvoicePDF(group.owner, unitsWithArrears, group.totalDue);
     toast({ title: 'Invoice Generated', description: `Invoice for ${group.ownerName} has been downloaded.` });
   };
-
-
-  const finalFilteredSelfManaged = useMemo(() => {
-    let accounts = groupedData.selfManaged;
-    if (smStatusFilter !== 'all') {
-      accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
-    }
-    if (!searchTerm) return accounts;
-    const lowercasedFilter = searchTerm.toLowerCase();
-    return accounts.filter(group =>
-        group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
-        group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
-    );
-  }, [groupedData.selfManaged, searchTerm, smStatusFilter]);
   
-  const smTotalPages = Math.ceil(finalFilteredSelfManaged.length / smPageSize);
-  const paginatedSmAccounts = finalFilteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
-
-  const finalFilteredManagedVacant = useMemo(() => {
-    let accounts = groupedData.managedVacant;
-    if (mvStatusFilter !== 'all') {
-        accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
-    }
-    if (!searchTerm) return accounts;
-    const lowercasedFilter = searchTerm.toLowerCase();
-    return accounts.filter(group =>
-        group.ownerName?.toLowerCase().includes(lowercasedFilter) ||
-        group.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
-    );
-  }, [groupedData.managedVacant, searchTerm, mvStatusFilter]);
-
-  const mvTotalPages = Math.ceil(finalFilteredManagedVacant.length / mvPageSize);
-  const paginatedMvAccounts = finalFilteredManagedVacant.slice((mvCurrentPage - 1) * mvPageSize, mvCurrentPage * mvPageSize);
-  
-  const finalFilteredArrears = useMemo(() => {
-    if (!searchTerm) return propertyFilteredData.arrears;
-    const lowercasedFilter = searchTerm.toLowerCase();
-    return propertyFilteredData.arrears.filter(acc =>
-        acc.ownerName.toLowerCase().includes(lowercasedFilter) ||
-        acc.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
-    );
-  }, [propertyFilteredData.arrears, searchTerm]);
-
-  const arrearsTotalPages = Math.ceil(finalFilteredArrears.length / arrearsPageSize);
-  const paginatedArrears = finalFilteredArrears.slice((arrearsCurrentPage - 1) * arrearsPageSize, arrearsCurrentPage * arrearsPageSize);
-
   const handleSmStatusFilterChange = useCallback((status: 'all' | 'Paid' | 'Pending' | 'N/A') => {
     setSmStatusFilter(status);
     setSmCurrentPage(1);
@@ -474,7 +475,7 @@ export default function ServiceChargesPage() {
                       </SelectTrigger>
                       <SelectContent>
                           <SelectItem value="all">All Properties</SelectItem>
-                          {allProperties.map(p => (
+                          {serviceChargeProperties.map(p => (
                               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                           ))}
                       </SelectContent>
@@ -523,7 +524,7 @@ export default function ServiceChargesPage() {
                 title="Client Occupied Units"
                 description="Payments for units currently occupied and managed by clients."
                 accounts={paginatedSmAccounts}
-                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'client-occupied')}
+                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc)}
                 onViewHistory={handleOpenHistoryDialog}
                 currentPage={smCurrentPage}
                 pageSize={smPageSize}
@@ -538,7 +539,7 @@ export default function ServiceChargesPage() {
                 title="Managed Vacant Units"
                 description="Service charge payments for handed-over vacant units managed by Eracov."
                 accounts={paginatedMvAccounts}
-                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc, 'managed-vacant')}
+                onConfirmPayment={(acc) => handleOpenOwnerPaymentDialog(acc)}
                 onViewHistory={handleOpenHistoryDialog}
                 currentPage={mvCurrentPage}
                 pageSize={mvPageSize}
@@ -809,6 +810,8 @@ const VacantArrearsTab = ({
         </Card>
     );
 }
+
+    
 
     
 
