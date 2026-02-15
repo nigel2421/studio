@@ -59,38 +59,18 @@ export default function AccountsPage() {
     fetchAllData();
   }, []);
 
-  const tenantsOnly = useMemo(() => residents.filter(r => r.residentType === 'Tenant'), [residents]);
-
-  const displayTenants = useMemo(() => {
-    if (!tenantsOnly.length || !properties.length) return [];
-
-    const paymentsByTenant = new Map<string, Payment[]>();
-    payments.forEach(p => {
-        if (!paymentsByTenant.has(p.tenantId)) {
-            paymentsByTenant.set(p.tenantId, []);
-        }
-        paymentsByTenant.get(p.tenantId)!.push(p);
-    });
-
-    return tenantsOnly.map(tenant => {
-        const tenantPayments = paymentsByTenant.get(tenant.id) || [];
-        // Note: we pass an empty array for water readings as this page only deals with rent/service charges.
-        const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, tenantPayments, properties, [], undefined, new Date(), { includeWater: false });
-
-        const updatedTenant = {
-            ...tenant,
-            dueBalance: finalDueBalance,
-            accountBalance: finalAccountBalance,
-            chargeArrears: finalDueBalance, // Use this for the arrears column
-            lease: {
-                ...tenant.lease,
-                paymentStatus: getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
-            }
-        };
-
-        return updatedTenant;
-    });
-  }, [tenantsOnly, properties, payments]);
+  const tenantsOnly = useMemo(() => {
+    return residents
+      .filter(r => r.residentType === 'Tenant')
+      .map(tenant => ({
+          ...tenant,
+          // Ensure paymentStatus is always fresh based on balance
+          lease: {
+              ...tenant.lease,
+              paymentStatus: getRecommendedPaymentStatus(tenant)
+          }
+      }));
+  }, [residents]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);
@@ -114,8 +94,8 @@ export default function AccountsPage() {
     .filter(p => p.type === 'Rent' && p.status === 'Paid')
     .reduce((sum, p) => sum + p.amount, 0), [payments]);
 
-  const totalArrears = useMemo(() => displayTenants
-    .reduce((sum, t) => sum + (t.chargeArrears || 0), 0), [displayTenants]);
+  const totalArrears = useMemo(() => tenantsOnly
+    .reduce((sum, t) => sum + (t.dueBalance || 0), 0), [tenantsOnly]);
 
   const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (Array.isArray(p.units) ? p.units.length : 0), 0), [properties]);
   const occupiedUnits = tenantsOnly.length;
@@ -129,7 +109,7 @@ export default function AccountsPage() {
   ];
 
   const filteredTenants = useMemo(() => {
-    return displayTenants.filter(t => {
+    return tenantsOnly.filter(t => {
       const searchMatch =
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.unitName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,7 +119,7 @@ export default function AccountsPage() {
       
       return searchMatch && statusMatch;
     });
-  }, [displayTenants, searchTerm, statusFilter]);
+  }, [tenantsOnly, searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredTenants.length / pageSize);
   const paginatedTenants = filteredTenants.slice(
@@ -242,7 +222,7 @@ export default function AccountsPage() {
                         }
                       </TableCell>
                       <TableCell className="font-semibold text-destructive">
-                        Ksh {(tenant.chargeArrears || 0).toLocaleString()}
+                        Ksh {(tenant.dueBalance || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-green-600 font-semibold">
                         Ksh {(tenant.accountBalance || 0).toLocaleString()}

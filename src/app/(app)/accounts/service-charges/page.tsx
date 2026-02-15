@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -107,12 +106,16 @@ export default function ServiceChargesPage() {
 
   const processedData = useMemo(() => {
     if (loading) return { clientOccupied: [], managedVacant: [], arrears: [] };
+    const propsToProcess = selectedPropertyId === 'all'
+        ? allProperties
+        : allProperties.filter(p => p.id === selectedPropertyId);
+
     const {
         clientOccupiedServiceChargeAccounts,
         managedVacantServiceChargeAccounts,
         vacantArrears,
     } = processServiceChargeData(
-        allProperties,
+        propsToProcess,
         allOwners,
         allTenants,
         allPayments,
@@ -124,56 +127,39 @@ export default function ServiceChargesPage() {
         managedVacant: groupAccounts(managedVacantServiceChargeAccounts),
         arrears: vacantArrears
     };
-  }, [loading, allProperties, allOwners, allTenants, allPayments, allLandlords]);
-
+  }, [loading, allProperties, allOwners, allTenants, allPayments, allLandlords, selectedPropertyId]);
+  
   const displayedStats = useMemo(() => {
-      let sourceAccounts: ServiceChargeAccount[] = [];
-      if(activeTab === 'client-occupied') sourceAccounts = processedData.clientOccupied.flatMap(g => g.units);
-      if(activeTab === 'managed-vacant') sourceAccounts = processedData.managedVacant.flatMap(g => g.units);
-
+      const sourceAccounts = activeTab === 'client-occupied' 
+        ? processedData.clientOccupied.flatMap(g => g.units)
+        : processedData.managedVacant.flatMap(g => g.units);
+      
       if (activeTab === 'arrears') {
-          const filteredArrears = selectedPropertyId === 'all'
-            ? processedData.arrears
-            : processedData.arrears.filter(a => a.units.some(u => u.propertyId === selectedPropertyId));
-          const totalArrears = filteredArrears.reduce((sum, acc) => sum + acc.totalDue, 0);
-          return {
-              stats: [
-                  { title: 'Owners with Arrears', value: filteredArrears.length.toString(), icon: Building2 },
-                  { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
-              ]
-          }
+          const totalArrears = processedData.arrears.reduce((sum, acc) => sum + acc.totalDue, 0);
+          return [
+              { title: 'Owners with Arrears', value: processedData.arrears.length.toString(), icon: Building2 },
+              { title: 'Total Arrears Due', value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle },
+          ];
       }
       
-      const filteredSource = selectedPropertyId === 'all'
-          ? sourceAccounts
-          : sourceAccounts.filter(a => a.propertyId === selectedPropertyId);
-  
-      const paidAccounts = filteredSource.filter(a => a.paymentStatus === 'Paid');
-      const pendingAccounts = filteredSource.filter(a => a.paymentStatus === 'Pending');
+      const paidAccounts = sourceAccounts.filter(a => a.paymentStatus === 'Paid');
+      const pendingAccounts = sourceAccounts.filter(a => a.paymentStatus === 'Pending');
   
       const totalPaid = paidAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
       const totalPending = pendingAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
       const totalCharged = totalPaid + totalPending;
       const paidPercentage = totalCharged > 0 ? (totalPaid / totalCharged) * 100 : 0;
       
-      const unitCountTitle = activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units';
-      const unitCount = filteredSource.length;
-  
-      return {
-          stats: [
-               { title: unitCountTitle, value: unitCount.toString(), icon: Building2 },
-               { title: 'Paid Service Charge', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
-               { title: 'Pending Service Charge', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
-               { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
-          ]
-      };
-  }, [activeTab, selectedPropertyId, processedData]);
+      return [
+           { title: activeTab === 'client-occupied' ? 'Client Occupied Units' : 'Managed Vacant Units', value: sourceAccounts.length.toString(), icon: Building2 },
+           { title: 'Paid This Month', value: `Ksh ${totalPaid.toLocaleString()}`, icon: DollarSign },
+           { title: 'Pending This Month', value: `Ksh ${totalPending.toLocaleString()}`, icon: AlertCircle },
+           { title: 'Collection Rate', value: `${paidPercentage.toFixed(1)}%`, icon: PieChart },
+      ];
+  }, [activeTab, processedData]);
   
   const finalFilteredSelfManaged = useMemo(() => {
     let accounts = processedData.clientOccupied;
-    if (selectedPropertyId && selectedPropertyId !== 'all') {
-      accounts = accounts.filter(group => group.units.some(u => u.propertyId === selectedPropertyId));
-    }
     if (smStatusFilter !== 'all') {
       accounts = accounts.filter(group => group.paymentStatus === smStatusFilter);
     }
@@ -185,13 +171,10 @@ export default function ServiceChargesPage() {
         );
     }
     return accounts;
-  }, [processedData.clientOccupied, searchTerm, smStatusFilter, selectedPropertyId]);
+  }, [processedData.clientOccupied, searchTerm, smStatusFilter]);
 
   const finalFilteredManagedVacant = useMemo(() => {
     let accounts = processedData.managedVacant;
-    if (selectedPropertyId && selectedPropertyId !== 'all') {
-        accounts = accounts.filter(group => group.units.some(u => u.propertyId === selectedPropertyId));
-    }
     if (mvStatusFilter !== 'all') {
         accounts = accounts.filter(group => group.paymentStatus === mvStatusFilter);
     }
@@ -203,20 +186,17 @@ export default function ServiceChargesPage() {
         );
     }
     return accounts;
-  }, [processedData.managedVacant, searchTerm, mvStatusFilter, selectedPropertyId]);
+  }, [processedData.managedVacant, searchTerm, mvStatusFilter]);
 
   const finalFilteredArrears = useMemo(() => {
     let accounts = processedData.arrears;
-     if (selectedPropertyId && selectedPropertyId !== 'all') {
-        accounts = accounts.filter(ownerArrears => ownerArrears.units.some(u => u.propertyId === selectedPropertyId));
-    }
     if (!searchTerm) return accounts;
     const lowercasedFilter = searchTerm.toLowerCase();
     return accounts.filter(acc =>
         acc.ownerName.toLowerCase().includes(lowercasedFilter) ||
         acc.units.some(u => u.unitName.toLowerCase().includes(lowercasedFilter) || u.propertyName.toLowerCase().includes(lowercasedFilter))
     );
-  }, [processedData.arrears, searchTerm, selectedPropertyId]);
+  }, [processedData.arrears, searchTerm]);
 
   const smTotalPages = Math.ceil(finalFilteredSelfManaged.length / smPageSize);
   const paginatedSmAccounts = finalFilteredSelfManaged.slice((smCurrentPage - 1) * smPageSize, smCurrentPage * smPageSize);
@@ -254,99 +234,21 @@ export default function ServiceChargesPage() {
 
         if (!owner) throw new Error("Owner not found");
         
-        const ownerUnits: Unit[] = allProperties.flatMap(p =>
-            (p.units || []).filter(u => {
-                const isDirectlyAssigned = u.landlordId === owner.id;
-                const ownerWithAssignedUnits = owner as PropertyOwner;
-                const isAssignedViaOwnerObject = ownerWithAssignedUnits.assignedUnits?.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
-                return isDirectlyAssigned || isAssignedViaOwnerObject;
-            }).map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
-        );
-
-        const relevantTenants = allTenants.filter(t =>
-            t.residentType === 'Homeowner' &&
-            ownerUnits.some(u => u.propertyId === t.propertyId && u.name === t.unitName)
-        );
-        const relevantTenantIds = relevantTenants.map(t => t.id);
-        const allOwnerPayments = allPayments.filter(p => relevantTenantIds.includes(p.tenantId));
-
-        const allHistoricalTransactions: { date: Date, charge: number, payment: number }[] = [];
-
-        allOwnerPayments.forEach(p => {
-            allHistoricalTransactions.push({
-                date: new Date(p.date),
-                charge: 0,
-                payment: p.amount
-            });
-        });
-
-        ownerUnits.forEach(unit => {
-            const monthlyCharge = unit.serviceCharge || 0;
-            if (monthlyCharge <= 0) return;
-
-            const tenant = relevantTenants.find(t => t.propertyId === unit.propertyId && t.unitName === unit.name);
-
-            let firstBillableMonth: Date | null = null;
-            
-            if (tenant?.lease.lastBilledPeriod && tenant.lease.lastBilledPeriod.trim() !== '' && !/^\\d{4}-NaN$/.test(tenant.lease.lastBilledPeriod)) {
-                firstBillableMonth = startOfMonth(addMonths(new Date(tenant.lease.lastBilledPeriod + '-02'), 1));
-            } else if (unit.handoverStatus === 'Handed Over') {
-                const dateToUse = unit.handoverDate || tenant?.lease.startDate;
-                if (dateToUse) {
-                    const effectiveDate = new Date(dateToUse);
-                    if(isValid(effectiveDate)) {
-                        const handoverDay = effectiveDate.getDate();
-                        if (handoverDay <= 10) {
-                            firstBillableMonth = startOfMonth(effectiveDate);
-                        } else {
-                            firstBillableMonth = startOfMonth(addMonths(effectiveDate, 1));
-                        }
-                    }
-                }
-            }
-
-            if (firstBillableMonth) {
-                let loopDate = firstBillableMonth;
-                const endOfPeriod = new Date();
-                while (loopDate <= endOfPeriod) {
-                    allHistoricalTransactions.push({
-                        date: loopDate,
-                        charge: monthlyCharge,
-                        payment: 0,
-                    });
-                    loopDate = addMonths(loopDate, 1);
-                }
-            }
-        });
-
-        const combinedItems = [...allHistoricalTransactions].sort((a, b) => {
-            const dateDiff = a.date.getTime() - b.date.getTime();
-            if (dateDiff !== 0) return dateDiff;
-            if (a.charge > 0 && b.payment > 0) return -1;
-            if (a.payment > 0 && b.charge > 0) return 1;
-            return 0;
-        });
-
-        let runningBalance = 0;
-        combinedItems.forEach(item => {
-            runningBalance += item.charge;
-            runningBalance -= item.payment;
-        });
-        const totalBalanceDue = runningBalance > 0 ? runningBalance : 0;
-        
         const ownerAccounts = [ ...processedData.clientOccupied, ...processedData.managedVacant]
             .flatMap(g => g.units)
             .filter(acc => acc.ownerId === account.ownerId && acc.paymentStatus === 'Pending');
         
-        if (totalBalanceDue <= 0) {
-            toast({ title: "No Pending Charges", description: "This owner has no outstanding balance." });
+        const totalDue = ownerAccounts.reduce((sum, acc) => sum + acc.unitServiceCharge, 0);
+
+        if (totalDue <= 0) {
+            toast({ title: "No Pending Charges", description: "This owner has no outstanding balance for the current month." });
             stopLoading();
             return;
         }
 
         setOwnerForPayment(owner);
         setAccountsForPayment(ownerAccounts);
-        setTotalBalanceForDialog(totalBalanceDue);
+        setTotalBalanceForDialog(totalDue);
         setIsOwnerPaymentDialogOpen(true);
 
     } catch (error) {
@@ -362,13 +264,12 @@ export default function ServiceChargesPage() {
 
     startLoading(`Recording payment for ${ownerForPayment.name}...`);
     try {
-        let primaryTenant: Tenant | null = allTenants.find(t => t.residentType === 'Homeowner' && (t.userId === ownerForPayment.userId || t.email === ownerForPayment.email)) || null;
-
-        if (!primaryTenant && accountsForPayment.length > 0) {
-            const firstAccount = accountsForPayment[0];
-            const property = allProperties.find(p => p.id === firstAccount.propertyId);
-            const unit = property?.units.find(u => u.name === firstAccount.unitName);
-            
+        const accountToBill = accountsForPayment[0];
+        let tenantToBill: Tenant | null = allTenants.find(t => t.id === accountToBill.tenantId) || null;
+        
+        if (!tenantToBill) {
+            const property = allProperties.find(p => p.id === accountToBill.propertyId);
+            const unit = property?.units.find(u => u.name === accountToBill.unitName);
             if (property && unit) {
                 const ownerAsPropertyOwner: PropertyOwner = {
                     id: ownerForPayment.id,
@@ -379,19 +280,19 @@ export default function ServiceChargesPage() {
                     bankAccount: 'bankAccount' in ownerForPayment ? ownerForPayment.bankAccount : undefined,
                     assignedUnits: 'assignedUnits' in ownerForPayment ? ownerForPayment.assignedUnits : [],
                 };
-                primaryTenant = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
+                tenantToBill = await findOrCreateHomeownerTenant(ownerAsPropertyOwner, unit, property.id);
             }
         }
         
-        if (!primaryTenant) {
+        if (!tenantToBill) {
             throw new Error(`Could not find or create a resident account for ${ownerForPayment.name} to record the payment against.`);
         }
 
         await addPayment({
-            tenantId: primaryTenant.id,
+            tenantId: tenantToBill.id,
             amount: paymentData.amount,
             date: format(paymentData.date, 'yyyy-MM-dd'),
-            notes: paymentData.notes || `Consolidated service charge payment for ${ownerForPayment.name}`,
+            notes: paymentData.notes || `Service charge payment for ${ownerForPayment.name}`,
             rentForMonth: paymentData.forMonth,
             status: 'Paid',
             type: 'ServiceCharge',
@@ -438,7 +339,6 @@ export default function ServiceChargesPage() {
 
   const statusFilterNode = useMemo(() => {
       if (activeTab === 'arrears') return null;
-
       const isSm = activeTab === 'client-occupied';
       const filterValue = isSm ? smStatusFilter : mvStatusFilter;
       const handler = isSm ? handleSmStatusFilterChange : handleMvStatusFilterChange;
@@ -456,7 +356,6 @@ export default function ServiceChargesPage() {
             </SelectContent>
         </Select>
       );
-
   }, [activeTab, smStatusFilter, mvStatusFilter, handleSmStatusFilterChange, handleMvStatusFilterChange]);
 
   return (
@@ -485,7 +384,7 @@ export default function ServiceChargesPage() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {(displayedStats.stats || []).map((stat, index) => (
+                {displayedStats.map((stat, index) => (
                     <Card key={index}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
@@ -496,7 +395,6 @@ export default function ServiceChargesPage() {
                         </CardContent>
                     </Card>
                 ))}
-                {displayedStats.stats.length === 2 && <div className="hidden md:block lg:col-span-2" />}
             </div>
         </div>
       </div>
@@ -593,8 +491,6 @@ export default function ServiceChargesPage() {
 }
 
 const ServiceChargeStatusTable = ({
-    title,
-    description,
     accounts,
     onConfirmPayment,
     onViewHistory,
@@ -633,16 +529,12 @@ const ServiceChargeStatusTable = ({
     
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-            </CardHeader>
             <CardContent className="p-0">
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Owner</TableHead>
-                            <TableHead>Units</TableHead>
+                            <TableHead>Units ({totalItems})</TableHead>
                             <TableHead>Total S. Charge</TableHead>
                             <TableHead>Payment Status</TableHead>
                             <TableHead>Actions</TableHead>
