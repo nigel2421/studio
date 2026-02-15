@@ -2,7 +2,7 @@ import { performSendArrearsReminder, performSendServiceChargeInvoice, getMainten
 import { getTenant, logCommunication } from '@/lib/data';
 import { sendCustomEmail } from '@/lib/firebase';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
-import { generateMaintenanceResponseDraft } from '@/ai/flows/automated-maintenance-response-drafts';
+import { generateMaintenanceResponseDraft, MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 
 // Mock dependencies
 jest.mock('@/lib/data');
@@ -90,11 +90,13 @@ describe('Server Actions', () => {
 
     describe('getMaintenanceResponseDraft', () => {
         it('should return AI draft on success', async () => {
-            const mockInput = {
+            const mockInput: MaintenanceRequestInput = {
                 tenantName: 'John',
                 propertyAddress: '123 St',
-                requestDetails: 'Leaking tap',
-                urgency: 'high' as const,
+                title: 'Leaking tap',
+                description: 'The tap in the kitchen is leaking.',
+                category: 'Plumbing',
+                priority: 'High',
             };
             const mockOutput = { draftResponse: 'Hello John...', suggestedActions: 'Call plumber' };
             (generateMaintenanceResponseDraft as unknown as jest.Mock).mockResolvedValue(mockOutput);

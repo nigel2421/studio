@@ -5,7 +5,7 @@ import { useLoading } from "@/hooks/useLoading";
 import { useToast } from "@/hooks/use-toast";
 import { getAllMaintenanceRequestsForReport, getAllPaymentsForReport, getProperties, getTenants } from "@/lib/data";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
-import { UnitOrientation, unitOrientations, UnitType, unitTypes } from "@/lib/types";
+import { Payment, MaintenanceRequest, Tenant, Property, Unit, UnitOrientation, unitOrientations, UnitType, unitTypes } from "@/lib/types";
 import { isSameMonth } from "date-fns";
 import { FileDown, Loader2 } from "lucide-react";
 
@@ -43,29 +43,29 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
             getProperties()
           ]);
     
-          const propertyForReport = allPropertiesForReport.find(p => p.id === propertyId);
+          const propertyForReport = allPropertiesForReport.find((p: Property) => p.id === propertyId);
           if (!propertyForReport) return;
     
-          const tenantsForProp = allTenantsForReport.filter(t => t.propertyId === propertyId);
-          const maintenanceForProp = allMaintenanceForReport.filter(m => m.propertyId === propertyId);
-          const tenantIds = new Set(tenantsForProp.map(t => t.id));
-          const paymentsForProp = allPaymentsForReport.filter(p => tenantIds.has(p.tenantId));
+          const tenantsForProp = allTenantsForReport.filter((t: Tenant) => t.propertyId === propertyId);
+          const maintenanceForProp = allMaintenanceForReport.filter((m: MaintenanceRequest) => m.propertyId === propertyId);
+          const tenantIds = new Set(tenantsForProp.map((t: Tenant) => t.id));
+          const paymentsForProp = allPaymentsForReport.filter((p: Payment) => tenantIds.has(p.tenantId));
     
           const totalTenants = tenantsForProp.length;
           const totalUnits = propertyForReport.units?.length || 0;
           
-          const occupiedUnits = new Set(tenantsForProp.map(t => t.unitName)).size;
+          const occupiedUnits = new Set(tenantsForProp.map((t: Tenant) => t.unitName)).size;
           const vacantUnits = totalUnits - occupiedUnits;
           const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
           
-          const pendingMaintenance = maintenanceForProp.filter(r => r.status !== 'Completed').length;
-          const totalArrears = tenantsForProp.reduce((sum, t) => sum + (t.dueBalance || 0), 0);
+          const pendingMaintenance = maintenanceForProp.filter((r: MaintenanceRequest) => r.status !== 'Completed').length;
+          const totalArrears = tenantsForProp.reduce((sum: number, t: Tenant) => sum + (t.dueBalance || 0), 0);
           
-          const totalMgmtFees = paymentsForProp.reduce((sum, p) => {
+          const totalMgmtFees = paymentsForProp.reduce((sum: number, p: Payment) => {
             if (p.type === 'Deposit') return sum;
-            const tenant = tenantsForProp.find(t => t.id === p.tenantId);
+            const tenant = tenantsForProp.find((t: Tenant) => t.id === p.tenantId);
             if (!tenant) return sum;
-            const unit = propertyForReport.units.find(u => u.name === tenant.unitName);
+            const unit = propertyForReport.units.find((u: Unit) => u.name === tenant.unitName);
             const breakdown = calculateTransactionBreakdown(p, unit, tenant);
             return sum + breakdown.managementFee;
           }, 0);
@@ -82,8 +82,8 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
           ];
     
           const collectedThisMonth = paymentsForProp
-            .filter(p => p.status === 'Paid' && isSameMonth(new Date(p.date), new Date()))
-            .reduce((sum, p) => sum + p.amount, 0);
+            .filter((p: Payment) => p.status === 'Paid' && isSameMonth(new Date(p.date), new Date()))
+            .reduce((sum: number, p: Payment) => sum + p.amount, 0);
     
           const financialDataForPDF = [
             { name: 'Collected This Month', amount: collectedThisMonth },
@@ -95,11 +95,11 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
             unitTypes.forEach(type => {
               breakdown[type] = { smRent: 0, landlordRent: 0 };
             });
-            const rentPayments = paymentsForProp.filter(p => p.status === 'Paid' && p.type === 'Rent');
-            rentPayments.forEach(payment => {
-              const tenant = tenantsForProp.find(t => t.id === payment.tenantId);
+            const rentPayments = paymentsForProp.filter((p: Payment) => p.status === 'Paid' && p.type === 'Rent');
+            rentPayments.forEach((payment: Payment) => {
+              const tenant = tenantsForProp.find((t: Tenant) => t.id === payment.tenantId);
               if (!tenant) return;
-              const unit = propertyForReport.units.find(u => u.name === tenant.unitName);
+              const unit = propertyForReport.units.find((u: Unit) => u.name === tenant.unitName);
               if (!unit || !unit.unitType) return;
               if (breakdown[unit.unitType]) {
                 if (unit.ownership === 'SM') {
@@ -117,11 +117,11 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
     
           const maintenanceBreakdownForPDF = (['New', 'In Progress', 'Completed'] as const).map(status => ({
             status,
-            count: maintenanceForProp.filter(r => r.status === status).length
+            count: maintenanceForProp.filter((r: MaintenanceRequest) => r.status === status).length
           }));
     
           const orientationCounts: { [key in UnitOrientation]?: number } = {};
-          propertyForReport.units.forEach(unit => {
+          propertyForReport.units.forEach((unit: Unit) => {
             if (unit.unitOrientation) {
               orientationCounts[unit.unitOrientation] = (orientationCounts[unit.unitOrientation] || 0) + 1;
             }

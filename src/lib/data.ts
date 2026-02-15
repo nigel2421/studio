@@ -404,6 +404,79 @@ export async function getPayment(id: string): Promise<Payment | null> {
     return cacheService.getOrFetch('payments', id, () => getDocument<Payment>('payments', id), 60000);
 }
 
+export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Unit, propertyId: string): Promise<Tenant> {
+    const tenantsRef = collection(db, 'tenants');
+    const q = query(
+        tenantsRef,
+        where("propertyId", "==", propertyId),
+        where("unitName", "==", unit.name),
+        where("residentType", "==", "Homeowner"),
+        limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Tenant;
+    }
+
+    const serviceCharge = unit.serviceCharge || 0;
+    const handoverDate = unit?.handoverDate ? new Date(unit.handoverDate) : new Date();
+    const handoverDay = handoverDate.getDate();
+
+    let lastBilledPeriod: string;
+    let firstBillableMonth: Date;
+
+    if (handoverDay <= 10) {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+    } else {
+        firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+    }
+    lastBilledPeriod = format(addMonths(firstBillableMonth, -1), 'yyyy-MM');
+
+
+    const newTenantData = {
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone,
+        idNumber: 'N/A',
+        propertyId: propertyId,
+        unitName: unit.name,
+        agent: 'Susan' as const,
+        status: 'active' as const,
+        residentType: 'Homeowner' as const,
+        lease: {
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
+            rent: 0,
+            serviceCharge: serviceCharge,
+            paymentStatus: 'Paid' as const, // Start as paid, reconciliation will create first charge.
+            lastBilledPeriod: lastBilledPeriod, // Set to month before first charge
+        },
+        securityDeposit: 0,
+        waterDeposit: 0,
+        dueBalance: 0, // Start with zero balance
+        accountBalance: 0,
+        userId: owner.userId,
+    };
+
+    const tenantDocRef = await addDoc(tenantsRef, newTenantData);
+    cacheService.clear('tenants');
+    await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
+
+    // Also update the User profile if it exists and doesn't have a tenantId yet.
+    // We don't want to overwrite a primary tenantId if they are also a tenant elsewhere.
+    if (owner.userId) {
+        const userRef = doc(db, 'users', owner.userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && !userSnap.data().tenantId) {
+            await updateDoc(userRef, { tenantId: tenantDocRef.id });
+            cacheService.clear('users');
+        }
+    }
+
+    return { id: tenantDocRef.id, ...newTenantData } as Tenant;
+}
+
 export async function addTenant(data: {
     name: string;
     email: string;
@@ -987,7 +1060,6 @@ export async function batchProcessPayments(
         }
     }
 }
-
 export async function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
     await addDoc(collection(db, 'tasks'), {
         ...taskData,

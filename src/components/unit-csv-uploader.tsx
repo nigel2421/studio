@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef } from 'react';
@@ -94,7 +93,7 @@ export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
                 <div className="max-h-60 overflow-y-auto">
                     <p>There were errors in your CSV file:</p>
                     <ul className="list-disc pl-5 mt-2 text-xs">
-                        {updateErrors.slice(0,5).map((e, i) => <li key={i}>{e}</li>)}
+                        {updateErrors.slice(0,5).map((e: string, i: number) => <li key={i}>{e}</li>)}
                         {updateErrors.length > 5 && <li>...and {updateErrors.length-5} more errors.</li>}
                     </ul>
                 </div>
@@ -157,7 +156,7 @@ export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
             <Label htmlFor="csv-file">CSV File</Label>
             <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} ref={fileInputRef} />
           </div>
-          <Button variant="link" type="button" onClick={handleDownloadTemplate} className="justify-start p-0 h-auto">
+           <Button variant="link" type="button" onClick={handleDownloadTemplate} className="justify-start p-0 h-auto">
             <FileDown className="mr-2 h-4 w-4" />
             Download CSV Template
           </Button>

@@ -46,9 +46,9 @@ export default function CommunicationsPage() {
 
   const fetchData = async () => {
     const comms = await getCommunications();
-    setCommunications(comms.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    setCommunications(comms.sort((a: Communication, b: Communication) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 
-    const userIds = [...new Set(comms.map(c => c.senderId))];
+    const userIds = [...new Set(comms.map((c: Communication) => c.senderId))].filter((id): id is string => !!id);
     const userPromises = userIds.map(id => getUserProfile(id));
     const userResults = await Promise.all(userPromises);
 

@@ -1,4 +1,4 @@
-import { generateMaintenanceResponseDraft } from './automated-maintenance-response-drafts';
+import { generateMaintenanceResponseDraft, MaintenanceRequestInput } from './automated-maintenance-response-drafts';
 import { ai } from '@/ai/genkit';
 
 // Mock the AI instance
@@ -31,11 +31,13 @@ describe('Maintenance Response AI Flow', () => {
         };
         (ai.generate as jest.Mock).mockResolvedValue({ output: mockOutput });
 
-        const input = {
+        const input: MaintenanceRequestInput = {
             tenantName: 'Jane Smith',
             propertyAddress: 'Apt 4B, Hilltop',
-            requestDetails: 'Blocked sink',
-            urgency: 'medium' as const,
+            title: 'Blocked Sink',
+            description: 'The sink in the main kitchen is blocked and water is not draining.',
+            category: 'Plumbing',
+            priority: 'Medium',
         };
 
         const result = await generateMaintenanceResponseDraft(input);
@@ -49,11 +51,13 @@ describe('Maintenance Response AI Flow', () => {
     it('should throw error if AI generation fails', async () => {
         (ai.generate as jest.Mock).mockRejectedValue(new Error('AI Generation Error'));
 
-        const input = {
+        const input: MaintenanceRequestInput = {
             tenantName: 'Jane Smith',
             propertyAddress: 'Apt 4B, Hilltop',
-            requestDetails: 'Blocked sink',
-            urgency: 'medium' as const,
+            title: 'Blocked Sink',
+            description: 'The sink in the main kitchen is blocked and water is not draining.',
+            category: 'Plumbing',
+            priority: 'Medium',
         };
 
         await expect(generateMaintenanceResponseDraft(input)).rejects.toThrow('AI Generation Error');

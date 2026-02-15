@@ -57,7 +57,7 @@ export default function UniversalOwnerDashboardPage() {
                 getAllWaterReadings(),
             ]);
 
-            const owner = allLandlords.find(l => l.id === effectiveOwnerId) || allPropertyOwners.find(o => o.id === effectiveOwnerId);
+            const owner: Landlord | PropertyOwner | undefined = allLandlords.find((l: Landlord) => l.id === effectiveOwnerId) || allPropertyOwners.find((o: PropertyOwner) => o.id === effectiveOwnerId);
 
             if (!owner) {
                 setLoading(false);
@@ -65,8 +65,8 @@ export default function UniversalOwnerDashboardPage() {
                 return;
             }
 
-            const ownedUnits: Unit[] = allProperties.flatMap(p =>
-                (p.units || []).filter(u => {
+            const ownedUnits: Unit[] = allProperties.flatMap((p: Property) =>
+                (p.units || []).filter((u: Unit) => {
                     if (isAdmin && effectiveOwnerId === 'soil_merchants_internal') {
                         return u.ownership === 'SM';
                     }
@@ -77,7 +77,7 @@ export default function UniversalOwnerDashboardPage() {
                         return u.landlordId === effectiveOwnerId;
                     }
                     return false;
-                }).map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
+                }).map((u: Unit) => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
             
             const uniqueOwnedUnits = Array.from(new Map(ownedUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values());
@@ -89,7 +89,7 @@ export default function UniversalOwnerDashboardPage() {
                 setDashboardType('landlord');
                 
                 const landlordProperties: { property: Property; units: Unit[] }[] = [];
-                allProperties.forEach(p => {
+                allProperties.forEach((p: Property) => {
                     const unitsForProp = uniqueOwnedUnits.filter(u => u.propertyId === p.id);
                     if (unitsForProp.length > 0) {
                         landlordProperties.push({ property: p, units: unitsForProp });
@@ -97,9 +97,9 @@ export default function UniversalOwnerDashboardPage() {
                 });
 
                 const ownedUnitIdentifiers = new Set(uniqueOwnedUnits.map(u => `${u.propertyId}-${u.name}`));
-                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                const relevantTenantIds = new Set(relevantTenants.map(t => t.id));
-                const relevantPayments = allPayments.filter(p => relevantTenantIds.has(p.tenantId));
+                const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                const relevantTenantIds = new Set(relevantTenants.map((t: Tenant) => t.id));
+                const relevantPayments = allPayments.filter((p: Payment) => relevantTenantIds.has(p.tenantId));
 
                 const financialSummary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
                 
@@ -112,17 +112,17 @@ export default function UniversalOwnerDashboardPage() {
                 });
             } else if (isClient) {
                 setDashboardType('homeowner');
-                const homeownerTenantProfiles = allTenants.filter(t => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
+                const homeownerTenantProfiles = allTenants.filter((t: Tenant) => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
                 const primaryTenantProfile = homeownerTenantProfiles.length > 0 ? homeownerTenantProfiles[0] : null;
 
-                const tenantIds = homeownerTenantProfiles.map(t => t.id);
+                const tenantIds = homeownerTenantProfiles.map((t: Tenant) => t.id);
 
                 let paymentData: Payment[] = [];
                 let waterData: WaterMeterReading[] = [];
 
                 if (tenantIds.length > 0) {
-                    const paymentPromises = tenantIds.map(id => getTenantPayments(id));
-                    const waterPromises = tenantIds.map(id => getTenantWaterReadings(id));
+                    const paymentPromises = tenantIds.map((id: string) => getTenantPayments(id));
+                    const waterPromises = tenantIds.map((id: string) => getTenantWaterReadings(id));
                     
                     const paymentResults = await Promise.all(paymentPromises);
                     const waterResults = await Promise.all(waterPromises);
@@ -167,12 +167,12 @@ export default function UniversalOwnerDashboardPage() {
                 const allTenants = await getTenants();
                 
                 const landlordProperties: { property: Property; units: Unit[] }[] = [];
-                const ownedUnits = allProperties.flatMap(p => 
-                    (p.units || []).filter(u => u.landlordId === entity.id || (entity.id === "soil_merchants_internal" && u.ownership === 'SM'))
-                    .map(u => ({...u, propertyId: p.id, propertyName: p.name}))
+                const ownedUnits = allProperties.flatMap((p: Property) => 
+                    (p.units || []).filter((u: Unit) => u.landlordId === entity.id || (entity.id === "soil_merchants_internal" && u.ownership === 'SM'))
+                    .map((u: Unit) => ({...u, propertyId: p.id, propertyName: p.name}))
                 );
                 
-                allProperties.forEach(p => {
+                allProperties.forEach((p: Property) => {
                     const unitsForProp = ownedUnits.filter(u => u.propertyId === p.id);
                     if(unitsForProp.length > 0) {
                         landlordProperties.push({property: p, units: unitsForProp});
@@ -180,11 +180,11 @@ export default function UniversalOwnerDashboardPage() {
                 });
     
                 const ownedUnitIdentifiers = new Set(ownedUnits.map(u => `${u.propertyId}-${u.name}`));
-                const relevantTenants = allTenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                const relevantTenantIds = new Set(relevantTenants.map(t => t.id));
+                const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+                const relevantTenantIds = new Set(relevantTenants.map((t: Tenant) => t.id));
     
                 const allPayments = await getAllPaymentsForReport();
-                const relevantPayments = allPayments.filter(p => 
+                const relevantPayments = allPayments.filter((p: Payment) => 
                     relevantTenantIds.has(p.tenantId) && 
                     isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
                 );
