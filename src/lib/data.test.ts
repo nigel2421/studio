@@ -1,5 +1,5 @@
 // Import all exports from data.ts to allow spying
-import { getLandlord, getPropertyOwner, getUsers, deleteLandlord, deletePropertyOwner, addWaterMeterReading } from './data';
+import * as data from './data';
 import { cacheService } from './cache'; // Import the cache service
 
 // Import types for mock data
@@ -45,28 +45,6 @@ describe('Data Logic in `data.ts`', () => {
         cacheService.clear();
     });
 
-    // Test suite for the dynamic role assignment in getUsers
-    describe('getUsers Role Differentiation', () => {
-        it('should correctly identify a user as a "landlord"', async () => {
-            // This test is complex due to the chained data fetching.
-            // For now, we'll focus on the more direct data manipulation tests.
-            // A full mock of getProperties, getLandlords etc. would be needed.
-            expect(true).toBe(true);
-        });
-
-        it('should correctly identify a user as a "homeowner"', async () => {
-            expect(true).toBe(true);
-        });
-
-        it('should prioritize "landlord" role for mixed-ownership users', async () => {
-            expect(true).toBe(true);
-        });
-
-        it('should not change the role for a user not linked to any properties', async () => {
-            expect(true).toBe(true);
-        });
-    });
-
     describe('Data Deletion Functions', () => {
         // Helper to mock the Firestore batch write operation
         const createMockBatch = () => {
@@ -101,7 +79,7 @@ describe('Data Logic in `data.ts`', () => {
             const batch = createMockBatch();
 
             // Act
-            await deleteLandlord(landlordId);
+            await data.deleteLandlord(landlordId);
 
             // Assert
             expect(batch.commit).toHaveBeenCalled();
@@ -110,7 +88,7 @@ describe('Data Logic in `data.ts`', () => {
         });
 
         it('should throw an error if trying to delete the internal Soil Merchants profile', async () => {
-            await expect(deleteLandlord('soil_merchants_internal')).rejects.toThrow(
+            await expect(data.deleteLandlord('soil_merchants_internal')).rejects.toThrow(
                 "Cannot delete the internal Soil Merchants profile."
             );
         });
@@ -127,7 +105,7 @@ describe('Data Logic in `data.ts`', () => {
             const batch = createMockBatch();
 
             // Act
-            await deletePropertyOwner(ownerId);
+            await data.deletePropertyOwner(ownerId);
 
             // Assert
             expect(batch.commit).toHaveBeenCalled();
@@ -188,7 +166,7 @@ describe('Data Logic in `data.ts`', () => {
             mockAddDoc.mockResolvedValue(undefined);
 
             // Act
-            await addWaterMeterReading(readingData, new Date('2024-02-20'));
+            await data.addWaterMeterReading(readingData, new Date('2024-02-20'));
 
             // Assert
             // 1. Check that a water reading was added with correct details

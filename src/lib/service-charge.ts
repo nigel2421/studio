@@ -1,6 +1,6 @@
 
 import { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
-import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore } from 'date-fns';
+import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore, differenceInMonths } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
 export interface ServiceChargeAccount {
@@ -136,10 +136,14 @@ export function processServiceChargeData(
             const handoverDate = parseISO(unit.handoverDate);
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const waivedMonth1 = startOfMonth(handoverDate);
-                const waivedMonth2 = handoverDay > 10 ? startOfMonth(addMonths(handoverDate, 1)) : null;
-
-                if (isSameMonth(selectedMonth, waivedMonth1) || (waivedMonth2 && isSameMonth(selectedMonth, waivedMonth2))) {
+                let firstBillableMonth: Date;
+                if (handoverDay <= 10) {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+                } else {
+                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+                }
+                
+                if (isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
                     isWaived = true;
                 }
             }
@@ -216,65 +220,64 @@ export function processServiceChargeData(
 
         if (ownedVacantUnits.length === 0) continue;
 
-        const associatedTenant = allTenants.find(t => t.userId === owner.userId && t.residentType === 'Homeowner');
-        const representativeTenant = associatedTenant || {
-            id: `dummy-${owner.id}`, name: owner.name, email: owner.email, phone: owner.phone, residentType: 'Homeowner',
-            propertyId: '', unitName: '', dueBalance: 0, accountBalance: 0,
-            lease: { startDate: '2000-01-01', rent: 0, paymentStatus: 'Pending', endDate: '2100-01-01' },
-            idNumber: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, userId: owner.userId
-        };
-        
-        const allAssociatedPayments = allPayments.filter(p => associatedTenant && p.tenantId === associatedTenant.id);
+        let totalDueForOwner = 0;
+        const unitsWithArrears: VacantArrearsAccount['units'] = [];
 
-        const { finalDueBalance, ledger } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, [], owner, selectedMonth, { includeRent: false, includeWater: false, includeServiceCharge: true });
+        for (const unit of ownedVacantUnits) {
+            if (!unit.handoverDate || !unit.serviceCharge || unit.serviceCharge <= 0) continue;
+            
+            const handoverDate = parseISO(unit.handoverDate);
+            const handoverDay = handoverDate.getDate();
+            let firstBillableMonth: Date;
 
-        if (finalDueBalance > 0) {
-            const arrearBreakdownForOwner: VacantArrearsAccount = {
+            if (handoverDay <= 10) {
+                // If handed over on or before the 10th, the next month is the first billable one.
+                // e.g., Handover Jan 10 -> Waive Jan -> Bill Feb.
+                firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
+            } else {
+                // If handed over after the 10th, the next TWO months are waived.
+                // e.g., Handover Jan 11 -> Waive Jan, Waive Feb -> Bill March.
+                firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
+            }
+            
+            if (isAfter(firstBillableMonth, selectedMonth)) {
+                continue; // Not yet billable as of the selected date
+            }
+
+            const monthsOfArrears = differenceInMonths(startOfMonth(selectedMonth), firstBillableMonth) + 1;
+            
+            if (monthsOfArrears <= 0) continue;
+
+            const totalDueForUnit = monthsOfArrears * unit.serviceCharge;
+            totalDueForOwner += totalDueForUnit;
+
+            const arrearsDetail: VacantArrearsAccount['units'][0]['arrearsDetail'] = [];
+            for (let i = 0; i < monthsOfArrears; i++) {
+                const month = format(addMonths(firstBillableMonth, i), 'MMM yyyy');
+                arrearsDetail.push({ month, amount: unit.serviceCharge, status: 'Pending' });
+            }
+            
+            unitsWithArrears.push({
+                unit,
+                property: unit.property,
+                unitName: unit.name,
+                propertyId: unit.property.id,
+                propertyName: unit.property.name,
+                unitHandoverDate: unit.handoverDate,
+                monthsInArrears,
+                totalDue: totalDueForUnit,
+                arrearsDetail,
+            });
+        }
+
+        if (totalDueForOwner > 0) {
+            vacantArrears.push({
                 ownerId: owner.id,
                 ownerName: owner.name,
-                owner,
-                totalDue: finalDueBalance,
-                units: [],
-            };
-            
-            const pendingCharges = ledger.filter(l => l.charge > 0 && l.payment === 0);
-            
-            const chargesByUnit = new Map<string, { unit: Unit, property: Property, arrearsDetail: { month: string, amount: number, status: 'Pending' }[] }>();
-
-            for (const charge of pendingCharges) {
-                 const unitNameMatch = charge.description.match(/Unit: ([\w-]+)/);
-                 if (unitNameMatch) {
-                    const unitName = unitNameMatch[1];
-                    const unitInfo = ownedVacantUnits.find(u => u.name === unitName);
-                    if (unitInfo) {
-                         if (!chargesByUnit.has(unitName)) {
-                            chargesByUnit.set(unitName, { unit: unitInfo, property: unitInfo.property, arrearsDetail: [] });
-                        }
-                        chargesByUnit.get(unitName)!.arrearsDetail.push({
-                            month: charge.forMonth || 'Unknown',
-                            amount: charge.charge,
-                            status: 'Pending'
-                        });
-                    }
-                 }
-            }
-
-            chargesByUnit.forEach((data, unitName) => {
-                 const totalDueForUnit = data.arrearsDetail.reduce((sum, item) => sum + item.amount, 0);
-                 arrearBreakdownForOwner.units.push({
-                     ...data,
-                     unitName,
-                     propertyId: data.property.id,
-                     propertyName: data.property.name,
-                     unitHandoverDate: data.unit.handoverDate || 'N/A',
-                     monthsInArrears: data.arrearsDetail.length,
-                     totalDue: totalDueForUnit,
-                 });
+                owner: owner,
+                totalDue: totalDueForOwner,
+                units: unitsWithArrears
             });
-            
-            if (arrearBreakdownForOwner.units.length > 0) {
-                 vacantArrears.push(arrearBreakdownForOwner);
-            }
         }
     }
 

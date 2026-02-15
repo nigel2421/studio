@@ -3,6 +3,7 @@ import { getTenant, logCommunication } from '@/lib/data';
 import { sendCustomEmail } from '@/lib/firebase';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { generateMaintenanceResponseDraft, MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
+import { Tenant } from '@/lib/types';
 
 // Mock dependencies
 jest.mock('@/lib/data');
@@ -17,12 +18,12 @@ describe('Server Actions', () => {
 
     describe('performSendArrearsReminder', () => {
         it('should send reminder if tenant has due balance', async () => {
-            const mockTenant = {
+            const mockTenant: Tenant = {
                 id: 't1',
                 name: 'John Doe',
                 email: 'john@example.com',
                 dueBalance: 5000,
-            };
+            } as Tenant;
             (getTenant as unknown as jest.Mock).mockResolvedValue(mockTenant);
             (sendCustomEmail as unknown as jest.Mock).mockResolvedValue({ success: true, data: {} });
 

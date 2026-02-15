@@ -84,10 +84,6 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
 }
 
 
-async function getAllUsers(): Promise<UserProfile[]> {
-    return cacheService.getOrFetch('users', 'all', () => getCollection<UserProfile>('users'), 300000);
-}
-
 async function getCollection<T>(collectionOrQuery: string | Query, queryConstraints: any[] = []): Promise<T[]> {
     let q: Query;
     if (typeof collectionOrQuery === 'string') {
@@ -109,15 +105,9 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
         return null;
     }
 }
-
-export async function getLandlords(): Promise<Landlord[]> {
-    return cacheService.getOrFetch('landlords', 'all', () => getCollection<Landlord>('landlords'), 300000);
+async function getAllUsers(): Promise<UserProfile[]> {
+    return cacheService.getOrFetch('users', 'all', () => getCollection<UserProfile>('users'), 300000);
 }
-
-export async function getPropertyOwners(): Promise<PropertyOwner[]> {
-    return cacheService.getOrFetch('propertyOwners', 'all', () => getCollection<PropertyOwner>('propertyOwners'), 300000);
-}
-
 export async function getProperties(forceRefresh = false): Promise<Property[]> {
     if (forceRefresh) {
         cacheService.clear('properties');
@@ -135,6 +125,14 @@ export async function getProperties(forceRefresh = false): Promise<Property[]> {
             return a.name.localeCompare(b.name);
         });
     }, 300000);
+}
+
+export async function getLandlords(): Promise<Landlord[]> {
+    return cacheService.getOrFetch('landlords', 'all', () => getCollection<Landlord>('landlords'), 300000);
+}
+
+export async function getPropertyOwners(): Promise<PropertyOwner[]> {
+    return cacheService.getOrFetch('propertyOwners', 'all', () => getCollection<PropertyOwner>('propertyOwners'), 300000);
 }
 
 

@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCommunications, getUserProfile, getProperties, getTenants, logActivity, getLandlords, getPropertyOwners } from '@/lib/data';
+import { getCommunications, getUserProfile, getProperties, getTenants, logCommunication, getLandlords, getPropertyOwners } from '@/lib/data';
 import type { Log, UserProfile, Property, Tenant, Landlord, PropertyOwner, Communication } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

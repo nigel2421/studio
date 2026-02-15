@@ -1,9 +1,10 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
 import { useLoading } from "@/hooks/useLoading";
 import { useToast } from "@/hooks/use-toast";
-import { getAllMaintenanceRequestsForReport, getAllPaymentsForReport, getProperties, getTenants } from "@/lib/data";
+import { getAllMaintenanceRequestsForReport, getProperties, getTenants, getAllPaymentsForReport } from "@/lib/data";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 import { Payment, MaintenanceRequest, Tenant, Property, Unit, UnitOrientation, unitOrientations, UnitType, unitTypes } from "@/lib/types";
 import { isSameMonth } from "date-fns";
@@ -103,9 +104,9 @@ export function ExportPdfButton({ propertyId, propertyName }: ExportPdfButtonPro
               if (!unit || !unit.unitType) return;
               if (breakdown[unit.unitType]) {
                 if (unit.ownership === 'SM') {
-                  breakdown[unit.unitType]!.smRent += payment.amount;
+                  breakdown[unit.unitType as UnitType]!.smRent += payment.amount;
                 } else if (unit.ownership === 'Landlord') {
-                  breakdown[unit.unitType]!.landlordRent += payment.amount;
+                  breakdown[unit.unitType as UnitType]!.landlordRent += payment.amount;
                 }
               }
             });
