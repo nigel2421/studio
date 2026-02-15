@@ -1,6 +1,7 @@
 
+
 import { Tenant, Unit, Property } from '@/lib/types';
-import { getProperties, getTenants, getAllPendingWaterBills } from '@/lib/data';
+import { getProperties, getTenants, getAllWaterReadings } from '@/lib/data';
 
 /**
  * @fileOverview Service Charge Arrears Management
@@ -29,10 +30,12 @@ export interface LandlordArrearsSummary {
  * @returns A sorted list of tenants with their arrears amount.
  */
 export async function getTenantsInArrears(): Promise<{ tenant: Tenant; arrears: number }[]> {
-  const [allTenants, allPendingWaterBills] = await Promise.all([
+  const [allTenants, allWaterReadings] = await Promise.all([
     getTenants(),
-    getAllPendingWaterBills()
+    getAllWaterReadings()
   ]);
+
+  const allPendingWaterBills = allWaterReadings.filter(bill => bill.status !== 'Paid');
 
   const pendingBillsByTenant = new Map<string, number>();
   allPendingWaterBills.forEach(bill => {
@@ -64,12 +67,14 @@ export async function getTenantsInArrears(): Promise<{ tenant: Tenant; arrears: 
 export async function getLandlordArrearsBreakdown(
   landlordId: string
 ): Promise<LandlordArrearsSummary> {
-  const [allProperties, allTenants, allPendingWaterBills] = await Promise.all([
+  const [allProperties, allTenants, allWaterReadings] = await Promise.all([
     getProperties(),
     getTenants(),
-    getAllPendingWaterBills()
+    getAllWaterReadings()
   ]);
   
+  const allPendingWaterBills = allWaterReadings.filter(bill => bill.status !== 'Paid');
+
   const pendingBillsByTenant = new Map<string, number>();
   allPendingWaterBills.forEach(bill => {
       const total = pendingBillsByTenant.get(bill.tenantId) || 0;

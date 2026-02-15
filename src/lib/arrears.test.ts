@@ -1,18 +1,18 @@
 
 import { getTenantsInArrears, getLandlordArrearsBreakdown } from './arrears';
-import { getTenants, getProperties, getAllPendingWaterBills } from './data';
+import { getTenants, getProperties, getAllWaterReadings } from './data';
 import { Tenant, Property, Unit, WaterMeterReading } from './types';
 
 // Mock the data fetching functions
 jest.mock('./data', () => ({
   getTenants: jest.fn(),
   getProperties: jest.fn(),
-  getAllPendingWaterBills: jest.fn(),
+  getAllWaterReadings: jest.fn(),
 }));
 
 const mockGetTenants = getTenants as jest.Mock;
 const mockGetProperties = getProperties as jest.Mock;
-const mockGetAllPendingWaterBills = getAllPendingWaterBills as jest.Mock;
+const mockGetAllWaterReadings = getAllWaterReadings as jest.Mock;
 
 // Helper to create mock data
 const createMockTenant = (id: string, dueBalance: number, propertyId = 'prop-1', unitName = 'A1'): Tenant => ({
@@ -39,7 +39,7 @@ const createMockTenant = (id: string, dueBalance: number, propertyId = 'prop-1',
   dueBalance,
 });
 
-const createMockWaterBill = (tenantId: string, amount: number): WaterMeterReading => ({
+const createMockWaterBill = (tenantId: string, amount: number, status: 'Paid' | 'Pending' = 'Pending'): WaterMeterReading => ({
     id: `water-${tenantId}`,
     tenantId,
     amount,
@@ -51,7 +51,7 @@ const createMockWaterBill = (tenantId: string, amount: number): WaterMeterReadin
     rate: 150,
     date: '2024-01-15',
     createdAt: new Date().toISOString(),
-    status: 'Pending'
+    status,
 });
 
 const createMockUnit = (name: string, landlordId?: string, handoverStatus: 'Handed Over' | 'Pending Hand Over' = 'Handed Over', serviceCharge = 1000): Unit => ({
@@ -70,7 +70,7 @@ describe('Arrears Logic', () => {
         // Clear all mocks before each test
         mockGetTenants.mockClear();
         mockGetProperties.mockClear();
-        mockGetAllPendingWaterBills.mockClear();
+        mockGetAllWaterReadings.mockClear();
     });
 
     describe('getTenantsInArrears', () => {
@@ -82,7 +82,7 @@ describe('Arrears Logic', () => {
                 createMockTenant('4', -100), // Credit
             ];
             mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllPendingWaterBills.mockResolvedValue([]);
+            mockGetAllWaterReadings.mockResolvedValue([]);
 
             const result = await getTenantsInArrears();
 
@@ -93,9 +93,9 @@ describe('Arrears Logic', () => {
         it('should exclude pending water bills from rent arrears calculation', async () => {
             // Tenant has 6500 total due, but 1500 is for water. Rent arrears should be 5000.
             const tenants = [createMockTenant('1', 6500)];
-            const waterBills = [createMockWaterBill('1', 1500)];
+            const waterBills = [createMockWaterBill('1', 1500, 'Pending')];
             mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllPendingWaterBills.mockResolvedValue(waterBills);
+            mockGetAllWaterReadings.mockResolvedValue(waterBills);
 
             const result = await getTenantsInArrears();
             
@@ -109,7 +109,7 @@ describe('Arrears Logic', () => {
                 createMockTenant('2', -50),
             ];
             mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllPendingWaterBills.mockResolvedValue([]);
+            mockGetAllWaterReadings.mockResolvedValue([]);
 
             const result = await getTenantsInArrears();
             expect(result).toHaveLength(0);
@@ -134,7 +134,7 @@ describe('Arrears Logic', () => {
 
             mockGetProperties.mockResolvedValue(properties);
             mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllPendingWaterBills.mockResolvedValue([]);
+            mockGetAllWaterReadings.mockResolvedValue([]);
 
             const result = await getLandlordArrearsBreakdown(landlordId);
 
