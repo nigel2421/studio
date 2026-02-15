@@ -1,3 +1,4 @@
+
 import { Property, PropertyOwner, Tenant, Payment, Landlord, Unit } from './types';
 import { format, startOfMonth, addMonths, isAfter, parseISO, isValid, isSameMonth, isBefore } from 'date-fns';
 
@@ -117,7 +118,6 @@ export function processServiceChargeData(
       paymentsByTenantMap.get(p.tenantId)!.push(p);
     });
 
-    // --- Client Occupied Units Logic (formerly Self-managed) ---
     const clientOccupiedUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
     allProperties.forEach(p => {
         (p.units || []).forEach(u => {
@@ -142,7 +142,7 @@ export function processServiceChargeData(
         
         const tenantPayments = tenant ? paymentsByTenantMap.get(tenant.id) || [] : [];
         const paymentInSelectedMonth = tenant ? tenantPayments
-            .filter(p => (p.type === 'ServiceCharge' || p.type === 'Rent') && p.status === 'Paid')
+            .filter(p => p.type === 'ServiceCharge' && p.status === 'Paid')
             .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
 
         let paymentStatus: 'Paid' | 'Pending' | 'N/A';
@@ -193,7 +193,6 @@ export function processServiceChargeData(
         };
     });
 
-    // --- Managed Vacant Units Logic ---
     const managedVacantUnits: (Unit & { propertyId: string, propertyName: string })[] = [];
     allProperties.forEach(p => {
       (p.units || []).forEach(u => {
@@ -267,8 +266,6 @@ export function processServiceChargeData(
       };
     });
 
-
-    // --- Vacant Units in Arrears Logic ---
     const individualArrears: SingleUnitVacantArrearsAccount[] = [];
 
     const liableUnits = allProperties.flatMap(p => 
@@ -403,3 +400,5 @@ export function processServiceChargeData(
         vacantArrears
     };
 }
+
+    
