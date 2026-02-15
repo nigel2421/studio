@@ -260,8 +260,8 @@ describe('Service Charge Logic', () => {
         expect(charlieGroup.units).toHaveLength(2);
         expect(charlieGroup.units.map(u => u.unitName).sort()).toEqual(['C301', 'C302']);
         // Each unit has 3 months of arrears (Mar, Apr, May)
-        expect(charlieGroup.units[0].totalDue).toBe(4500); // 1500 * 3
-        expect(charlieGroup.units[1].totalDue).toBe(6000); // 2000 * 3
+        expect(charlieGroup.units.find(u => u.unitName === 'C301')?.totalDue).toBe(4500); // 1500 * 3
+        expect(charlieGroup.units.find(u => u.unitName === 'C302')?.totalDue).toBe(6000); // 2000 * 3
         expect(charlieGroup.totalDue).toBe(10500); // 4500 + 6000
     });
 });

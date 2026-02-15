@@ -1,5 +1,17 @@
+
 // Import all exports from data.ts to allow spying
-import * as data from './data';
+import {
+    getUsers,
+    deleteLandlord,
+    deletePropertyOwner,
+    addWaterMeterReading,
+    getProperties,
+    getLandlords,
+    getPropertyOwners,
+    getTenant,
+    getPaymentHistory,
+    getTenantWaterReadings
+} from './data';
 import { cacheService } from './cache'; // Import the cache service
 
 // Import types for mock data
@@ -79,7 +91,7 @@ describe('Data Logic in `data.ts`', () => {
             const batch = createMockBatch();
 
             // Act
-            await data.deleteLandlord(landlordId);
+            await deleteLandlord(landlordId);
 
             // Assert
             expect(batch.commit).toHaveBeenCalled();
@@ -88,7 +100,7 @@ describe('Data Logic in `data.ts`', () => {
         });
 
         it('should throw an error if trying to delete the internal Soil Merchants profile', async () => {
-            await expect(data.deleteLandlord('soil_merchants_internal')).rejects.toThrow(
+            await expect(deleteLandlord('soil_merchants_internal')).rejects.toThrow(
                 "Cannot delete the internal Soil Merchants profile."
             );
         });
@@ -105,7 +117,7 @@ describe('Data Logic in `data.ts`', () => {
             const batch = createMockBatch();
 
             // Act
-            await data.deletePropertyOwner(ownerId);
+            await deletePropertyOwner(ownerId);
 
             // Assert
             expect(batch.commit).toHaveBeenCalled();
@@ -166,7 +178,7 @@ describe('Data Logic in `data.ts`', () => {
             mockAddDoc.mockResolvedValue(undefined);
 
             // Act
-            await data.addWaterMeterReading(readingData, new Date('2024-02-20'));
+            await addWaterMeterReading(readingData, new Date('2024-02-20'));
 
             // Assert
             // 1. Check that a water reading was added with correct details
