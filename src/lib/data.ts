@@ -1,5 +1,3 @@
-
-
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
@@ -112,7 +110,6 @@ async function getDocument<T>(collectionName: string, id: string): Promise<T | n
     }
 }
 
-// Moved these functions up to be available for getUsers
 export async function getLandlords(): Promise<Landlord[]> {
     return cacheService.getOrFetch('landlords', 'all', () => getCollection<Landlord>('landlords'), 300000);
 }
@@ -990,6 +987,7 @@ export async function batchProcessPayments(
         }
     }
 }
+
 export async function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
     await addDoc(collection(db, 'tasks'), {
         ...taskData,

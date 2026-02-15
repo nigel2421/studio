@@ -136,8 +136,10 @@ export function processServiceChargeData(
             const handoverDate = parseISO(unit.handoverDate);
             if (isValid(handoverDate)) {
                 const handoverDay = handoverDate.getDate();
-                const waivedMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
-                if (isSameMonth(selectedMonth, waivedMonth)) {
+                const waivedMonth1 = startOfMonth(handoverDate);
+                const waivedMonth2 = handoverDay > 10 ? startOfMonth(addMonths(handoverDate, 1)) : null;
+
+                if (isSameMonth(selectedMonth, waivedMonth1) || (waivedMonth2 && isSameMonth(selectedMonth, waivedMonth2))) {
                     isWaived = true;
                 }
             }
@@ -215,14 +217,16 @@ export function processServiceChargeData(
         if (ownedVacantUnits.length === 0) continue;
 
         const associatedTenant = allTenants.find(t => t.userId === owner.userId && t.residentType === 'Homeowner');
-        const dummyTenant: Tenant = associatedTenant || {
+        const representativeTenant = associatedTenant || {
             id: `dummy-${owner.id}`, name: owner.name, email: owner.email, phone: owner.phone, residentType: 'Homeowner',
             propertyId: '', unitName: '', dueBalance: 0, accountBalance: 0,
             lease: { startDate: '2000-01-01', rent: 0, paymentStatus: 'Pending', endDate: '2100-01-01' },
-            idNumber: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0
+            idNumber: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, userId: owner.userId
         };
+        
+        const allAssociatedPayments = allPayments.filter(p => associatedTenant && p.tenantId === associatedTenant.id);
 
-        const { finalDueBalance, ledger } = generateLedger(dummyTenant, allPayments, allProperties, [], owner, selectedMonth, { includeRent: false, includeWater: false, includeServiceCharge: true });
+        const { finalDueBalance, ledger } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, [], owner, selectedMonth, { includeRent: false, includeWater: false, includeServiceCharge: true });
 
         if (finalDueBalance > 0) {
             const arrearBreakdownForOwner: VacantArrearsAccount = {
