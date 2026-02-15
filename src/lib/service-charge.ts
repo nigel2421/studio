@@ -87,7 +87,9 @@ export function processServiceChargeData(
     selectedMonth: Date
 ) {
     const landlordMap = new Map(allLandlords.map(l => [l.id, l]));
-    const ownerByUnitMap = new Map<string, PropertyOwner>();
+    const ownerMap = new Map(allOwners.map(o => [o.id, o]));
+
+    const ownerByUnitMap = new Map<string, PropertyOwner | Landlord>();
     allOwners.forEach(o => {
       o.assignedUnits?.forEach(au => {
         au.unitNames.forEach(unitName => {
@@ -95,6 +97,14 @@ export function processServiceChargeData(
         });
       });
     });
+    allProperties.forEach(p => {
+        (p.units || []).forEach(u => {
+            if (u.landlordId && landlordMap.has(u.landlordId)) {
+                ownerByUnitMap.set(`${p.id}-${u.name}`, landlordMap.get(u.landlordId)!);
+            }
+        });
+    });
+
     const tenantMap = new Map(allTenants.map(t => [`${t.propertyId}-${t.unitName}`, t]));
     const paymentsByTenantMap = new Map<string, Payment[]>();
     allPayments.forEach(p => {
@@ -114,27 +124,28 @@ export function processServiceChargeData(
     });
 
     const clientOccupiedServiceChargeAccounts: ServiceChargeAccount[] = clientOccupiedUnits.map(unit => {
-        let owner: { id: string; name: string } | undefined;
-
-        if (unit.landlordId) {
-            owner = landlordMap.get(unit.landlordId);
-        }
-        
-        if (!owner) {
-            owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
-        }
-
+        const owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
         const tenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
-        
         const tenantPayments = tenant ? paymentsByTenantMap.get(tenant.id) || [] : [];
-        const paymentInSelectedMonth = tenant ? tenantPayments
+        const paymentInSelectedMonth = tenantPayments
             .filter(p => p.type === 'ServiceCharge' && p.status === 'Paid')
-            .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM')) : undefined;
+            .find(p => p.rentForMonth === format(selectedMonth, 'yyyy-MM'));
 
+        let isWaived = false;
+        if (unit.handoverDate) {
+            const handoverDate = parseISO(unit.handoverDate);
+            if (isValid(handoverDate)) {
+                const handoverDay = handoverDate.getDate();
+                const waivedMonth = handoverDay <= 10 ? startOfMonth(handoverDate) : startOfMonth(addMonths(handoverDate, 1));
+                if (isSameMonth(selectedMonth, waivedMonth)) {
+                    isWaived = true;
+                }
+            }
+        }
+        
         let paymentStatus: 'Paid' | 'Pending' | 'N/A';
         
-        // A homeowner tenant record MUST exist for a charge to be applied.
-        if (!tenant || (unit.serviceCharge || 0) <= 0) {
+        if (isWaived || (unit.serviceCharge || 0) <= 0) {
             paymentStatus = 'N/A';
         } else if (paymentInSelectedMonth) {
             paymentStatus = 'Paid';
@@ -167,16 +178,7 @@ export function processServiceChargeData(
     });
     
     const managedVacantServiceChargeAccounts: ServiceChargeAccount[] = managedVacantUnits.map(unit => {
-      let owner: { id: string; name: string } | undefined;
-
-      if (unit.landlordId) {
-          owner = landlordMap.get(unit.landlordId);
-      }
-      
-      if (!owner) {
-          owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
-      }
-
+      const owner = ownerByUnitMap.get(`${unit.propertyId}-${unit.name}`);
       const homeownerTenant = tenantMap.get(`${unit.propertyId}-${unit.name}`);
       const tenantPayments = homeownerTenant ? paymentsByTenantMap.get(homeownerTenant.id) || [] : [];
       const paymentForMonthExists = tenantPayments.some(p =>
@@ -197,26 +199,32 @@ export function processServiceChargeData(
         paymentStatus: paymentForMonthExists ? 'Paid' : 'Pending',
       };
     });
-
+    
     const vacantArrears: VacantArrearsAccount[] = [];
     const allClientOwnersAndLandlords = [...allOwners, ...allLandlords];
 
     for (const owner of allClientOwnersAndLandlords) {
-        const homeownerTenants = allTenants.filter(t => t.residentType === 'Homeowner' && ((owner.userId && t.userId === owner.userId) || t.email === owner.email));
-        if (homeownerTenants.length === 0) continue;
-        
-        // Use the first tenant as representative for ledger generation.
-        const repTenant = homeownerTenants[0];
-        const allAssociatedPayments = allPayments.filter(p => homeownerTenants.some(t => t.id === p.tenantId));
+        const ownedVacantUnits = allProperties.flatMap(p => 
+            p.units.filter(u =>
+                u.status === 'vacant' &&
+                u.handoverStatus === 'Handed Over' &&
+                (u.landlordId === owner.id || ownerByUnitMap.get(`${p.id}-${u.name}`)?.id === owner.id)
+            ).map(u => ({ ...u, property: p }))
+        );
 
-        const { finalDueBalance, ledger } = generateLedger(repTenant, allAssociatedPayments, allProperties, [], owner, selectedMonth, { includeRent: false, includeWater: false, includeServiceCharge: true });
+        if (ownedVacantUnits.length === 0) continue;
+
+        const associatedTenant = allTenants.find(t => t.userId === owner.userId && t.residentType === 'Homeowner');
+        const dummyTenant: Tenant = associatedTenant || {
+            id: `dummy-${owner.id}`, name: owner.name, email: owner.email, phone: owner.phone, residentType: 'Homeowner',
+            propertyId: '', unitName: '', dueBalance: 0, accountBalance: 0,
+            lease: { startDate: '2000-01-01', rent: 0, paymentStatus: 'Pending', endDate: '2100-01-01' },
+            idNumber: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0
+        };
+
+        const { finalDueBalance, ledger } = generateLedger(dummyTenant, allPayments, allProperties, [], owner, selectedMonth, { includeRent: false, includeWater: false, includeServiceCharge: true });
 
         if (finalDueBalance > 0) {
-            const ownedUnits = allProperties.flatMap(p => 
-                p.units.filter(u => u.landlordId === owner.id || ('assignedUnits' in owner && (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name))))
-                .map(u => ({ ...u, property: p }))
-            );
-            
             const arrearBreakdownForOwner: VacantArrearsAccount = {
                 ownerId: owner.id,
                 ownerName: owner.name,
@@ -224,40 +232,40 @@ export function processServiceChargeData(
                 totalDue: finalDueBalance,
                 units: [],
             };
-
-            const pendingCharges = ledger.filter(l => l.charge > 0);
             
-            const chargesByUnit = new Map<string, { totalDue: number, details: any[] }>();
+            const pendingCharges = ledger.filter(l => l.charge > 0 && l.payment === 0);
+            
+            const chargesByUnit = new Map<string, { unit: Unit, property: Property, arrearsDetail: { month: string, amount: number, status: 'Pending' }[] }>();
 
             for (const charge of pendingCharges) {
-                // The description is like "Service Charge for Unit: C301"
-                const unitNameMatch = charge.description.match(/Unit: (.*)/);
-                if (unitNameMatch) {
+                 const unitNameMatch = charge.description.match(/Unit: ([\w-]+)/);
+                 if (unitNameMatch) {
                     const unitName = unitNameMatch[1];
-                     if (!chargesByUnit.has(unitName)) {
-                        chargesByUnit.set(unitName, { totalDue: 0, details: [] });
+                    const unitInfo = ownedVacantUnits.find(u => u.name === unitName);
+                    if (unitInfo) {
+                         if (!chargesByUnit.has(unitName)) {
+                            chargesByUnit.set(unitName, { unit: unitInfo, property: unitInfo.property, arrearsDetail: [] });
+                        }
+                        chargesByUnit.get(unitName)!.arrearsDetail.push({
+                            month: charge.forMonth || 'Unknown',
+                            amount: charge.charge,
+                            status: 'Pending'
+                        });
                     }
-                    const unitCharges = chargesByUnit.get(unitName)!;
-                    unitCharges.totalDue += charge.charge;
-                    unitCharges.details.push({ month: charge.forMonth, amount: charge.charge, status: 'Pending' as const });
-                }
+                 }
             }
 
-            chargesByUnit.forEach((value, unitName) => {
-                const unit = ownedUnits.find(u => u.name === unitName);
-                if (unit) {
-                    arrearBreakdownForOwner.units.push({
-                        propertyId: unit.property.id,
-                        propertyName: unit.property.name,
-                        unitName: unit.name,
-                        unitHandoverDate: unit.handoverDate || 'N/A',
-                        monthsInArrears: value.details.length,
-                        totalDue: value.totalDue,
-                        arrearsDetail: value.details,
-                        unit,
-                        property: unit.property
-                    })
-                }
+            chargesByUnit.forEach((data, unitName) => {
+                 const totalDueForUnit = data.arrearsDetail.reduce((sum, item) => sum + item.amount, 0);
+                 arrearBreakdownForOwner.units.push({
+                     ...data,
+                     unitName,
+                     propertyId: data.property.id,
+                     propertyName: data.property.name,
+                     unitHandoverDate: data.unit.handoverDate || 'N/A',
+                     monthsInArrears: data.arrearsDetail.length,
+                     totalDue: totalDueForUnit,
+                 });
             });
             
             if (arrearBreakdownForOwner.units.length > 0) {
