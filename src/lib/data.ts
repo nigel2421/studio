@@ -1215,8 +1215,36 @@ export async function addOrUpdateLandlord(landlord: Partial<Landlord>, assignedU
 }
 
 export async function deleteLandlord(id: string): Promise<void> {
-    await deleteDoc(doc(db, 'landlords', id));
+    if (id === 'soil_merchants_internal') {
+        throw new Error("Cannot delete the internal Soil Merchants profile.");
+    }
+
+    const landlordRef = doc(db, 'landlords', id);
+    const properties = await getProperties();
+    const batch = writeBatch(db);
+
+    // Delete the landlord
+    batch.delete(landlordRef);
+
+    // Unassign units from this landlord
+    properties.forEach(property => {
+        const updatedUnits = property.units.map(unit => {
+            if (unit.landlordId === id) {
+                const newUnit = { ...unit };
+                delete newUnit.landlordId;
+                return newUnit;
+            }
+            return unit;
+        });
+
+        if (JSON.stringify(updatedUnits) !== JSON.stringify(property.units)) {
+            batch.update(doc(db, 'properties', property.id), { units: updatedUnits });
+        }
+    });
+
+    await batch.commit();
     cacheService.clear('landlords');
+    cacheService.clear('properties');
 }
 
 export async function updatePropertyOwner(id: string, data: Partial<PropertyOwner>): Promise<void> {
@@ -1225,8 +1253,31 @@ export async function updatePropertyOwner(id: string, data: Partial<PropertyOwne
 }
 
 export async function deletePropertyOwner(id: string): Promise<void> {
-    await deleteDoc(doc(db, 'propertyOwners', id));
+    const ownerRef = doc(db, 'propertyOwners', id);
+    const ownerSnap = await getDoc(ownerRef);
+
+    if (!ownerSnap.exists()) {
+        throw new Error("Property owner not found");
+    }
+
+    const ownerData = ownerSnap.data() as PropertyOwner;
+    const batch = writeBatch(db);
+
+    // Delete the owner
+    batch.delete(ownerRef);
+
+    // Update user link if it exists
+    if (ownerData.userId) {
+        const userRef = doc(db, 'users', ownerData.userId);
+        batch.update(userRef, {
+            propertyOwnerId: deleteField(),
+            role: 'viewer'
+        });
+    }
+
+    await batch.commit();
     cacheService.clear('propertyOwners');
+    cacheService.clear('users');
 }
 
 export async function getCommunications(): Promise<Communication[]> {
