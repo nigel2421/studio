@@ -135,20 +135,17 @@ export function processServiceChargeData(
         if (unit.handoverDate) {
             const handoverDate = parseISO(unit.handoverDate);
             if (isValid(handoverDate)) {
-                // A month is waived if it's the same calendar month as the handover.
-                if (isSameMonth(selectedMonth, handoverDate)) {
+                const handoverDay = handoverDate.getDate();
+                const firstBillableMonth = handoverDay <= 10
+                    ? startOfMonth(addMonths(handoverDate, 1))
+                    : startOfMonth(addMonths(handoverDate, 2));
+
+                if (isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
                     isWaived = true;
-                } else {
-                    const handoverDay = handoverDate.getDate();
-                    // If handover was after the 10th, the following month is also waived.
-                    const monthAfterHandover = startOfMonth(addMonths(handoverDate, 1));
-                    if (handoverDay > 10 && isSameMonth(selectedMonth, monthAfterHandover)) {
-                        isWaived = true;
-                    }
                 }
             }
         }
-
+        
         let paymentStatus: 'Paid' | 'Pending' | 'N/A';
 
         if (isWaived || (unit.serviceCharge || 0) <= 0) {
