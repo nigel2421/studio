@@ -7,6 +7,7 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { PageLoader } from '@/components/page-loader';
 import { LoadingProvider } from '@/hooks/useLoading';
 import { cn } from '@/lib/utils';
+import Script from 'next/script';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -31,6 +32,22 @@ export default function RootLayout({
         className={cn('font-body antialiased', ptSans.variable)}
         suppressHydrationWarning
       >
+        <Script
+          strategy="afterInteractive"
+          src="https://www.googletagmanager.com/gtag/js?id=G-74GJ8HRE8S"
+        />
+        <Script
+          id="gtag-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-74GJ8HRE8S');
+            `,
+          }}
+        />
         <AuthProvider>
           <LoadingProvider>
             <PageLoader />
