@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -62,8 +63,9 @@ export default function EditTenantPage() {
         getProperties().then(setProperties);
     }, [id, form]);
 
+    const selectedPropertyId = form.watch('propertyId');
+
     useEffect(() => {
-        const selectedPropertyId = form.watch('propertyId');
         const selectedProperty = properties.find(p => p.id === selectedPropertyId);
         
         if (selectedProperty) {
@@ -82,7 +84,7 @@ export default function EditTenantPage() {
             setUnits([]);
         }
 
-    }, [form.watch('propertyId'), properties, tenant]);
+    }, [selectedPropertyId, properties, tenant]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         if (tenant) {

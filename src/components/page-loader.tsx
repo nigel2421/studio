@@ -54,7 +54,7 @@ export function PageLoader() {
     return () => {
       clearTimeout(timer);
     }
-  }, [pathname]);
+  }, [pathname, isVisible]);
 
   return (
     <>

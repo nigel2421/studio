@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -93,7 +94,7 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
                 <DialogHeader>
                     <DialogTitle>{owner?.name ? 'Edit' : 'Add'} Property Owner</DialogTitle>
                     <DialogDescription>
-                        Manage contact information for "{property.name}" owners.
+                        Manage contact information for &quot;{property.name}&quot; owners.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">

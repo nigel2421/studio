@@ -683,7 +683,7 @@ export default function MegarackPage() {
             <Card className="w-full max-w-lg mx-auto">
                 <CardHeader>
                 <CardTitle>Add Water Meter Reading</CardTitle>
-                <CardDescription>Enter the new water meter reading for a tenant's unit.</CardDescription>
+                <CardDescription>Enter the new water meter reading for a tenant&apos;s unit.</CardDescription>
                 </CardHeader>
                 <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">

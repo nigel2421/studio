@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { getTenantsInArrears } from '@/lib/arrears';
 import { getProperties } from '@/lib/data';
 import type { Tenant, Property } from '@/lib/types';
@@ -41,7 +41,7 @@ export default function ArrearsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [arrears, props] = await Promise.all([
@@ -56,15 +56,15 @@ export default function ArrearsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  const getPropertyName = (propertyId: string) => {
+  const getPropertyName = useCallback((propertyId: string) => {
     return properties.find(p => p.id === propertyId)?.name || 'N/A';
-  };
+  }, [properties]);
   
   const handleSendReminder = async (tenant: Tenant) => {
     if (!user) {
@@ -104,7 +104,7 @@ export default function ArrearsPage() {
         tenant.email.toLowerCase().includes(lowercasedFilter) ||
         getPropertyName(tenant.propertyId).toLowerCase().includes(lowercasedFilter)
     );
-  }, [rentArrearsData, rentSearchTerm, properties]);
+  }, [rentArrearsData, rentSearchTerm, getPropertyName]);
   
   const filteredScData = useMemo(() => {
     if (!scSearchTerm) return serviceChargeArrearsData;
@@ -114,7 +114,7 @@ export default function ArrearsPage() {
         tenant.email.toLowerCase().includes(lowercasedFilter) ||
         getPropertyName(tenant.propertyId).toLowerCase().includes(lowercasedFilter)
     );
-  }, [serviceChargeArrearsData, scSearchTerm, properties]);
+  }, [serviceChargeArrearsData, scSearchTerm, getPropertyName]);
 
   const totalPagesRent = Math.ceil(filteredRentData.length / rentPageSize);
   const paginatedRentData = filteredRentData.slice((rentCurrentPage - 1) * rentPageSize, rentCurrentPage * rentPageSize);

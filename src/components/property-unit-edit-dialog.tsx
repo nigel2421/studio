@@ -110,7 +110,7 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
                 <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle>Edit Unit: {unit?.name}</DialogTitle>
                     <DialogDescription>
-                        Update the details for this unit. Click save when you're done.
+                        Update the details for this unit. Click save when you&apos;re done.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>

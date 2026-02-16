@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPaymentsForReport, deleteLandlord } from '@/lib/data';
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -57,7 +57,7 @@ export default function LandlordsPage() {
   const { userProfile } = useAuth();
   const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     startLoading('Loading property data...');
     Promise.all([
       getLandlords(),
@@ -73,11 +73,11 @@ export default function LandlordsPage() {
       console.error("Failed to fetch data:", err);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load required data.' });
     }).finally(() => stopLoading());
-  }
+  }, [startLoading, stopLoading, toast]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Reset pagination when property or search query changes
   useEffect(() => {

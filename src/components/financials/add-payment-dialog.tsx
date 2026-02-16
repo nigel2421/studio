@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { batchProcessPayments } from '@/lib/data';
 import { type Tenant, type Property, type Payment, type Unit, paymentMethods, type WaterMeterReading } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -125,7 +126,7 @@ export function AddPaymentDialog({
     return tenantForDisplay?.residentType === 'Homeowner' ? 'ServiceCharge' : 'Rent';
   }, [tenantForDisplay]);
 
-  const getDefaultAmount = (type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
+  const getDefaultAmount = useCallback((type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
     if (!tenantInfo) return '';
     // This is buggy because Tenant type does not have waterReadings.
     // The logic is now handled by the readingForPayment prop, so this can be simplified.
@@ -143,7 +144,7 @@ export function AddPaymentDialog({
       default:
         return '';
     }
-  };
+  }, [displayData.waterBalance]);
 
   useEffect(() => {
     if (open) {
@@ -181,7 +182,7 @@ export function AddPaymentDialog({
             setSelectedUnit('');
         }
     }
-}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment]);
+}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment, getDefaultAmount, setSelectedFloor, setSelectedProperty, setSelectedUnit]);
 
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
@@ -456,5 +457,3 @@ export function AddPaymentDialog({
     </Dialog>
   );
 }
-
-    

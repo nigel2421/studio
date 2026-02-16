@@ -81,7 +81,7 @@ export default function UsersPage() {
     if (searchQuery !== localSearch) {
       setLocalSearch(searchQuery);
     }
-  }, [searchQuery]);
+  }, [searchQuery, localSearch]);
 
   // Debounced effect to update URL from local search input
   useEffect(() => {

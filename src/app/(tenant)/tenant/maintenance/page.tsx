@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -47,18 +47,18 @@ export default function MaintenancePage() {
         },
     });
 
-    const fetchRequests = async () => {
+    const fetchRequests = useCallback(async () => {
         if (userProfile?.tenantId) {
         setIsLoadingRequests(true);
         const tenantRequests = await getTenantMaintenanceRequests(userProfile.tenantId);
         setRequests(tenantRequests);
         setIsLoadingRequests(false);
         }
-    };
+    }, [userProfile?.tenantId]);
 
     useEffect(() => {
         fetchRequests();
-    }, [userProfile]);
+    }, [fetchRequests]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         if (!userProfile?.tenantId || !userProfile?.propertyId) {

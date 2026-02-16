@@ -113,7 +113,7 @@ export default function PropertyManagementPage() {
                 lateFee: property.lateFee || 0,
             });
         }
-    }, [property, form.reset]);
+    }, [property, form]);
 
     const handleFilterChange = (filterName: keyof typeof filters, value: string) => {
         setFilters(prev => ({ ...prev, [filterName]: value as any }));

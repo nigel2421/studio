@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -61,8 +61,8 @@ export default function MaintenancePage() {
     fetchData();
   }, []);
 
-  const getTenant = (tenantId: string) => tenants.find((t) => t.id === tenantId);
-  const getProperty = (propertyId: string) => properties.find((p) => p.id === propertyId);
+  const getTenant = useCallback((tenantId: string) => tenants.find((t) => t.id === tenantId), [tenants]);
+  const getProperty = useCallback((propertyId: string) => properties.find((p) => p.id === propertyId), [properties]);
 
   const getStatusVariant = (status: MaintenanceStatus) => {
     switch (status) {
@@ -104,7 +104,7 @@ export default function MaintenancePage() {
 
       return searchMatch && statusMatch && priorityMatch && categoryMatch;
     });
-  }, [maintenanceRequests, searchTerm, statusFilter, priorityFilter, categoryFilter, tenants, properties]);
+  }, [maintenanceRequests, searchTerm, statusFilter, priorityFilter, categoryFilter, getTenant, getProperty]);
 
   const totalPages = Math.ceil(filteredRequests.length / pageSize);
   const paginatedRequests = filteredRequests.slice(

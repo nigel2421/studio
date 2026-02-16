@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -93,7 +94,7 @@ export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
                 <div className="max-h-60 overflow-y-auto">
                     <p>There were errors in your CSV file:</p>
                     <ul className="list-disc pl-5 mt-2 text-xs">
-                        {updateErrors.slice(0,5).map((e: string, i: number) => <li key={i}>{e}</li>)}
+                        {updateErrors.slice(0,5).map((e, i) => <li key={i}>{e}</li>)}
                         {updateErrors.length > 5 && <li>...and {updateErrors.length-5} more errors.</li>}
                     </ul>
                 </div>
@@ -148,7 +149,7 @@ export function UnitCsvUploader({ propertyId, onUploadComplete }: Props) {
         <DialogHeader>
           <DialogTitle>Bulk Process Units via CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV to create new units or update existing ones. The 'UnitName' column is required.
+            Upload a CSV to create new units or update existing ones. The &apos;UnitName&apos; column is required.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
