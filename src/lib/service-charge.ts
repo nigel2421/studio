@@ -135,16 +135,16 @@ export function processServiceChargeData(
         if (unit.handoverDate) {
             const handoverDate = parseISO(unit.handoverDate);
             if (isValid(handoverDate)) {
-                const handoverDay = handoverDate.getDate();
-                let firstBillableMonth: Date;
-                if (handoverDay <= 10) {
-                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-                } else {
-                    firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-                }
-
-                if (isBefore(startOfMonth(selectedMonth), firstBillableMonth)) {
+                // A month is waived if it's the same calendar month as the handover.
+                if (isSameMonth(selectedMonth, handoverDate)) {
                     isWaived = true;
+                } else {
+                    const handoverDay = handoverDate.getDate();
+                    // If handover was after the 10th, the following month is also waived.
+                    const monthAfterHandover = startOfMonth(addMonths(handoverDate, 1));
+                    if (handoverDay > 10 && isSameMonth(selectedMonth, monthAfterHandover)) {
+                        isWaived = true;
+                    }
                 }
             }
         }
@@ -207,68 +207,54 @@ export function processServiceChargeData(
     });
 
     const vacantArrears: VacantArrearsAccount[] = [];
-    const allClientOwnersAndLandlords = [...allOwners, ...allLandlords];
+    const allCombinedOwners: (Landlord | PropertyOwner)[] = [...allLandlords, ...allOwners];
 
-    for (const owner of allClientOwnersAndLandlords) {
-        const ownedVacantUnits = allProperties.flatMap(p =>
-            p.units.filter(u =>
-                u.status === 'vacant' &&
-                u.handoverStatus === 'Handed Over' &&
-                (u.landlordId === owner.id || ownerByUnitMap.get(`${p.id}-${u.name}`)?.id === owner.id)
-            ).map(u => ({ ...u, property: p }))
-        );
-
-        if (ownedVacantUnits.length === 0) continue;
-
+    for (const owner of allCombinedOwners) {
+        const ownerId = owner.id;
+        const ownerUnitsWithArrears: VacantArrearsAccount['units'] = [];
         let totalDueForOwner = 0;
-        const unitsWithArrears: VacantArrearsAccount['units'] = [];
 
-        for (const unit of ownedVacantUnits) {
-            if (!unit.handoverDate || !unit.serviceCharge || unit.serviceCharge <= 0) continue;
+        allProperties.forEach(p => {
+            (p.units || []).forEach(u => {
+                const unitOwnerId = u.landlordId || ownerByUnitMap.get(`${p.id}-${u.name}`)?.id;
+                if (unitOwnerId !== ownerId || u.status !== 'vacant' || u.handoverStatus !== 'Handed Over' || !u.handoverDate || !u.serviceCharge || u.serviceCharge <= 0) {
+                    return;
+                }
 
-            const handoverDate = parseISO(unit.handoverDate);
-            const handoverDay = handoverDate.getDate();
-            let firstBillableMonth: Date;
+                const handoverDate = parseISO(u.handoverDate);
+                const handoverDay = handoverDate.getDate();
+                const firstBillableMonth = handoverDay <= 10
+                    ? startOfMonth(addMonths(handoverDate, 1))
+                    : startOfMonth(addMonths(handoverDate, 2));
 
-            if (handoverDay <= 10) {
-                // If handed over on or before the 10th, the next month is the first billable one.
-                // e.g., Handover Jan 10 -> Waive Jan -> Bill Feb.
-                firstBillableMonth = startOfMonth(addMonths(handoverDate, 1));
-            } else {
-                // If handed over after the 10th, the next TWO months are waived.
-                // e.g., Handover Jan 11 -> Waive Jan, Waive Feb -> Bill March.
-                firstBillableMonth = startOfMonth(addMonths(handoverDate, 2));
-            }
+                if (isAfter(firstBillableMonth, selectedMonth)) {
+                    return;
+                }
 
-            if (isAfter(firstBillableMonth, selectedMonth)) {
-                continue; // Not yet billable as of the selected date
-            }
+                const monthsInArrears = differenceInMonths(startOfMonth(selectedMonth), firstBillableMonth) + 1;
+                if (monthsInArrears <= 0) return;
 
-            const monthsInArrears = differenceInMonths(startOfMonth(selectedMonth), firstBillableMonth) + 1;
+                const totalDueForUnit = monthsInArrears * u.serviceCharge;
+                totalDueForOwner += totalDueForUnit;
+                
+                const arrearsDetail = Array.from({ length: monthsInArrears }).map((_, i) => {
+                    const monthDate = addMonths(firstBillableMonth, i);
+                    return { month: format(monthDate, 'MMM yyyy'), amount: u.serviceCharge!, status: 'Pending' as 'Pending' };
+                });
 
-            if (monthsInArrears <= 0) continue;
-
-            const totalDueForUnit = monthsInArrears * unit.serviceCharge;
-            totalDueForOwner += totalDueForUnit;
-
-            const arrearsDetail: VacantArrearsAccount['units'][0]['arrearsDetail'] = [];
-            for (let i = 0; i < monthsInArrears; i++) {
-                const month = format(addMonths(firstBillableMonth, i), 'MMM yyyy');
-                arrearsDetail.push({ month, amount: unit.serviceCharge, status: 'Pending' });
-            }
-
-            unitsWithArrears.push({
-                unit,
-                property: unit.property,
-                unitName: unit.name,
-                propertyId: unit.property.id,
-                propertyName: unit.property.name,
-                unitHandoverDate: unit.handoverDate,
-                monthsInArrears,
-                totalDue: totalDueForUnit,
-                arrearsDetail,
+                ownerUnitsWithArrears.push({
+                    unit: u,
+                    property: p,
+                    unitName: u.name,
+                    propertyId: p.id,
+                    propertyName: p.name,
+                    unitHandoverDate: u.handoverDate,
+                    monthsInArrears,
+                    totalDue: totalDueForUnit,
+                    arrearsDetail,
+                });
             });
-        }
+        });
 
         if (totalDueForOwner > 0) {
             vacantArrears.push({
@@ -276,7 +262,7 @@ export function processServiceChargeData(
                 ownerName: owner.name,
                 owner: owner,
                 totalDue: totalDueForOwner,
-                units: unitsWithArrears
+                units: ownerUnitsWithArrears
             });
         }
     }
