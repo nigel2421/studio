@@ -1,3 +1,4 @@
+
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -189,8 +190,8 @@ describe('Financial Utils Logic', () => {
             ];
             const props = [createMockProperty('prop-multi', units)];
             const tenants = [
-                createMockTenant({ id: 't-A1', unitName: 'A1', propertyId: 'prop-multi', lease: { rent: 20000 } }),
-                createMockTenant({ id: 't-A2', unitName: 'A2', propertyId: 'prop-multi', lease: { rent: 30000 } }),
+                createMockTenant({ id: 't-A1', unitName: 'A1', propertyId: 'prop-multi', lease: { rent: 20000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
+                createMockTenant({ id: 't-A2', unitName: 'A2', propertyId: 'prop-multi', lease: { rent: 30000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
             ];
             const payments = [
                 createMockPayment({ tenantId: 't-A1', amount: 20000, date: '2024-01-05', rentForMonth: '2024-01'}),
@@ -215,7 +216,7 @@ describe('Financial Utils Logic', () => {
             const landlord = { id: landlordId, name: 'Single Unit Lord', email: '', phone: '' };
             const units = [createMockUnit({ name: 'B1', landlordId, rentAmount: 40000 })];
             const props = [createMockProperty('prop-single', units)];
-            const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { rent: 40000 } });
+            const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { rent: 40000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } });
             
             const payments = [
                 createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-01-05', rentForMonth: '2024-01'}),
@@ -237,8 +238,8 @@ describe('Financial Utils Logic', () => {
             ];
             const props = [createMockProperty('prop-special', units)];
             const tenants = [
-                createMockTenant({ id: 't-S1', unitName: 'S1', propertyId: 'prop-special', lease: { rent: 20000 } }),
-                createMockTenant({ id: 't-S2', unitName: 'S2', propertyId: 'prop-special', lease: { rent: 30000 } }),
+                createMockTenant({ id: 't-S1', unitName: 'S1', propertyId: 'prop-special', lease: { rent: 20000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
+                createMockTenant({ id: 't-S2', unitName: 'S2', propertyId: 'prop-special', lease: { rent: 30000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
             ];
             const payments = [
                 createMockPayment({ tenantId: 't-S1', amount: 20000, date: '2024-01-05', rentForMonth: '2024-01' }),

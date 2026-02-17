@@ -71,7 +71,7 @@ const otherItems = [
 ]
 
 export function AppSidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
   const router = useRouter();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { user, userProfile } = useAuth();

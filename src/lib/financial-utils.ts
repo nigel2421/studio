@@ -1,6 +1,25 @@
 
-import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary } from "./types";
+import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary, UnitType } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter } from 'date-fns';
+
+interface DisplayTransaction {
+    id: string;
+    date: string;
+    propertyId: string;
+    unitName: string;
+    unitType: UnitType | 'N/A';
+    rentForMonth: string;
+    forMonthDisplay: string;
+    gross: number;
+    serviceChargeDeduction: number;
+    managementFee: number;
+    otherCosts: number;
+    netToLandlord: number;
+    stageTwoCost: number;
+    stageThreeCost: number;
+    specialDeductions: number;
+}
+
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -173,7 +192,7 @@ export function generateLandlordDisplayTransactions(
         return isWithinInterval(paymentDate, { start: startDate, end: endDate });
     });
 
-    let transactions: any[] = [];
+    let transactions: DisplayTransaction[] = [];
     
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -276,17 +295,17 @@ export function generateLandlordDisplayTransactions(
         transactions[0].stageThreeCost = totalStageThreeCost;
     }
 
-    const groupedByMonth = transactions.reduce((acc, t) => {
+    const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
         const month = t.rentForMonth || format(new Date(t.date), 'yyyy-MM');
         if (!acc[month]) {
             acc[month] = [];
         }
         acc[month].push(t);
         return acc;
-    }, {} as Record<string, any[]>);
+    }, {} as Record<string, DisplayTransaction[]>);
 
     const sortedMonths = Object.keys(groupedByMonth).sort();
-    const finalTransactions: any[] = [];
+    const finalTransactions: DisplayTransaction[] = [];
     let carryOverDeficit = 0;
 
     sortedMonths.forEach(month => {
@@ -297,7 +316,7 @@ export function generateLandlordDisplayTransactions(
             monthTransactions[0].specialDeductions = (monthTransactions[0].specialDeductions || 0) + carryOverDeficit;
         }
 
-        monthTransactions.forEach(t => {
+        monthTransactions.forEach((t: DisplayTransaction) => {
             const paymentMonth = t.rentForMonth ? new Date(t.rentForMonth + '-02').getMonth() : -1;
             const isJanuary = paymentMonth === 0;
             if (isJanuary) {

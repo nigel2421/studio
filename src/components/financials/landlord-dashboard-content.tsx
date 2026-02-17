@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
 import { Payment, Property, Tenant, Unit } from '@/lib/types';
-import { FinancialSummary } from '@/lib/financial-utils';
+import type { FinancialSummary } from '@/lib/types';
 import { downloadCSV } from '@/lib/utils';
 import { Button } from '../ui/button';
 

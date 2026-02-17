@@ -1,3 +1,4 @@
+
 import { processOverdueNotices, getDocs, doc, writeBatch, getDoc, collection, query, where, updateDoc, addDoc } from './data';
 import { Tenant, Property, NoticeToVacate, Unit } from './types';
 import { format, subDays } from 'date-fns';
@@ -18,9 +19,9 @@ jest.mock('firebase/firestore', () => {
     };
 });
 
-const mockGetDocs = getDocs as jest.Mock;
-const mockGetDoc = getDoc as jest.Mock;
-const mockWriteBatch = writeBatch as jest.Mock;
+const mockGetDocs = jest.requireMock('firebase/firestore').getDocs as jest.Mock;
+const mockGetDoc = jest.requireMock('firebase/firestore').getDoc as jest.Mock;
+const mockWriteBatch = jest.requireMock('firebase/firestore').writeBatch as jest.Mock;
 const mockAddDoc = jest.requireMock('firebase/firestore').addDoc;
 
 
