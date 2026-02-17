@@ -119,10 +119,10 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
 
 
 export function generateLandlordDisplayTransactions(
-    payments: Payment[], 
-    tenants: Tenant[], 
+    payments: Payment[],
+    tenants: Tenant[],
     properties: Property[],
-    startDate?: Date, 
+    startDate?: Date,
     endDate?: Date
 ) {
     const unitMap = new Map<string, Unit>();
@@ -133,7 +133,15 @@ export function generateLandlordDisplayTransactions(
     });
 
     const transactions: any[] = [];
-    const sortedPayments = [...payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // 1. Filter payments by the selected date range first.
+    const filteredPayments = payments.filter(p => {
+        if (!startDate || !endDate) return true; // if no range, include all
+        const paymentDate = parseISO(p.date);
+        return isWithinInterval(paymentDate, { start: startDate, end: endDate });
+    });
+
+    const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const tenantFirstPaymentMap = new Map<string, string>();
     tenants.forEach(tenant => {
@@ -146,11 +154,6 @@ export function generateLandlordDisplayTransactions(
     sortedPayments.forEach(payment => {
         const tenant = tenants.find(t => t.id === payment.tenantId);
         if (!tenant || payment.type === 'Deposit' || payment.type === 'Water') {
-            return;
-        }
-
-        const paymentDate = parseISO(payment.date);
-        if (startDate && endDate && !isWithinInterval(paymentDate, { start: startDate, end: endDate })) {
             return;
         }
 
@@ -171,43 +174,49 @@ export function generateLandlordDisplayTransactions(
         
         if (amountToApportionAsRent <= 0) return;
 
-        if (unitRent > 0 && amountToApportionAsRent > unitRent * 1.1) {
-            let remainingAmount = amountToApportionAsRent;
-            let monthIndex = 0;
-            const leaseStartDate = parseISO(tenant.lease.startDate);
+        // Cap the apportioned amount at the unit's rent to exclude overpayments from the breakdown
+        const effectiveAmount = Math.min(amountToApportionAsRent, unitRent);
 
-            while (remainingAmount > 0) {
-                const currentMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
-                const rentForThisIteration = Math.min(remainingAmount, unitRent);
-                
-                const monthString = format(currentMonth, 'yyyy-MM');
-                const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: monthString, type: 'Rent' };
-                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-                
+        if (unitRent > 0 && effectiveAmount > 0) {
+            // For lump sums that cover more than one month, break them down.
+            if (effectiveAmount > unitRent * 1.1) {
+                let remainingAmount = effectiveAmount;
+                let monthIndex = 0;
+                const leaseStartDate = parseISO(tenant.lease.startDate);
+
+                while (remainingAmount > 0) {
+                    const currentMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
+                    const rentForThisIteration = Math.min(remainingAmount, unitRent);
+                    
+                    const monthString = format(currentMonth, 'yyyy-MM');
+                    const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: monthString, type: 'Rent' };
+                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                    
+                    transactions.push({
+                        id: `${payment.id}-${monthIndex}`,
+                        date: payment.date,
+                        unitName: tenant.unitName,
+                        unitType: unit?.unitType || 'N/A',
+                        forMonth: format(currentMonth, 'MMM yyyy'),
+                        ...breakdown,
+                    });
+                    
+                    remainingAmount -= rentForThisIteration;
+                    if (remainingAmount < 1) break;
+                    monthIndex++;
+                }
+            } else { // Handle single month payment
+                const paymentForBreakdown: Payment = { ...payment, amount: effectiveAmount, type: 'Rent' };
+                const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
                 transactions.push({
-                    id: `${payment.id}-${monthIndex}`,
+                    id: payment.id,
                     date: payment.date,
                     unitName: tenant.unitName,
                     unitType: unit?.unitType || 'N/A',
-                    forMonth: format(currentMonth, 'MMM yyyy'),
+                    forMonth: payment.rentForMonth ? format(parseISO(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
                     ...breakdown,
                 });
-                
-                remainingAmount -= rentForThisIteration;
-                if (remainingAmount < 1) break;
-                monthIndex++;
             }
-        } else {
-            const paymentForBreakdown: Payment = { ...payment, amount: Math.min(amountToApportionAsRent, unitRent), type: 'Rent' };
-            const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
-            transactions.push({
-                id: payment.id,
-                date: payment.date,
-                unitName: tenant.unitName,
-                unitType: unit?.unitType || 'N/A',
-                forMonth: payment.rentForMonth ? format(parseISO(payment.rentForMonth + '-02'), 'MMM yyyy') : 'N/A',
-                ...breakdown,
-            });
         }
     });
     

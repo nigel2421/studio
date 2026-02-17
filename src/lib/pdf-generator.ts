@@ -393,22 +393,23 @@ export const generateLandlordStatementPDF = (
     addHeader(doc, 'Landlord Statement');
 
     // Landlord Details - Placed below main header line
+    let yPos = 48;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('STATEMENT FOR:', 14, 48);
-    doc.setFontSize(10);
+    doc.text('STATEMENT FOR:', 14, yPos);
     doc.setFont('helvetica', 'normal');
-    doc.text(landlord.name, 14, 54);
+    doc.setFontSize(10);
+    doc.text(landlord.name, 14, yPos + 6);
 
-    doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
+    doc.text(`Date Issued: ${dateStr}`, 196, yPos, { align: 'right' });
     
     if (startDate && endDate) {
         const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
-        doc.text(`Period: ${periodStr}`, 196, 54, { align: 'right' });
+        doc.text(`Period: ${periodStr}`, 196, yPos + 6, { align: 'right' });
     }
 
     // Summary Section
-    let yPos = 70;
+    yPos = 70;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Summary', 14, yPos);
