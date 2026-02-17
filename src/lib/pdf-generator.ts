@@ -391,7 +391,7 @@ export const generateLandlordStatementPDF = (
     // Header
     addHeader(doc, 'Landlord Statement');
 
-    let yPos = 52;
+    let yPos = 62; // Adjusted Y position
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('STATEMENT FOR:', 14, yPos);
@@ -459,7 +459,7 @@ export const generateLandlordStatementPDF = (
     const body: any[] = [];
 
     sortedMonths.forEach(month => {
-        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 7, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach(t => {
             body.push([
@@ -491,7 +491,6 @@ export const generateLandlordStatementPDF = (
         theme: 'striped',
         headStyles: { fillColor: [41, 102, 182] },
         columnStyles: {
-            2: { halign: 'right' },
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' },

@@ -1,6 +1,6 @@
 
 import { Payment, Property, Tenant, Unit } from "./types";
-import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth } from 'date-fns';
+import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -113,21 +113,32 @@ export function aggregateFinancials(
         const start = startOfMonth(startDate);
         const end = startOfMonth(endDate);
         
-        const landlordUnits = properties.flatMap(p => p.units.filter(u => 
-            u.landlordId === landlordId || 
-            (landlordId === 'soil_merchants_internal' && u.ownership === 'SM')
-        ));
+        const landlordUnits = properties.flatMap(p => p.units.filter(u => {
+             const unitProperty = properties.find(prop => prop.id === u.propertyId);
+             if(!unitProperty) { // This handles cases where unit might not have propertyId, we get it from parent
+                 u.propertyId = p.id;
+             }
+             return u.landlordId === landlordId || (landlordId === 'soil_merchants_internal' && u.ownership === 'SM')
+        }));
         
         let loopDate = start;
-        while(loopDate <= end) {
+        while(isBefore(loopDate, end) || isSameMonth(loopDate, end)) {
             landlordUnits.forEach(u => {
-                // Find property for the unit to check propertyId
-                const property = properties.find(p => p.units.includes(u));
-                if (!property) return;
-    
-                const isOccupied = tenants.some(t => t.unitName === u.name && t.propertyId === property.id);
-                if (!isOccupied && u.status === 'vacant' && u.handoverStatus === 'Handed Over' && u.serviceCharge) {
-                  vacantUnitDeduction += u.serviceCharge;
+                if (!u.propertyId) return;
+
+                const isOccupied = tenants.some(t => t.unitName === u.name && t.propertyId === u.propertyId);
+
+                if (!isOccupied && u.status === 'vacant' && u.handoverStatus === 'Handed Over' && u.serviceCharge && u.handoverDate) {
+                  const handoverDate = parseISO(u.handoverDate);
+                  const handoverDay = handoverDate.getDate();
+
+                  const firstBillableMonth = handoverDay <= 10
+                      ? startOfMonth(addMonths(handoverDate, 1))
+                      : startOfMonth(addMonths(handoverDate, 2));
+                  
+                  if (isSameMonth(loopDate, firstBillableMonth) || isAfter(loopDate, firstBillableMonth)) {
+                      vacantUnitDeduction += u.serviceCharge;
+                  }
                 }
             });
             loopDate = addMonths(loopDate, 1);
@@ -151,7 +162,7 @@ export function generateLandlordDisplayTransactions(
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
         (p.units || []).forEach(u => {
-            unitMap.set(`${p.id}-${u.name}`, u);
+            unitMap.set(`${p.id}-${u.name}`, { ...u, propertyId: p.id });
         });
     });
 
@@ -214,7 +225,7 @@ export function generateLandlordDisplayTransactions(
                 unitName: tenant.unitName,
                 unitType: unit?.unitType || 'N/A',
                 rentForMonth: format(currentMonth, 'yyyy-MM'),
-                forMonth: format(currentMonth, 'MMM yyyy'),
+                forMonthDisplay: format(currentMonth, 'MMM yyyy'),
                 ...breakdown,
             });
             
@@ -241,7 +252,7 @@ export function generateLandlordDisplayTransactions(
         const processedMonths = new Set<string>();
         transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date to apply cost to first transaction
             .forEach(t => {
-                const monthKey = t.forMonth;
+                const monthKey = t.rentForMonth;
                 if (processedMonths.has(monthKey)) {
                     t.otherCosts = 0; // Set subsequent transaction costs in the same month to 0
                 } else {
