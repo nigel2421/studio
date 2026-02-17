@@ -171,23 +171,24 @@ export const generateOwnerServiceChargeStatementPDF = (
     // Header Section - Right Side
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(owner.name, 196, 48, { align: 'right' });
+    doc.text('STATEMENT FOR:', 14, 48);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(owner.email, 196, 54, { align: 'right' });
-    doc.text(`Date Issued: ${dateStr}`, 196, 60, { align: 'right' });
+    doc.text(owner.name, 14, 54);
+    
+    doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
     const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
-    doc.text(`Period: ${periodStr}`, 196, 66, { align: 'right' });
+    doc.text(`Period: ${periodStr}`, 196, 54, { align: 'right' });
 
-    let yPos = 80;
+    let yPos = 70;
     
     if (isServiceChargeContext) {
-        const unitsYStart = 48;
+        yPos = 62;
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('Your Units:', 14, unitsYStart);
+        doc.text('Your Units:', 14, yPos);
         
-        let unitYPos = unitsYStart + 6;
+        let unitYPos = yPos + 6;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
 
@@ -198,7 +199,7 @@ export const generateOwnerServiceChargeStatementPDF = (
             unitYPos += 5;
         });
         
-        yPos = Math.max(yPos, unitYPos + 6);
+        yPos = Math.max(80, unitYPos + 6);
     }
 
     const associatedTenants = allTenants.filter(t => 
@@ -391,17 +392,19 @@ export const generateLandlordStatementPDF = (
     // Header
     addHeader(doc, 'Landlord Statement');
 
-    // Landlord Details
+    // Landlord Details - Placed below main header line
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(landlord.name, 196, 48, { align: 'right' });
+    doc.text('STATEMENT FOR:', 14, 48);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Date Issued: ${dateStr}`, 196, 54, { align: 'right' });
+    doc.text(landlord.name, 14, 54);
+
+    doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
     
     if (startDate && endDate) {
         const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
-        doc.text(`Period: ${periodStr}`, 196, 60, { align: 'right' });
+        doc.text(`Period: ${periodStr}`, 196, 54, { align: 'right' });
     }
 
     // Summary Section
@@ -837,4 +840,3 @@ export const generateDashboardReportPDF = (
 
     doc.save(`dashboard_report_${dateStr.replace(/, /g, '_')}.pdf`);
 };
-

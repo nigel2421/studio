@@ -94,13 +94,23 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
     });
 
     let vacantUnitDeduction = 0;
-    properties.forEach(p => {
-      (p.units || []).forEach(u => {
-        if (u.status === 'vacant' && u.handoverStatus === 'Handed Over') {
-          vacantUnitDeduction += u.serviceCharge || 0;
+    if (startDate && endDate) {
+        const start = startOfMonth(startDate);
+        const end = startOfMonth(endDate);
+        
+        let loopDate = start;
+        while(loopDate <= end) {
+            properties.forEach(p => {
+              (p.units || []).forEach(u => {
+                const isOccupied = tenants.some(t => t.propertyId === p.id && t.unitName === u.name);
+                if (!isOccupied && u.status === 'vacant' && u.handoverStatus === 'Handed Over' && u.serviceCharge) {
+                  vacantUnitDeduction += u.serviceCharge;
+                }
+              });
+            });
+            loopDate = addMonths(loopDate, 1);
         }
-      });
-    });
+    }
     summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
     summary.totalNetRemittance -= vacantUnitDeduction;
 
@@ -203,5 +213,3 @@ export function generateLandlordDisplayTransactions(
     
     return transactions;
 }
-
-    
