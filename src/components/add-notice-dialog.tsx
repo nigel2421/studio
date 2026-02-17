@@ -38,24 +38,30 @@ export function AddNoticeDialog({
   const [selectedUnit, setSelectedUnit] = useState('');
   const [moveOutDate, setMoveOutDate] = useState<Date | undefined>(addMonths(new Date(), 1));
 
+  // Filter for actual tenants, not homeowners
+  const activeTenants = useMemo(() => {
+    return tenants.filter(t => t.residentType === 'Tenant');
+  }, [tenants]);
+
   const propertiesWithTenants = useMemo(() => {
-    const tenantedPropertyIds = new Set(tenants.map(t => t.propertyId));
+    if (!activeTenants.length) return [];
+    const tenantedPropertyIds = new Set(activeTenants.map(t => t.propertyId));
     return properties.filter(p => tenantedPropertyIds.has(p.id));
-  }, [properties, tenants]);
+  }, [properties, activeTenants]);
 
   const occupiedUnits = useMemo(() => {
     if (!selectedProperty) return [];
-    const tenantUnits = tenants
+    const tenantUnits = activeTenants
       .filter(t => t.propertyId === selectedProperty)
       .map(t => t.unitName);
     const property = properties.find(p => p.id === selectedProperty);
     return property?.units.filter(u => tenantUnits.includes(u.name)) || [];
-  }, [selectedProperty, properties, tenants]);
+  }, [selectedProperty, properties, activeTenants]);
 
   const selectedTenant = useMemo(() => {
     if (!selectedUnit || !selectedProperty) return null;
-    return tenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
-  }, [selectedUnit, selectedProperty, tenants]);
+    return activeTenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
+  }, [selectedUnit, selectedProperty, activeTenants]);
   
   useEffect(() => {
     if(!open) {
