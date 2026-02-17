@@ -1,4 +1,5 @@
 
+
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
@@ -20,5 +21,7 @@ module.exports = {
     '<rootDir>/.firebase/',
     '<rootDir>/functions/',
     '<rootDir>/src/functions/',
+    '<rootDir>/dataconnect/',
+    '<rootDir>/apphosting.*'
   ],
 };
