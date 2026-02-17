@@ -325,7 +325,7 @@ export function generateLandlordDisplayTransactions(
 
         let monthNet = 0;
         // Calculate net for each transaction and sum up for the month
-        monthTransactions.forEach(t => {
+        monthTransactions.forEach((t: DisplayTransaction) => {
             t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0) - (t.specialDeductions || 0);
             monthNet += t.netToLandlord;
         });
