@@ -55,6 +55,9 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
         });
     }, [displayTransactions]);
 
+    const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + p.units.length, 0), [properties]);
+    const serviceChargeLabel = totalUnits > 1 ? 'Service Charges (from Occupied Units)' : 'Service Charges';
+
 
     const handleExport = () => {
         const data = displayTransactions.map(t => ({
@@ -86,7 +89,7 @@ export function LandlordDashboardContent({ properties, tenants, payments, financ
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium">Service Charges (Occupied)</CardTitle>
+                        <CardTitle className="text-sm font-medium">{serviceChargeLabel}</CardTitle>
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>

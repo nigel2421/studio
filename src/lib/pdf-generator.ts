@@ -389,12 +389,7 @@ export const generateLandlordStatementPDF = (
     });
 
     // Header
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Eracov Properties', 14, 20);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Landlord Statement', 14, 26);
+    addHeader(doc, 'Landlord Statement');
 
     // Landlord Details
     doc.setFontSize(12);
@@ -418,10 +413,14 @@ export const generateLandlordStatementPDF = (
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Summary', 14, yPos);
     yPos += 8;
+    
+    const totalUnits = units.length;
+    const serviceChargeLabel = totalUnits > 1 ? 'Service Charges (from Occupied Units)' : 'Service Charges';
+
 
     const summaryData = [
         ['Total Rent (Gross)', formatCurrency(summary.totalRent)],
-        ['Service Charges (from Occupied Units)', `-${formatCurrency(summary.totalServiceCharges)}`],
+        [serviceChargeLabel, `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
         ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];

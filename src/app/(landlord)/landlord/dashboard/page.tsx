@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -188,8 +189,8 @@ export default function UniversalOwnerDashboardPage() {
                     isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
                 );
     
-                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
-                const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties);
+                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties, startDate, endDate);
+                const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties, startDate, endDate);
           
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),

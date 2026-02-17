@@ -1,6 +1,6 @@
 
 import { Payment, Property, Tenant, Unit } from "./types";
-import { isSameMonth, parseISO, differenceInMonths, addMonths, format } from 'date-fns';
+import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -68,7 +68,7 @@ export function calculateTransactionBreakdown(
     }
 
     const isEracovManaged = unit?.managementStatus !== 'Client Managed';
-    const otherCosts = isEracovManaged && payment.type === 'Rent' ? 500 : 0;
+    const otherCosts = isEracovManaged && payment.type === 'Rent' ? 1000 : 0;
 
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee - otherCosts;
 
@@ -91,8 +91,8 @@ export interface FinancialSummary {
     vacantUnitServiceChargeDeduction?: number;
 }
 
-export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[]): FinancialSummary {
-    const transactions = generateLandlordDisplayTransactions(payments, tenants, properties);
+export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[], startDate?: Date, endDate?: Date): FinancialSummary {
+    const transactions = generateLandlordDisplayTransactions(payments, tenants, properties, startDate, endDate);
 
     const summary: FinancialSummary = {
         totalRent: 0,
@@ -131,7 +131,9 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
 export function generateLandlordDisplayTransactions(
     payments: Payment[], 
     tenants: Tenant[], 
-    properties: { property: Property, units: Unit[] }[]
+    properties: { property: Property, units: Unit[] }[],
+    startDate?: Date, 
+    endDate?: Date
 ) {
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
@@ -180,40 +182,44 @@ export function generateLandlordDisplayTransactions(
             const leaseStartDate = parseISO(tenant.lease.startDate);
 
             while (remainingAmount >= unitRent) {
-                const currentMonth = addMonths(leaseStartDate, monthIndex);
-                const monthString = format(currentMonth, 'yyyy-MM');
-                const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
-                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-                
-                transactions.push({
-                    id: `${payment.id}-${monthIndex}`,
-                    date: payment.date,
-                    unitName: tenant.unitName,
-                    unitType: unit?.unitType || 'N/A',
-                    forMonth: format(currentMonth, 'MMM yyyy'),
-                    ...breakdown,
-                });
+                const currentMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
+                if (!startDate || isWithinInterval(currentMonth, { start: startDate, end: endDate! })) {
+                    const monthString = format(currentMonth, 'yyyy-MM');
+                    const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
+                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                    
+                    transactions.push({
+                        id: `${payment.id}-${monthIndex}`,
+                        date: payment.date,
+                        unitName: tenant.unitName,
+                        unitType: unit?.unitType || 'N/A',
+                        forMonth: format(currentMonth, 'MMM yyyy'),
+                        ...breakdown,
+                    });
+                }
                 
                 remainingAmount -= unitRent;
                 monthIndex++;
             }
 
             if (remainingAmount > 1) {
-                const nextMonth = addMonths(leaseStartDate, monthIndex);
-                const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
-                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                const nextMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
+                if (!startDate || isWithinInterval(nextMonth, { start: startDate, end: endDate! })) {
+                    const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
+                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
 
-                transactions.push({
-                    id: `${payment.id}-rem`,
-                    date: payment.date,
-                    unitName: tenant.unitName,
-                    unitType: unit?.unitType || 'N/A',
-                    forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
-                    ...breakdown,
-                });
+                    transactions.push({
+                        id: `${payment.id}-rem`,
+                        date: payment.date,
+                        unitName: tenant.unitName,
+                        unitType: unit?.unitType || 'N/A',
+                        forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
+                        ...breakdown,
+                    });
+                }
             }
         } else {
-            const paymentForBreakdown = { ...payment, amount: amountToApportionAsRent };
+            const paymentForBreakdown = { ...payment, amount: Math.min(amountToApportionAsRent, unitRent) };
             const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
             transactions.push({
                 id: payment.id,
