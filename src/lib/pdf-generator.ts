@@ -377,7 +377,7 @@ export const generateArrearsServiceChargeInvoicePDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceCharge: number; mgmtFee: number; otherCosts?: number; net: number, rentForMonth?: string }[],
+    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; netToLandlord: number, rentForMonth?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -408,7 +408,7 @@ export const generateLandlordStatementPDF = (
     }
 
     // Summary Section
-    yPos = 75;
+    yPos += 23;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Summary', 14, yPos);
@@ -446,47 +446,63 @@ export const generateLandlordStatementPDF = (
     doc.text('Transaction History', 14, yPos);
     yPos += 8;
     
-    const totals = transactions.reduce((acc, t) => {
-        acc.gross += t.gross;
-        acc.serviceCharge += t.serviceCharge;
-        acc.mgmtFee += t.mgmtFee;
-        acc.otherCosts += t.otherCosts || 0;
-        acc.net += t.net;
+    const groupedByMonth = transactions.reduce((acc, t) => {
+        const month = t.rentForMonth || 'Unknown Month';
+        if (!acc[month]) {
+            acc[month] = [];
+        }
+        acc[month].push(t);
         return acc;
-    }, { gross: 0, serviceCharge: 0, mgmtFee: 0, otherCosts: 0, net: 0 });
+    }, {} as Record<string, typeof transactions>);
+
+    const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        return dateA.getTime() - dateB.getTime();
+    });
+    
+    const body: any[] = [];
+
+    sortedMonths.forEach(month => {
+        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 7, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        const monthTransactions = groupedByMonth[month];
+        monthTransactions.forEach(t => {
+            body.push([
+                t.date,
+                t.unit,
+                formatCurrency(t.gross),
+                `-${formatCurrency(t.serviceChargeDeduction)}`,
+                `-${formatCurrency(t.mgmtFee)}`,
+                `-${formatCurrency(t.otherCosts || 0)}`,
+                formatCurrency(t.netToLandlord)
+            ]);
+        });
+    });
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
-        body: transactions.map(t => [
-            t.date,
-            t.unit,
-            t.rentForMonth || 'N/A',
-            formatCurrency(t.gross),
-            `-${formatCurrency(t.serviceCharge)}`,
-            `-${formatCurrency(t.mgmtFee)}`,
-            `-${formatCurrency(t.otherCosts || 0)}`,
-            formatCurrency(t.net),
-        ]),
+        head: [['Date', 'Unit', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
+        body: body,
         foot: [[
-            { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(totals.gross), styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(totals.serviceCharge)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(totals.mgmtFee)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(totals.otherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(totals.net), styles: { fontStyle: 'bold', halign: 'right' } }
+            { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
         theme: 'striped',
         headStyles: { fillColor: [41, 102, 182] },
         columnStyles: {
+            2: { halign: 'right' },
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' },
             6: { halign: 'right' },
-            7: { halign: 'right' },
         },
     });
+
     yPos = (doc as any).lastAutoTable.finalY + 15;
     
     // Units Overview

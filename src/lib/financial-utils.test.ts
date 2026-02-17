@@ -1,5 +1,3 @@
-
-
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -148,7 +146,7 @@ describe('Financial Utils Logic', () => {
                 date: '2023-10-02'
             });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties);
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, undefined, undefined, 'soil_merchants_internal');
 
             // Assertions
             expect(transactions).toHaveLength(4); // Should unroll into 4 rent transactions
@@ -179,11 +177,59 @@ describe('Financial Utils Logic', () => {
             
             const payment = createMockPayment({ tenantId: 't-anchor', amount: 50000, date: '2023-07-16' });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties);
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, undefined, undefined, 'soil_merchants_internal');
             
             expect(transactions).toHaveLength(2);
             expect(transactions[0].forMonth).toBe('Jul 2023');
             expect(transactions[1].forMonth).toBe('Aug 2023');
+        });
+
+        it('should apply otherCosts once per month for multi-unit landlords', () => {
+            const landlordId = 'multi-unit-lord';
+            const units = [
+                createMockUnit({ name: 'A1', landlordId, rentAmount: 20000 }),
+                createMockUnit({ name: 'A2', landlordId, rentAmount: 30000 }),
+            ];
+            const props = [createMockProperty('prop-multi', units)];
+            const tenants = [
+                createMockTenant({ id: 't-A1', unitName: 'A1', propertyId: 'prop-multi', lease: { rent: 20000 } }),
+                createMockTenant({ id: 't-A2', unitName: 'A2', propertyId: 'prop-multi', lease: { rent: 30000 } }),
+            ];
+            const payments = [
+                createMockPayment({ tenantId: 't-A1', amount: 20000, date: '2024-01-05', rentForMonth: '2024-01'}),
+                createMockPayment({ tenantId: 't-A2', amount: 30000, date: '2024-01-06', rentForMonth: '2024-01'}),
+            ];
+
+            const transactions = generateLandlordDisplayTransactions(payments, tenants, props, undefined, undefined, landlordId);
+            
+            expect(transactions.length).toBe(2);
+            const janTransactions = transactions.filter(t => t.forMonth === 'Jan 2024');
+            
+            const costs = janTransactions.map(t => t.otherCosts);
+            expect(costs).toContain(1000);
+            expect(costs).toContain(0);
+            
+            const totalCosts = costs.reduce((a, b) => a + b, 0);
+            expect(totalCosts).toBe(1000);
+        });
+
+        it('should apply otherCosts per transaction for single-unit landlords', () => {
+            const landlordId = 'single-unit-lord';
+            const units = [createMockUnit({ name: 'B1', landlordId, rentAmount: 40000 })];
+            const props = [createMockProperty('prop-single', units)];
+            const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { rent: 40000 } });
+            
+            // Simulating two separate payments for the same month's rent
+            const payments = [
+                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-01-05', rentForMonth: '2024-01'}),
+                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-02-05', rentForMonth: '2024-02'}),
+            ];
+
+            const transactions = generateLandlordDisplayTransactions(payments, [tenant], props, undefined, undefined, landlordId);
+            
+            expect(transactions.length).toBe(2);
+            expect(transactions[0].otherCosts).toBe(1000);
+            expect(transactions[1].otherCosts).toBe(1000);
         });
     });
 });

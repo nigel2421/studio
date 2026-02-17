@@ -41,6 +41,7 @@ export function calculateTransactionBreakdown(
         if (unitRent > 0 && payment.type === 'Rent') {
             const rentRatio = Math.min(1, grossAmount / unitRent); // Ensure ratio is not > 1
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
+            // Only deduct service charge if it's not a 50% commission deal (initial letting)
             serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
             managementFee = 0; // No management fee on non-rent or zero-rent payments
@@ -48,10 +49,11 @@ export function calculateTransactionBreakdown(
         }
     }
     
+    // This now correctly calculates the fee per transaction, which will be adjusted later for multi-unit landlords.
     const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
     const otherCosts = isEracovManaged && payment.type === 'Rent' && grossAmount > 0 ? 1000 : 0;
 
-    const netToLandlord = grossAmount - serviceChargeDeduction - managementFee - otherCosts;
+    const netToLandlord = grossAmount - serviceChargeDeduction - managementFee; // Other costs will be subtracted later
 
     return {
         gross: grossAmount,
@@ -72,8 +74,20 @@ export interface FinancialSummary {
     vacantUnitServiceChargeDeduction?: number;
 }
 
-export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: Property[], startDate?: Date, endDate?: Date, landlordId?: string): FinancialSummary {
-    const transactions = generateLandlordDisplayTransactions(payments, tenants, properties, startDate, endDate);
+export function aggregateFinancials(
+    allTransactions: any[],
+    properties: Property[], 
+    tenants: Tenant[],
+    startDate?: Date, 
+    endDate?: Date, 
+    landlordId?: string
+): FinancialSummary {
+    // This function now expects transactions to have costs pre-calculated by generateLandlordDisplayTransactions
+    const transactions = allTransactions.filter(t => {
+        if (!startDate || !endDate) return true;
+        const transactionDate = parseISO(t.date);
+        return isWithinInterval(transactionDate, { start: startDate, end: endDate });
+    });
 
     const summary: FinancialSummary = {
         totalRent: 0,
@@ -90,6 +104,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         summary.totalServiceCharges += transaction.serviceChargeDeduction;
         summary.totalManagementFees += transaction.managementFee;
         summary.totalOtherCosts += transaction.otherCosts || 0;
+        // The netToLandlord from generateLandlordDisplayTransactions already accounts for otherCosts
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
@@ -98,18 +113,22 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         const start = startOfMonth(startDate);
         const end = startOfMonth(endDate);
         
+        const landlordUnits = properties.flatMap(p => p.units.filter(u => 
+            u.landlordId === landlordId || 
+            (landlordId === 'soil_merchants_internal' && u.ownership === 'SM')
+        ));
+        
         let loopDate = start;
         while(loopDate <= end) {
-            properties.forEach(p => {
-              (p.units || []).forEach(u => {
-                const isLandlordUnit = u.landlordId === landlordId || (landlordId === 'soil_merchants_internal' && u.ownership === 'SM');
-                if (!isLandlordUnit) return;
-
-                const isOccupied = tenants.some(t => t.propertyId === p.id && t.unitName === u.name);
+            landlordUnits.forEach(u => {
+                // Find property for the unit to check propertyId
+                const property = properties.find(p => p.units.includes(u));
+                if (!property) return;
+    
+                const isOccupied = tenants.some(t => t.unitName === u.name && t.propertyId === property.id);
                 if (!isOccupied && u.status === 'vacant' && u.handoverStatus === 'Handed Over' && u.serviceCharge) {
                   vacantUnitDeduction += u.serviceCharge;
                 }
-              });
             });
             loopDate = addMonths(loopDate, 1);
         }
@@ -126,7 +145,8 @@ export function generateLandlordDisplayTransactions(
     tenants: Tenant[],
     properties: Property[],
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
+    landlordId?: string
 ) {
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
@@ -200,6 +220,41 @@ export function generateLandlordDisplayTransactions(
             remainingAmount -= unitRent;
             monthIndex++;
         }
+    });
+    
+    // --- New Logic for Other Costs ---
+    let landlordUnitCount = 0;
+    if (landlordId) {
+        const landlordOwnedUnits = new Set<string>();
+        properties.forEach(p => {
+            (p.units || []).forEach(u => {
+                if(u.landlordId === landlordId || (landlordId === 'soil_merchants_internal' && u.ownership === 'SM')) {
+                    landlordOwnedUnits.add(`${p.id}-${u.name}`);
+                }
+            });
+        });
+        landlordUnitCount = landlordOwnedUnits.size;
+    }
+    
+    if (landlordUnitCount > 1) {
+        const processedMonths = new Set<string>();
+        transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date to apply cost to first transaction
+            .forEach(t => {
+                const monthKey = t.forMonth;
+                if (processedMonths.has(monthKey)) {
+                    t.otherCosts = 0; // Set subsequent transaction costs in the same month to 0
+                } else {
+                    if (t.otherCosts > 0) { // Only apply if it was eligible in the first place
+                       t.otherCosts = 1000;
+                       processedMonths.add(monthKey);
+                    }
+                }
+            });
+    }
+    
+    // Recalculate all net figures after otherCosts has been adjusted
+    transactions.forEach(t => {
+        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - t.otherCosts;
     });
     
     return transactions;
