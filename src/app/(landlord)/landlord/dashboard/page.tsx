@@ -188,11 +188,12 @@ export default function UniversalOwnerDashboardPage() {
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),
                     unit: t.unitName,
-                    rentForMonth: t.forMonth,
+                    rentForMonth: t.rentForMonth,
+                    forMonthDisplay: t.forMonth,
                     gross: t.gross,
-                    serviceCharge: t.serviceChargeDeduction,
+                    serviceChargeDeduction: t.serviceChargeDeduction,
                     mgmtFee: t.managementFee,
-                    net: t.netToLandlord,
+                    netToLandlord: t.netToLandlord,
                     otherCosts: t.otherCosts
                 }));
     

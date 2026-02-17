@@ -373,11 +373,10 @@ export const generateArrearsServiceChargeInvoicePDF = (
     return doc.output('datauristring').split(',')[1];
 };
 
-
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; netToLandlord: number, rentForMonth?: string }[],
+    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -455,11 +454,7 @@ export const generateLandlordStatementPDF = (
         return acc;
     }, {} as Record<string, typeof transactions>);
 
-    const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => {
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        return dateA.getTime() - dateB.getTime();
-    });
+    const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => a.localeCompare(b));
     
     const body: any[] = [];
 
@@ -470,6 +465,7 @@ export const generateLandlordStatementPDF = (
             body.push([
                 t.date,
                 t.unit,
+                t.forMonthDisplay,
                 formatCurrency(t.gross),
                 `-${formatCurrency(t.serviceChargeDeduction)}`,
                 `-${formatCurrency(t.mgmtFee)}`,
@@ -481,10 +477,10 @@ export const generateLandlordStatementPDF = (
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
         body: body,
         foot: [[
-            { content: 'Totals', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -500,6 +496,7 @@ export const generateLandlordStatementPDF = (
             4: { halign: 'right' },
             5: { halign: 'right' },
             6: { halign: 'right' },
+            7: { halign: 'right' },
         },
     });
 

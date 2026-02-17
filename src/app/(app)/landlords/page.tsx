@@ -286,12 +286,13 @@ export default function LandlordsPage() {
         const transactionsForPDF = displayTransactions.map(t => ({
             date: new Date(t.date).toLocaleDateString(),
             unit: t.unitName,
-            rentForMonth: t.forMonth,
+            rentForMonth: t.rentForMonth,
+            forMonthDisplay: t.forMonth,
             gross: t.gross,
-            serviceCharge: t.serviceChargeDeduction,
+            serviceChargeDeduction: t.serviceChargeDeduction,
             mgmtFee: t.managementFee,
             otherCosts: t.otherCosts || 0,
-            net: t.netToLandlord,
+            netToLandlord: t.netToLandlord,
         }));
         
         const unitsForPDF = relevantProperties.flatMap(p => 
@@ -549,5 +550,3 @@ export default function LandlordsPage() {
     </div>
   );
 }
-
-    
