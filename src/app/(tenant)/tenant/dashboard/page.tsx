@@ -85,7 +85,8 @@ export default function TenantDashboardPage() {
         toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
         try {
             const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
-            generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, activeTenantTab);
+            const context = activeTenantTab === 'water' ? 'megarack' : 'rent';
+            generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, context);
         } catch(e) {
             console.error("Error generating PDF:", e);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate your statement.' });

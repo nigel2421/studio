@@ -8,6 +8,11 @@ import { generateLedger } from './financial-logic';
 
 // Helper to add company header
 const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties') => {
+    const isMegaRack = brand === 'Mega Rack';
+    const phone = isMegaRack ? '0793111222' : '+254 7XX XXX XXX';
+    const email = isMegaRack ? 'megarackltd@gmail.com' : 'support@eracovproperties.com';
+    const address = isMegaRack ? 'Industrial Area, Nairobi' : 'Westlands, Nairobi';
+
     doc.setTextColor(40);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
@@ -15,9 +20,9 @@ const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('Westlands, Nairobi', 14, 26);
-    doc.text('Phone: +254 7XX XXX XXX', 14, 30);
-    doc.text('Email: support@eracovproperties.com', 14, 34);
+    doc.text(address, 14, 26);
+    doc.text(`Phone: ${phone}`, 14, 30);
+    doc.text(`Email: ${email}`, 14, 34);
 
     // Document Title
     doc.setFontSize(16);
