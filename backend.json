@@ -55,6 +55,24 @@
         }
       },
       "required": ["propertyId", "tenantId", "title", "description", "category", "priority", "status", "date", "createdAt", "updatedAt"]
+    },
+    "noticeToVacate": {
+      "title": "Notice to Vacate",
+      "description": "A notice submitted by a tenant or admin to terminate a lease.",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "unitName": { "type": "string" },
+        "tenantName": { "type": "string" },
+        "propertyName": { "type": "string" },
+        "noticeSubmissionDate": { "type": "string", "format": "date-time" },
+        "scheduledMoveOutDate": { "type": "string", "format": "date" },
+        "submittedBy": { "type": "string", "enum": ["Admin", "Tenant"] },
+        "submittedByName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Completed"] }
+      },
+      "required": ["tenantId", "propertyId", "unitName", "tenantName", "propertyName", "noticeSubmissionDate", "scheduledMoveOutDate", "submittedBy", "status"]
     }
   },
   "auth": {
@@ -66,6 +84,12 @@
         "$ref": "#/entities/maintenanceRequest"
       },
       "description": "Stores all maintenance requests from tenants."
+    },
+    "/noticesToVacate/{noticeId}": {
+      "schema": {
+        "$ref": "#/entities/noticeToVacate"
+      },
+      "description": "Stores all active and completed notices to vacate."
     }
   }
 }

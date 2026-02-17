@@ -316,3 +316,17 @@ export type MaintenanceRequest = {
   updatedAt: string;
   completedAt?: string;
 };
+
+export type NoticeToVacate = {
+  id: string;
+  tenantId: string;
+  propertyId: string;
+  unitName: string;
+  tenantName: string;
+  propertyName: string;
+  noticeSubmissionDate: string;
+  scheduledMoveOutDate: string;
+  submittedBy: 'Admin' | 'Tenant';
+  submittedByName: string;
+  status: 'Active' | 'Completed';
+};

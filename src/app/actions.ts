@@ -1,6 +1,8 @@
+'use server';
+
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
-import { logCommunication, getTenant, getWaterReadingsAndTenants } from '@/lib/data';
+import { logCommunication, getTenant, getWaterReadingsAndTenants, processOverdueNotices } from '@/lib/data';
 import { Communication, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { format } from 'date-fns';
@@ -217,4 +219,20 @@ export async function performSendWaterBills(readingIds: string[], senderId: stri
     console.error("Error sending water bills:", error);
     return { success: false, error: error.message || 'An unexpected error occurred while sending bills.' };
   }
+}
+
+export async function performProcessMoveOuts(editorId: string) {
+    try {
+        const { processedCount, errorCount } = await processOverdueNotices(editorId);
+        if (errorCount > 0) {
+            return { success: false, error: `Processed ${processedCount} notices, but ${errorCount} failed.` };
+        }
+        if (processedCount === 0) {
+            return { success: true, data: { message: 'No overdue move-out notices to process.' } };
+        }
+        return { success: true, data: { message: `Successfully processed ${processedCount} move-out notices.` } };
+    } catch (error: any) {
+        console.error("Error running move-out automation:", error);
+        return { success: false, error: error.message || 'An unexpected error occurred.' };
+    }
 }
