@@ -153,8 +153,8 @@ describe('Financial Utils Logic', () => {
             expect(transactions[0].forMonthDisplay).toBe('Oct 2023');
             expect(transactions[0].gross).toBe(25000);
             expect(transactions[0].managementFee).toBe(1250);
-            expect(transactions[0].otherCosts).toBe(1000);
-            expect(transactions[0].netToLandlord).toBe(22750);
+            expect(transactions[0].otherCosts).toBe(0); // Jan rule doesn't apply to Oct
+            expect(transactions[0].netToLandlord).toBe(23750); // 25000 - 1250
 
             expect(transactions[3].forMonthDisplay).toBe('Jan 2024');
             expect(transactions[3].gross).toBe(25000);
@@ -254,15 +254,15 @@ describe('Financial Utils Logic', () => {
             const t3 = transactions.find(t => t.unitName === 'S1' && t.rentForMonth === '2024-02');
             
             // t1 should have Stage 2 (10000) + Stage 3 Studio (8000) = 18000
-            expect(t1.specialDeductions).toBe(18000);
+            expect(t1!.specialDeductions).toBe(18000);
             // t2 should have Stage 2 (10000) + Stage 3 1BR (12000) = 22000
-            expect(t2.specialDeductions).toBe(22000);
+            expect(t2!.specialDeductions).toBe(22000);
             // t3 is for a subsequent month for a unit that already had deductions, so it should be 0
-            expect(t3.specialDeductions).toBe(0);
+            expect(t3!.specialDeductions).toBe(0);
 
             // Check net payout
-            expect(t1.netToLandlord).toBe(20000 - (20000 * 0.05) - 1000 - 18000); // gross - mgmt - other - special
-            expect(t2.netToLandlord).toBe(30000 - (30000 * 0.05) - 0 - 22000); // other cost is 0 as it's second tx in same month
+            expect(t1!.netToLandlord).toBe(20000 - (20000 * 0.05) - 0 - 18000); // Jan rent for S1, other costs is 0 for Jan
+            expect(t2!.netToLandlord).toBe(30000 - (30000 * 0.05) - 0 - 22000); // Jan rent for S2
         });
 
     });

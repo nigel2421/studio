@@ -15,4 +15,10 @@ module.exports = {
   ],
   clearMocks: true,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  modulePathIgnorePatterns: [
+    '<rootDir>/deployed2live/',
+    '<rootDir>/.firebase/',
+    '<rootDir>/functions/',
+    '<rootDir>/src/functions/',
+  ],
 };

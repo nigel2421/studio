@@ -1,29 +1,26 @@
 
-import { processOverdueNotices, getDocs, doc, writeBatch, getDoc, collection, query, where, updateDoc, addDoc } from './data';
+import { processOverdueNotices } from './data';
 import { Tenant, Property, NoticeToVacate, Unit } from './types';
 import { format, subDays } from 'date-fns';
+import { getDocs, doc, writeBatch, getDoc, collection, query, where, updateDoc, addDoc } from 'firebase/firestore';
 
-jest.mock('firebase/firestore', () => {
-    const originalModule = jest.requireActual('firebase/firestore');
-    return {
-        ...originalModule,
-        getDocs: jest.fn(),
-        getDoc: jest.fn(),
-        doc: jest.fn((db, collectionName, id) => ({ path: `${collectionName}/${id}`, id: id })),
-        writeBatch: jest.fn(),
-        collection: jest.fn(),
-        query: jest.fn(),
-        where: jest.fn(),
-        updateDoc: jest.fn(),
-        addDoc: jest.fn(), // Mock addDoc for logging
-    };
-});
+jest.mock('firebase/firestore', () => ({
+    ...jest.requireActual('firebase/firestore'),
+    getDocs: jest.fn(),
+    getDoc: jest.fn(),
+    doc: jest.fn((db, collectionName, id) => ({ path: `${collectionName}/${id}`, id: id })),
+    writeBatch: jest.fn(),
+    collection: jest.fn((db, path) => ({ path })),
+    query: jest.fn(),
+    where: jest.fn(),
+    updateDoc: jest.fn(),
+    addDoc: jest.fn(),
+}));
 
-const mockGetDocs = jest.requireMock('firebase/firestore').getDocs as jest.Mock;
-const mockGetDoc = jest.requireMock('firebase/firestore').getDoc as jest.Mock;
-const mockWriteBatch = jest.requireMock('firebase/firestore').writeBatch as jest.Mock;
-const mockAddDoc = jest.requireMock('firebase/firestore').addDoc;
-
+const mockGetDocs = getDocs as jest.Mock;
+const mockGetDoc = getDoc as jest.Mock;
+const mockWriteBatch = writeBatch as jest.Mock;
+const mockAddDoc = addDoc as jest.Mock;
 
 describe('Notice to Vacate Processing', () => {
     beforeEach(() => {
@@ -114,7 +111,7 @@ describe('Notice to Vacate Processing', () => {
 
         // Verify activity was logged (since it's not in the batch)
         expect(mockAddDoc).toHaveBeenCalledWith(
-            undefined, // In our mock, db is undefined, which is fine for this check.
+            expect.anything(), 
             expect.objectContaining({ action: `Processed move-out for ${mockTenant.name} in unit ${mockTenant.unitName}.` })
         );
     });
