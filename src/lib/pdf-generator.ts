@@ -376,7 +376,7 @@ export const generateArrearsServiceChargeInvoicePDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
+    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; specialDeductions?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -388,10 +388,9 @@ export const generateLandlordStatementPDF = (
         day: 'numeric',
     });
 
-    // Header
     addHeader(doc, 'Landlord Statement');
 
-    let yPos = 62; // Adjusted Y position
+    let yPos = 62;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('STATEMENT FOR:', 14, yPos);
@@ -406,7 +405,6 @@ export const generateLandlordStatementPDF = (
         doc.text(`Period: ${periodStr}`, 196, yPos + 6, { align: 'right' });
     }
 
-    // Summary Section
     yPos += 23;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
@@ -416,13 +414,16 @@ export const generateLandlordStatementPDF = (
     const totalUnits = units.length;
     const serviceChargeLabel = totalUnits > 1 ? 'Service Charges (from Occupied Units)' : 'Service Charges';
 
-
     const summaryData = [
         ['Total Rent (Gross)', formatCurrency(summary.totalRent)],
         [serviceChargeLabel, `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
         ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
+
+    if (summary.totalSpecialDeductions > 0) {
+        summaryData.push(['Special Deductions (Stage 2/3)', `-${formatCurrency(summary.totalSpecialDeductions)}`]);
+    }
 
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
       summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`])
@@ -439,7 +440,6 @@ export const generateLandlordStatementPDF = (
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
-    // Transaction History
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Transaction History', 14, yPos);
@@ -459,7 +459,7 @@ export const generateLandlordStatementPDF = (
     const body: any[] = [];
 
     sortedMonths.forEach(month => {
-        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 9, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach(t => {
             body.push([
@@ -470,6 +470,7 @@ export const generateLandlordStatementPDF = (
                 `-${formatCurrency(t.serviceChargeDeduction)}`,
                 `-${formatCurrency(t.mgmtFee)}`,
                 `-${formatCurrency(t.otherCosts || 0)}`,
+                `-${formatCurrency(t.specialDeductions || 0)}`,
                 formatCurrency(t.netToLandlord)
             ]);
         });
@@ -477,7 +478,7 @@ export const generateLandlordStatementPDF = (
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Special Costs', 'Net']],
         body: body,
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -485,6 +486,7 @@ export const generateLandlordStatementPDF = (
             { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(summary.totalSpecialDeductions)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
@@ -496,12 +498,12 @@ export const generateLandlordStatementPDF = (
             5: { halign: 'right' },
             6: { halign: 'right' },
             7: { halign: 'right' },
+            8: { halign: 'right' },
         },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
     
-    // Units Overview
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Unit Portfolio', 14, yPos);
@@ -527,7 +529,6 @@ export const generateLandlordStatementPDF = (
         );
         yPos += 10;
     }
-
 
     doc.save(`landlord_statement_${landlord.name.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
@@ -571,7 +572,7 @@ export const generateTenantStatementPDF = (
     doc.setFontSize(10);
     doc.text(`Date Issued: ${dateStr}`, 196, 48, { align: 'right' });
 
-    const asOf = new Date(); // Always generate statements up to the current date
+    const asOf = new Date();
 
     const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, [], undefined, asOf, { includeWater: false });
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeRent: false, includeServiceCharge: false });
@@ -608,7 +609,7 @@ export const generateTenantStatementPDF = (
         const balanceLabel = tenant.residentType === 'Homeowner' ? 'Service Charge Balance:' : 'Rent Balance:';
         doc.text(balanceLabel, 140, yPos);
         doc.text(rentDue > 0 ? formatCurrency(rentDue) : `${formatCurrency(rentCredit)} Cr`, 196, yPos, { align: 'right' });
-        yPos += 10; // Add space for the next table if it's a full report
+        yPos += 10;
     }
     
     if (context === 'water' || context === 'full') {

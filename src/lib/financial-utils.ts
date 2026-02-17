@@ -48,7 +48,6 @@ export function calculateTransactionBreakdown(
         }
     }
     
-    // This now correctly calculates the fee per transaction, which will be adjusted later for multi-unit landlords.
     const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
     const otherCosts = isEracovManaged && payment.type === 'Rent' && grossAmount > 0 ? 1000 : 0;
 
@@ -68,6 +67,7 @@ export interface FinancialSummary {
     totalManagementFees: number;
     totalServiceCharges: number;
     totalOtherCosts: number;
+    totalSpecialDeductions: number;
     totalNetRemittance: number;
     transactionCount: number;
     vacantUnitServiceChargeDeduction?: number;
@@ -81,7 +81,6 @@ export function aggregateFinancials(
     endDate?: Date, 
     landlord?: Landlord | null
 ): FinancialSummary {
-    // This function now expects transactions to have costs pre-calculated by generateLandlordDisplayTransactions
     const transactions = allTransactions.filter(t => {
         if (!startDate || !endDate) return true;
         const transactionDate = parseISO(t.date);
@@ -93,6 +92,7 @@ export function aggregateFinancials(
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalOtherCosts: 0,
+        totalSpecialDeductions: 0,
         totalNetRemittance: 0,
         transactionCount: transactions.length,
         vacantUnitServiceChargeDeduction: 0,
@@ -103,7 +103,7 @@ export function aggregateFinancials(
         summary.totalServiceCharges += transaction.serviceChargeDeduction;
         summary.totalManagementFees += transaction.managementFee;
         summary.totalOtherCosts += transaction.otherCosts || 0;
-        // The netToLandlord from generateLandlordDisplayTransactions already accounts for otherCosts
+        summary.totalSpecialDeductions += transaction.specialDeductions || 0;
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
@@ -183,29 +183,6 @@ export function generateLandlordDisplayTransactions(
         }
     });
 
-    let stageTwoCostToDeduct = landlord?.deductStageTwoCost ? 10000 : 0;
-    const stageThreeCostsToDeduct = new Map<string, number>();
-
-    if (landlord?.deductStageThreeCost) {
-        properties.forEach(p => {
-            (p.units || []).forEach(u => {
-                if (u.landlordId === landlordId) {
-                    switch (u.unitType) {
-                        case 'Studio':
-                            stageThreeCostsToDeduct.set(u.name, 8000);
-                            break;
-                        case 'One Bedroom':
-                            stageThreeCostsToDeduct.set(u.name, 12000);
-                            break;
-                        case 'Two Bedroom':
-                            stageThreeCostsToDeduct.set(u.name, 16000);
-                            break;
-                    }
-                }
-            });
-        });
-    }
-
     sortedPayments.forEach(payment => {
         const tenant = tenantMap.get(payment.tenantId);
         if (!tenant || payment.type !== 'Rent') {
@@ -240,28 +217,17 @@ export function generateLandlordDisplayTransactions(
             const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: format(currentMonth, 'yyyy-MM'), type: 'Rent' };
             const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
             
-            let specialDeductions = 0;
-            if (stageTwoCostToDeduct > 0) {
-                specialDeductions += stageTwoCostToDeduct;
-                stageTwoCostToDeduct = 0;
-            }
-
-            if (unit && stageThreeCostsToDeduct.has(unit.name)) {
-                specialDeductions += stageThreeCostsToDeduct.get(unit.name)!;
-                stageThreeCostsToDeduct.delete(unit.name);
-            }
-
-            breakdown.otherCosts += specialDeductions;
-            
             transactions.push({
                 id: `${payment.id}-${monthIndex}`,
                 date: payment.date,
+                propertyId: tenant.propertyId,
                 unitName: tenant.unitName,
                 unitType: unit?.unitType || 'N/A',
                 rentForMonth: format(currentMonth, 'yyyy-MM'),
                 forMonthDisplay: format(currentMonth, 'MMM yyyy'),
                 ...breakdown,
-                gross: rentForThisIteration, // The gross is the actual amount apportioned for this month's rent
+                specialDeductions: 0,
+                gross: rentForThisIteration,
             });
             
             remainingAmount -= rentForThisIteration;
@@ -269,7 +235,38 @@ export function generateLandlordDisplayTransactions(
         }
     });
     
-    // --- New Logic for Other Costs ---
+    // --- Special Deductions Logic ---
+    const deductedStageTwoUnits = new Set<string>();
+    const deductedStageThreeUnits = new Set<string>();
+
+    if (landlord?.deductStageTwoCost) {
+        transactions.forEach(t => {
+            if (!deductedStageTwoUnits.has(t.unitName)) {
+                t.specialDeductions = (t.specialDeductions || 0) + 10000;
+                deductedStageTwoUnits.add(t.unitName);
+            }
+        });
+    }
+
+    if (landlord?.deductStageThreeCost) {
+        transactions.forEach(t => {
+            const unit = unitMap.get(`${t.propertyId}-${t.unitName}`);
+            if (unit && !deductedStageThreeUnits.has(t.unitName)) {
+                let cost = 0;
+                switch (unit.unitType) {
+                    case 'Studio': cost = 8000; break;
+                    case 'One Bedroom': cost = 12000; break;
+                    case 'Two Bedroom': cost = 16000; break;
+                }
+                if (cost > 0) {
+                    t.specialDeductions = (t.specialDeductions || 0) + cost;
+                    deductedStageThreeUnits.add(t.unitName);
+                }
+            }
+        });
+    }
+
+    // --- Transaction Fee Logic ---
     let landlordUnitCount = 0;
     if (landlordId) {
         const landlordOwnedUnits = new Set<string>();
@@ -285,14 +282,12 @@ export function generateLandlordDisplayTransactions(
     
     if (landlordUnitCount > 1) {
         const processedMonths = new Set<string>();
-        transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date to apply cost to first transaction
+        transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
             .forEach(t => {
                 const monthKey = t.rentForMonth;
                 if (processedMonths.has(monthKey)) {
-                    if (t.otherCosts > 1000) { // Keep special deductions
-                        t.otherCosts -= 1000;
-                    } else {
-                        t.otherCosts = 0; // Set subsequent transaction costs in the same month to 0
+                    if (t.otherCosts >= 1000) { 
+                        t.otherCosts = 0; 
                     }
                 } else {
                     if (t.otherCosts >= 1000) {
@@ -302,9 +297,8 @@ export function generateLandlordDisplayTransactions(
             });
     }
     
-    // Recalculate all net figures after otherCosts has been adjusted
     transactions.forEach(t => {
-        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - t.otherCosts;
+        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - t.otherCosts - t.specialDeductions;
     });
     
     return transactions;

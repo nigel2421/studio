@@ -139,31 +139,27 @@ describe('Financial Utils Logic', () => {
                 waterDeposit: 5000,
             });
 
-            // This single payment covers deposits + 4 months rent
             const payment = createMockPayment({
                 tenantId: 't-lump',
                 amount: 130000,
                 date: '2023-10-02'
             });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, undefined, undefined, 'soil_merchants_internal');
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, null);
 
-            // Assertions
-            expect(transactions).toHaveLength(4); // Should unroll into 4 rent transactions
+            expect(transactions).toHaveLength(4);
 
-            // Check October (first month)
-            expect(transactions[0].forMonth).toBe('Oct 2023');
+            expect(transactions[0].forMonthDisplay).toBe('Oct 2023');
             expect(transactions[0].gross).toBe(25000);
-            expect(transactions[0].managementFee).toBe(1250); // 5% of 25k
+            expect(transactions[0].managementFee).toBe(1250);
             expect(transactions[0].otherCosts).toBe(1000);
-            expect(transactions[0].netToLandlord).toBe(22750); // 25000 - 1250 - 1000
+            expect(transactions[0].netToLandlord).toBe(22750);
 
-            // Check January (last month)
-            expect(transactions[3].forMonth).toBe('Jan 2024');
+            expect(transactions[3].forMonthDisplay).toBe('Jan 2024');
             expect(transactions[3].gross).toBe(25000);
 
             const totalGross = transactions.reduce((sum, t) => sum + t.gross, 0);
-            expect(totalGross).toBe(100000); // Should only be the rent portion
+            expect(totalGross).toBe(100000);
         });
         
         it('should anchor the breakdown to the lease start date', () => {
@@ -177,15 +173,16 @@ describe('Financial Utils Logic', () => {
             
             const payment = createMockPayment({ tenantId: 't-anchor', amount: 50000, date: '2023-07-16' });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, undefined, undefined, 'soil_merchants_internal');
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, null);
             
             expect(transactions).toHaveLength(2);
-            expect(transactions[0].forMonth).toBe('Jul 2023');
-            expect(transactions[1].forMonth).toBe('Aug 2023');
+            expect(transactions[0].forMonthDisplay).toBe('Jul 2023');
+            expect(transactions[1].forMonthDisplay).toBe('Aug 2023');
         });
 
         it('should apply otherCosts once per month for multi-unit landlords', () => {
             const landlordId = 'multi-unit-lord';
+            const landlord = { id: landlordId, name: 'Multi Unit Lord', email: '', phone: '' };
             const units = [
                 createMockUnit({ name: 'A1', landlordId, rentAmount: 20000 }),
                 createMockUnit({ name: 'A2', landlordId, rentAmount: 30000 }),
@@ -200,10 +197,10 @@ describe('Financial Utils Logic', () => {
                 createMockPayment({ tenantId: 't-A2', amount: 30000, date: '2024-01-06', rentForMonth: '2024-01'}),
             ];
 
-            const transactions = generateLandlordDisplayTransactions(payments, tenants, props, undefined, undefined, landlordId);
+            const transactions = generateLandlordDisplayTransactions(payments, tenants, props, landlord);
             
             expect(transactions.length).toBe(2);
-            const janTransactions = transactions.filter(t => t.forMonth === 'Jan 2024');
+            const janTransactions = transactions.filter(t => t.forMonthDisplay === 'Jan 2024');
             
             const costs = janTransactions.map(t => t.otherCosts);
             expect(costs).toContain(1000);
@@ -215,21 +212,57 @@ describe('Financial Utils Logic', () => {
 
         it('should apply otherCosts per transaction for single-unit landlords', () => {
             const landlordId = 'single-unit-lord';
+            const landlord = { id: landlordId, name: 'Single Unit Lord', email: '', phone: '' };
             const units = [createMockUnit({ name: 'B1', landlordId, rentAmount: 40000 })];
             const props = [createMockProperty('prop-single', units)];
             const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { rent: 40000 } });
             
-            // Simulating two separate payments for the same month's rent
             const payments = [
                 createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-01-05', rentForMonth: '2024-01'}),
                 createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-02-05', rentForMonth: '2024-02'}),
             ];
 
-            const transactions = generateLandlordDisplayTransactions(payments, [tenant], props, undefined, undefined, landlordId);
+            const transactions = generateLandlordDisplayTransactions(payments, [tenant], props, landlord);
             
             expect(transactions.length).toBe(2);
             expect(transactions[0].otherCosts).toBe(1000);
             expect(transactions[1].otherCosts).toBe(1000);
         });
+
+        it('should apply special deductions per unit once', () => {
+            const landlord = { id: 'special-lord', name: 'Special Lord', email: '', phone: '', deductStageTwoCost: true, deductStageThreeCost: true };
+            const units = [
+                createMockUnit({ name: 'S1', unitType: 'Studio', landlordId: landlord.id }),
+                createMockUnit({ name: 'S2', unitType: 'One Bedroom', landlordId: landlord.id }),
+            ];
+            const props = [createMockProperty('prop-special', units)];
+            const tenants = [
+                createMockTenant({ id: 't-S1', unitName: 'S1', propertyId: 'prop-special', lease: { rent: 20000 } }),
+                createMockTenant({ id: 't-S2', unitName: 'S2', propertyId: 'prop-special', lease: { rent: 30000 } }),
+            ];
+            const payments = [
+                createMockPayment({ tenantId: 't-S1', amount: 20000, date: '2024-01-05', rentForMonth: '2024-01' }),
+                createMockPayment({ tenantId: 't-S2', amount: 30000, date: '2024-01-06', rentForMonth: '2024-01' }),
+                createMockPayment({ tenantId: 't-S1', amount: 20000, date: '2024-02-05', rentForMonth: '2024-02' }),
+            ];
+            
+            const transactions = generateLandlordDisplayTransactions(payments, tenants, props, landlord);
+            
+            const t1 = transactions.find(t => t.unitName === 'S1' && t.rentForMonth === '2024-01');
+            const t2 = transactions.find(t => t.unitName === 'S2' && t.rentForMonth === '2024-01');
+            const t3 = transactions.find(t => t.unitName === 'S1' && t.rentForMonth === '2024-02');
+            
+            // t1 should have Stage 2 (10000) + Stage 3 Studio (8000) = 18000
+            expect(t1.specialDeductions).toBe(18000);
+            // t2 should have Stage 2 (10000) + Stage 3 1BR (12000) = 22000
+            expect(t2.specialDeductions).toBe(22000);
+            // t3 is for a subsequent month for a unit that already had deductions, so it should be 0
+            expect(t3.specialDeductions).toBe(0);
+
+            // Check net payout
+            expect(t1.netToLandlord).toBe(20000 - (20000 * 0.05) - 1000 - 18000); // gross - mgmt - other - special
+            expect(t2.netToLandlord).toBe(30000 - (30000 * 0.05) - 0 - 22000); // other cost is 0 as it's second tx in same month
+        });
+
     });
 });
