@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
-import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
+import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getPaymentHistory, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -22,7 +22,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 export default function UniversalOwnerDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
     const router = useRouter();
-    
+
     const [dashboardType, setDashboardType] = useState<'landlord' | 'homeowner' | null>(null);
     const [viewData, setViewData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -74,16 +74,16 @@ export default function UniversalOwnerDashboardPage() {
                     if (isAdmin && effectiveOwnerId === 'soil_merchants_internal') {
                         return u.ownership === 'SM';
                     }
-                    if ('assignedUnits' in owner && (owner as PropertyOwner).assignedUnits) { 
+                    if ('assignedUnits' in owner && (owner as PropertyOwner).assignedUnits) {
                         return (owner as PropertyOwner).assignedUnits.some(au => au.propertyId === p.id && au.unitNames.includes(u.name));
                     }
-                    if ('bankAccount' in owner) { 
+                    if ('bankAccount' in owner) {
                         return u.landlordId === effectiveOwnerId;
                     }
                     return false;
                 }).map((u: Unit) => ({ ...u, propertyId: p.id, propertyName: p.name }))
             );
-            
+
             const uniqueOwnedUnits = Array.from(new Map(ownedUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values());
 
             const isInvestor = uniqueOwnedUnits.some(u => u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Rented for Soil Merchants' || u.managementStatus === 'Airbnb');
@@ -91,7 +91,7 @@ export default function UniversalOwnerDashboardPage() {
 
             if (isInvestor) {
                 setDashboardType('landlord');
-                
+
                 const landlordPropertyMap = new Map<string, Property>();
                 allProperties.forEach((p: Property) => {
                     const unitsForProp = uniqueOwnedUnits.filter(u => u.propertyId === p.id);
@@ -106,7 +106,7 @@ export default function UniversalOwnerDashboardPage() {
                 const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
                 const relevantTenantIds = new Set(relevantTenants.map((t: Tenant) => t.id));
                 const relevantPayments = allPayments.filter((p: Payment) => relevantTenantIds.has(p.tenantId));
-                
+
                 setViewData({
                     properties: landlordPropertiesResult,
                     tenants: relevantTenants,
@@ -126,9 +126,9 @@ export default function UniversalOwnerDashboardPage() {
                 let waterData: WaterMeterReading[] = [];
 
                 if (tenantIds.length > 0) {
-                    const paymentPromises = tenantIds.map((id: string) => getTenantPayments(id));
+                    const paymentPromises = tenantIds.map((id: string) => getPaymentHistory(id));
                     const waterPromises = tenantIds.map((id: string) => getTenantWaterReadings(id));
-                    
+
                     const paymentResults = await Promise.all(paymentPromises);
                     const waterResults = await Promise.all(waterPromises);
 
@@ -159,7 +159,7 @@ export default function UniversalOwnerDashboardPage() {
 
         const transactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, viewData.owner, startDate, endOfDay(endDate || new Date()));
         const summary = aggregateFinancials(transactions, viewData.properties, viewData.tenants, startDate, endOfDay(endDate || new Date()), viewData.owner);
-        
+
         return {
             financialSummary: summary,
             displayTransactions: transactions,
@@ -171,7 +171,7 @@ export default function UniversalOwnerDashboardPage() {
         await signOut(auth);
         router.push('/login');
     };
-    
+
     const handleGenerateStatement = async (entity: Landlord | PropertyOwner, pdfStartDate: Date, pdfEndDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
@@ -181,10 +181,10 @@ export default function UniversalOwnerDashboardPage() {
                 generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, pdfStartDate, pdfEndDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
                 const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
-    
+
                 const displayTransactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, viewData.owner, pdfStartDate, pdfEndDate);
                 const summary = aggregateFinancials(displayTransactions, viewData.properties, viewData.tenants, pdfStartDate, pdfEndDate, viewData.owner);
-          
+
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),
                     unit: t.unitName,
@@ -196,14 +196,14 @@ export default function UniversalOwnerDashboardPage() {
                     netToLandlord: t.netToLandlord,
                     otherCosts: t.otherCosts
                 }));
-    
+
                 const unitsForPDF = viewData.properties.flatMap((p: Property) => p.units.map((u: Unit) => ({
                     property: p.name,
                     unitName: u.name,
                     unitType: u.unitType,
                     status: u.status
                 })));
-          
+
                 generateLandlordStatementPDF(entity as Landlord, summary, transactionsForPDF, unitsForPDF, pdfStartDate, pdfEndDate);
             }
             setIsStatementOpen(false);
@@ -222,26 +222,26 @@ export default function UniversalOwnerDashboardPage() {
             </div>
         );
     }
-    
+
     const headerDescription = dashboardType === 'landlord' ? 'Financial overview of your managed property portfolio.' : 'Here is the overview of your service charge and water accounts.';
 
     return (
         <div className="container mx-auto p-4 md:p-8">
             <Tabs value={activeOwnerTab} onValueChange={(v) => setActiveOwnerTab(v as any)} className="space-y-8">
-                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
                         <p className="text-muted-foreground">{headerDescription}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                         {dashboardType === 'landlord' && (
+                        {dashboardType === 'landlord' && (
                             <>
                                 <DatePicker value={startDate} onChange={setStartDate} />
                                 <DatePicker value={endDate} onChange={setEndDate} />
                             </>
                         )}
                         {dashboardType === 'homeowner' && (
-                             <TabsList>
+                            <TabsList>
                                 <TabsTrigger value="service-charge">Service Charge</TabsTrigger>
                                 <TabsTrigger value="water">Water</TabsTrigger>
                             </TabsList>
@@ -256,9 +256,9 @@ export default function UniversalOwnerDashboardPage() {
                         </Button>
                     </div>
                 </header>
-                
+
                 {dashboardType === 'landlord' && viewData && filteredDashboardData && (
-                    <LandlordDashboardContent 
+                    <LandlordDashboardContent
                         properties={viewData.properties}
                         financialSummary={filteredDashboardData.financialSummary}
                         displayTransactions={filteredDashboardData.displayTransactions}
@@ -267,7 +267,7 @@ export default function UniversalOwnerDashboardPage() {
                 )}
 
                 {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} activeTab={activeOwnerTab} />}
-                
+
                 {!dashboardType && !loading && (
                     <div className="text-center py-10">
                         <h2 className="text-xl font-semibold">No Property Data Found</h2>

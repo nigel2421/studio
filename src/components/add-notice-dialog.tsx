@@ -23,8 +23,8 @@ interface AddNoticeDialogProps {
   onNoticeAdded: () => void;
 }
 
-export function AddNoticeDialog({ 
-  properties, 
+export function AddNoticeDialog({
+  properties,
   tenants,
   open,
   onOpenChange,
@@ -62,12 +62,12 @@ export function AddNoticeDialog({
     if (!selectedUnit || !selectedProperty) return null;
     return activeTenants.find(t => t.propertyId === selectedProperty && t.unitName === selectedUnit);
   }, [selectedUnit, selectedProperty, activeTenants]);
-  
+
   useEffect(() => {
-    if(!open) {
-        setSelectedProperty('');
-        setSelectedUnit('');
-        setMoveOutDate(addMonths(new Date(), 1));
+    if (!open) {
+      setSelectedProperty('');
+      setSelectedUnit('');
+      setMoveOutDate(addMonths(new Date(), 1));
     }
   }, [open]);
 
@@ -78,34 +78,34 @@ export function AddNoticeDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTenant || !selectedProperty || !selectedUnit || !moveOutDate || !userProfile?.name) {
-        toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a property, unit, and date.' });
-        return;
+      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a property, unit, and date.' });
+      return;
     }
-    
+
     startLoading('Submitting notice...');
     try {
-        const property = properties.find(p => p.id === selectedProperty);
-        
-        await addNoticeToVacate({
-            tenantId: selectedTenant.id,
-            propertyId: selectedProperty,
-            unitName: selectedUnit,
-            tenantName: selectedTenant.name,
-            propertyName: property?.name || 'N/A',
-            noticeSubmissionDate: new Date().toISOString(),
-            scheduledMoveOutDate: format(moveOutDate, 'yyyy-MM-dd'),
-            submittedBy: 'Admin',
-            submittedByName: userProfile.name,
-            status: 'Active',
-        });
-        
-        toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant.name} has been recorded.` });
-        onNoticeAdded();
-        onOpenChange(false);
+      const property = properties.find(p => p.id === selectedProperty);
+
+      await addNoticeToVacate({
+        tenantId: selectedTenant.id,
+        propertyId: selectedProperty,
+        unitName: selectedUnit,
+        tenantName: selectedTenant.name,
+        propertyName: property?.name || 'N/A',
+        noticeSubmissionDate: new Date().toISOString(),
+        scheduledMoveOutDate: format(moveOutDate, 'yyyy-MM-dd'),
+        submittedBy: 'Admin',
+        submittedByName: userProfile.name,
+        status: 'Active',
+      });
+
+      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant.name} has been recorded.` });
+      onNoticeAdded();
+      onOpenChange(false);
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit notice.' });
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit notice.' });
     } finally {
-        stopLoading();
+      stopLoading();
     }
   };
 
@@ -120,29 +120,47 @@ export function AddNoticeDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="property">Property</Label>
-                <Select onValueChange={setSelectedProperty} value={selectedProperty}>
-                  <SelectTrigger id="property"><SelectValue placeholder="Select a property" /></SelectTrigger>
-                  <SelectContent>{propertiesWithTenants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                </Select>
+            <div className="space-y-2">
+              <Label htmlFor="property">Property</Label>
+              <Select onValueChange={setSelectedProperty} value={selectedProperty}>
+                <SelectTrigger id="property"><SelectValue placeholder="Select a property" /></SelectTrigger>
+                <SelectContent>
+                  {propertiesWithTenants.map(p => {
+                    const tenantCount = activeTenants.filter(t => t.propertyId === p.id).length;
+                    return (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} <span className="text-muted-foreground text-xs ml-1">({tenantCount} tenant{tenantCount !== 1 ? 's' : ''})</span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unit</Label>
+              <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedProperty}>
+                <SelectTrigger id="unit"><SelectValue placeholder="Select an occupied unit" /></SelectTrigger>
+                <SelectContent>
+                  {occupiedUnits.map(u => {
+                    const tenant = activeTenants.find(t => t.propertyId === selectedProperty && t.unitName === u.name);
+                    return (
+                      <SelectItem key={u.name} value={u.name}>
+                        {u.name} {tenant && <span className="text-muted-foreground text-xs ml-1">({tenant.name})</span>}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedTenant && (
+              <div className='p-3 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-md'>
+                Tenant: <span className="font-semibold">{selectedTenant.name}</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedProperty}>
-                  <SelectTrigger id="unit"><SelectValue placeholder="Select an occupied unit" /></SelectTrigger>
-                  <SelectContent>{occupiedUnits.map(u => <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {selectedTenant && (
-                <div className='p-3 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-md'>
-                    Tenant: <span className="font-semibold">{selectedTenant.name}</span>
-                </div>
-              )}
-               <div className="space-y-2">
-                <Label htmlFor="move-out-date">Scheduled Move-Out Date</Label>
-                <DatePicker id="move-out-date" value={moveOutDate} onChange={setMoveOutDate} />
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="move-out-date">Scheduled Move-Out Date</Label>
+              <DatePicker id="move-out-date" value={moveOutDate} onChange={setMoveOutDate} />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -1356,12 +1356,12 @@ export async function forceRecalculateTenantBalance(tenantId: string): Promise<v
     const payments = await getPaymentHistory(tenantId);
     const property = await getProperty(tenant.propertyId);
     const unit = property?.units.find(u => u.name === tenant.unitName);
-    
+
     // Create a dummy starting point for the ledger
     const dummyStartDate = parseISO(tenant.lease.startDate);
-    
+
     const { ledger, finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date());
-    
+
     const latestPayment = payments[0]; // Assuming they are sorted by date desc
 
     const tenantRef = doc(db, 'tenants', tenantId);
@@ -1376,6 +1376,7 @@ export async function forceRecalculateTenantBalance(tenantId: string): Promise<v
 }
 
 
+
 export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
 
@@ -1387,4 +1388,75 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     });
 
     return unsubscribe;
+}
+
+export async function addNoticeToVacate(notice: Omit<NoticeToVacate, 'id'>) {
+    await addDoc(collection(db, 'noticesToVacate'), notice);
+    cacheService.clear('noticesToVacate');
+    await logActivity(`Submitted notice to vacate for ${notice.tenantName}`);
+}
+
+export async function getNoticesToVacate(): Promise<NoticeToVacate[]> {
+    return cacheService.getOrFetch('noticesToVacate', 'all', () => {
+        const q = query(collection(db, 'noticesToVacate'), orderBy('scheduledMoveOutDate', 'desc'));
+        return getCollection<NoticeToVacate>(q);
+    }, 120000);
+}
+
+export async function processOverdueNotices(editorId: string) {
+    const today = new Date();
+    const q = query(collection(db, 'noticesToVacate'), where('status', '==', 'Active'));
+    const snapshot = await getDocs(q);
+    const notices = snapshot.docs.map(doc => postToJSON<NoticeToVacate>(doc));
+
+    let processedCount = 0;
+    let errorCount = 0;
+    const batch = writeBatch(db);
+
+    for (const notice of notices) {
+        if (new Date(notice.scheduledMoveOutDate) < today) {
+            try {
+                // 1. Archive the tenant
+                const tenantRef = doc(db, 'tenants', notice.tenantId);
+                const tenantSnap = await getDoc(tenantRef);
+                if (tenantSnap.exists()) {
+                    const tenantData = tenantSnap.data() as Tenant;
+                    const archivedTenantRef = doc(db, 'archived_tenants', notice.tenantId);
+                    batch.set(archivedTenantRef, { ...tenantData, archivedAt: new Date().toISOString(), status: 'archived' });
+                    batch.delete(tenantRef);
+
+                    // 2. Mark unit as vacant
+                    const propertyRef = doc(db, 'properties', notice.propertyId);
+                    const propertySnap = await getDoc(propertyRef);
+                    if (propertySnap.exists()) {
+                        const propertyData = propertySnap.data() as Property;
+                        const updatedUnits = propertyData.units.map(u =>
+                            u.name === notice.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
+                        );
+                        batch.update(propertyRef, { units: updatedUnits });
+                    }
+                }
+
+                // 3. Complete the notice
+                const noticeRef = doc(db, 'noticesToVacate', notice.id);
+                batch.update(noticeRef, { status: 'Completed' });
+
+                await logActivity(`Processed move-out for ${notice.tenantName} in unit ${notice.unitName}.`, editorId);
+                processedCount++;
+            } catch (error) {
+                console.error(`Error processing notice ${notice.id}:`, error);
+                errorCount++;
+            }
+        }
+    }
+
+    if (processedCount > 0) {
+        await batch.commit();
+        cacheService.clear('tenants');
+        cacheService.clear('archived_tenants');
+        cacheService.clear('properties');
+        cacheService.clear('noticesToVacate');
+    }
+
+    return { processedCount, errorCount };
 }

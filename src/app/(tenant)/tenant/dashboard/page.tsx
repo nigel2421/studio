@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Tenant, Payment, Property, LedgerEntry, WaterMeterReading } from '@/lib/types';
 import { DollarSign, Calendar, Droplets, LogOut, PlusCircle, AlertCircle, Loader2, FileDown } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
-import { getTenantPayments, getProperties, getTenantWaterReadings } from '@/lib/data';
+import { getPaymentHistory, getProperties, getTenantWaterReadings } from '@/lib/data';
 import { generateLedger, getRecommendedPaymentStatus } from '@/lib/financial-logic';
 import {
     Table,
@@ -31,7 +31,7 @@ export default function TenantDashboardPage() {
     const router = useRouter();
     const { toast } = useToast();
     const tenantDetails = userProfile?.tenantDetails;
-    
+
     const [payments, setPayments] = useState<Payment[]>([]);
     const [waterReadings, setWaterReadings] = useState<WaterMeterReading[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
@@ -46,19 +46,19 @@ export default function TenantDashboardPage() {
         if (!authIsLoading && userProfile?.tenantId) {
             setIsLoading(true);
             Promise.all([
-                getTenantPayments(userProfile.tenantId),
+                getPaymentHistory(userProfile.tenantId),
                 getTenantWaterReadings(userProfile.tenantId),
                 getProperties()
             ]).then(([paymentData, waterData, propertiesData]) => {
                 setPayments(paymentData);
                 setWaterReadings(waterData);
                 setProperties(propertiesData);
-                if(tenantDetails) {
+                if (tenantDetails) {
                     const { ledger: rentOnlyLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenantDetails, paymentData, propertiesData, [], undefined, undefined, { includeWater: false });
                     const { ledger: waterOnlyLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, undefined, undefined, { includeRent: false, includeServiceCharge: false });
 
-                    setRentLedger(rentOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                    setWaterLedger(waterOnlyLedger.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setRentLedger(rentOnlyLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setWaterLedger(waterOnlyLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                     setBalances({ rentDue, rentCredit, waterDue, waterCredit });
                 }
                 setIsLoading(false);
@@ -82,12 +82,12 @@ export default function TenantDashboardPage() {
 
     const handleGenerateStatement = async () => {
         if (!tenantDetails) return;
-        toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.'});
+        toast({ title: 'Generating Statement...', description: 'Your PDF will download shortly.' });
         try {
             const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
             const context = activeTenantTab === 'water' ? 'megarack' : 'rent';
             generateTenantStatementPDF(tenantDetails, payments, properties, waterReadings, context);
-        } catch(e) {
+        } catch (e) {
             console.error("Error generating PDF:", e);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate your statement.' });
         }
@@ -117,122 +117,122 @@ export default function TenantDashboardPage() {
     };
 
     if (isLoading || authIsLoading) {
-      return (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      );
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
     }
-    
+
     const renderLedgerTable = (ledgerEntries: LedgerEntry[]) => (
-      <>
-        {/* Mobile Card View */}
-        <div className="md:hidden space-y-4">
-          {ledgerEntries.map((entry, index) => (
-            <Card key={`${entry.id}-${index}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-base leading-tight">{entry.description}</CardTitle>
-                  <div className="text-xs text-muted-foreground text-right shrink-0 pl-2">
-                    <p>{format(new Date(entry.date), 'PPP')}</p>
-                    {entry.forMonth && <p>For {entry.forMonth}</p>}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex justify-between items-center text-sm">
-                <div>
-                  {entry.charge > 0 && <p>Charge: <span className="font-medium text-red-600">Ksh {entry.charge.toLocaleString()}</span></p>}
-                  {entry.payment > 0 && <p>Payment: <span className="font-medium text-green-600">Ksh {entry.payment.toLocaleString()}</span></p>}
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Balance</p>
-                  <p className="font-bold text-right">
-                    {entry.balance < 0
-                      ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                      : `Ksh ${entry.balance.toLocaleString()}`
-                    }
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        {/* Desktop Table View */}
-        <Table className="hidden md:table">
-           <TableHeader>
-               <TableRow>
-                   <TableHead>Date</TableHead>
-                   <TableHead>Description</TableHead>
-                   <TableHead className="text-right">Charge</TableHead>
-                   <TableHead className="text-right">Payment</TableHead>
-                   <TableHead className="text-right">Balance</TableHead>
-               </TableRow>
-           </TableHeader>
-           <TableBody>
-               {ledgerEntries.length > 0 ? (
-                   ledgerEntries.map((entry, index) => (
-                       <TableRow key={`${entry.id}-${index}`}>
-                           <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
-                           <TableCell>{entry.description}</TableCell>
-                           <TableCell className="text-right text-red-600">
-                               {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
-                           </TableCell>
-                           <TableCell className="text-right text-green-600">
-                               {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                           </TableCell>
-                           <TableCell className="text-right font-bold">
-                                {entry.balance < 0
-                                   ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                   : `Ksh ${entry.balance.toLocaleString()}`
-                               }
-                           </TableCell>
-                       </TableRow>
-                   ))
-               ) : (
-                   <TableRow>
-                       <TableCell colSpan={5} className="text-center">No transaction history found for this category.</TableCell>
-                   </TableRow>
-               )}
-           </TableBody>
-       </Table>
-      </>
+        <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {ledgerEntries.map((entry, index) => (
+                    <Card key={`${entry.id}-${index}`}>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <CardTitle className="text-base leading-tight">{entry.description}</CardTitle>
+                                <div className="text-xs text-muted-foreground text-right shrink-0 pl-2">
+                                    <p>{format(new Date(entry.date), 'PPP')}</p>
+                                    {entry.forMonth && <p>For {entry.forMonth}</p>}
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex justify-between items-center text-sm">
+                            <div>
+                                {entry.charge > 0 && <p>Charge: <span className="font-medium text-red-600">Ksh {entry.charge.toLocaleString()}</span></p>}
+                                {entry.payment > 0 && <p>Payment: <span className="font-medium text-green-600">Ksh {entry.payment.toLocaleString()}</span></p>}
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Balance</p>
+                                <p className="font-bold text-right">
+                                    {entry.balance < 0
+                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                        : `Ksh ${entry.balance.toLocaleString()}`
+                                    }
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+            {/* Desktop Table View */}
+            <Table className="hidden md:table">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Charge</TableHead>
+                        <TableHead className="text-right">Payment</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {ledgerEntries.length > 0 ? (
+                        ledgerEntries.map((entry, index) => (
+                            <TableRow key={`${entry.id}-${index}`}>
+                                <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
+                                <TableCell>{entry.description}</TableCell>
+                                <TableCell className="text-right text-red-600">
+                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right text-green-600">
+                                    {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-bold">
+                                    {entry.balance < 0
+                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                        : `Ksh ${entry.balance.toLocaleString()}`
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={5} className="text-center">No transaction history found for this category.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </>
     );
-    
+
     const renderWaterLedgerTable = (ledgerEntries: LedgerEntry[]) => (
         <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
-              {ledgerEntries.map((entry, index) => (
-                <Card key={`${entry.id}-${index}`}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-base leading-tight">{entry.description}</CardTitle>
-                      <div className="text-xs text-muted-foreground text-right shrink-0 pl-2">
-                        <p>{format(new Date(entry.date), 'PPP')}</p>
-                        {entry.forMonth && <p>For {entry.forMonth}</p>}
-                      </div>
-                    </div>
-                     <CardDescription>
-                        {entry.priorReading !== undefined && `From ${entry.priorReading} to ${entry.currentReading} units (${entry.consumption} units @ Ksh ${entry.rate})`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex justify-between items-center text-sm">
-                    <div>
-                      {entry.charge > 0 && <p>Charge: <span className="font-medium text-red-600">Ksh {entry.charge.toLocaleString()}</span></p>}
-                      {entry.payment > 0 && <p>Payment: <span className="font-medium text-green-600">Ksh {entry.payment.toLocaleString()}</span></p>}
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Balance</p>
-                      <p className="font-bold text-right">
-                        {entry.balance < 0
-                          ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                          : `Ksh ${entry.balance.toLocaleString()}`
-                        }
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                {ledgerEntries.map((entry, index) => (
+                    <Card key={`${entry.id}-${index}`}>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <CardTitle className="text-base leading-tight">{entry.description}</CardTitle>
+                                <div className="text-xs text-muted-foreground text-right shrink-0 pl-2">
+                                    <p>{format(new Date(entry.date), 'PPP')}</p>
+                                    {entry.forMonth && <p>For {entry.forMonth}</p>}
+                                </div>
+                            </div>
+                            <CardDescription>
+                                {entry.priorReading !== undefined && `From ${entry.priorReading} to ${entry.currentReading} units (${entry.consumption} units @ Ksh ${entry.rate})`}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex justify-between items-center text-sm">
+                            <div>
+                                {entry.charge > 0 && <p>Charge: <span className="font-medium text-red-600">Ksh {entry.charge.toLocaleString()}</span></p>}
+                                {entry.payment > 0 && <p>Payment: <span className="font-medium text-green-600">Ksh {entry.payment.toLocaleString()}</span></p>}
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Balance</p>
+                                <p className="font-bold text-right">
+                                    {entry.balance < 0
+                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                        : `Ksh ${entry.balance.toLocaleString()}`
+                                    }
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
             {/* Desktop Table View */}
@@ -261,7 +261,7 @@ export default function TenantDashboardPage() {
                                 <TableCell>{entry.currentReading?.toLocaleString() ?? '-'}</TableCell>
                                 <TableCell>{entry.rate ? `Ksh ${entry.rate}` : '-'}</TableCell>
                                 <TableCell className="text-right text-red-600">
-                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}
                                 </TableCell>
                                 <TableCell className="text-right text-green-600">
                                     {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
@@ -316,7 +316,7 @@ export default function TenantDashboardPage() {
                 </header>
 
                 <TabsContent value="rent">
-                     {tenantDetails && (
+                    {tenantDetails && (
                         <div className="space-y-8">
                             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                                 <Card>
@@ -352,7 +352,7 @@ export default function TenantDashboardPage() {
                                     </CardContent>
                                 </Card>
                             </div>
-                             <Card>
+                            <Card>
                                 <CardHeader><CardTitle>Rent Transaction History</CardTitle></CardHeader>
                                 <CardContent className="p-0 md:p-6">{renderLedgerTable(rentLedger)}</CardContent>
                             </Card>
@@ -360,15 +360,15 @@ export default function TenantDashboardPage() {
                     )}
                 </TabsContent>
 
-                 <TabsContent value="water">
-                     {tenantDetails && (
+                <TabsContent value="water">
+                    {tenantDetails && (
                         <div className="space-y-8">
                             <Card>
                                 <CardHeader><CardTitle>Water Bill Transaction History</CardTitle></CardHeader>
                                 <CardContent className="p-0 md:p-6">{renderWaterLedgerTable(waterLedger)}</CardContent>
                             </Card>
                         </div>
-                     )}
+                    )}
                 </TabsContent>
             </Tabs>
             <div className='px-2 space-y-2 mt-8'>
