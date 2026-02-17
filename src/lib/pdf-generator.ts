@@ -375,7 +375,7 @@ export const generateArrearsServiceChargeInvoicePDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; stageTwoCost?: number; stageThreeCost?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
+    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; stageTwoCost?: number; stageThreeCost?: number; specialDeductions?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -387,7 +387,7 @@ export const generateLandlordStatementPDF = (
         day: 'numeric',
     });
 
-    addHeader(doc, 'Landlord Statement');
+    addHeader(doc, 'LANDLORD STATEMENT');
 
     let yPos = 50;
     doc.setFontSize(11);
@@ -459,13 +459,15 @@ export const generateLandlordStatementPDF = (
     const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => a.localeCompare(b));
     
     const body: any[] = [];
-    const totalSpecialDeductions = summary.totalStageTwoCost + summary.totalStageThreeCost;
 
     sortedMonths.forEach(month => {
-        body.push([{ content: format(parseISO(month + '-01'), 'MMMM yyyy'), colSpan: 9, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        const monthDate = parseISO(month + '-01');
+        if(!isValid(monthDate)) return;
+
+        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 9, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach(t => {
-            const specialCosts = (t.stageTwoCost || 0) + (t.stageThreeCost || 0);
+            const specialCosts = t.specialDeductions || 0;
             body.push([
                 t.date,
                 t.unit,
@@ -479,6 +481,8 @@ export const generateLandlordStatementPDF = (
             ]);
         });
     });
+    
+    const totalSpecialDeductions = summary.totalStageTwoCost + summary.totalStageThreeCost;
 
     autoTable(doc, {
         startY: yPos,
@@ -664,95 +668,4 @@ export const generateTenantStatementPDF = (
     }
 
     doc.save(`statement_${tenant.name.toLowerCase().replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
-export const generateVacantServiceChargeInvoicePDF = (
-    owner: PropertyOwner | Landlord,
-    unitsWithArrears: {
-        unit: Unit;
-        property: Property;
-        arrearsDetail: { month: string; amount: number; status: 'Paid' | 'Pending' }[];
-        totalDue: number;
-    }[],
-    grandTotalDue: number
-): void => {
-    const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-
-    addHeader(doc, 'Service Charge Invoice');
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(owner.name, 14, 50);
-    doc.setFont('helvetica', 'normal');
-    doc.text(owner.email, 14, 56);
-    
-    doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
-    doc.text(`For: Vacant Unit Service Charges`, 196, 56, { align: 'right' });
-
-    let yPos = 70;
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Outstanding Service Charges for Vacant Units', 14, yPos);
-    yPos += 8;
-
-    const body: (string | { content: string, styles: any })[][] = [];
-
-    const monthlyArrears = new Map<string, number>();
-    
-    const unitNames = unitsWithArrears.map(item => item.unit.name).join(', ');
-
-     body.push([
-        { content: `Arrears for: Unit(s) ${unitNames}`, styles: { fontStyle: 'bold', halign: 'left', minCellHeight: 10 } },
-        ''
-    ]);
-    
-    unitsWithArrears.forEach(item => {
-        item.arrearsDetail.filter(d => d.status === 'Pending').forEach(detail => {
-            const currentAmount = monthlyArrears.get(detail.month) || 0;
-            monthlyArrears.set(detail.month, currentAmount + detail.amount);
-        });
-    });
-
-    const sortedMonths = [...monthlyArrears.keys()].sort((a, b) => {
-        const dateA = new Date(`01 ${a}`);
-        const dateB = new Date(`01 ${b}`);
-        return dateA.getTime() - dateB.getTime();
-    });
-
-    for (const month of sortedMonths) {
-        const amount = monthlyArrears.get(month) || 0;
-        body.push([
-            `Service Charge for ${month}`,
-            formatCurrency(amount)
-        ]);
-    }
-
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Description', 'Amount Due']],
-        body,
-        theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
-        foot: [[
-            { content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: formatCurrency(grandTotalDue), styles: { fontStyle: 'bold', halign: 'right' } }
-        ]],
-        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0] },
-        columnStyles: {
-            1: { halign: 'right' }
-        },
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-    doc.setTextColor(40);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
-
-    doc.save(`service_charge_invoice_${owner.name.toLowerCase().replace(/ /g, '_')}_vacant_units.pdf`);
 };
