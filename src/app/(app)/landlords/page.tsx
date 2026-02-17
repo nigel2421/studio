@@ -280,8 +280,8 @@ export default function LandlordsPage() {
         const relevantTenantIds = relevantTenants.map(t => t.id);
         const allRelevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
 
-        const summary = aggregateFinancials(allRelevantPayments, relevantTenants, relevantProperties, startDate, endDate, landlord.id);
-        const displayTransactions = generateLandlordDisplayTransactions(allRelevantPayments, relevantTenants, relevantProperties, startDate, endDate);
+        const displayTransactions = generateLandlordDisplayTransactions(allRelevantPayments, relevantTenants, relevantProperties, startDate, endDate, landlord.id);
+        const summary = aggregateFinancials(displayTransactions, relevantProperties, relevantTenants, startDate, endDate, landlord.id);
         
         const transactionsForPDF = displayTransactions.map(t => ({
             date: new Date(t.date).toLocaleDateString(),

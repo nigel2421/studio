@@ -157,8 +157,8 @@ export default function UniversalOwnerDashboardPage() {
     const filteredDashboardData = useMemo(() => {
         if (!viewData || dashboardType !== 'landlord') return null;
 
-        const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()), viewData.owner?.id);
-        const transactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()));
+        const transactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()), viewData.owner?.id);
+        const summary = aggregateFinancials(transactions, viewData.properties, viewData.tenants, startDate, endOfDay(endDate || new Date()), viewData.owner?.id);
         
         return {
             financialSummary: summary,
@@ -182,8 +182,8 @@ export default function UniversalOwnerDashboardPage() {
             } else if (dashboardType === 'landlord') {
                 const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
     
-                const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate, viewData.owner?.id);
-                const displayTransactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate);
+                const displayTransactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate, viewData.owner?.id);
+                const summary = aggregateFinancials(displayTransactions, viewData.properties, viewData.tenants, pdfStartDate, pdfEndDate, viewData.owner?.id);
           
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),
