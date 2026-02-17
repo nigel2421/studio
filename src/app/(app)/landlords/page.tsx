@@ -258,65 +258,65 @@ export default function LandlordsPage() {
   const handleGenerateStatement = async (landlord: Landlord, startDate: Date, endDate: Date) => {
     startLoading('Generating Statement...');
     try {
-      const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
-      const landlordProperties: { property: Property; units: Unit[] }[] = [];
-      if (landlord.id === SOIL_MERCHANTS_LANDLORD.id) {
+        const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
+
+        const landlordUnitIdentifiers = new Set<string>();
+        const landlordPropertyIds = new Set<string>();
+
         properties.forEach(p => {
-          const units = p.units.filter(u => u.ownership === 'SM');
-          if (units.length > 0) {
-            landlordProperties.push({ property: p, units });
-          }
+            (p.units || []).forEach(u => {
+                const isSoilMerchantsUnit = landlord.id === SOIL_MERCHANTS_LANDLORD.id && u.ownership === 'SM';
+                const isLandlordUnit = u.landlordId === landlord.id;
+
+                if (isSoilMerchantsUnit || isLandlordUnit) {
+                    landlordUnitIdentifiers.add(`${p.id}-${u.name}`);
+                    landlordPropertyIds.add(p.id);
+                }
+            });
         });
-      } else {
-        properties.forEach(p => {
-          const units = p.units.filter(u => u.landlordId === landlord.id);
-          if (units.length > 0) {
-            landlordProperties.push({ property: p, units });
-          }
-        });
-      }
+        
+        const relevantProperties = properties.filter(p => landlordPropertyIds.has(p.id));
+        const relevantTenants = tenants.filter(t => landlordUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
+        const relevantTenantIds = relevantTenants.map(t => t.id);
+        const allRelevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
 
-      const ownedUnitIdentifiers = new Set<string>();
-      landlordProperties.forEach(p => {
-        p.units.forEach(u => ownedUnitIdentifiers.add(`${p.property.id}-${u.name}`));
-      });
-
-      const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-      const relevantTenantIds = relevantTenants.map(t => t.id);
-      
-      const allRelevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
-
-      const summary = aggregateFinancials(allRelevantPayments, relevantTenants, landlordProperties, startDate, endDate);
-      const displayTransactions = generateLandlordDisplayTransactions(allRelevantPayments, relevantTenants, landlordProperties, startDate, endDate);
-      
-      const transactionsForPDF = displayTransactions.map(t => ({
-        date: new Date(t.date).toLocaleDateString(),
-        unit: t.unitName,
-        rentForMonth: t.forMonth,
-        gross: t.gross,
-        serviceCharge: t.serviceChargeDeduction,
-        mgmtFee: t.managementFee,
-        otherCosts: t.otherCosts || 0,
-        net: t.netToLandlord,
-      }));
-
-      const unitsForPDF = landlordProperties.flatMap(p => p.units.map(u => ({
-        property: p.property.name,
-        unitName: u.name,
-        unitType: u.unitType,
-        status: u.status
-      })));
-      
-      generateLandlordStatementPDF(landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
-      setIsStatementDialogOpen(false); 
+        const summary = aggregateFinancials(allRelevantPayments, relevantTenants, relevantProperties, startDate, endDate);
+        const displayTransactions = generateLandlordDisplayTransactions(allRelevantPayments, relevantTenants, relevantProperties, startDate, endDate);
+        
+        const transactionsForPDF = displayTransactions.map(t => ({
+            date: new Date(t.date).toLocaleDateString(),
+            unit: t.unitName,
+            rentForMonth: t.forMonth,
+            gross: t.gross,
+            serviceCharge: t.serviceChargeDeduction,
+            mgmtFee: t.managementFee,
+            otherCosts: t.otherCosts || 0,
+            net: t.netToLandlord,
+        }));
+        
+        const unitsForPDF = relevantProperties.flatMap(p => 
+            (p.units || []).filter(u => {
+                const isSoilMerchantsUnit = landlord.id === SOIL_MERCHANTS_LANDLORD.id && u.ownership === 'SM';
+                const isLandlordUnit = u.landlordId === landlord.id;
+                return isSoilMerchantsUnit || isLandlordUnit;
+            }).map(u => ({
+                property: p.name,
+                unitName: u.name,
+                unitType: u.unitType,
+                status: u.status,
+            }))
+        );
+        
+        generateLandlordStatementPDF(landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
+        setIsStatementDialogOpen(false); 
 
     } catch (error) {
-      console.error("Error generating statement:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not generate PDF statement.' });
+        console.error("Error generating statement:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not generate PDF statement.' });
     } finally {
-      stopLoading();
+        stopLoading();
     }
-  };
+};
   
   return (
     <div className="space-y-6">

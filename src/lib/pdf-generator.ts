@@ -392,23 +392,20 @@ export const generateLandlordStatementPDF = (
     addHeader(doc, 'Landlord Statement');
 
     // Landlord Details
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(landlord.name, 196, 20, { align: 'right' });
+    doc.text(landlord.name, 196, 48, { align: 'right' });
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Date Issued: ${dateStr}`, 196, 26, { align: 'right' });
+    doc.text(`Date Issued: ${dateStr}`, 196, 54, { align: 'right' });
     
     if (startDate && endDate) {
         const periodStr = `${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
-        doc.text(`Period: ${periodStr}`, 196, 31, { align: 'right' });
+        doc.text(`Period: ${periodStr}`, 196, 60, { align: 'right' });
     }
 
-    doc.setDrawColor(200);
-    doc.line(14, 35, 196, 35);
-
     // Summary Section
-    let yPos = 45;
+    let yPos = 70;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Summary', 14, yPos);
@@ -840,3 +837,4 @@ export const generateDashboardReportPDF = (
 
     doc.save(`dashboard_report_${dateStr.replace(/, /g, '_')}.pdf`);
 };
+

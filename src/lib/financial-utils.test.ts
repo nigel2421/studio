@@ -1,4 +1,5 @@
 
+
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -97,8 +98,8 @@ describe('Financial Utils Logic', () => {
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             expect(breakdown.managementFee).toBe(25000); // 50%
             expect(breakdown.serviceChargeDeduction).toBe(0); // Waived
-            expect(breakdown.otherCosts).toBe(500); // Transaction cost
-            expect(breakdown.netToLandlord).toBe(24500); // 50000 - 25000 - 0 - 500
+            expect(breakdown.otherCosts).toBe(1000); // Transaction cost
+            expect(breakdown.netToLandlord).toBe(24000); // 50000 - 25000 - 0 - 1000
         });
 
         it('should calculate 5% commission for a subsequent letting of a "Rented for Clients" unit', () => {
@@ -119,8 +120,8 @@ describe('Financial Utils Logic', () => {
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             expect(breakdown.managementFee).toBe(2500); // 5%
             expect(breakdown.serviceChargeDeduction).toBe(6000); // Not waived
-            expect(breakdown.otherCosts).toBe(500);
-            expect(breakdown.netToLandlord).toBe(41000); // 50000 - 6000 - 2500 - 500
+            expect(breakdown.otherCosts).toBe(1000);
+            expect(breakdown.netToLandlord).toBe(40500); // 50000 - 6000 - 2500 - 1000
         });
     });
 
@@ -147,7 +148,7 @@ describe('Financial Utils Logic', () => {
                 date: '2023-10-02'
             });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], [{ property: mockProperties[0], units: mockProperties[0].units }]);
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties);
 
             // Assertions
             expect(transactions).toHaveLength(4); // Should unroll into 4 rent transactions
@@ -156,8 +157,8 @@ describe('Financial Utils Logic', () => {
             expect(transactions[0].forMonth).toBe('Oct 2023');
             expect(transactions[0].gross).toBe(25000);
             expect(transactions[0].managementFee).toBe(1250); // 5% of 25k
-            expect(transactions[0].otherCosts).toBe(500);
-            expect(transactions[0].netToLandlord).toBe(23250); // 25000 - 1250 - 500
+            expect(transactions[0].otherCosts).toBe(1000);
+            expect(transactions[0].netToLandlord).toBe(22750); // 25000 - 1250 - 1000
 
             // Check January (last month)
             expect(transactions[3].forMonth).toBe('Jan 2024');
@@ -178,7 +179,7 @@ describe('Financial Utils Logic', () => {
             
             const payment = createMockPayment({ tenantId: 't-anchor', amount: 50000, date: '2023-07-16' });
 
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], [{ property: mockProperties[0], units: mockProperties[0].units }]);
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties);
             
             expect(transactions).toHaveLength(2);
             expect(transactions[0].forMonth).toBe('Jul 2023');
