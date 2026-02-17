@@ -31,7 +31,7 @@ export function AddNoticeDialog({
   onNoticeAdded,
 }: AddNoticeDialogProps) {
   const { toast } = useToast();
-  const { startLoading, stopLoading } = useLoading();
+  const { startLoading, stopLoading, isLoading } = useLoading();
   const { userProfile } = useAuth();
 
   const [selectedProperty, setSelectedProperty] = useState('');

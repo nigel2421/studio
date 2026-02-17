@@ -1,5 +1,5 @@
-import { performSendArrearsReminder, performSendServiceChargeInvoice, getMaintenanceResponseDraft } from './actions';
-import { getTenant, logCommunication } from '@/lib/data';
+import { performSendArrearsReminder, performSendServiceChargeInvoice, getMaintenanceResponseDraft, performProcessMoveOuts } from './actions';
+import { getTenant, logCommunication, processOverdueNotices } from '@/lib/data';
 import { sendCustomEmail } from '@/lib/firebase';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { generateMaintenanceResponseDraft, MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
@@ -117,6 +117,45 @@ describe('Server Actions', () => {
             expect(result.success).toBe(false);
             expect(result.error).toBe('AI Busy');
             consoleSpy.mockRestore();
+        });
+    });
+
+    describe('performProcessMoveOuts', () => {
+        it('should return a success message when notices are processed', async () => {
+            (processOverdueNotices as jest.Mock).mockResolvedValue({ processedCount: 2, errorCount: 0 });
+
+            const result = await performProcessMoveOuts('admin-id');
+
+            expect(result.success).toBe(true);
+            expect(result.data).toEqual({ message: 'Successfully processed 2 move-out notices.' });
+            expect(processOverdueNotices).toHaveBeenCalledWith('admin-id');
+        });
+
+        it('should return a different success message when no notices are processed', async () => {
+            (processOverdueNotices as jest.Mock).mockResolvedValue({ processedCount: 0, errorCount: 0 });
+
+            const result = await performProcessMoveOuts('admin-id');
+
+            expect(result.success).toBe(true);
+            expect(result.data).toEqual({ message: 'No overdue move-out notices to process.' });
+        });
+
+        it('should return error message when processing fails with an exception', async () => {
+            (processOverdueNotices as jest.Mock).mockRejectedValue(new Error('DB connection failed'));
+
+            const result = await performProcessMoveOuts('admin-id');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('DB connection failed');
+        });
+        
+        it('should return an error message when some notices fail to process', async () => {
+            (processOverdueNotices as jest.Mock).mockResolvedValue({ processedCount: 1, errorCount: 1 });
+        
+            const result = await performProcessMoveOuts('editor123');
+        
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('Processed 1 notices, but 1 failed.');
         });
     });
 });
