@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance, getLandlords, getPropertyOwners, addPayment, getWaterReadingsAndTenants } from '@/lib/data';
+import { getProperties, addWaterMeterReading, getLatestWaterReading, getPropertyWaterReadings, getTenants, getPayment, updatePayment, forceRecalculateTenantBalance, getLandlords, getPropertyOwners, addPayment, getWaterReadingsAndTenants, getPaymentHistory } from '@/lib/data';
 import type { Property, WaterMeterReading, Tenant, Payment, Landlord, PropertyOwner, Unit } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, PlusCircle, Edit2, User, ChevronDown, Mail } from 'lucide-react';
+import { Loader2, Search, PlusCircle, Edit2, User, ChevronDown, Mail, Download, MoreHorizontal } from 'lucide-react';
 import { useUnitFilter } from '@/hooks/useUnitFilter';
 import { useLoading } from '@/hooks/useLoading';
 import { format } from 'date-fns';
@@ -43,6 +43,12 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { performSendWaterBills } from '@/app/actions';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 
 interface WaterReadingRecord extends WaterMeterReading {
@@ -454,6 +460,30 @@ export default function MegarackPage() {
   
   const totalPages = Math.ceil(filteredReadings.length / pageSize);
 
+  const handleGenerateStatement = async (reading: WaterReadingRecord) => {
+    const tenant = tenants.find(t => t.id === reading.tenantId);
+    if (!tenant) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Tenant not found for this reading.' });
+        return;
+    }
+
+    startLoading('Generating Statement...');
+    try {
+        const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
+        const tenantPayments = await getPaymentHistory(tenant.id);
+        const tenantWaterReadings = allReadings.filter(r => r.tenantId === tenant.id);
+        
+        generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings, 'megarack');
+
+        toast({ title: 'Statement Generated', description: `Statement for ${tenant.name} downloaded.` });
+    } catch (error) {
+        console.error("Error generating statement", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });
+    } finally {
+        stopLoading();
+    }
+};
+
   return (
     <>
     <Tabs defaultValue="owner-bills" className="space-y-4">
@@ -640,17 +670,31 @@ export default function MegarackPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {isPaid ? (
-                                                <Button size="sm" variant="outline" onClick={() => handleEditClick(reading)}>
-                                                    <Edit2 className="mr-2 h-4 w-4" />
-                                                    Edit
-                                                </Button>
-                                            ) : (
-                                                <Button size="sm" variant="default" onClick={() => handleRecordPaymentClick(reading)}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                                    Pay
-                                                </Button>
-                                            )}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <span className="sr-only">Open menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleGenerateStatement(reading)}>
+                                                        <Download className="mr-2 h-4 w-4" />
+                                                        <span>Download Statement</span>
+                                                    </DropdownMenuItem>
+                                                    {isPaid ? (
+                                                        <DropdownMenuItem onClick={() => handleEditClick(reading)}>
+                                                            <Edit2 className="mr-2 h-4 w-4" />
+                                                            <span>Edit Payment</span>
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem onClick={() => handleRecordPaymentClick(reading)}>
+                                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                                            <span>Record Payment</span>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                     )

@@ -7,11 +7,11 @@ import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
 // Helper to add company header
-const addHeader = (doc: jsPDF, title: string) => {
+const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties') => {
     doc.setTextColor(40);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('Eracov Properties', 14, 20);
+    doc.text(brand, 14, 20);
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -548,7 +548,7 @@ export const generateTenantStatementPDF = (
     payments: Payment[],
     properties: Property[],
     waterReadings: WaterMeterReading[],
-    context: 'rent' | 'water' | 'full' = 'full'
+    context: 'rent' | 'water' | 'full' | 'megarack' = 'full'
 ) => {
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-US', {
@@ -557,10 +557,11 @@ export const generateTenantStatementPDF = (
         day: 'numeric',
     });
     
-    const isWaterContext = context === 'water';
+    const isWaterContext = context === 'water' || context === 'megarack';
     const statementTitle = isWaterContext ? 'Water Bill Statement' : tenant.residentType === 'Homeowner' ? 'Resident Statement' : 'Tenant Statement';
+    const brand = context === 'megarack' ? 'Mega Rack' : 'Eracov Properties';
 
-    addHeader(doc, statementTitle);
+    addHeader(doc, statementTitle, brand);
     
     const property = properties.find(p => p.id === tenant.propertyId);
     const unit = property?.units.find(u => u.name === tenant.unitName);
@@ -622,7 +623,7 @@ export const generateTenantStatementPDF = (
         yPos += 10;
     }
     
-    if (context === 'water' || context === 'full') {
+    if (context === 'water' || context === 'full' || context === 'megarack') {
         const waterTableBody = waterLedger.map(entry => {
             let readingDetails = { unit: entry.description, prior: '', current: '', rate: '' };
             if (entry.id.startsWith('charge-water-')) {
@@ -669,5 +670,9 @@ export const generateTenantStatementPDF = (
         doc.text(waterDue > 0 ? formatCurrency(waterDue) : `${formatCurrency(waterCredit)} Cr`, 196, yPos, { align: 'right' });
     }
 
-    doc.save(`statement_${tenant.name.toLowerCase().replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`);
+    const filename = context === 'megarack'
+        ? `Mega_Rack_Statement_${tenant.name.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+        : `statement_${tenant.name.toLowerCase().replace(/ /g, '_')}_${context}_${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    doc.save(filename);
 };
