@@ -281,6 +281,18 @@ export type Log = {
   timestamp: string;
 };
 
+export type FinancialSummary = {
+    totalRent: number;
+    totalManagementFees: number;
+    totalServiceCharges: number;
+    totalOtherCosts: number;
+    totalStageTwoCost: number;
+    totalStageThreeCost: number;
+    totalNetRemittance: number;
+    transactionCount: number;
+    vacantUnitServiceChargeDeduction?: number;
+};
+
 export const maintenanceCategories = ['Plumbing', 'Electrical', 'HVAC', 'General', 'Appliance', 'Other'] as const;
 export type MaintenanceCategory = (typeof maintenanceCategories)[number];
 

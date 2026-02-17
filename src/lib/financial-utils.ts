@@ -1,4 +1,4 @@
-import { Payment, Property, Tenant, Unit, Landlord } from "./types";
+import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter } from 'date-fns';
 
 /**
@@ -49,7 +49,12 @@ export function calculateTransactionBreakdown(
     }
     
     const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
-    const otherCosts = isEracovManaged && payment.type === 'Rent' && grossAmount > 0 ? 1000 : 0;
+    
+    // Fee does not apply for January rent
+    const paymentMonth = payment.rentForMonth ? new Date(payment.rentForMonth + '-02').getMonth() : -1;
+    const isJanuary = paymentMonth === 0;
+
+    const otherCosts = isEracovManaged && payment.type === 'Rent' && grossAmount > 0 && !isJanuary ? 1000 : 0;
 
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee; // Other costs will be subtracted later
 
@@ -60,17 +65,6 @@ export function calculateTransactionBreakdown(
         otherCosts: otherCosts,
         netToLandlord: Math.round(netToLandlord),
     };
-}
-
-export interface FinancialSummary {
-    totalRent: number;
-    totalManagementFees: number;
-    totalServiceCharges: number;
-    totalOtherCosts: number;
-    totalSpecialDeductions: number;
-    totalNetRemittance: number;
-    transactionCount: number;
-    vacantUnitServiceChargeDeduction?: number;
 }
 
 export function aggregateFinancials(
@@ -92,7 +86,8 @@ export function aggregateFinancials(
         totalManagementFees: 0,
         totalServiceCharges: 0,
         totalOtherCosts: 0,
-        totalSpecialDeductions: 0,
+        totalStageTwoCost: 0,
+        totalStageThreeCost: 0,
         totalNetRemittance: 0,
         transactionCount: transactions.length,
         vacantUnitServiceChargeDeduction: 0,
@@ -103,7 +98,8 @@ export function aggregateFinancials(
         summary.totalServiceCharges += transaction.serviceChargeDeduction;
         summary.totalManagementFees += transaction.managementFee;
         summary.totalOtherCosts += transaction.otherCosts || 0;
-        summary.totalSpecialDeductions += transaction.specialDeductions || 0;
+        summary.totalStageTwoCost += transaction.stageTwoCost || 0;
+        summary.totalStageThreeCost += transaction.stageThreeCost || 0;
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
@@ -226,6 +222,8 @@ export function generateLandlordDisplayTransactions(
                 rentForMonth: format(currentMonth, 'yyyy-MM'),
                 forMonthDisplay: format(currentMonth, 'MMM yyyy'),
                 ...breakdown,
+                stageTwoCost: 0,
+                stageThreeCost: 0,
                 specialDeductions: 0,
                 gross: rentForThisIteration,
             });
@@ -242,7 +240,7 @@ export function generateLandlordDisplayTransactions(
     if (landlord?.deductStageTwoCost) {
         transactions.forEach(t => {
             if (!deductedStageTwoUnits.has(t.unitName)) {
-                t.specialDeductions = (t.specialDeductions || 0) + 10000;
+                t.stageTwoCost = 10000;
                 deductedStageTwoUnits.add(t.unitName);
             }
         });
@@ -259,7 +257,7 @@ export function generateLandlordDisplayTransactions(
                     case 'Two Bedroom': cost = 16000; break;
                 }
                 if (cost > 0) {
-                    t.specialDeductions = (t.specialDeductions || 0) + cost;
+                    t.stageThreeCost = cost;
                     deductedStageThreeUnits.add(t.unitName);
                 }
             }
@@ -298,6 +296,7 @@ export function generateLandlordDisplayTransactions(
     }
     
     transactions.forEach(t => {
+        t.specialDeductions = (t.stageTwoCost || 0) + (t.stageThreeCost || 0);
         t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - t.otherCosts - t.specialDeductions;
     });
     
