@@ -213,6 +213,7 @@ export function generateLandlordDisplayTransactions(
                 date: payment.date,
                 unitName: tenant.unitName,
                 unitType: unit?.unitType || 'N/A',
+                rentForMonth: format(currentMonth, 'yyyy-MM'),
                 forMonth: format(currentMonth, 'MMM yyyy'),
                 ...breakdown,
             });
