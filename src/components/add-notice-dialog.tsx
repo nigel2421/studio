@@ -1,5 +1,4 @@
 
-// This is a new file.
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -78,8 +77,26 @@ export function AddNoticeDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTenant || !selectedProperty || !selectedUnit || !moveOutDate || !userProfile?.name) {
-      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a property, unit, and date.' });
+
+    const validationCriteria = {
+      tenantSelected: !!selectedTenant,
+      propertySelected: !!selectedProperty,
+      unitSelected: !!selectedUnit,
+      dateSelected: !!moveOutDate,
+      userProfileExists: !!userProfile,
+    };
+
+    if (Object.values(validationCriteria).some(v => !v)) {
+      console.error("Notice to Vacate - Validation Failed. Current state:", {
+          ...validationCriteria,
+          selectedTenantName: selectedTenant?.name,
+          selectedPropertyId: selectedProperty,
+          selectedUnitName: selectedUnit,
+          selectedDate: moveOutDate,
+          userProfileName: userProfile?.name,
+          userProfileEmail: userProfile?.email,
+      });
+      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please ensure all fields are selected and try again.' });
       return;
     }
 
@@ -88,22 +105,23 @@ export function AddNoticeDialog({
       const property = properties.find(p => p.id === selectedProperty);
 
       await addNoticeToVacate({
-        tenantId: selectedTenant.id,
+        tenantId: selectedTenant!.id,
         propertyId: selectedProperty,
         unitName: selectedUnit,
-        tenantName: selectedTenant.name,
+        tenantName: selectedTenant!.name,
         propertyName: property?.name || 'N/A',
         noticeSubmissionDate: new Date().toISOString(),
         scheduledMoveOutDate: format(moveOutDate, 'yyyy-MM-dd'),
         submittedBy: 'Admin',
-        submittedByName: userProfile.name,
+        submittedByName: userProfile?.name || userProfile?.email || 'System Admin',
         status: 'Active',
       });
 
-      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant.name} has been recorded.` });
+      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant!.name} has been recorded.` });
       onNoticeAdded();
       onOpenChange(false);
     } catch (error: any) {
+      console.error("Error submitting notice to vacate:", error);
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit notice.' });
     } finally {
       stopLoading();
