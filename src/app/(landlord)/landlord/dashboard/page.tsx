@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -92,13 +91,15 @@ export default function UniversalOwnerDashboardPage() {
             if (isInvestor) {
                 setDashboardType('landlord');
                 
-                const landlordProperties: { property: Property; units: Unit[] }[] = [];
+                const landlordPropertyMap = new Map<string, Property>();
                 allProperties.forEach((p: Property) => {
                     const unitsForProp = uniqueOwnedUnits.filter(u => u.propertyId === p.id);
                     if (unitsForProp.length > 0) {
-                        landlordProperties.push({ property: p, units: unitsForProp });
+                        landlordPropertyMap.set(p.id, { ...p, units: unitsForProp });
                     }
                 });
+                const landlordPropertiesResult = Array.from(landlordPropertyMap.values());
+
 
                 const ownedUnitIdentifiers = new Set(uniqueOwnedUnits.map(u => `${u.propertyId}-${u.name}`));
                 const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
@@ -106,7 +107,7 @@ export default function UniversalOwnerDashboardPage() {
                 const relevantPayments = allPayments.filter((p: Payment) => relevantTenantIds.has(p.tenantId));
                 
                 setViewData({
-                    properties: landlordProperties,
+                    properties: landlordPropertiesResult,
                     tenants: relevantTenants,
                     payments: relevantPayments,
                     owner,
@@ -194,8 +195,8 @@ export default function UniversalOwnerDashboardPage() {
                     otherCosts: t.otherCosts
                 }));
     
-                const unitsForPDF = viewData.properties.flatMap((p: { property: { name: any; }; units: any[]; }) => p.units.map((u: { name: any; unitType: any; status: any; }) => ({
-                    property: p.property.name,
+                const unitsForPDF = viewData.properties.flatMap((p: Property) => p.units.map((u: Unit) => ({
+                    property: p.name,
                     unitName: u.name,
                     unitType: u.unitType,
                     status: u.status
@@ -268,7 +269,7 @@ export default function UniversalOwnerDashboardPage() {
                 {!dashboardType && !loading && (
                     <div className="text-center py-10">
                         <h2 className="text-xl font-semibold">No Property Data Found</h2>
-                        <p className="text-muted-foreground mt-2">Your account is not currently assigned to any properties. Please contact management.</p>
+                        <p className="text-muted-foreground">Your account is not currently assigned to any properties. Please contact management.</p>
                     </div>
                 )}
             </Tabs>

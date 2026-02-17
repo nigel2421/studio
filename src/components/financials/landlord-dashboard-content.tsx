@@ -11,7 +11,7 @@ import { downloadCSV } from '@/lib/utils';
 import { Button } from '../ui/button';
 
 interface LandlordDashboardContentProps {
-    properties: { property: Property, units: Unit[] }[];
+    properties: Property[];
     financialSummary: FinancialSummary;
     displayTransactions: any[];
     totalUnits: number;
@@ -171,9 +171,9 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                         </TableHeader>
                         <TableBody>
                             {properties.map(propData => (
-                                propData.units.map(unit => (
-                                    <TableRow key={`${propData.property.id}-${unit.name}`}>
-                                        <TableCell className="font-medium">{propData.property.name}</TableCell>
+                                (propData.units || []).map(unit => (
+                                    <TableRow key={`${propData.id}-${unit.name}`}>
+                                        <TableCell className="font-medium">{propData.name}</TableCell>
                                         <TableCell>{unit.name}</TableCell>
                                         <TableCell>{unit.unitType}</TableCell>
                                         <TableCell className="text-right">

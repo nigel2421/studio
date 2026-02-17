@@ -39,7 +39,7 @@ export function calculateTransactionBreakdown(
         serviceChargeDeduction = 0;
     } else {
         if (unitRent > 0 && payment.type === 'Rent') {
-            const rentRatio = grossAmount / unitRent;
+            const rentRatio = Math.min(1, grossAmount / unitRent); // Ensure ratio is not > 1
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
             serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
@@ -49,7 +49,7 @@ export function calculateTransactionBreakdown(
     }
     
     const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
-    const otherCosts = isEracovManaged && payment.type === 'Rent' ? 1000 : 0;
+    const otherCosts = isEracovManaged && payment.type === 'Rent' && grossAmount > 0 ? 1000 : 0;
 
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee - otherCosts;
 
@@ -72,7 +72,7 @@ export interface FinancialSummary {
     vacantUnitServiceChargeDeduction?: number;
 }
 
-export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: { property: Property, units: Unit[] }[], startDate?: Date, endDate?: Date): FinancialSummary {
+export function aggregateFinancials(payments: Payment[], tenants: Tenant[], properties: Property[], startDate?: Date, endDate?: Date): FinancialSummary {
     const transactions = generateLandlordDisplayTransactions(payments, tenants, properties, startDate, endDate);
 
     const summary: FinancialSummary = {
@@ -95,7 +95,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
 
     let vacantUnitDeduction = 0;
     properties.forEach(p => {
-      p.units.forEach(u => {
+      (p.units || []).forEach(u => {
         if (u.status === 'vacant' && u.handoverStatus === 'Handed Over') {
           vacantUnitDeduction += u.serviceCharge || 0;
         }
@@ -111,14 +111,14 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
 export function generateLandlordDisplayTransactions(
     payments: Payment[], 
     tenants: Tenant[], 
-    properties: { property: Property, units: Unit[] }[],
+    properties: Property[],
     startDate?: Date, 
     endDate?: Date
 ) {
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
-        p.units.forEach(u => {
-            unitMap.set(`${p.property.id}-${u.name}`, u);
+        (p.units || []).forEach(u => {
+            unitMap.set(`${p.id}-${u.name}`, u);
         });
     });
 
@@ -188,7 +188,7 @@ export function generateLandlordDisplayTransactions(
                 monthIndex++;
             }
         } else {
-            const paymentForBreakdown = { ...payment, amount: Math.min(amountToApportionAsRent, unitRent) };
+            const paymentForBreakdown: Payment = { ...payment, amount: Math.min(amountToApportionAsRent, unitRent), type: 'Rent' };
             const breakdown = calculateTransactionBreakdown(paymentForBreakdown, unit, tenant);
             transactions.push({
                 id: payment.id,
