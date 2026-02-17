@@ -832,5 +832,3 @@ export default function MegarackPage() {
     </>
   );
 }
-
-    

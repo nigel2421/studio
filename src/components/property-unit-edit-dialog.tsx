@@ -358,5 +358,3 @@ export function UnitEditDialog({ unit, landlords, open, onOpenChange, onSave }: 
         </Dialog>
     );
 }
-
-    

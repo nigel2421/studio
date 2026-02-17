@@ -189,5 +189,3 @@ export function ManagePropertyOwnerDialog({ isOpen, onClose, owner, property, al
         </Dialog>
     );
 }
-
-    

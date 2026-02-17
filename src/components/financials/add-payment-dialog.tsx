@@ -182,7 +182,7 @@ export function AddPaymentDialog({
             setSelectedUnit('');
         }
     }
-}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment, getDefaultAmount, setSelectedFloor, setSelectedProperty, setSelectedUnit]);
+}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment, getDefaultAmount, setSelectedProperty, setSelectedFloor, setSelectedUnit]);
 
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
