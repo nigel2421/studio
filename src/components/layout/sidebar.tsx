@@ -11,6 +11,9 @@ import {
   SidebarFooter,
   useSidebar,
   SidebarTrigger,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
@@ -41,7 +44,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useLoading } from '@/hooks/useLoading';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { Task } from '@/lib/types';
 import { listenToTasks } from '@/lib/data';
@@ -53,7 +56,8 @@ const navItems = [
   { href: '/accounts/arrears', icon: AlertCircle, label: 'Arrears' },
   { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
-  { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
+  // Archived is now part of the collapsible group
+  // { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Megarack' },
   { href: '/properties', icon: Building2, label: 'Properties' },
@@ -96,6 +100,7 @@ export function AppSidebar() {
   }
   
   const visibleNavItems = navItems.filter(item => {
+    if (item.href === '/tenants/archived') return false; // Always hide the standalone archived link
     if (isAgent) {
         const agentHidden = ['/accounts', '/accounts/arrears', '/accounts/service-charges'];
         if (agentHidden.includes(item.href)) return false;
@@ -139,7 +144,47 @@ export function AppSidebar() {
 
       <SidebarContent className="flex-1">
         <SidebarMenu>
-          {visibleNavItems.map((item) => (
+          {visibleNavItems.map((item) => {
+            if (item.href === '/tenants') {
+                 // Render the collapsible Tenants menu if it's not filtered out
+                 if (isInvestmentConsultant && !['/dashboard', '/properties', '/tenants'].includes(item.href)) {
+                    return null;
+                 }
+                 return (
+                    <Collapsible asChild key="tenants-group" defaultOpen={pathname.startsWith('/tenants')}>
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger className="w-full">
+                                <SidebarMenuButton isActive={pathname.startsWith('/tenants')}>
+                                    <Users />
+                                    <span>Tenants</span>
+                                    <ChevronDown className="ml-auto h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem>
+                                        <Link href="/tenants" onClick={() => handleLinkClick('All Residents')}>
+                                            <SidebarMenuSubButton isActive={pathname === '/tenants'}>All Residents</SidebarMenuSubButton>
+                                        </Link>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <Link href="/tenants/notice-to-vacate" onClick={() => handleLinkClick('Notice to Vacate')}>
+                                            <SidebarMenuSubButton isActive={pathname === '/tenants/notice-to-vacate'}>Notice to Vacate</SidebarMenuSubButton>
+                                        </Link>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <Link href="/tenants/archived" onClick={() => handleLinkClick('Archived Tenants')}>
+                                            <SidebarMenuSubButton isActive={pathname === '/tenants/archived'}>Archived</SidebarMenuSubButton>
+                                        </Link>
+                                    </SidebarMenuSubItem>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                 );
+            }
+
+            return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.label)}>
                   <SidebarMenuButton
@@ -151,7 +196,8 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-          ))}
+            )
+          })}
 
 
           <Separator className="my-2" />
