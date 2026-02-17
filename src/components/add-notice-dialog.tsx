@@ -99,6 +99,11 @@ export function AddNoticeDialog({
       toast({ variant: 'destructive', title: 'Missing Information', description: 'Please ensure all fields are selected and try again.' });
       return;
     }
+    
+    if (!moveOutDate) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Move-out date is missing.' });
+        return;
+    }
 
     startLoading('Submitting notice...');
     try {
