@@ -1,4 +1,4 @@
-import { Payment, Property, Tenant, Unit } from "./types";
+import { Payment, Property, Tenant, Unit, Landlord } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter } from 'date-fns';
 
 /**
@@ -79,7 +79,7 @@ export function aggregateFinancials(
     tenants: Tenant[],
     startDate?: Date, 
     endDate?: Date, 
-    landlordId?: string
+    landlord?: Landlord | null
 ): FinancialSummary {
     // This function now expects transactions to have costs pre-calculated by generateLandlordDisplayTransactions
     const transactions = allTransactions.filter(t => {
@@ -108,12 +108,12 @@ export function aggregateFinancials(
     });
 
     let vacantUnitDeduction = 0;
-    if (startDate && endDate && landlordId) {
+    if (startDate && endDate && landlord) {
         const start = startOfMonth(startDate);
         const end = startOfMonth(endDate);
         
         const landlordUnits = properties.flatMap(p => 
-            (p.units || []).filter(u => u.landlordId === landlordId || (landlordId === 'soil_merchants_internal' && u.ownership === 'SM'))
+            (p.units || []).filter(u => u.landlordId === landlord.id || (landlord.id === 'soil_merchants_internal' && u.ownership === 'SM'))
             .map(u => ({...u, propertyId: p.id }))
         );
         
@@ -151,10 +151,11 @@ export function generateLandlordDisplayTransactions(
     payments: Payment[],
     tenants: Tenant[],
     properties: Property[],
+    landlord: Landlord | null,
     startDate?: Date,
-    endDate?: Date,
-    landlordId?: string
+    endDate?: Date
 ) {
+    const landlordId = landlord?.id;
     const unitMap = new Map<string, Unit>();
     properties.forEach(p => {
         (p.units || []).forEach(u => {
@@ -181,6 +182,29 @@ export function generateLandlordDisplayTransactions(
             tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
         }
     });
+
+    let stageTwoCostToDeduct = landlord?.deductStageTwoCost ? 10000 : 0;
+    const stageThreeCostsToDeduct = new Map<string, number>();
+
+    if (landlord?.deductStageThreeCost) {
+        properties.forEach(p => {
+            (p.units || []).forEach(u => {
+                if (u.landlordId === landlordId) {
+                    switch (u.unitType) {
+                        case 'Studio':
+                            stageThreeCostsToDeduct.set(u.name, 8000);
+                            break;
+                        case 'One Bedroom':
+                            stageThreeCostsToDeduct.set(u.name, 12000);
+                            break;
+                        case 'Two Bedroom':
+                            stageThreeCostsToDeduct.set(u.name, 16000);
+                            break;
+                    }
+                }
+            });
+        });
+    }
 
     sortedPayments.forEach(payment => {
         const tenant = tenantMap.get(payment.tenantId);
@@ -210,11 +234,24 @@ export function generateLandlordDisplayTransactions(
         const leaseStartDate = parseISO(tenant.lease.startDate);
 
         while (remainingAmount > 0 && monthIndex < 24) { // Add a safeguard limit
-            const currentMonth = addMonths(leaseStartDate, monthIndex);
             const rentForThisIteration = Math.min(remainingAmount, unitRent);
+            const currentMonth = addMonths(leaseStartDate, monthIndex);
             
             const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: format(currentMonth, 'yyyy-MM'), type: 'Rent' };
             const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+            
+            let specialDeductions = 0;
+            if (stageTwoCostToDeduct > 0) {
+                specialDeductions += stageTwoCostToDeduct;
+                stageTwoCostToDeduct = 0;
+            }
+
+            if (unit && stageThreeCostsToDeduct.has(unit.name)) {
+                specialDeductions += stageThreeCostsToDeduct.get(unit.name)!;
+                stageThreeCostsToDeduct.delete(unit.name);
+            }
+
+            breakdown.otherCosts += specialDeductions;
             
             transactions.push({
                 id: `${payment.id}-${monthIndex}`,
@@ -252,10 +289,13 @@ export function generateLandlordDisplayTransactions(
             .forEach(t => {
                 const monthKey = t.rentForMonth;
                 if (processedMonths.has(monthKey)) {
-                    t.otherCosts = 0; // Set subsequent transaction costs in the same month to 0
+                    if (t.otherCosts > 1000) { // Keep special deductions
+                        t.otherCosts -= 1000;
+                    } else {
+                        t.otherCosts = 0; // Set subsequent transaction costs in the same month to 0
+                    }
                 } else {
-                    if (t.otherCosts > 0) { // Only apply if it was eligible in the first place
-                       t.otherCosts = 1000;
+                    if (t.otherCosts >= 1000) {
                        processedMonths.add(monthKey);
                     }
                 }

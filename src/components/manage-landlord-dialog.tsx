@@ -37,6 +37,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
   const [bankAccount, setBankAccount] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
+  const [deductStageTwo, setDeductStageTwo] = useState(false);
+  const [deductStageThree, setDeductStageThree] = useState(false);
   const { isLoading, startLoading, stopLoading } = useLoading();
   const { toast } = useToast();
   
@@ -55,6 +57,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         setEmail(landlord.email || '');
         setPhone(landlord.phone || '');
         setBankAccount(landlord.bankAccount || '');
+        setDeductStageTwo(landlord.deductStageTwoCost || false);
+        setDeductStageThree(landlord.deductStageThreeCost || false);
         // Pre-select units already assigned to this landlord
         const currentlyAssigned = allLandlordOwnedUnits
           .filter(u => u.landlordId === landlord.id)
@@ -66,6 +70,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         setEmail('');
         setPhone('');
         setBankAccount('');
+        setDeductStageTwo(false);
+        setDeductStageThree(false);
         setSelectedUnits([]);
       }
       setUnitSearchTerm('');
@@ -110,7 +116,9 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         email,
         phone,
         bankAccount,
-        userId: landlord?.userId
+        userId: landlord?.userId,
+        deductStageTwoCost: deductStageTwo,
+        deductStageThreeCost: deductStageThree,
       };
       await onSave(landlordData, selectedUnits);
     } catch (error) {
@@ -149,6 +157,31 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
               <Label htmlFor="bank-account">Bank Account Details</Label>
               <Input id="bank-account" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
             </div>
+
+            <div className="space-y-2 pt-4">
+                <Label>Special Deductions</Label>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="deduct-stage-two"
+                        checked={deductStageTwo}
+                        onCheckedChange={(checked) => setDeductStageTwo(!!checked)}
+                    />
+                    <label htmlFor="deduct-stage-two" className="text-sm font-medium leading-none">
+                        Apply Stage Two Cost (KSh 10,000)
+                    </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="deduct-stage-three"
+                        checked={deductStageThree}
+                        onCheckedChange={(checked) => setDeductStageThree(!!checked)}
+                    />
+                    <label htmlFor="deduct-stage-three" className="text-sm font-medium leading-none">
+                        Apply Stage Three Costs (per unit type)
+                    </label>
+                </div>
+            </div>
+
             <div className="grid gap-4">
               <Label>Assign Landlord Units</Label>
               <div className="relative">

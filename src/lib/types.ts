@@ -254,6 +254,8 @@ export type Landlord = {
   phone: string;
   bankAccount?: string;
   userId?: string;
+  deductStageTwoCost?: boolean;
+  deductStageThreeCost?: boolean;
 };
 
 export const userRoles = ['admin', 'agent', 'tenant', 'landlord', 'viewer', 'water-meter-reader', 'investment-consultant', 'accounts', 'homeowner'] as const;
