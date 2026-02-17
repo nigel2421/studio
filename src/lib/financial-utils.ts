@@ -51,7 +51,6 @@ export function calculateTransactionBreakdown(
     
     const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
     
-    // Fee does not apply for January rent
     const paymentMonth = payment.rentForMonth ? new Date(payment.rentForMonth + '-02').getMonth() : -1;
     const isJanuary = paymentMonth === 0;
 
@@ -174,7 +173,7 @@ export function generateLandlordDisplayTransactions(
         return isWithinInterval(paymentDate, { start: startDate, end: endDate });
     });
 
-    const transactions: any[] = [];
+    let transactions: any[] = [];
     
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -249,24 +248,30 @@ export function generateLandlordDisplayTransactions(
 
     let totalStageTwoCost = 0;
     let totalStageThreeCost = 0;
+    const processedUnitsForDeduction = new Set<string>();
 
     if (landlord) {
         landlordUnits.forEach(unit => {
-            if (landlord.deductStageTwoCost) {
-                totalStageTwoCost += 10000;
-            }
-            if (landlord.deductStageThreeCost) {
-                switch (unit.unitType) {
-                    case 'Studio': totalStageThreeCost += 8000; break;
-                    case 'One Bedroom': totalStageThreeCost += 12000; break;
-                    case 'Two Bedroom': totalStageThreeCost += 16000; break;
+            if (!processedUnitsForDeduction.has(unit.name)) {
+                if (landlord.deductStageTwoCost) {
+                    totalStageTwoCost += 10000;
                 }
+                if (landlord.deductStageThreeCost) {
+                    switch (unit.unitType) {
+                        case 'Studio': totalStageThreeCost += 8000; break;
+                        case 'One Bedroom': totalStageThreeCost += 12000; break;
+                        case 'Two Bedroom': totalStageThreeCost += 16000; break;
+                    }
+                }
+                processedUnitsForDeduction.add(unit.name);
             }
         });
     }
-    const totalSpecialDeductions = totalStageTwoCost + totalStageThreeCost;
+
+    const initialSpecialDeductions = totalStageTwoCost + totalStageThreeCost;
+
     if (transactions.length > 0) {
-        transactions[0].specialDeductions = totalSpecialDeductions;
+        transactions[0].specialDeductions = (transactions[0].specialDeductions || 0) + initialSpecialDeductions;
         transactions[0].stageTwoCost = totalStageTwoCost;
         transactions[0].stageThreeCost = totalStageThreeCost;
     }
@@ -282,21 +287,31 @@ export function generateLandlordDisplayTransactions(
 
     const sortedMonths = Object.keys(groupedByMonth).sort();
     const finalTransactions: any[] = [];
-    let carryOverFromPreviousMonth = 0;
+    let carryOverDeficit = 0;
 
     sortedMonths.forEach(month => {
         const monthTransactions = groupedByMonth[month];
         let monthNet = 0;
+        
+        if (monthTransactions.length > 0 && carryOverDeficit > 0) {
+            monthTransactions[0].specialDeductions = (monthTransactions[0].specialDeductions || 0) + carryOverDeficit;
+        }
 
-        monthTransactions.forEach((t, index) => {
-            if (index === 0 && carryOverFromPreviousMonth > 0) {
-                t.otherCosts = (t.otherCosts || 0) + carryOverFromPreviousMonth;
+        monthTransactions.forEach(t => {
+            const paymentMonth = t.rentForMonth ? new Date(t.rentForMonth + '-02').getMonth() : -1;
+            const isJanuary = paymentMonth === 0;
+            if (isJanuary) {
+                t.otherCosts = 0;
             }
-            t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - t.otherCosts - t.specialDeductions;
+            t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0) - (t.specialDeductions || 0);
             monthNet += t.netToLandlord;
         });
 
-        carryOverFromPreviousMonth = monthNet < 0 ? Math.abs(monthNet) : 0;
+        if (monthNet < 0) {
+            carryOverDeficit = Math.abs(monthNet);
+        } else {
+            carryOverDeficit = 0;
+        }
         
         finalTransactions.push(...monthTransactions);
     });

@@ -449,7 +449,7 @@ export const generateLandlordStatementPDF = (
     yPos += 8;
     
     const groupedByMonth = transactions.reduce((acc, t) => {
-        const month = t.rentForMonth || 'Unknown Month';
+        const month = t.rentForMonth || format(new Date(), 'yyyy-MM');
         if (!acc[month]) {
             acc[month] = [];
         }
@@ -484,7 +484,7 @@ export const generateLandlordStatementPDF = (
         });
     });
     
-    const totalSpecialDeductions = summary.totalStageTwoCost + summary.totalStageThreeCost;
+    const totalSpecialDeductions = transactions.reduce((acc, t) => acc + (t.specialDeductions || 0), 0);
 
     autoTable(doc, {
         startY: yPos,
