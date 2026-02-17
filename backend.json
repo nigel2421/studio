@@ -70,7 +70,8 @@
         "scheduledMoveOutDate": { "type": "string", "format": "date" },
         "submittedBy": { "type": "string", "enum": ["Admin", "Tenant"] },
         "submittedByName": { "type": "string" },
-        "status": { "type": "string", "enum": ["Active", "Completed"] }
+        "status": { "type": "string", "enum": ["Active", "Completed"] },
+        "reason": { "type": "string", "description": "The reason the tenant is vacating." }
       },
       "required": ["tenantId", "propertyId", "unitName", "tenantName", "propertyName", "noticeSubmissionDate", "scheduledMoveOutDate", "submittedBy", "status"]
     }

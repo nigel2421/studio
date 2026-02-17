@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,6 +13,7 @@ import { useLoading } from '@/hooks/useLoading';
 import { Loader2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useAuth } from '@/hooks/useAuth';
+import { Textarea } from '@/components/ui/textarea';
 
 interface AddNoticeDialogProps {
   properties: Property[];
@@ -37,8 +37,8 @@ export function AddNoticeDialog({
   const [selectedProperty, setSelectedProperty] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
   const [moveOutDate, setMoveOutDate] = useState<Date | undefined>(addMonths(new Date(), 1));
+  const [reason, setReason] = useState('');
 
-  // Filter for actual tenants, not homeowners
   const activeTenants = useMemo(() => {
     return tenants.filter(t => t.residentType === 'Tenant');
   }, [tenants]);
@@ -68,6 +68,7 @@ export function AddNoticeDialog({
       setSelectedProperty('');
       setSelectedUnit('');
       setMoveOutDate(addMonths(new Date(), 1));
+      setReason('');
     }
   }, [open]);
 
@@ -77,6 +78,11 @@ export function AddNoticeDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!moveOutDate) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Move-out date is missing.' });
+        return;
+    }
 
     const validationCriteria = {
       tenantSelected: !!selectedTenant,
@@ -99,30 +105,26 @@ export function AddNoticeDialog({
       toast({ variant: 'destructive', title: 'Missing Information', description: 'Please ensure all fields are selected and try again.' });
       return;
     }
-    
-    if (!moveOutDate) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Move-out date is missing.' });
-        return;
-    }
 
     startLoading('Submitting notice...');
     try {
       const property = properties.find(p => p.id === selectedProperty);
 
       await addNoticeToVacate({
-        tenantId: selectedTenant!.id,
+        tenantId: selectedTenant.id,
         propertyId: selectedProperty,
         unitName: selectedUnit,
-        tenantName: selectedTenant!.name,
+        tenantName: selectedTenant.name,
         propertyName: property?.name || 'N/A',
         noticeSubmissionDate: new Date().toISOString(),
         scheduledMoveOutDate: format(moveOutDate, 'yyyy-MM-dd'),
         submittedBy: 'Admin',
         submittedByName: userProfile?.name || userProfile?.email || 'System Admin',
         status: 'Active',
+        reason: reason,
       });
 
-      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant!.name} has been recorded.` });
+      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant.name} has been recorded.` });
       onNoticeAdded();
       onOpenChange(false);
     } catch (error: any) {
@@ -184,6 +186,15 @@ export function AddNoticeDialog({
             <div className="space-y-2">
               <Label htmlFor="move-out-date">Scheduled Move-Out Date</Label>
               <DatePicker id="move-out-date" value={moveOutDate} onChange={setMoveOutDate} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="move-out-reason">Reason for Moving Out (Optional)</Label>
+              <Textarea
+                id="move-out-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g., Job relocation, end of lease term, etc."
+              />
             </div>
           </div>
           <DialogFooter>

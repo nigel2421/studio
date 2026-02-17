@@ -1,4 +1,3 @@
-// This is a new file.
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -104,12 +103,13 @@ export default function NoticeToVacatePage() {
                                     <TableHead>Submission Date</TableHead>
                                     <TableHead>Move-Out Due Date</TableHead>
                                     <TableHead>Submitted By</TableHead>
+                                    <TableHead>Reason</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
+                                        <TableCell colSpan={7} className="h-24 text-center">
                                             <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
                                         </TableCell>
                                     </TableRow>
@@ -122,11 +122,14 @@ export default function NoticeToVacatePage() {
                                             <TableCell>{format(parseISO(notice.noticeSubmissionDate), 'PPP')}</TableCell>
                                             <TableCell>{format(parseISO(notice.scheduledMoveOutDate), 'PPP')}</TableCell>
                                             <TableCell>{notice.submittedBy} ({notice.submittedByName})</TableCell>
+                                            <TableCell className="max-w-[200px] truncate" title={notice.reason}>
+                                                {notice.reason || <span className="text-muted-foreground italic">No reason given</span>}
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
+                                        <TableCell colSpan={7} className="h-24 text-center">
                                             No active notices to vacate found.
                                         </TableCell>
                                     </TableRow>
@@ -137,10 +140,10 @@ export default function NoticeToVacatePage() {
                 </Card>
             </div>
             <AddNoticeDialog
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
                 properties={properties}
                 tenants={tenants}
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
                 onNoticeAdded={handleNoticeAdded}
             />
         </>

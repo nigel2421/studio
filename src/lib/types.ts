@@ -329,4 +329,5 @@ export type NoticeToVacate = {
   submittedBy: 'Admin' | 'Tenant';
   submittedByName: string;
   status: 'Active' | 'Completed';
+  reason?: string;
 };
