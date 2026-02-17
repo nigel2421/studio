@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPaymentsForReport, deleteLandlord } from '@/lib/data';
+import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPayments, deleteLandlord } from '@/lib/data';
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
@@ -63,7 +63,7 @@ export default function LandlordsPage() {
       getLandlords(),
       getProperties(),
       getTenants(),
-      getAllPaymentsForReport()
+      getAllPayments()
     ]).then(([landlordData, propertyData, tenantData, paymentData]) => {
       setLandlords([SOIL_MERCHANTS_LANDLORD, ...landlordData]);
       setProperties(propertyData);
@@ -284,14 +284,10 @@ export default function LandlordsPage() {
       const relevantTenants = tenants.filter(t => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
       const relevantTenantIds = relevantTenants.map(t => t.id);
       
-      const relevantPayments = payments.filter(p => 
-          relevantTenantIds.includes(p.tenantId) && 
-          isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
-      );
+      const allRelevantPayments = payments.filter(p => relevantTenantIds.includes(p.tenantId));
 
-      const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
-      
-      const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties);
+      const summary = aggregateFinancials(allRelevantPayments, relevantTenants, landlordProperties, startDate, endDate);
+      const displayTransactions = generateLandlordDisplayTransactions(allRelevantPayments, relevantTenants, landlordProperties, startDate, endDate);
       
       const transactionsForPDF = displayTransactions.map(t => ({
         date: new Date(t.date).toLocaleDateString(),
@@ -300,6 +296,7 @@ export default function LandlordsPage() {
         gross: t.gross,
         serviceCharge: t.serviceChargeDeduction,
         mgmtFee: t.managementFee,
+        otherCosts: t.otherCosts || 0,
         net: t.netToLandlord,
       }));
 
@@ -552,3 +549,5 @@ export default function LandlordsPage() {
     </div>
   );
 }
+
+    
