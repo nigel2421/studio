@@ -240,34 +240,36 @@ export function generateLandlordDisplayTransactions(
         }
     });
 
-    // --- Special Deductions & Other Costs Logic ---
-    const landlordUnitCount = landlordUnits.size;
-    let totalSpecialDeductions = 0;
-    if (landlord) {
-        landlordUnits.forEach(unit => {
-            if (landlord.deductStageTwoCost) {
-                totalSpecialDeductions += 10000;
-            }
-            if (landlord.deductStageThreeCost) {
-                switch (unit.unitType) {
-                    case 'Studio': totalSpecialDeductions += 8000; break;
-                    case 'One Bedroom': totalSpecialDeductions += 12000; break;
-                    case 'Two Bedroom': totalSpecialDeductions += 16000; break;
-                }
-            }
-        });
-    }
-
-    if (transactions.length > 0) {
-        transactions[0].specialDeductions = totalSpecialDeductions;
-    }
-    
     transactions.sort((a,b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         if (dateA !== dateB) return dateA - dateB;
         return a.unitName.localeCompare(b.unitName);
     });
+
+    let totalStageTwoCost = 0;
+    let totalStageThreeCost = 0;
+
+    if (landlord) {
+        landlordUnits.forEach(unit => {
+            if (landlord.deductStageTwoCost) {
+                totalStageTwoCost += 10000;
+            }
+            if (landlord.deductStageThreeCost) {
+                switch (unit.unitType) {
+                    case 'Studio': totalStageThreeCost += 8000; break;
+                    case 'One Bedroom': totalStageThreeCost += 12000; break;
+                    case 'Two Bedroom': totalStageThreeCost += 16000; break;
+                }
+            }
+        });
+    }
+    const totalSpecialDeductions = totalStageTwoCost + totalStageThreeCost;
+    if (transactions.length > 0) {
+        transactions[0].specialDeductions = totalSpecialDeductions;
+        transactions[0].stageTwoCost = totalStageTwoCost;
+        transactions[0].stageThreeCost = totalStageThreeCost;
+    }
 
     const groupedByMonth = transactions.reduce((acc, t) => {
         const month = t.rentForMonth || format(new Date(t.date), 'yyyy-MM');
@@ -286,7 +288,6 @@ export function generateLandlordDisplayTransactions(
         const monthTransactions = groupedByMonth[month];
         let monthNet = 0;
 
-        // First pass for the month: calculate initial net and apply carry-over
         monthTransactions.forEach((t, index) => {
             if (index === 0 && carryOverFromPreviousMonth > 0) {
                 t.otherCosts = (t.otherCosts || 0) + carryOverFromPreviousMonth;

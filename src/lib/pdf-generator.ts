@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary } from '@/lib/types';
@@ -461,7 +462,8 @@ export const generateLandlordStatementPDF = (
     const body: any[] = [];
 
     sortedMonths.forEach(month => {
-        const monthDate = parseISO(month + '-01');
+        const monthDateStr = month + '-01';
+        const monthDate = parseISO(monthDateStr);
         if(!isValid(monthDate)) return;
 
         body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 9, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
@@ -486,7 +488,7 @@ export const generateLandlordStatementPDF = (
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Special Costs', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Stage Costs', 'Net']],
         body: body,
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
