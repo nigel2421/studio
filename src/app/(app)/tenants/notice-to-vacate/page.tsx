@@ -1,7 +1,7 @@
 // This is a new file.
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getNoticesToVacate, getProperties, getTenants } from '@/lib/data';
 import { NoticeToVacate, Property, Tenant } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +24,11 @@ export default function NoticeToVacatePage() {
     const { startLoading, stopLoading, isLoading } = useLoading();
     const { userProfile } = useAuth();
     const { toast } = useToast();
+
+    const propertiesWithTenants = useMemo(() => {
+        const tenantedPropertyIds = new Set(tenants.map(t => t.propertyId));
+        return properties.filter(p => tenantedPropertyIds.has(p.id));
+    }, [tenants, properties]);
 
     const fetchData = useCallback(async () => {
         startLoading('Loading notices...');
@@ -139,7 +144,7 @@ export default function NoticeToVacatePage() {
             <AddNoticeDialog
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
-                properties={properties}
+                properties={propertiesWithTenants}
                 tenants={tenants}
                 onNoticeAdded={handleNoticeAdded}
             />
