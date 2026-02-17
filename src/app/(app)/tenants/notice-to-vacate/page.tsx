@@ -25,11 +25,6 @@ export default function NoticeToVacatePage() {
     const { userProfile } = useAuth();
     const { toast } = useToast();
 
-    const propertiesWithTenants = useMemo(() => {
-        const tenantedPropertyIds = new Set(tenants.map(t => t.propertyId));
-        return properties.filter(p => tenantedPropertyIds.has(p.id));
-    }, [tenants, properties]);
-
     const fetchData = useCallback(async () => {
         startLoading('Loading notices...');
         try {
@@ -144,7 +139,7 @@ export default function NoticeToVacatePage() {
             <AddNoticeDialog
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
-                properties={propertiesWithTenants}
+                properties={properties}
                 tenants={tenants}
                 onNoticeAdded={handleNoticeAdded}
             />

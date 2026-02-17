@@ -38,6 +38,11 @@ export function AddNoticeDialog({
   const [selectedUnit, setSelectedUnit] = useState('');
   const [moveOutDate, setMoveOutDate] = useState<Date | undefined>(addMonths(new Date(), 1));
 
+  const propertiesWithTenants = useMemo(() => {
+    const tenantedPropertyIds = new Set(tenants.map(t => t.propertyId));
+    return properties.filter(p => tenantedPropertyIds.has(p.id));
+  }, [properties, tenants]);
+
   const occupiedUnits = useMemo(() => {
     if (!selectedProperty) return [];
     const tenantUnits = tenants
@@ -113,7 +118,7 @@ export function AddNoticeDialog({
                 <Label htmlFor="property">Property</Label>
                 <Select onValueChange={setSelectedProperty} value={selectedProperty}>
                   <SelectTrigger id="property"><SelectValue placeholder="Select a property" /></SelectTrigger>
-                  <SelectContent>{properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{propertiesWithTenants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
