@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
-import { getTenants, getAllPayments, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
+import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -55,7 +55,7 @@ export default function UniversalOwnerDashboardPage() {
             const [allProperties, allTenants, allPayments, allLandlords, allPropertyOwners, allWaterReadings] = await Promise.all([
                 getProperties(),
                 getTenants(),
-                getAllPayments(),
+                getAllPaymentsForReport(),
                 getLandlords(),
                 getPropertyOwners(),
                 getAllWaterReadings(),
@@ -157,7 +157,7 @@ export default function UniversalOwnerDashboardPage() {
     const filteredDashboardData = useMemo(() => {
         if (!viewData || dashboardType !== 'landlord') return null;
 
-        const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()));
+        const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()), viewData.owner?.id);
         const transactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()));
         
         return {
@@ -178,11 +178,11 @@ export default function UniversalOwnerDashboardPage() {
             if (dashboardType === 'homeowner') {
                 const { generateOwnerServiceChargeStatementPDF } = await import('@/lib/pdf-generator');
                 const allWaterReadings = await getAllWaterReadings();
-                generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPayments(), allWaterReadings, pdfStartDate, pdfEndDate, activeOwnerTab);
+                generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, pdfStartDate, pdfEndDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
                 const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
     
-                const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate);
+                const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate, viewData.owner?.id);
                 const displayTransactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate);
           
                 const transactionsForPDF = displayTransactions.map(t => ({
@@ -242,7 +242,7 @@ export default function UniversalOwnerDashboardPage() {
                         {dashboardType === 'homeowner' && (
                              <TabsList>
                                 <TabsTrigger value="service-charge">Service Charge</TabsTrigger>
-                                <TabsTrigger value="water">Water Bills</TabsTrigger>
+                                <TabsTrigger value="water">Water</TabsTrigger>
                             </TabsList>
                         )}
                         <Button onClick={() => setIsStatementOpen(true)} variant="outline">

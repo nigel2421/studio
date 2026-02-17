@@ -392,8 +392,7 @@ export const generateLandlordStatementPDF = (
     // Header
     addHeader(doc, 'Landlord Statement');
 
-    // Landlord Details - Placed below main header line
-    let yPos = 48;
+    let yPos = 52;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('STATEMENT FOR:', 14, yPos);
@@ -409,7 +408,7 @@ export const generateLandlordStatementPDF = (
     }
 
     // Summary Section
-    yPos = 70;
+    yPos = 75;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Summary', 14, yPos);
