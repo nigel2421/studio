@@ -14,6 +14,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Tenant, Property, agents, Agent } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format, parseISO } from 'date-fns';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -23,6 +25,11 @@ const formSchema = z.object({
     propertyId: z.string().min(1, 'Property is required'),
     unitName: z.string().min(1, 'Unit is required'),
     agent: z.enum([...agents]),
+    lease: z.object({
+        startDate: z.date({ required_error: "Lease start date is required."}),
+        rent: z.coerce.number().min(0, "Rent must be a positive number."),
+    }),
+    securityDeposit: z.coerce.number().min(0, "Security deposit must be a positive number."),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -45,6 +52,11 @@ export default function EditTenantPage() {
             idNumber: '',
             propertyId: '',
             unitName: '',
+            lease: {
+                startDate: new Date(),
+                rent: 0,
+            },
+            securityDeposit: 0,
         },
     });
 
@@ -54,8 +66,18 @@ export default function EditTenantPage() {
                 if (tenantData) {
                     setTenant(tenantData);
                     form.reset({
-                        ...tenantData,
+                        name: tenantData.name,
+                        email: tenantData.email,
+                        phone: tenantData.phone,
+                        idNumber: tenantData.idNumber,
+                        propertyId: tenantData.propertyId,
+                        unitName: tenantData.unitName,
                         agent: tenantData.agent,
+                        lease: {
+                            startDate: tenantData.lease?.startDate ? parseISO(tenantData.lease.startDate) : new Date(),
+                            rent: tenantData.lease?.rent || 0,
+                        },
+                        securityDeposit: tenantData.securityDeposit || 0
                     });
                 }
             });
@@ -88,9 +110,22 @@ export default function EditTenantPage() {
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         if (tenant) {
+            const updatedLeaseData = {
+                ...tenant.lease,
+                startDate: format(data.lease.startDate, 'yyyy-MM-dd'),
+                rent: data.lease.rent,
+            };
+
             await updateTenant(tenant.id, {
-                ...data,
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                idNumber: data.idNumber,
+                propertyId: data.propertyId,
+                unitName: data.unitName,
                 agent: data.agent as Agent,
+                lease: updatedLeaseData,
+                securityDeposit: data.securityDeposit,
             });
             toast({
                 title: "Tenant Updated",
@@ -112,130 +147,171 @@ export default function EditTenantPage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="phone"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Phone</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="idNumber"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>ID Number</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="propertyId"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Property</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a property" />
-                                            </SelectTrigger>
+                                            <Input {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {properties.map(property => (
-                                                <SelectItem key={property.id} value={property.id}>
-                                                    {property.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="unitName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Unit</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a unit" />
-                                            </SelectTrigger>
+                                            <Input {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {units.map(unit => (
-                                                <SelectItem key={unit} value={unit}>
-                                                    {unit}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="agent"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Agent</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="phone"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Phone</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select an agent" />
-                                            </SelectTrigger>
+                                            <Input {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {agents.map(agent => (
-                                                <SelectItem key={agent} value={agent}>
-                                                    {agent}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="idNumber"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>ID Number</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="propertyId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Property</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a property" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {properties.map(property => (
+                                                    <SelectItem key={property.id} value={property.id}>
+                                                        {property.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="unitName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Unit</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a unit" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {units.map(unit => (
+                                                    <SelectItem key={unit} value={unit}>
+                                                        {unit}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="agent"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Agent</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select an agent" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {agents.map(agent => (
+                                                    <SelectItem key={agent} value={agent}>
+                                                        {agent}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="lease.rent"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Monthly Rent (Ksh)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="securityDeposit"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Security Deposit (Ksh)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="lease.startDate"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>Lease Start Date</FormLabel>
+                                        <FormControl>
+                                            <DatePicker value={field.value} onChange={field.onChange} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                         <Button type="submit">Save Changes</Button>
                     </form>
                 </Form>
