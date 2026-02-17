@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/layout/header';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AuthWrapper from '@/components/auth-wrapper';
 import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -23,7 +24,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           {showHeader && <AppHeader />}
           <div className="min-h-[calc(100vh-4rem)] w-full">
             {/* Remove padding on the new property management page */}
-            <main className={!isPropertyManagementPage && !isEditPropertyPage ? "p-4 sm:p-6 lg:p-8" : ""}>{children}</main>
+            <main className={cn({ "p-4 sm:p-6 lg:p-8": !isPropertyManagementPage && !isEditPropertyPage })}>{children}</main>
           </div>
         </SidebarInset>
       </SidebarProvider>

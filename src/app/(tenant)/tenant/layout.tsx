@@ -18,7 +18,7 @@ export default function TenantAppLayout({ children }: { children: ReactNode }) {
         <SidebarInset>
           <AppHeader />
           <div className="min-h-[calc(100vh-4rem)] w-full">
-            <main className={"p-4 sm:p-6 lg:p-8"}>{children}</main>
+            <main className="p-4 sm:p-6 lg:p-8">{children}</main>
           </div>
         </SidebarInset>
       </SidebarProvider>
