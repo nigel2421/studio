@@ -4,19 +4,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
-import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
+import { getTenants, getAllPayments, getProperties, getLandlords, getTenantPayments, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
-import { FinancialSummary, aggregateFinancials, calculateTransactionBreakdown, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
+import { FinancialSummary, aggregateFinancials, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { useLoading } from '@/hooks/useLoading';
-import { isWithinInterval } from 'date-fns';
+import { isWithinInterval, startOfYear, endOfDay } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function UniversalOwnerDashboardPage() {
     const { userProfile, isLoading: authLoading } = useAuth();
@@ -27,9 +28,12 @@ export default function UniversalOwnerDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [activeOwnerTab, setActiveOwnerTab] = useState<'service-charge' | 'water'>('service-charge');
 
-
     const [isStatementOpen, setIsStatementOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
+
+    // Date range state for dashboard filtering
+    const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
+    const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
     useEffect(() => {
         if (authLoading || !userProfile) return;
@@ -51,7 +55,7 @@ export default function UniversalOwnerDashboardPage() {
             const [allProperties, allTenants, allPayments, allLandlords, allPropertyOwners, allWaterReadings] = await Promise.all([
                 getProperties(),
                 getTenants(),
-                getAllPaymentsForReport(),
+                getAllPayments(),
                 getLandlords(),
                 getPropertyOwners(),
                 getAllWaterReadings(),
@@ -100,16 +104,15 @@ export default function UniversalOwnerDashboardPage() {
                 const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
                 const relevantTenantIds = new Set(relevantTenants.map((t: Tenant) => t.id));
                 const relevantPayments = allPayments.filter((p: Payment) => relevantTenantIds.has(p.tenantId));
-
-                const financialSummary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties);
                 
                 setViewData({
                     properties: landlordProperties,
                     tenants: relevantTenants,
                     payments: relevantPayments,
-                    financialSummary,
                     owner,
+                    totalUnits: uniqueOwnedUnits.length,
                 });
+
             } else if (isClient) {
                 setDashboardType('homeowner');
                 const homeownerTenantProfiles = allTenants.filter((t: Tenant) => userProfile && (t.userId === userProfile.id || t.email === userProfile.email) && t.residentType === 'Homeowner');
@@ -133,7 +136,7 @@ export default function UniversalOwnerDashboardPage() {
 
                 setViewData({
                     owner: owner,
-                    tenantDetails: primaryTenantProfile, // Pass the primary one for ledger generation context
+                    tenantDetails: primaryTenantProfile,
                     payments: paymentData,
                     waterReadings: waterData,
                     allProperties: allProperties,
@@ -149,48 +152,36 @@ export default function UniversalOwnerDashboardPage() {
 
     }, [userProfile, authLoading]);
 
+    const filteredDashboardData = useMemo(() => {
+        if (!viewData || dashboardType !== 'landlord') return null;
+
+        const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()));
+        const transactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, startDate, endOfDay(endDate || new Date()));
+        
+        return {
+            financialSummary: summary,
+            displayTransactions: transactions,
+        };
+    }, [viewData, dashboardType, startDate, endDate]);
+
+
     const handleSignOut = async () => {
         await signOut(auth);
         router.push('/login');
     };
     
-    const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
+    const handleGenerateStatement = async (entity: Landlord | PropertyOwner, pdfStartDate: Date, pdfEndDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
             if (dashboardType === 'homeowner') {
                 const { generateOwnerServiceChargeStatementPDF } = await import('@/lib/pdf-generator');
                 const allWaterReadings = await getAllWaterReadings();
-                generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPaymentsForReport(), allWaterReadings, startDate, endDate, activeOwnerTab);
+                generateOwnerServiceChargeStatementPDF(entity, viewData.allProperties, await getTenants(), await getAllPayments(), allWaterReadings, pdfStartDate, pdfEndDate, activeOwnerTab);
             } else if (dashboardType === 'landlord') {
                 const { generateLandlordStatementPDF } = await import('@/lib/pdf-generator');
-                const allProperties = await getProperties();
-                const allTenants = await getTenants();
-                
-                const landlordProperties: { property: Property; units: Unit[] }[] = [];
-                const ownedUnits = allProperties.flatMap((p: Property) => 
-                    (p.units || []).filter((u: Unit) => u.landlordId === entity.id || (entity.id === "soil_merchants_internal" && u.ownership === 'SM'))
-                    .map((u: Unit) => ({...u, propertyId: p.id, propertyName: p.name}))
-                );
-                
-                allProperties.forEach((p: Property) => {
-                    const unitsForProp = ownedUnits.filter(u => u.propertyId === p.id);
-                    if(unitsForProp.length > 0) {
-                        landlordProperties.push({property: p, units: unitsForProp});
-                    }
-                });
     
-                const ownedUnitIdentifiers = new Set(ownedUnits.map(u => `${u.propertyId}-${u.name}`));
-                const relevantTenants = allTenants.filter((t: Tenant) => ownedUnitIdentifiers.has(`${t.propertyId}-${t.unitName}`));
-                const relevantTenantIds = new Set(relevantTenants.map((t: Tenant) => t.id));
-    
-                const allPayments = await getAllPaymentsForReport();
-                const relevantPayments = allPayments.filter((p: Payment) => 
-                    relevantTenantIds.has(p.tenantId) && 
-                    isWithinInterval(new Date(p.date), { start: startDate, end: endDate })
-                );
-    
-                const summary = aggregateFinancials(relevantPayments, relevantTenants, landlordProperties, startDate, endDate);
-                const displayTransactions = generateLandlordDisplayTransactions(relevantPayments, relevantTenants, landlordProperties, startDate, endDate);
+                const summary = aggregateFinancials(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate);
+                const displayTransactions = generateLandlordDisplayTransactions(viewData.payments, viewData.tenants, viewData.properties, pdfStartDate, pdfEndDate);
           
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),
@@ -203,14 +194,14 @@ export default function UniversalOwnerDashboardPage() {
                     otherCosts: t.otherCosts
                 }));
     
-                const unitsForPDF = landlordProperties.flatMap(p => p.units.map(u => ({
+                const unitsForPDF = viewData.properties.flatMap((p: { property: { name: any; }; units: any[]; }) => p.units.map((u: { name: any; unitType: any; status: any; }) => ({
                     property: p.property.name,
                     unitName: u.name,
                     unitType: u.unitType,
                     status: u.status
                 })));
           
-                generateLandlordStatementPDF(entity as Landlord, summary, transactionsForPDF, unitsForPDF, startDate, endDate);
+                generateLandlordStatementPDF(entity as Landlord, summary, transactionsForPDF, unitsForPDF, pdfStartDate, pdfEndDate);
             }
             setIsStatementOpen(false);
         } catch (error) {
@@ -234,12 +225,18 @@ export default function UniversalOwnerDashboardPage() {
     return (
         <div className="container mx-auto p-4 md:p-8">
             <Tabs value={activeOwnerTab} onValueChange={(v) => setActiveOwnerTab(v as any)} className="space-y-8">
-                 <header className="flex items-center justify-between">
+                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold">Welcome, {userProfile?.name}</h1>
                         <p className="text-muted-foreground">{headerDescription}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                         {dashboardType === 'landlord' && (
+                            <>
+                                <DatePicker value={startDate} onChange={setStartDate} />
+                                <DatePicker value={endDate} onChange={setEndDate} />
+                            </>
+                        )}
                         {dashboardType === 'homeowner' && (
                              <TabsList>
                                 <TabsTrigger value="service-charge">Service Charge</TabsTrigger>
@@ -257,7 +254,15 @@ export default function UniversalOwnerDashboardPage() {
                     </div>
                 </header>
                 
-                {dashboardType === 'landlord' && viewData && <LandlordDashboardContent {...viewData} />}
+                {dashboardType === 'landlord' && viewData && filteredDashboardData && (
+                    <LandlordDashboardContent 
+                        properties={viewData.properties}
+                        financialSummary={filteredDashboardData.financialSummary}
+                        displayTransactions={filteredDashboardData.displayTransactions}
+                        totalUnits={viewData.totalUnits}
+                    />
+                )}
+
                 {dashboardType === 'homeowner' && viewData && <ClientLandlordDashboard {...viewData} activeTab={activeOwnerTab} />}
                 
                 {!dashboardType && !loading && (

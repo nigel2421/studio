@@ -4,18 +4,6 @@ import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinI
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
- * 
- * Logic:
- * 1. Gross Amount = The actual payment amount made.
- * 2. Management Fee:
- *    - For "Rented for Clients" units on their first-ever letting, it's 50% for the first month of a new tenant.
- *    - Otherwise, it's 5% of the unit's standard rent. For lump-sum payments, this is pro-rated.
- * 3. Service Charge = The unit's standard service charge. This is WAIVED for the landlord on the first month of an initial letting. For lump-sum payments, this is pro-rated.
- * 4. Net to Landlord = Gross Payment - Service Charge - Management Fee.
- * 
- * @param payment The payment object.
- * @param unit The unit associated with the payment.
- * @param tenant The tenant associated with the payment.
  */
 export function calculateTransactionBreakdown(
     payment: Payment,
@@ -33,9 +21,6 @@ export function calculateTransactionBreakdown(
     const isRentedForClients = unit?.managementStatus === 'Rented for Clients';
     const isFirstMonthOfLease = tenant?.lease?.startDate && payment.rentForMonth && isSameMonth(parseISO(tenant.lease.startDate), parseISO(`${payment.rentForMonth}-01`));
 
-    // Determine if this is the initial letting of the unit after it was handed over.
-    // We consider it "initial" if the lease starts within 3 months of the handover.
-    // This helps differentiate a true first-time letting from a subsequent re-letting.
     let isInitialLettingAfterHandover = false;
     if (isRentedForClients && isFirstMonthOfLease && unit?.handoverDate && tenant?.lease?.startDate) {
         try {
@@ -50,24 +35,20 @@ export function calculateTransactionBreakdown(
     }
 
     if (isRentedForClients && isFirstMonthOfLease && isInitialLettingAfterHandover) {
-        // Special 50% first-month commission for a new letting.
         managementFee = unitRent * 0.50;
-        // Service charge is waived for the landlord for the very first month's rent collection.
         serviceChargeDeduction = 0;
     } else {
-        // Standard fee calculation for all other months or scenarios.
         if (unitRent > 0 && payment.type === 'Rent') {
-            // Pro-rate deductions for lump-sum payments that cover multiple months.
             const rentRatio = grossAmount / unitRent;
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
             serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
-            // Fallback for non-rent payments or if rent is zero.
-            managementFee = unitRent * standardManagementFeeRate;
+            managementFee = 0; // No management fee on non-rent or zero-rent payments
+            serviceChargeDeduction = serviceCharge;
         }
     }
-
-    const isEracovManaged = unit?.managementStatus !== 'Client Managed';
+    
+    const isEracovManaged = unit?.managementStatus === 'Rented for Clients' || unit?.managementStatus === 'Rented for Soil Merchants' || unit?.managementStatus === 'Airbnb';
     const otherCosts = isEracovManaged && payment.type === 'Rent' ? 1000 : 0;
 
     const netToLandlord = grossAmount - serviceChargeDeduction - managementFee - otherCosts;
@@ -112,7 +93,6 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
-    // Calculate service charge for vacant units that have been handed over
     let vacantUnitDeduction = 0;
     properties.forEach(p => {
       p.units.forEach(u => {
@@ -122,7 +102,7 @@ export function aggregateFinancials(payments: Payment[], tenants: Tenant[], prop
       });
     });
     summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
-    summary.totalNetRemittance -= vacantUnitDeduction; // Deduct from the final payout
+    summary.totalNetRemittance -= vacantUnitDeduction;
 
     return summary;
 }
@@ -159,6 +139,11 @@ export function generateLandlordDisplayTransactions(
             return;
         }
 
+        const paymentDate = parseISO(payment.date);
+        if (startDate && endDate && !isWithinInterval(paymentDate, { start: startDate, end: endDate })) {
+            return;
+        }
+
         const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
         const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
         const isFirstPaymentForTenant = tenantFirstPaymentMap.get(tenant.id) === payment.id;
@@ -181,42 +166,26 @@ export function generateLandlordDisplayTransactions(
             let monthIndex = 0;
             const leaseStartDate = parseISO(tenant.lease.startDate);
 
-            while (remainingAmount >= unitRent) {
+            while (remainingAmount > 0) {
                 const currentMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
-                if (!startDate || isWithinInterval(currentMonth, { start: startDate, end: endDate! })) {
-                    const monthString = format(currentMonth, 'yyyy-MM');
-                    const virtualPayment: Payment = { ...payment, amount: unitRent, rentForMonth: monthString };
-                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-                    
-                    transactions.push({
-                        id: `${payment.id}-${monthIndex}`,
-                        date: payment.date,
-                        unitName: tenant.unitName,
-                        unitType: unit?.unitType || 'N/A',
-                        forMonth: format(currentMonth, 'MMM yyyy'),
-                        ...breakdown,
-                    });
-                }
+                const rentForThisIteration = Math.min(remainingAmount, unitRent);
                 
-                remainingAmount -= unitRent;
+                const monthString = format(currentMonth, 'yyyy-MM');
+                const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: monthString, type: 'Rent' };
+                const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
+                
+                transactions.push({
+                    id: `${payment.id}-${monthIndex}`,
+                    date: payment.date,
+                    unitName: tenant.unitName,
+                    unitType: unit?.unitType || 'N/A',
+                    forMonth: format(currentMonth, 'MMM yyyy'),
+                    ...breakdown,
+                });
+                
+                remainingAmount -= rentForThisIteration;
+                if (remainingAmount < 1) break;
                 monthIndex++;
-            }
-
-            if (remainingAmount > 1) {
-                const nextMonth = startOfMonth(addMonths(leaseStartDate, monthIndex));
-                if (!startDate || isWithinInterval(nextMonth, { start: startDate, end: endDate! })) {
-                    const virtualPayment: Payment = { ...payment, amount: remainingAmount, rentForMonth: format(nextMonth, 'yyyy-MM') };
-                    const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
-
-                    transactions.push({
-                        id: `${payment.id}-rem`,
-                        date: payment.date,
-                        unitName: tenant.unitName,
-                        unitType: unit?.unitType || 'N/A',
-                        forMonth: `Partial - ${format(nextMonth, 'MMM yyyy')}`,
-                        ...breakdown,
-                    });
-                }
             }
         } else {
             const paymentForBreakdown = { ...payment, amount: Math.min(amountToApportionAsRent, unitRent) };
