@@ -300,6 +300,11 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
     return cacheService.getOrFetch('archived_tenants', 'all', () => getCollection<ArchivedTenant>('archived_tenants'), 300000);
 }
 
+export async function getCommunications(): Promise<Communication[]> {
+    return getCollection<Communication>(query(collection(db, 'communications'), orderBy('timestamp', 'desc'), limit(50)));
+}
+
+
 export async function getMaintenanceRequests(options: { propertyId?: string } = {}): Promise<MaintenanceRequest[]> {
     const { propertyId } = options;
     const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'all';
@@ -400,6 +405,13 @@ export async function getTenant(id: string): Promise<Tenant | null> {
 
 export async function getPayment(id: string): Promise<Payment | null> {
     return cacheService.getOrFetch('payments', id, () => getDocument<Payment>('payments', id), 60000);
+}
+
+export async function getAllPaymentsForReport(): Promise<Payment[]> {
+    return cacheService.getOrFetch('payments', 'all-report', () => {
+        const q = query(collection(db, 'payments'), orderBy('date', 'desc'));
+        return getCollection<Payment>(q);
+    }, 300000);
 }
 
 export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Unit, propertyId: string): Promise<Tenant> {
@@ -617,6 +629,140 @@ export async function updateProperty(propertyId: string, data: Partial<Property>
     await logActivity(`Updated property: ID ${propertyId}`);
 }
 
+export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
+    const landlordRef = doc(db, 'landlords', landlord.id);
+    await setDoc(landlordRef, landlord, { merge: true });
+
+    // Update units
+    const propertiesToUpdate = new Map<string, Unit[]>();
+
+    const allProperties = await getProperties(true);
+    allProperties.forEach(p => {
+        let changed = false;
+        const newUnits = p.units.map(u => {
+            if (u.ownership === 'Landlord') {
+                const shouldBeAssigned = assignedUnitNames.includes(u.name);
+                if (shouldBeAssigned && u.landlordId !== landlord.id) {
+                    changed = true;
+                    return { ...u, landlordId: landlord.id };
+                }
+                if (!shouldBeAssigned && u.landlordId === landlord.id) {
+                    changed = true;
+                    const { landlordId, ...rest } = u;
+                    return rest;
+                }
+            }
+            return u;
+        });
+        if (changed) {
+            propertiesToUpdate.set(p.id, newUnits);
+        }
+    });
+
+    const batch = writeBatch(db);
+    propertiesToUpdate.forEach((units, propId) => {
+        batch.update(doc(db, 'properties', propId), { units });
+    });
+
+    await batch.commit();
+
+    cacheService.clear('properties');
+    cacheService.clear('landlords');
+    await logActivity(`Saved landlord: ${landlord.name}`);
+}
+
+
+export async function addLandlordsFromCSV(landlords: { name: string; email: string; phone: string }[]): Promise<{ added: number; skipped: number }> {
+    const existingLandlords = await getLandlords();
+    const existingEmails = new Set(existingLandlords.map(l => l.email.toLowerCase()));
+    let added = 0;
+    let skipped = 0;
+    const batch = writeBatch(db);
+
+    for (const landlord of landlords) {
+        if (landlord.email && !existingEmails.has(landlord.email.toLowerCase())) {
+            const landlordId = `landlord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            const landlordRef = doc(db, 'landlords', landlordId);
+            batch.set(landlordRef, { ...landlord, id: landlordId });
+            added++;
+            existingEmails.add(landlord.email.toLowerCase());
+        } else {
+            skipped++;
+        }
+    }
+
+    await batch.commit();
+    if (added > 0) {
+        cacheService.clear('landlords');
+        await logActivity(`Bulk-added ${added} new landlords via CSV.`);
+    }
+    return { added, skipped };
+}
+
+export async function bulkUpdateUnitsFromCSV(propertyId: string, csvData: Record<string, string>[]): Promise<{ updatedCount: number; createdCount: number; errors: string[] }> {
+    const property = await getProperty(propertyId);
+    if (!property) {
+        throw new Error("Property not found.");
+    }
+    const currentUnitsMap = new Map(property.units.map(u => [u.name.toLowerCase(), u]));
+    let updatedCount = 0;
+    let createdCount = 0;
+    const errors: string[] = [];
+    const newUnitsArray: Unit[] = [...property.units];
+
+    csvData.forEach((row, index) => {
+        const unitName = row.UnitName;
+        if (!unitName) {
+            errors.push(`Row ${index + 2}: Missing required 'UnitName'.`);
+            return;
+        }
+
+        const existingUnit = currentUnitsMap.get(unitName.toLowerCase());
+
+        const unitData: Partial<Unit> = {};
+
+        if (row.Status && (unitStatuses as readonly string[]).includes(row.Status)) unitData.status = row.Status as UnitStatus;
+        if (row.Ownership && (ownershipTypes as readonly string[]).includes(row.Ownership)) unitData.ownership = row.Ownership as OwnershipType;
+        if (row.UnitType && (unitTypes as readonly string[]).includes(row.UnitType)) unitData.unitType = row.UnitType as UnitType;
+        if (row.UnitOrientation && (unitOrientations as readonly string[]).includes(row.UnitOrientation)) unitData.unitOrientation = row.UnitOrientation as UnitOrientation;
+        if (row.ManagementStatus && (managementStatuses as readonly string[]).includes(row.ManagementStatus)) unitData.managementStatus = row.ManagementStatus as ManagementStatus;
+        if (row.HandoverStatus && (handoverStatuses as readonly string[]).includes(row.HandoverStatus)) unitData.handoverStatus = row.HandoverStatus as HandoverStatus;
+        if (row.HandoverDate) unitData.handoverDate = row.HandoverDate;
+        if (row.RentAmount) unitData.rentAmount = Number(row.RentAmount);
+        if (row.ServiceCharge) unitData.serviceCharge = Number(row.ServiceCharge);
+        if (row.BaselineReading) unitData.baselineReading = Number(row.BaselineReading);
+
+
+        if (existingUnit) { // Update existing unit
+            const unitIndex = newUnitsArray.findIndex(u => u.name.toLowerCase() === unitName.toLowerCase());
+            if (unitIndex !== -1) {
+                newUnitsArray[unitIndex] = { ...newUnitsArray[unitIndex], ...unitData };
+                updatedCount++;
+            }
+        } else { // Create new unit
+            if (!row.UnitType) {
+                errors.push(`Row ${index + 2}: New unit '${unitName}' requires 'UnitType'.`);
+                return;
+            }
+            newUnitsArray.push({
+                name: unitName,
+                unitType: row.UnitType as UnitType,
+                status: (row.Status as UnitStatus) || 'vacant',
+                ownership: (row.Ownership as OwnershipType) || 'SM',
+                ...unitData
+            });
+            createdCount++;
+        }
+    });
+
+    if (updatedCount > 0 || createdCount > 0) {
+        await updateProperty(propertyId, { units: newUnitsArray });
+        await logActivity(`CSV Upload for ${property.name}: ${createdCount} created, ${updatedCount} updated.`);
+    }
+
+    return { updatedCount, createdCount, errors };
+}
+
 export async function archiveTenant(tenantId: string): Promise<void> {
     const tenant = await getTenant(tenantId);
     if (tenant) {
@@ -675,6 +821,79 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
             }
         }
     }
+}
+
+export async function updatePropertyOwner(ownerId: string, data: Partial<PropertyOwner>): Promise<void> {
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    await updateDoc(ownerRef, data);
+    cacheService.clear('propertyOwners');
+    await logActivity(`Updated property owner: ${data.name || ownerId}`);
+}
+
+export async function deletePropertyOwner(ownerId: string): Promise<void> {
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    const ownerSnap = await getDoc(ownerRef);
+    if (ownerSnap.exists()) {
+        const ownerData = ownerSnap.data() as PropertyOwner;
+        const batch = writeBatch(db);
+        batch.delete(ownerRef);
+
+        if (ownerData.userId) {
+            const userRef = doc(db, 'users', ownerData.userId);
+            batch.update(userRef, {
+                role: 'viewer',
+                propertyOwnerId: deleteField()
+            });
+        }
+        await batch.commit();
+
+        cacheService.clear('propertyOwners');
+        cacheService.clear('users');
+        await logActivity(`Deleted property owner: ${ownerData.name}`);
+    }
+}
+
+
+export async function deleteLandlord(landlordId: string): Promise<void> {
+    if (landlordId === 'soil_merchants_internal') {
+        throw new Error("Cannot delete the internal Soil Merchants profile.");
+    }
+    const landlordRef = doc(db, 'landlords', landlordId);
+    const landlordSnap = await getDoc(landlordRef);
+    if (!landlordSnap.exists()) {
+        throw new Error("Landlord not found.");
+    }
+    const landlordData = landlordSnap.data() as Landlord;
+
+    const allProperties = await getProperties();
+    const batch = writeBatch(db);
+
+    allProperties.forEach(p => {
+        let changed = false;
+        const newUnits = p.units.map(u => {
+            if (u.landlordId === landlordId) {
+                changed = true;
+                const { landlordId: _, ...rest } = u;
+                return rest;
+            }
+            return u;
+        });
+        if (changed) {
+            batch.update(doc(db, 'properties', p.id), { units: newUnits });
+        }
+    });
+
+    batch.delete(landlordRef);
+    if (landlordData.userId) {
+        const userRef = doc(db, 'users', landlordData.userId);
+        batch.update(userRef, { role: 'viewer', landlordId: deleteField() });
+    }
+
+    await batch.commit();
+    cacheService.clear('landlords');
+    cacheService.clear('properties');
+    cacheService.clear('users');
+    await logActivity(`Deleted landlord: ${landlordData.name}`);
 }
 
 export async function createUserProfile(userId: string, email: string, role: UserProfile['role'], details: Partial<UserProfile> = {}) {
@@ -840,6 +1059,44 @@ export async function addWaterMeterReading(data: {
     await logActivity(`Added water reading for unit ${data.unitName}`);
 }
 
+export async function addPayment(
+    tenantId: string,
+    entry: {
+        amount: number,
+        date: string,
+        notes?: string,
+        rentForMonth?: string,
+        type: Payment['type'],
+        paymentMethod?: Payment['paymentMethod'],
+        transactionId?: string,
+        waterReadingId?: string,
+    }
+) {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) throw new Error("Tenant not found.");
+    validatePayment(entry.amount, new Date(entry.date), tenant, entry.type);
+
+    const paymentDocRef = await addDoc(collection(db, 'payments'), {
+        tenantId,
+        ...entry,
+        status: 'Paid',
+        createdAt: new Date().toISOString()
+    });
+
+    const paymentUpdate = processPayment(tenant, entry.amount, entry.type, new Date(entry.date));
+    const tenantRef = doc(db, 'tenants', tenantId);
+    await updateDoc(tenantRef, paymentUpdate);
+
+    if (entry.type === 'Water' && entry.waterReadingId) {
+        const readingRef = doc(db, 'waterReadings', entry.waterReadingId);
+        await updateDoc(readingRef, { status: 'Paid', paymentId: paymentDocRef.id });
+    }
+
+    cacheService.clear('tenants');
+    cacheService.clear('payments');
+}
+
+
 export async function getPaymentHistory(tenantId: string, options?: { startDate?: string, endDate?: string }): Promise<Payment[]> {
     const cacheKey = `paymentHistory-${tenantId}-${options?.startDate || 'none'}-${options?.endDate || 'none'}`;
     return cacheService.getOrFetch('payments', cacheKey, () => {
@@ -858,11 +1115,6 @@ export async function getPaymentHistory(tenantId: string, options?: { startDate?
         );
         return getCollection<Payment>(q);
     }, 120000);
-}
-
-export async function getTenantPayments(tenantId: string): Promise<Payment[]> {
-    if (!tenantId) return [];
-    return getPaymentHistory(tenantId);
 }
 
 export async function getPaymentsForTenants(tenantIds: string[]): Promise<Payment[]> {
@@ -1064,6 +1316,65 @@ export async function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise
     cacheService.clear('tasks');
 }
 
+export async function updatePayment(
+    paymentId: string,
+    data: Partial<Payment>,
+    reason: string,
+    editorId: string
+): Promise<void> {
+    const paymentRef = doc(db, 'payments', paymentId);
+    const paymentSnap = await getDoc(paymentRef);
+    if (!paymentSnap.exists()) {
+        throw new Error("Payment record not found.");
+    }
+    const originalPayment = paymentSnap.data() as Payment;
+
+    const editRecord = {
+        editedAt: new Date().toISOString(),
+        editedBy: editorId,
+        reason: reason,
+        previousValues: {
+            amount: originalPayment.amount,
+            date: originalPayment.date,
+            notes: originalPayment.notes,
+        },
+    };
+
+    await updateDoc(paymentRef, {
+        ...data,
+        editHistory: arrayUnion(editRecord),
+    });
+
+    cacheService.clear('payments');
+    await logActivity(`Edited payment ${paymentId}. Reason: ${reason}`, editorId);
+}
+
+export async function forceRecalculateTenantBalance(tenantId: string): Promise<void> {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) throw new Error("Tenant not found for balance recalculation.");
+
+    const payments = await getPaymentHistory(tenantId);
+    const property = await getProperty(tenant.propertyId);
+    const unit = property?.units.find(u => u.name === tenant.unitName);
+    
+    // Create a dummy starting point for the ledger
+    const dummyStartDate = parseISO(tenant.lease.startDate);
+    
+    const { ledger, finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date());
+    
+    const latestPayment = payments[0]; // Assuming they are sorted by date desc
+
+    const tenantRef = doc(db, 'tenants', tenantId);
+    await updateDoc(tenantRef, {
+        dueBalance: finalDueBalance,
+        accountBalance: finalAccountBalance,
+        'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: finalDueBalance }),
+        'lease.lastPaymentDate': latestPayment ? latestPayment.date : tenant.lease.lastPaymentDate,
+    });
+    cacheService.clear('tenants');
+    await logActivity(`Forced balance recalculation for tenant ${tenant.name}.`);
+}
+
 
 export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
@@ -1077,5 +1388,3 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
 
     return unsubscribe;
 }
-
-    

@@ -2,8 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getProperties, getPropertyOwners, getTenants, getAllPaymentsForReport, getLandlords } from '@/lib/data';
-import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord } from '@/lib/types';
+import { getProperties, getPropertyOwners, getTenants, getAllPaymentsForReport, getLandlords, getAllWaterReadings } from '@/lib/data';
+import type { Property, PropertyOwner, Unit, Tenant, Payment, Landlord, WaterMeterReading } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
