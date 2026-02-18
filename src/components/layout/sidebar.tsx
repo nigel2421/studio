@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -148,8 +149,8 @@ export function AppSidebar() {
                             <CollapsibleContent>
                                 <SidebarMenuSub>
                                     <SidebarMenuSubItem>
-                                        <Link href="/tenants" onClick={() => handleLinkClick('All Residents')}>
-                                            <SidebarMenuSubButton isActive={pathname === '/tenants'}>All Residents</SidebarMenuSubButton>
+                                        <Link href="/tenants" onClick={() => handleLinkClick('All Tenants')}>
+                                            <SidebarMenuSubButton isActive={pathname === '/tenants'}>All Tenants</SidebarMenuSubButton>
                                         </Link>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>

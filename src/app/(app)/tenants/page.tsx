@@ -68,21 +68,40 @@ export default function TenantsPage() {
 
     const tenants = useMemo(() => allResidents.filter(r => r.residentType === 'Tenant'), [allResidents]);
     
-    const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (p.units?.length || 0), 0), [properties]);
-    const occupiedUnits = allResidents.length;
-    const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+    // Stats filtered strictly by property selection
+    const residentsInSelectedProperty = useMemo(() => {
+        if (selectedPropertyId === 'all') return allResidents;
+        return allResidents.filter(r => r.propertyId === selectedPropertyId);
+    }, [allResidents, selectedPropertyId]);
+
+    const activeTenantsInSelectedProperty = useMemo(() => {
+        return residentsInSelectedProperty.filter(r => r.residentType === 'Tenant');
+    }, [residentsInSelectedProperty]);
+
+    const statsTotalUnits = useMemo(() => {
+        if (selectedPropertyId === 'all') {
+            return properties.reduce((sum, p) => sum + (p.units?.length || 0), 0);
+        }
+        const prop = properties.find(p => p.id === selectedPropertyId);
+        return prop?.units?.length || 0;
+    }, [properties, selectedPropertyId]);
+
+    const occupancyRate = useMemo(() => {
+        if (statsTotalUnits === 0) return 0;
+        return (residentsInSelectedProperty.length / statsTotalUnits) * 100;
+    }, [residentsInSelectedProperty, statsTotalUnits]);
 
     const handleArchive = async (tenantId: string) => {
-        startLoading('Archiving resident...');
+        startLoading('Archiving tenant...');
         try {
             await archiveTenant(tenantId);
             fetchResidents();
             toast({
-                title: "Resident Archived",
+                title: "Tenant Archived",
                 description: "The occupant has been moved to the archived list.",
             });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to archive resident.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to archive tenant.' });
         } finally {
             stopLoading();
         }
@@ -142,8 +161,7 @@ export default function TenantsPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between w-full gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Residents</h2>
-                    <p className="text-muted-foreground">Manage tenants and homeowners across your portfolio.</p>
+                    <h2 className="text-3xl font-bold tracking-tight">Tenants</h2>
                 </div>
                 {!isInvestmentConsultant && (
                     <div className="flex items-center gap-2">
@@ -170,7 +188,7 @@ export default function TenantsPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{tenants.length}</div>
+                        <div className="text-2xl font-bold">{activeTenantsInSelectedProperty.length}</div>
                     </CardContent>
                 </Card>
                  <Card>
