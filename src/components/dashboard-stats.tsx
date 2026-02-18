@@ -20,7 +20,9 @@ interface DashboardStatsProps {
 }
 
 export function DashboardStats({ tenants, properties, maintenanceRequests, payments }: DashboardStatsProps) {
-  const totalTenants = tenants.length;
+  // Only count residents with type 'Tenant' to align with the Residents module
+  const activeTenantsOnly = tenants.filter(t => t.residentType === 'Tenant');
+  const totalTenants = activeTenantsOnly.length;
   const pendingMaintenance = maintenanceRequests.filter(r => r.status !== 'Completed').length;
   
   const totalArrears = tenants
@@ -49,32 +51,12 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
   const vacantUnits = totalUnits - occupiedUnits;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
-  const tenantMap = new Map(tenants.map(t => [t.id, t]));
-  const unitMap = new Map<string, Unit>();
-  properties.forEach(p => {
-    if (p.units) {
-        p.units.forEach(u => {
-            unitMap.set(`${p.id}-${u.name}`, u);
-        });
-    }
-  });
-
-  const totalMgmtFees = payments.reduce((sum, p) => {
-    if (p.type === 'Deposit') return sum;
-    const tenant = tenantMap.get(p.tenantId);
-    if (!tenant) return sum;
-    const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-    const breakdown = calculateTransactionBreakdown(p, unit, tenant);
-    return sum + breakdown.managementFee;
-  }, 0);
-
   const stats = [
     { title: "Total Tenants", value: totalTenants, icon: Users, variant: 'default' },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, variant: 'success' },
     { title: "Vacant Units", value: vacantUnits, icon: Home, variant: 'default' },
     { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, variant: 'danger' },
     { title: "Pending Maint.", value: pendingMaintenance, icon: Wrench, variant: 'warning' },
-    { title: "Mgmt. Revenue", value: `Ksh ${totalMgmtFees.toLocaleString()}`, icon: Briefcase, variant: 'success' },
   ];
 
   const variantStyles = {
@@ -101,7 +83,7 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       {stats.map((stat, index) => {
         const styles = variantStyles[stat.variant as keyof typeof variantStyles] || variantStyles.default;
         return (

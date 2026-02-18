@@ -67,7 +67,6 @@ export default function TenantsPage() {
     }, []);
 
     const tenants = useMemo(() => allResidents.filter(r => r.residentType === 'Tenant'), [allResidents]);
-    const homeowners = useMemo(() => allResidents.filter(r => r.residentType === 'Homeowner'), [allResidents]);
     
     const totalUnits = useMemo(() => properties.reduce((sum, p) => sum + (p.units?.length || 0), 0), [properties]);
     const occupiedUnits = allResidents.length;
@@ -128,7 +127,6 @@ export default function TenantsPage() {
             const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
             const tenantPayments = await getPaymentHistory(tenant.id);
             const tenantWaterReadings = await getTenantWaterReadings(tenant.id);
-            // Context is 'rent' because this is the general tenants module
             generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings, 'rent');
             toast({ title: 'Statement Generated', description: `Rent Statement for ${tenant.name} downloaded.` });
         } catch (error) {
@@ -165,7 +163,7 @@ export default function TenantsPage() {
                 )}
             </div>
             
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Total Tenants</CardTitle>
@@ -175,16 +173,7 @@ export default function TenantsPage() {
                         <div className="text-2xl font-bold">{tenants.length}</div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Total Homeowners</CardTitle>
-                        <Home className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{homeowners.length}</div>
-                    </CardContent>
-                </Card>
-                 <Card className="col-span-2 md:col-span-1">
+                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Portfolio Occupancy</CardTitle>
                         <Percent className="h-4 w-4 text-muted-foreground" />

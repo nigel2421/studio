@@ -1,3 +1,4 @@
+
 'use client';
 
 import dynamic from 'next/dynamic';
@@ -24,11 +25,6 @@ const OrientationOverviewChart = dynamic(() => import('./orientation-overview-ch
     ssr: false,
 });
 
-const RentBreakdownChart = dynamic(() => import('./rent-breakdown-chart').then(mod => mod.RentBreakdownChart), {
-    loading: () => <Skeleton className="h-[300px]" />,
-    ssr: false,
-});
-
 interface DashboardChartsProps {
     payments: Payment[];
     tenants: Tenant[];
@@ -47,10 +43,6 @@ export function DashboardCharts({ payments, tenants, selectedProperty, maintenan
             <div className="grid gap-8 md:grid-cols-2">
                 <MaintenanceOverviewChart maintenanceRequests={maintenanceRequests} />
                 <OrientationOverviewChart properties={[selectedProperty]} />
-            </div>
-
-            <div className="grid gap-8">
-                <RentBreakdownChart payments={payments} tenants={tenants} properties={[selectedProperty]} />
             </div>
         </>
     );
