@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -185,14 +186,20 @@ export default function UniversalOwnerDashboardPage() {
 
                 const transactionsForPDF = displayTransactions.map(t => ({
                     date: new Date(t.date).toLocaleDateString(),
-                    unit: t.unitName,
+                    unitName: t.unitName,
                     rentForMonth: t.rentForMonth,
                     forMonthDisplay: t.forMonthDisplay,
                     gross: t.gross,
                     serviceChargeDeduction: t.serviceChargeDeduction,
-                    mgmtFee: t.managementFee,
+                    managementFee: t.managementFee,
                     netToLandlord: t.netToLandlord,
-                    otherCosts: t.otherCosts
+                    otherCosts: t.otherCosts,
+                    id: t.id,
+                    propertyId: t.propertyId,
+                    unitType: t.unitType,
+                    stageTwoCost: t.stageTwoCost,
+                    stageThreeCost: t.stageThreeCost,
+                    specialDeductions: t.specialDeductions
                 }));
 
                 const unitsForPDF = viewData.properties.flatMap((p: Property) => (p.units || []).map((u: Unit) => ({

@@ -285,14 +285,20 @@ export default function LandlordsPage() {
         
         const transactionsForPDF = displayTransactions.map(t => ({
             date: new Date(t.date).toLocaleDateString(),
-            unit: t.unitName,
+            unitName: t.unitName,
             rentForMonth: t.rentForMonth,
             forMonthDisplay: t.forMonthDisplay,
             gross: t.gross,
             serviceChargeDeduction: t.serviceChargeDeduction,
-            mgmtFee: t.managementFee,
+            managementFee: t.managementFee,
             otherCosts: t.otherCosts || 0,
             netToLandlord: t.netToLandlord,
+            id: t.id,
+            propertyId: t.propertyId,
+            unitType: t.unitType,
+            stageTwoCost: t.stageTwoCost,
+            stageThreeCost: t.stageThreeCost,
+            specialDeductions: t.specialDeductions
         }));
         
         const unitsForPDF = relevantProperties.flatMap(p => 
