@@ -1,4 +1,6 @@
 
+'use client';
+
 import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary, DisplayTransaction } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter, isValid } from 'date-fns';
 
@@ -16,26 +18,9 @@ export function calculateTransactionBreakdown(
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
     const grossAmount = payment.amount || 0;
     
+    // Default to the full service charge amount
     let serviceChargeDeduction = serviceCharge;
     
-    // Handle service charge waiver based on handover date
-    if (unit?.handoverDate && payment.rentForMonth) {
-        try {
-            const handoverDate = parseISO(unit.handoverDate);
-            const handoverDay = handoverDate.getDate();
-            const firstBillableMonth = handoverDay <= 10
-                ? startOfMonth(addMonths(handoverDate, 1))
-                : startOfMonth(addMonths(handoverDate, 2));
-            
-            const paymentMonth = startOfMonth(parseISO(`${payment.rentForMonth}-01`));
-            if (isBefore(paymentMonth, firstBillableMonth)) {
-                serviceChargeDeduction = 0;
-            }
-        } catch (e) {
-            // silent fail
-        }
-    }
-
     let managementFee = 0;
     const standardManagementFeeRate = 0.05;
 
@@ -47,25 +32,31 @@ export function calculateTransactionBreakdown(
         try {
             const handoverDate = parseISO(unit.handoverDate);
             const leaseStartDate = parseISO(tenant.lease.startDate);
+            // If leased within 3 months of handover, it's considered an initial letting
             if (differenceInMonths(leaseStartDate, handoverDate) < 3) {
                 isInitialLettingAfterHandover = true;
             }
         } catch (e) {
-            // silent fail
+            // ignore parsing errors
         }
     }
 
     if (isRentedForClients && isFirstMonthOfLease && isInitialLettingAfterHandover) {
+        // Initial letting month: 50% commission and waived service charge deduction
         managementFee = unitRent * 0.50;
         serviceChargeDeduction = 0;
     } else {
+        // Standard processing for subsequent months or non-initial lettings
         if (unitRent > 0 && payment.type === 'Rent') {
             const rentRatio = Math.min(1, grossAmount / unitRent); 
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
-            serviceChargeDeduction = serviceChargeDeduction * rentRatio;
+            
+            // Apply service charge deduction pro-rated to the amount of rent paid
+            serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
+            // No fees or deductions for non-rent types (deposits, etc)
             managementFee = 0;
-            // serviceChargeDeduction remains as set above (waived or full)
+            serviceChargeDeduction = 0;
         }
     }
     
@@ -123,7 +114,7 @@ export function aggregateFinancials(
         const start = startOfMonth(startDate);
         const end = startOfMonth(endDate);
         
-        // Map landlord units and ensure propertyId is attached for tenant matching
+        // Map landlord units
         const landlordUnits = properties.flatMap(p => 
             (p.units || []).filter(u => u.landlordId === landlord.id || (landlord.id === 'soil_merchants_internal' && u.ownership === 'SM'))
                 .map(u => ({ ...u, propertyId: p.id }))
@@ -134,7 +125,7 @@ export function aggregateFinancials(
         let loopDate = start;
         while(isBefore(loopDate, end) || isSameMonth(loopDate, end)) {
             landlordUnits.forEach(u => {
-                // Determine if billable - for vacant units we charge from the handover month onwards
+                // For vacant units, landlords are billed starting from the month of handover
                 let isBillableInMonth = false;
                 if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
                     const hDate = parseISO(u.handoverDate);
@@ -146,7 +137,6 @@ export function aggregateFinancials(
                     }
                 }
 
-                // Check occupancy based on active tenants and their lease dates
                 const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
                 let isOccupiedInMonth = false;
                 if (tenant && tenant.lease?.startDate) {
@@ -281,7 +271,7 @@ export function generateLandlordDisplayTransactions(
     });
 
     const processedForOtherCosts = new Set<string>();
-    const policyStartDate = parseISO('2026-02-01'); // Policy effective from Feb 2026
+    const policyStartDate = parseISO('2026-02-01');
 
     transactions.forEach(t => {
         const rentMonthDate = parseISO(t.rentForMonth + '-01');
