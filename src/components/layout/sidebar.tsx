@@ -152,13 +152,11 @@ export function AppSidebar() {
                                             <SidebarMenuSubButton isActive={pathname === '/tenants'}>All Residents</SidebarMenuSubButton>
                                         </Link>
                                     </SidebarMenuSubItem>
-                                    {!isInvestmentConsultant && (
-                                        <SidebarMenuSubItem>
-                                            <Link href="/tenants/notice-to-vacate" onClick={() => handleLinkClick('Notice to Vacate')}>
-                                                <SidebarMenuSubButton isActive={pathname === '/tenants/notice-to-vacate'}>Notice to Vacate</SidebarMenuSubButton>
-                                            </Link>
-                                        </SidebarMenuSubItem>
-                                    )}
+                                    <SidebarMenuSubItem>
+                                        <Link href="/tenants/notice-to-vacate" onClick={() => handleLinkClick('Notice to Vacate')}>
+                                            <SidebarMenuSubButton isActive={pathname === '/tenants/notice-to-vacate'}>Notice to Vacate</SidebarMenuSubButton>
+                                        </Link>
+                                    </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <Link href="/tenants/archived" onClick={() => handleLinkClick('Archived Tenants')}>
                                             <SidebarMenuSubButton isActive={pathname === '/tenants/archived'}>Archived</SidebarMenuSubButton>

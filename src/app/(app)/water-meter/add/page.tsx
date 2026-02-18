@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -493,13 +492,11 @@ export default function MegarackPage() {
                 <h2 className="text-3xl font-bold tracking-tight">Megarack - Water Management</h2>
                 <p className="text-muted-foreground">Manage water meter readings and billing records.</p>
             </div>
-            {!isInvestmentConsultant && (
-                <TabsList>
-                    <TabsTrigger value="owner-bills">Owner Bills</TabsTrigger>
-                    <TabsTrigger value="all-records">All Records</TabsTrigger>
-                    <TabsTrigger value="add">Add Reading</TabsTrigger>
-                </TabsList>
-            )}
+            <TabsList>
+                {!isInvestmentConsultant && <TabsTrigger value="owner-bills">Owner Bills</TabsTrigger>}
+                <TabsTrigger value="all-records">All Records</TabsTrigger>
+                <TabsTrigger value="add">Add Reading</TabsTrigger>
+            </TabsList>
         </div>
         <TabsContent value="owner-bills">
             <Card>
@@ -594,7 +591,7 @@ export default function MegarackPage() {
                        </div>
                         <div className="flex items-center gap-4 w-full sm:w-auto">
                             <Select value={recordsSelectedProperty} onValueChange={setRecordsSelectedProperty}>
-                                <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectTrigger className="w-full sm:w-[240px]">
                                     <SelectValue placeholder="Filter by property..." />
                                 </SelectTrigger>
                                 <SelectContent>
