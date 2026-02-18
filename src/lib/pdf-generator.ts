@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary, UnitType, UnitOrientation, unitOrientations } from './types';
@@ -223,7 +222,8 @@ export const generateOwnerServiceChargeStatementPDF = (
                 startDate: '2000-01-01', 
                 endDate: '2099-12-31', 
                 rent: 0, 
-                paymentStatus: 'Paid' 
+                paymentStatus: 'Paid',
+                serviceCharge: 0
             },
             propertyId: '', 
             unitName: '', 
@@ -691,15 +691,35 @@ export const generateDashboardReportPDF = (
     let yPos = 60;
     doc.setFontSize(14); doc.setFont('helvetica', 'bold');
     doc.text('Key Statistics', 14, yPos); yPos += 8;
-    autoTable(doc, { startY: yPos, body: stats.map(s => [s.title, s.value.toString()]), theme: 'grid', styles: { fontSize: 10 }, columnStyles: { 1: { halign: 'right' } } });
+    autoTable(doc, { 
+        startY: yPos, 
+        body: stats.map(s => [s.title, s.value.toString()]), 
+        theme: 'grid', 
+        styles: { fontSize: 10 }, 
+        columnStyles: { 1: { halign: 'right' } } 
+    });
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
     doc.text('Financial Overview', 14, yPos); yPos += 8;
-    autoTable(doc, { startY: yPos, head: [['Metric', 'Amount']], body: financialData.map(d => [d.name, formatCurrency(d.amount)]), theme: 'striped', headStyles: { fillColor: [51, 65, 85] }, columnStyles: { 1: { halign: 'right' } } });
+    autoTable(doc, { 
+        startY: yPos, 
+        head: [['Metric', 'Amount']], 
+        body: financialData.map(d => [d.name, formatCurrency(d.amount)]), 
+        theme: 'striped', 
+        headStyles: { fillColor: [51, 65, 85] }, 
+        columnStyles: { 1: { halign: 'right' } } 
+    });
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
     doc.text('Rent Revenue by Ownership', 14, yPos); yPos += 8;
-    autoTable(doc, { startY: yPos, head: [['Unit Type', 'SM Rent', 'Landlord Rent']], body: rentBreakdown.map(d => [d.unitType, formatCurrency(d.smRent || 0), formatCurrency(d.landlordRent || 0)]), theme: 'striped', headStyles: { fillColor: [51, 65, 85] }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } } });
+    autoTable(doc, { 
+        startY: yPos, 
+        head: [['Unit Type', 'SM Rent', 'Landlord Rent']], 
+        body: rentBreakdown.map(d => [d.unitType, formatCurrency(d.smRent || 0), formatCurrency(d.landlordRent || 0)]), 
+        theme: 'striped', 
+        headStyles: { fillColor: [51, 65, 85] }, 
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } } 
+    });
     
     doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
 };
@@ -725,6 +745,15 @@ export const generateVacantServiceChargeInvoicePDF = (
         body.push([{ content: `Total for Unit ${unitData.unit.name}`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: formatCurrency(unitData.totalDue), styles: { fontStyle: 'bold', halign: 'right' } }]);
     });
 
-    autoTable(doc, { startY: yPos, head: [['Description', 'Amount Due']], body, theme: 'striped', headStyles: { fillColor: [217, 119, 6] }, foot: [[{ content: 'GRAND TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } }, { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', halign: 'right' } }]], footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0] }, columnStyles: { 1: { halign: 'right' } } });
+    autoTable(doc, { 
+        startY: yPos, 
+        head: [['Description', 'Amount Due']], 
+        body, 
+        theme: 'striped', 
+        headStyles: { fillColor: [217, 119, 6] }, 
+        foot: [[{ content: 'GRAND TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } }, { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', halign: 'right' } }]], 
+        footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0] }, 
+        columnStyles: { 1: { halign: 'right' } } 
+    });
     doc.save(`vacant_sc_invoice_${owner.name.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -6,7 +5,7 @@ import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPay
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
-import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2, Trash } from 'lucide-react';
+import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2, Trash, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
@@ -175,17 +174,29 @@ export default function LandlordsPage() {
   }, [landlordsForSelectedProperty, searchQuery]);
 
 
-  const totalInvestorLandlords = useMemo(() => {
-    return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
-  }, [landlords]);
+  const displayedLandlordCount = useMemo(() => {
+    if (!selectedPropertyId) {
+      // System-wide unique landlords (excluding internal Soil Merchants)
+      return landlords.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
+    }
+    // Property-specific unique landlords (excluding internal Soil Merchants)
+    return landlordsForSelectedProperty.filter(l => l.id !== SOIL_MERCHANTS_LANDLORD.id).length;
+  }, [selectedPropertyId, landlords, landlordsForSelectedProperty]);
 
-  const totalManagedUnits = useMemo(() => {
-    let count = 0;
-    properties.forEach(p => {
-        count += p.units.filter(u => u.ownership === 'SM' || u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Airbnb').length;
-    });
-    return count;
-  }, [properties]);
+  const displayedManagedUnitsCount = useMemo(() => {
+    if (!selectedPropertyId) {
+      // Total managed units across the entire portfolio
+      let count = 0;
+      properties.forEach(p => {
+        count += (p.units || []).filter(u => u.ownership === 'SM' || u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Airbnb').length;
+      });
+      return count;
+    }
+    // Managed units only in the selected property
+    const property = properties.find(p => p.id === selectedPropertyId);
+    if (!property) return 0;
+    return (property.units || []).filter(u => u.ownership === 'SM' || u.managementStatus === 'Rented for Clients' || u.managementStatus === 'Airbnb').length;
+  }, [selectedPropertyId, properties]);
   
   const unassignedUnitsForSelectedProperty = useMemo(() => {
       if (!selectedPropertyId) return [];
@@ -348,11 +359,11 @@ export default function LandlordsPage() {
        <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Investor Landlords</CardTitle>
-            <Users2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Landlords</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalInvestorLandlords}</div>
+            <div className="text-2xl font-bold">{displayedLandlordCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -361,7 +372,7 @@ export default function LandlordsPage() {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalManagedUnits}</div>
+            <div className="text-2xl font-bold">{displayedManagedUnitsCount}</div>
           </CardContent>
         </Card>
       </div>

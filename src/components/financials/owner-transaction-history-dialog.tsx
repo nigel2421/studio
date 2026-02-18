@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -86,7 +85,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
                     phone: owner.phone,
                     idNumber: 'N/A',
                     residentType: 'Homeowner',
-                    lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Pending' },
+                    lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Paid', serviceCharge: 0 },
                     propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
                 };
                 primaryTenant = dummyTenant;
@@ -174,10 +173,11 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         }
     };
 
-    const handleGenerateStatement = async (entity: Landlord | PropertyOwner, startDate: Date, endDate: Date) => {
+    const handleGenerateStatement = async (entity: any, startDate: Date, endDate: Date) => {
         startPdfLoading('Generating Statement...');
         try {
-            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, await getAllWaterReadings(), startDate, endDate, 'service-charge');
+            const allWaterReadings = await getAllWaterReadings();
+            generateOwnerServiceChargeStatementPDF(entity, allProperties, allTenants, allPayments, allWaterReadings, startDate, endDate, 'service-charge');
             setIsStatementOptionsOpen(false);
             toast({ title: 'Statement Downloaded', description: 'Your PDF statement has been generated.' });
         } catch (error) {
@@ -295,5 +295,3 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         </>
     );
 }
-
-    
