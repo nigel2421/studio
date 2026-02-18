@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,7 +5,7 @@ import type { MaintenanceRequest, Tenant, Property } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader, WandSparkles, Send, User } from 'lucide-react';
+import { Loader, WandSparkles, Send, User, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getMaintenanceResponseDraft, performRespondToMaintenanceRequest } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
