@@ -19,6 +19,7 @@ import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
 import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings, getAllWaterReadings } from '@/lib/data';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface OwnerTransactionHistoryDialogProps {
@@ -199,64 +200,66 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                    <DialogHeader>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="p-6 pb-2">
                         <DialogTitle>Transaction History for {owner.name}</DialogTitle>
                         <DialogDescription>
                            Statement as of {selectedMonth && format(selectedMonth, 'MMMM yyyy')}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex-1 overflow-y-auto border rounded-md">
-                        {isLoading ? (
-                            <div className="flex justify-center items-center h-full">
-                                <Loader2 className="h-8 w-8 animate-spin" />
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>For Month</TableHead>
-                                        <TableHead>Details</TableHead>
-                                        <TableHead className="text-right">Charge</TableHead>
-                                        <TableHead className="text-right">Payment</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {ledger.map((t, index) => (
-                                        <TableRow key={`${t.id}-${index}`}>
-                                            <TableCell>{format(new Date(t.date), 'dd MMM yyyy')}</TableCell>
-                                            <TableCell>{t.forMonth}</TableCell>
-                                            <TableCell>{t.description}</TableCell>
-                                            <TableCell className="text-right text-red-600">{t.charge > 0 ? `Ksh ${t.charge.toLocaleString()}` : '-'}</TableCell>
-                                            <TableCell className="text-right text-green-600">{t.payment > 0 ? `Ksh ${t.payment.toLocaleString()}` : '-'}</TableCell>
-                                            <TableCell className="text-right font-bold">
-                                                {t.balance < 0
-                                                    ? <span className="text-green-600">Ksh {Math.abs(t.balance).toLocaleString()} Cr</span>
-                                                    : `Ksh ${t.balance.toLocaleString()}`
-                                                }
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {!t.id.startsWith('charge-') && (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(t.id)}>
-                                                        <Edit2 className="h-4 w-4 text-muted-foreground" />
-                                                    </Button>
-                                                )}
-                                            </TableCell>
+                    <div className="flex-1 overflow-hidden border-y">
+                        <ScrollArea className="h-full px-6">
+                            {isLoading ? (
+                                <div className="flex justify-center items-center py-20">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>For Month</TableHead>
+                                            <TableHead>Details</TableHead>
+                                            <TableHead className="text-right">Charge</TableHead>
+                                            <TableHead className="text-right">Payment</TableHead>
+                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="w-[50px]"></TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                        {ledger.length === 0 && !isLoading && (
-                             <div className="flex justify-center items-center h-full text-muted-foreground">
-                                No transactions found for this owner.
-                            </div>
-                        )}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {ledger.map((t, index) => (
+                                            <TableRow key={`${t.id}-${index}`}>
+                                                <TableCell>{format(new Date(t.date), 'dd MMM yyyy')}</TableCell>
+                                                <TableCell>{t.forMonth}</TableCell>
+                                                <TableCell>{t.description}</TableCell>
+                                                <TableCell className="text-right text-red-600">{t.charge > 0 ? `Ksh ${t.charge.toLocaleString()}` : '-'}</TableCell>
+                                                <TableCell className="text-right text-green-600">{t.payment > 0 ? `Ksh ${t.payment.toLocaleString()}` : '-'}</TableCell>
+                                                <TableCell className="text-right font-bold">
+                                                    {t.balance < 0
+                                                        ? <span className="text-green-600">Ksh {Math.abs(t.balance).toLocaleString()} Cr</span>
+                                                        : `Ksh ${t.balance.toLocaleString()}`
+                                                    }
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {!t.id.startsWith('charge-') && (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(t.id)}>
+                                                            <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                            {ledger.length === 0 && !isLoading && (
+                                <div className="flex justify-center items-center py-20 text-muted-foreground">
+                                    No transactions found for this owner.
+                                </div>
+                            )}
+                        </ScrollArea>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="p-6">
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                         <Button onClick={handleOpenInvoicePreview} disabled={isSending}>
                             <Mail className="mr-2 h-4 w-4" />

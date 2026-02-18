@@ -14,6 +14,7 @@ import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
 import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TransactionHistoryDialogProps {
     tenant: Tenant | null;
@@ -107,7 +108,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
         const fullPaymentHistory = await getPaymentHistory(tenant.id);
         const waterReadings = await getTenantWaterReadings(tenant.id);
-        generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties, waterReadings);
+        generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties, waterReadings, 'rent');
     };
 
     if (!tenant) return null;
@@ -142,61 +143,63 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                     </div>
 
                     <div className="border rounded-md">
-                        {isLoading ? (
-                            <div className="flex justify-center p-8">
-                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>For Month</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead className="text-right">Charge</TableHead>
-                                        <TableHead className="text-right">Payment</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
-                                        <TableHead className="w-[50px]"> </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {paginatedLedger.length > 0 ? (
-                                        paginatedLedger.map((entry, index) => (
-                                            <TableRow key={`${entry.id}-${index}`}>
-                                                <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                                <TableCell>{entry.forMonth}</TableCell>
-                                                <TableCell>{entry.description}</TableCell>
-                                                <TableCell className="text-right text-red-600 font-medium">
-                                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right text-green-600 font-medium">
-                                                    {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {entry.balance < 0
-                                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                                        : `Ksh ${entry.balance.toLocaleString()}`
-                                                    }
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {!entry.id.startsWith('charge-') && (
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(entry.id)}>
-                                                            <Edit2 className="h-4 w-4 text-muted-foreground" />
-                                                        </Button>
-                                                    )}
+                        <ScrollArea className="h-[450px]">
+                            {isLoading ? (
+                                <div className="flex justify-center p-8">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>For Month</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead className="text-right">Charge</TableHead>
+                                            <TableHead className="text-right">Payment</TableHead>
+                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="w-[50px]"> </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paginatedLedger.length > 0 ? (
+                                            paginatedLedger.map((entry, index) => (
+                                                <TableRow key={`${entry.id}-${index}`}>
+                                                    <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                                                    <TableCell>{entry.forMonth}</TableCell>
+                                                    <TableCell>{entry.description}</TableCell>
+                                                    <TableCell className="text-right text-red-600 font-medium">
+                                                        {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-green-600 font-medium">
+                                                        {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {entry.balance < 0
+                                                            ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                                            : `Ksh ${entry.balance.toLocaleString()}`
+                                                        }
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {!entry.id.startsWith('charge-') && (
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(entry.id)}>
+                                                                <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                    No transaction history found.
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                No transaction history found.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        )}
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </ScrollArea>
                     </div>
                     {ledger.length > 0 && (
                         <div className="pt-4 border-t">

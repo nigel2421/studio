@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,6 +16,7 @@ import {
 import { generateLedger } from '@/lib/financial-logic';
 import { PaginationControls } from '../ui/pagination-controls';
 import { TabsContent } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ClientLandlordDashboardProps {
     tenantDetails: Tenant | null;
@@ -62,45 +62,47 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
 
       return (
         <>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>For Month</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Charge</TableHead>
-                        <TableHead className="text-right">Payment</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paginatedLedger.length > 0 ? (
-                        paginatedLedger.map((entry, index) => (
-                            <TableRow key={`${entry.id}-${index}`}>
-                                <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
-                                <TableCell>{entry.forMonth}</TableCell>
-                                <TableCell>{entry.description}</TableCell>
-                                <TableCell className="text-right text-red-600">
-                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
-                                </TableCell>
-                                <TableCell className="text-right text-green-600">
-                                    {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-bold">
-                                     {entry.balance < 0
-                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                        : `Ksh ${entry.balance.toLocaleString()}`
-                                    }
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    ) : (
+            <ScrollArea className="h-[500px]">
+                <Table>
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center">No transaction history found.</TableCell>
+                            <TableHead>Date</TableHead>
+                            <TableHead>For Month</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Charge</TableHead>
+                            <TableHead className="text-right">Payment</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                         </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedLedger.length > 0 ? (
+                            paginatedLedger.map((entry, index) => (
+                                <TableRow key={`${entry.id}-${index}`}>
+                                    <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                    <TableCell>{entry.forMonth}</TableCell>
+                                    <TableCell>{entry.description}</TableCell>
+                                    <TableCell className="text-right text-red-600">
+                                        {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right text-green-600">
+                                        {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">
+                                        {entry.balance < 0
+                                            ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                            : `Ksh ${entry.balance.toLocaleString()}`
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center">No transaction history found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
             {totalPages > 1 && (
                 <div className="p-4 border-t">
                     <PaginationControls
@@ -123,51 +125,53 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
 
       return (
         <>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>For Month</TableHead>
-                        <TableHead>Unit</TableHead>
-                        <TableHead>Prior Rd</TableHead>
-                        <TableHead>Current Rd</TableHead>
-                        <TableHead>Rate</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Payment</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paginatedLedger.length > 0 ? (
-                        paginatedLedger.map((entry, index) => (
-                            <TableRow key={`${entry.id}-${index}`}>
-                                <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
-                                <TableCell>{entry.forMonth}</TableCell>
-                                <TableCell>{entry.unitName || '-'}</TableCell>
-                                <TableCell>{entry.priorReading?.toLocaleString() ?? '-'}</TableCell>
-                                <TableCell>{entry.currentReading?.toLocaleString() ?? '-'}</TableCell>
-                                <TableCell>{entry.rate ? `Ksh ${entry.rate}`: '-'}</TableCell>
-                                <TableCell className="text-right text-red-600">
-                                    {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
-                                </TableCell>
-                                <TableCell className="text-right text-green-600">
-                                    {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-bold">
-                                     {entry.balance < 0
-                                        ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                        : `Ksh ${entry.balance.toLocaleString()}`
-                                    }
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    ) : (
+            <ScrollArea className="h-[500px]">
+                <Table>
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={9} className="text-center">No transaction history found.</TableCell>
+                            <TableHead>Date</TableHead>
+                            <TableHead>For Month</TableHead>
+                            <TableHead>Unit</TableHead>
+                            <TableHead>Prior Rd</TableHead>
+                            <TableHead>Current Rd</TableHead>
+                            <TableHead>Rate</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Payment</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                         </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedLedger.length > 0 ? (
+                            paginatedLedger.map((entry, index) => (
+                                <TableRow key={`${entry.id}-${index}`}>
+                                    <TableCell>{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                    <TableCell>{entry.forMonth}</TableCell>
+                                    <TableCell>{entry.unitName || '-'}</TableCell>
+                                    <TableCell>{entry.priorReading?.toLocaleString() ?? '-'}</TableCell>
+                                    <TableCell>{entry.currentReading?.toLocaleString() ?? '-'}</TableCell>
+                                    <TableCell>{entry.rate ? `Ksh ${entry.rate}`: '-'}</TableCell>
+                                    <TableCell className="text-right text-red-600">
+                                        {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right text-green-600">
+                                        {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">
+                                        {entry.balance < 0
+                                            ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
+                                            : `Ksh ${entry.balance.toLocaleString()}`
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={9} className="text-center">No transaction history found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
             {totalPages > 1 && (
                 <div className="p-4 border-t">
                     <PaginationControls
@@ -226,7 +230,6 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     <div className="text-2xl font-bold text-green-600">Ksh {(serviceChargeCredit || 0).toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                 </CardContent>
-            </Card>
         </>
     );
 
