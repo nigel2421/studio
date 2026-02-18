@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -472,9 +473,10 @@ export default function MegarackPage() {
         const tenantPayments = await getPaymentHistory(tenant.id);
         const tenantWaterReadings = allReadings.filter(r => r.tenantId === tenant.id);
         
+        // Pass context 'megarack' to use Mega Rack branding and filter for water only
         generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings, 'megarack');
 
-        toast({ title: 'Statement Generated', description: `Statement for ${tenant.name} downloaded.` });
+        toast({ title: 'Statement Generated', description: `Water Statement for ${tenant.name} downloaded.` });
     } catch (error) {
         console.error("Error generating statement", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });

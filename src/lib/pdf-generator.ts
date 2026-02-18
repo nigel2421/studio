@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary, UnitType, UnitOrientation, unitOrientations } from './types';
@@ -89,7 +90,7 @@ const generateRentReceipt = (doc: jsPDF, document: FinancialDocument) => {
 };
 
 const generateWaterBill = (doc: jsPDF, document: FinancialDocument) => {
-    addHeader(doc, 'Water Bill');
+    addHeader(doc, 'Water Bill', 'Mega Rack');
 
     const reading = document.sourceData as WaterMeterReading;
     const dateStr = new Date(reading.date).toLocaleDateString();

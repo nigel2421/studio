@@ -1046,6 +1046,13 @@ export async function addWaterMeterReading(data: {
     cacheService.clear('waterReadings');
 
     const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
+    
+    // Add the water reading amount to the high-level due balance
+    let updatedDue = reconciliationUpdates.dueBalance !== undefined ? reconciliationUpdates.dueBalance : (tenantForReading.dueBalance || 0);
+    updatedDue += amount;
+    
+    reconciliationUpdates.dueBalance = updatedDue;
+    reconciliationUpdates['lease.paymentStatus'] = getRecommendedPaymentStatus({ dueBalance: updatedDue }, asOfDate || new Date());
 
     if (Object.keys(reconciliationUpdates).length > 0) {
         const tenantRef = doc(db, 'tenants', originalTenant.id);
@@ -1231,20 +1238,19 @@ export async function batchProcessPayments(
 
             transaction.set(paymentDocRef, paymentPayload);
 
-            if (entry.type !== 'Water') {
-                const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
+            // Water payments also reduce the high-level dueBalance
+            const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
 
-                workingTenant = {
-                    ...workingTenant,
-                    dueBalance: paymentProcessingUpdates.dueBalance,
-                    accountBalance: paymentProcessingUpdates.accountBalance,
-                    lease: {
-                        ...workingTenant.lease,
-                        paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
-                        lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
-                    }
-                };
-            }
+            workingTenant = {
+                ...workingTenant,
+                dueBalance: paymentProcessingUpdates.dueBalance,
+                accountBalance: paymentProcessingUpdates.accountBalance,
+                lease: {
+                    ...workingTenant.lease,
+                    paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
+                    lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
+                }
+            };
         }
 
         const finalUpdates: { [key: string]: any } = {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -127,8 +128,9 @@ export default function TenantsPage() {
             const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
             const tenantPayments = await getPaymentHistory(tenant.id);
             const tenantWaterReadings = await getTenantWaterReadings(tenant.id);
-            generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings);
-            toast({ title: 'Statement Generated', description: `Statement for ${tenant.name} downloaded.` });
+            // Context is 'rent' because this is the general tenants module
+            generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings, 'rent');
+            toast({ title: 'Statement Generated', description: `Rent Statement for ${tenant.name} downloaded.` });
         } catch (error) {
             console.error("Error generating statement", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate statement.' });

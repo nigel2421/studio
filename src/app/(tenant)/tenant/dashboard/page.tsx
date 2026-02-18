@@ -55,7 +55,7 @@ export default function TenantDashboardPage() {
                 setProperties(propertiesData);
                 if (tenantDetails) {
                     const { ledger: rentOnlyLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenantDetails, paymentData, propertiesData, [], undefined, undefined, { includeWater: false });
-                    const { ledger: waterOnlyLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, undefined, undefined, { includeRent: false, includeServiceCharge: false });
+                    const { ledger: waterOnlyLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenantDetails, paymentData, propertiesData, waterData, undefined, undefined, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
                     setRentLedger(rentOnlyLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                     setWaterLedger(waterOnlyLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
