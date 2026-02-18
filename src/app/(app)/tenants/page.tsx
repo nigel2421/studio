@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -44,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/useAuth';
 
 export default function TenantsPage() {
-    const [allResidents, setAllResidents] = useState<Tenant[]>([]);
+    const [allTenants, setAllTenants] = useState<Tenant[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const { toast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
@@ -57,26 +56,26 @@ export default function TenantsPage() {
     const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
     const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
 
-    const fetchResidents = () => {
-        getTenants().then(setAllResidents);
+    const fetchTenantsData = () => {
+        getTenants().then(setAllTenants);
     }
 
     useEffect(() => {
-        fetchResidents();
+        fetchTenantsData();
         getProperties().then(setProperties);
     }, []);
 
-    const tenants = useMemo(() => allResidents.filter(r => r.residentType === 'Tenant'), [allResidents]);
+    const activeTenantsOnly = useMemo(() => allTenants.filter(r => r.residentType === 'Tenant'), [allTenants]);
     
     // Stats filtered strictly by property selection
-    const residentsInSelectedProperty = useMemo(() => {
-        if (selectedPropertyId === 'all') return allResidents;
-        return allResidents.filter(r => r.propertyId === selectedPropertyId);
-    }, [allResidents, selectedPropertyId]);
+    const tenantsInSelectedProperty = useMemo(() => {
+        if (selectedPropertyId === 'all') return allTenants;
+        return allTenants.filter(r => r.propertyId === selectedPropertyId);
+    }, [allTenants, selectedPropertyId]);
 
-    const activeTenantsInSelectedProperty = useMemo(() => {
-        return residentsInSelectedProperty.filter(r => r.residentType === 'Tenant');
-    }, [residentsInSelectedProperty]);
+    const statsActiveTenants = useMemo(() => {
+        return tenantsInSelectedProperty.filter(r => r.residentType === 'Tenant');
+    }, [tenantsInSelectedProperty]);
 
     const statsTotalUnits = useMemo(() => {
         if (selectedPropertyId === 'all') {
@@ -88,17 +87,17 @@ export default function TenantsPage() {
 
     const occupancyRate = useMemo(() => {
         if (statsTotalUnits === 0) return 0;
-        return (residentsInSelectedProperty.length / statsTotalUnits) * 100;
-    }, [residentsInSelectedProperty, statsTotalUnits]);
+        return (tenantsInSelectedProperty.length / statsTotalUnits) * 100;
+    }, [tenantsInSelectedProperty, statsTotalUnits]);
 
     const handleArchive = async (tenantId: string) => {
         startLoading('Archiving tenant...');
         try {
             await archiveTenant(tenantId);
-            fetchResidents();
+            fetchTenantsData();
             toast({
                 title: "Tenant Archived",
-                description: "The occupant has been moved to the archived list.",
+                description: "The tenant has been moved to the archived list.",
             });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to archive tenant.' });
@@ -121,19 +120,19 @@ export default function TenantsPage() {
         }
     }
 
-    const filteredTenants = useMemo(() => {
-        return tenants.filter(tenant => {
+    const filteredTenantsList = useMemo(() => {
+        return activeTenantsOnly.filter(tenant => {
              const propertyMatch = selectedPropertyId === 'all' || tenant.propertyId === selectedPropertyId;
              const searchMatch = tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 tenant.email.toLowerCase().includes(searchQuery.toLowerCase());
             const statusMatch = statusFilter === 'all' || tenant.lease?.paymentStatus === statusFilter;
             return propertyMatch && searchMatch && statusMatch;
         });
-    }, [tenants, searchQuery, selectedPropertyId, statusFilter]);
+    }, [activeTenantsOnly, searchQuery, selectedPropertyId, statusFilter]);
 
 
-    const totalPages = Math.ceil(filteredTenants.length / pageSize);
-    const paginatedTenants = filteredTenants.slice(
+    const totalPages = Math.ceil(filteredTenantsList.length / pageSize);
+    const paginatedTenants = filteredTenantsList.slice(
         (currentPage - 1) * pageSize,
         currentPage * pageSize
     );
@@ -188,7 +187,7 @@ export default function TenantsPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{activeTenantsInSelectedProperty.length}</div>
+                        <div className="text-2xl font-bold">{statsActiveTenants.length}</div>
                     </CardContent>
                 </Card>
                  <Card>
@@ -238,7 +237,7 @@ export default function TenantsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenants, 'tenants_export.csv')}>
+                        <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredTenantsList, 'tenants_export.csv')}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Export CSV
                         </Button>
@@ -312,7 +311,7 @@ export default function TenantsPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {filteredTenants.length === 0 && (
+                            {filteredTenantsList.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center">
                                         No tenants found for the selected criteria.
@@ -327,7 +326,7 @@ export default function TenantsPage() {
                         currentPage={currentPage}
                         totalPages={totalPages}
                         pageSize={pageSize}
-                        totalItems={filteredTenants.length}
+                        totalItems={filteredTenantsList.length}
                         onPageChange={setCurrentPage}
                         onPageSizeChange={setPageSize}
                     />
@@ -376,7 +375,7 @@ const TenantActions = ({ tenant, onArchive, isConsultant, onExport }: { tenant: 
                         <AlertDialogHeader>
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action will archive the occupant and mark their unit as vacant. You can view archived records later.
+                                This action will archive the tenant and mark their unit as vacant. You can view archived records later.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

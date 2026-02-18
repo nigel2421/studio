@@ -230,6 +230,7 @@ export function ClientLandlordDashboard({ tenantDetails, payments, waterReadings
                     <div className="text-2xl font-bold text-green-600">Ksh {(serviceChargeCredit || 0).toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground">Overpayment carry-over</p>
                 </CardContent>
+            </Card>
         </>
     );
 
