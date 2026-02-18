@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -25,7 +24,6 @@ interface PaymentEntry {
   amount: string;
   type: Payment['type'];
   date: Date;
-  notes: string;
   rentForMonth: string;
   paymentMethod: Payment['paymentMethod'];
   transactionId: string;
@@ -118,7 +116,6 @@ export function AddPaymentDialog({
     if (tenantForDisplay?.residentType === 'Homeowner') {
       return allPaymentTypes.filter(t => t !== 'Rent' && t !== 'Deposit');
     }
-    // Default to tenant types - they don't pay "ServiceCharge" directly, it's part of rent.
     return allPaymentTypes.filter(t => t !== 'ServiceCharge');
   }, [tenantForDisplay]);
   
@@ -128,9 +125,6 @@ export function AddPaymentDialog({
 
   const getDefaultAmount = useCallback((type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
     if (!tenantInfo) return '';
-    // This is buggy because Tenant type does not have waterReadings.
-    // The logic is now handled by the readingForPayment prop, so this can be simplified.
-    // const latestWaterBillAmount = tenantInfo.waterReadings?.[0]?.amount;
 
     switch (type) {
       case 'Rent':
@@ -164,7 +158,6 @@ export function AddPaymentDialog({
             amount,
             type,
             date: new Date(),
-            notes: '',
             rentForMonth: rentForMonthDefault,
             paymentMethod: 'M-Pesa',
             transactionId: '',
@@ -215,7 +208,6 @@ export function AddPaymentDialog({
         amount: type === 'Adjustment' ? '' : getDefaultAmount(type, tenantForDisplay),
         type: type,
         date: new Date(),
-        notes: '',
         rentForMonth: format(new Date(), 'yyyy-MM'),
         paymentMethod: 'M-Pesa',
         transactionId: '',
@@ -259,7 +251,6 @@ export function AddPaymentDialog({
       const paymentsToBatch = validEntries.map(e => ({
         amount: Number(e.amount),
         date: format(e.date, 'yyyy-MM-dd'),
-        notes: e.notes,
         rentForMonth: e.rentForMonth,
         type: e.type,
         paymentMethod: e.paymentMethod,
@@ -437,10 +428,6 @@ export function AddPaymentDialog({
                             <Input id={`transaction-id-${entry.id}`} value={entry.transactionId || ''} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} placeholder="e.g. UAE6G3OSE9" required/>
                         </div>
                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`notes-${entry.id}`} className="text-xs">Notes (Optional)</Label>
-                        <Input id={`notes-${entry.id}`} value={entry.notes} onChange={(e) => handleEntryChange(entry.id, 'notes', e.target.value)} placeholder={entry.type === 'Adjustment' ? 'Reason for adjustment' : 'e.g. part payment'}/>
-                    </div>
                   </div>
                 ))}
               </div>

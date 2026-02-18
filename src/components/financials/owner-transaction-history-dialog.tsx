@@ -121,7 +121,7 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             return;
         }
 
-        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd'), notes: data.notes }, data.reason, userProfile.id);
+        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
         await forceRecalculateTenantBalance(tenant.id);
         toast({ title: "Payment Updated", description: "The transaction has been successfully updated."});
         if (onDataChange) {

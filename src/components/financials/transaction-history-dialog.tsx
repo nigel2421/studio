@@ -85,7 +85,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         
         await updatePayment(
             paymentId,
-            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd'), notes: data.notes },
+            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') },
             data.reason,
             userProfile.id
         );

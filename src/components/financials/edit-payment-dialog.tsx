@@ -16,7 +16,6 @@ import { format, parseISO } from 'date-fns';
 const editSchema = z.object({
     amount: z.coerce.number().min(0.01, "Amount must be positive."),
     date: z.date({ required_error: "Payment date is required."}),
-    notes: z.string().optional(),
     reason: z.string().min(5, "Please provide a reason for this change."),
 });
 
@@ -41,7 +40,6 @@ export function EditPaymentDialog({ payment, open, onOpenChange, onSave }: EditP
             form.reset({
                 amount: payment.amount,
                 date: parseISO(payment.date),
-                notes: payment.notes || '',
                 reason: '',
             });
         }
@@ -63,7 +61,7 @@ export function EditPaymentDialog({ payment, open, onOpenChange, onSave }: EditP
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit Payment Record</DialogTitle>
-                    <DialogDescription>Modify the payment details below. All changes will be logged.</DialogDescription>
+                    <DialogDescription>Modify the payment details below. A reason for change is required for auditing.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
                      <div className="grid grid-cols-2 gap-4">
@@ -74,9 +72,6 @@ export function EditPaymentDialog({ payment, open, onOpenChange, onSave }: EditP
                             <div className="flex flex-col gap-2"><Label>Payment Date</Label><DatePicker value={field.value} onChange={field.onChange} /><p className="text-red-500 text-xs">{fieldState.error?.message}</p></div>
                         )}/>
                      </div>
-                     <Controller control={form.control} name="notes" render={({ field, fieldState }) => (
-                        <div><Label>Notes (Optional)</Label><Input {...field} /><p className="text-red-500 text-xs mt-1">{fieldState.error?.message}</p></div>
-                     )}/>
                      <Controller control={form.control} name="reason" render={({ field, fieldState }) => (
                         <div><Label>Reason for Edit</Label><Textarea {...field} placeholder="e.g., Corrected wrong amount entered." /><p className="text-red-500 text-xs mt-1">{fieldState.error?.message}</p></div>
                      )}/>

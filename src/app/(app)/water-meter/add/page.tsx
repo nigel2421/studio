@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -326,7 +325,7 @@ export default function MegarackPage() {
             date: format(paymentData.date, 'yyyy-MM-dd'),
             type: 'Water' as const,
             status: 'Paid' as const,
-            notes: `Consolidated water payment for ${selectedOwnerBill.owner.name}. Covers ${readingsToPay.length} bill(s).`,
+            notes: `Consolidated water payment for ${selectedOwnerBill.owner.name}.`,
             paymentMethod: paymentData.paymentMethod,
             transactionId: paymentData.transactionId,
             createdAt: new Date(),
@@ -392,7 +391,7 @@ export default function MegarackPage() {
     try {
         await updatePayment(
             paymentId,
-            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd'), notes: data.notes },
+            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') },
             data.reason,
             userProfile.id
         );
