@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -197,9 +196,6 @@ export default function UniversalOwnerDashboardPage() {
                     id: t.id,
                     propertyId: t.propertyId,
                     unitType: t.unitType,
-                    stageTwoCost: t.stageTwoCost,
-                    stageThreeCost: t.stageThreeCost,
-                    specialDeductions: t.specialDeductions
                 }));
 
                 const unitsForPDF = viewData.properties.flatMap((p: Property) => (p.units || []).map((u: Unit) => ({
