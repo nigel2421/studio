@@ -1,3 +1,4 @@
+
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -128,11 +129,12 @@ describe('Financial Utils Logic', () => {
         ];
 
         it('should correctly break down a lump-sum payment and exclude deposits', () => {
+            // Use dates after Feb 2026 to include otherCosts
             const tenant = createMockTenant({
                 id: 't-lump',
                 unitName: 'A1',
                 propertyId: 'prop-1',
-                lease: { startDate: '2023-10-01', rent: 25000, endDate: '2024-10-01', paymentStatus: 'Paid' },
+                lease: { startDate: '2026-03-01', rent: 25000, endDate: '2027-03-01', paymentStatus: 'Paid' },
                 securityDeposit: 25000,
                 waterDeposit: 5000,
             });
@@ -140,19 +142,19 @@ describe('Financial Utils Logic', () => {
             const payment = createMockPayment({
                 tenantId: 't-lump',
                 amount: 130000,
-                date: '2023-10-02'
+                date: '2026-03-02'
             });
 
             const transactions = generateLandlordDisplayTransactions([payment], [tenant], mockProperties, null);
 
             expect(transactions).toHaveLength(4);
 
-            expect(transactions[0].forMonthDisplay).toBe('Oct 2023');
+            expect(transactions[0].forMonthDisplay).toBe('Mar 2026');
             expect(transactions[0].gross).toBe(25000);
             expect(transactions[0].managementFee).toBe(1250);
             expect(transactions[0].netToLandlord).toBe(22750); // 25000 - 1250 - 1000
 
-            expect(transactions[3].forMonthDisplay).toBe('Jan 2024');
+            expect(transactions[3].forMonthDisplay).toBe('Jun 2026');
 
             const totalGross = transactions.reduce((sum, t) => sum + t.gross, 0);
             expect(totalGross).toBe(100000);
@@ -185,18 +187,18 @@ describe('Financial Utils Logic', () => {
             ];
             const props = [createMockProperty('prop-multi', units)];
             const tenants = [
-                createMockTenant({ id: 't-A1', unitName: 'A1', propertyId: 'prop-multi', lease: { startDate: '2024-02-01', rent: 20000, endDate: '2025-02-01', paymentStatus: 'Paid' } }),
-                createMockTenant({ id: 't-A2', unitName: 'A2', propertyId: 'prop-multi', lease: { startDate: '2024-02-01', rent: 30000, endDate: '2025-02-01', paymentStatus: 'Paid' } }),
+                createMockTenant({ id: 't-A1', unitName: 'A1', propertyId: 'prop-multi', lease: { startDate: '2026-02-01', rent: 20000, endDate: '2027-02-01', paymentStatus: 'Paid' } }),
+                createMockTenant({ id: 't-A2', unitName: 'A2', propertyId: 'prop-multi', lease: { startDate: '2026-02-01', rent: 30000, endDate: '2027-02-01', paymentStatus: 'Paid' } }),
             ];
             const payments = [
-                createMockPayment({ tenantId: 't-A1', amount: 20000, date: '2024-02-05', rentForMonth: '2024-02'}),
-                createMockPayment({ tenantId: 't-A2', amount: 30000, date: '2024-02-06', rentForMonth: '2024-02'}),
+                createMockPayment({ tenantId: 't-A1', amount: 20000, date: '2026-02-05', rentForMonth: '2026-02'}),
+                createMockPayment({ tenantId: 't-A2', amount: 30000, date: '2026-02-06', rentForMonth: '2026-02'}),
             ];
 
             const transactions = generateLandlordDisplayTransactions(payments, tenants, props, landlord);
             
             expect(transactions.length).toBe(2);
-            const febTransactions = transactions.filter(t => t.forMonthDisplay === 'Feb 2024');
+            const febTransactions = transactions.filter(t => t.forMonthDisplay === 'Feb 2026');
             
             const costs = febTransactions.map(t => t.otherCosts);
             expect(costs).toContain(1000);
@@ -211,11 +213,11 @@ describe('Financial Utils Logic', () => {
             const landlord = { id: landlordId, name: 'Single Unit Lord', email: '', phone: '' };
             const units = [createMockUnit({ name: 'B1', landlordId, rentAmount: 40000 })];
             const props = [createMockProperty('prop-single', units)];
-            const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { startDate: '2024-02-01', rent: 40000, endDate: '2025-02-01', paymentStatus: 'Paid' } });
+            const tenant = createMockTenant({ id: 't-B1', unitName: 'B1', propertyId: 'prop-single', lease: { startDate: '2026-02-01', rent: 40000, endDate: '2027-02-01', paymentStatus: 'Paid' } });
             
             const payments = [
-                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-02-05', rentForMonth: '2024-02'}),
-                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2024-03-05', rentForMonth: '2024-03'}),
+                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2026-02-05', rentForMonth: '2026-02'}),
+                createMockPayment({ tenantId: 't-B1', amount: 40000, date: '2026-03-05', rentForMonth: '2026-03'}),
             ];
 
             const transactions = generateLandlordDisplayTransactions(payments, [tenant], props, landlord);
@@ -255,7 +257,7 @@ describe('Financial Utils Logic', () => {
             // t3 is for a subsequent month for a unit that already had deductions, so it should be 0
             expect(t3!.specialDeductions).toBe(0);
 
-            // Check net payout (Jan costs are waived)
+            // Check net payout (Costs before policy date are 0)
             expect(t1!.netToLandlord).toBe(20000 - (20000 * 0.05) - 0 - 18000);
             expect(t2!.netToLandlord).toBe(30000 - (30000 * 0.05) - 0 - 22000);
         });

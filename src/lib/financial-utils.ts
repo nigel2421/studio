@@ -32,7 +32,7 @@ export function calculateTransactionBreakdown(
                 isInitialLettingAfterHandover = true;
             }
         } catch (e) {
-            console.error("Error parsing dates for letting check:", e);
+            // silent fail
         }
     }
 
@@ -176,6 +176,8 @@ export function generateLandlordDisplayTransactions(
         }
     });
 
+    const tenantMonthTracker = new Map<string, number>();
+
     sortedPayments.forEach(payment => {
         const tenant = tenantMap.get(payment.tenantId);
         if (!tenant || payment.type !== 'Rent') return;
@@ -198,11 +200,9 @@ export function generateLandlordDisplayTransactions(
         if (amountToApportionAsRent <= 0 || unitRent <= 0) return;
 
         let remainingAmount = amountToApportionAsRent;
-        let monthIndex = 0;
+        let monthIndex = tenantMonthTracker.get(tenant.id) || 0;
         const leaseStartDate = parseISO(tenant.lease.startDate);
 
-        // Cap apportionment at 24 months to prevent infinite loops and map only to full rent months
-        // This ensures excess payment (tenant credit) does not reflect as payout
         while (remainingAmount >= unitRent && monthIndex < 24) { 
             const rentForThisIteration = unitRent;
             const currentMonth = addMonths(leaseStartDate, monthIndex);
@@ -231,6 +231,7 @@ export function generateLandlordDisplayTransactions(
             remainingAmount -= rentForThisIteration;
             monthIndex++;
         }
+        tenantMonthTracker.set(tenant.id, monthIndex);
     });
 
     transactions.sort((a,b) => {
@@ -265,7 +266,6 @@ export function generateLandlordDisplayTransactions(
             processedForSpecialDeduction.add(t.unitName);
         }
 
-        // NEW POLICY: otherCosts (KSh 1000) only applies from Feb 2026 onwards
         const rentMonthDate = parseISO(t.rentForMonth + '-01');
         if (isBefore(rentMonthDate, policyStartDate)) {
             t.otherCosts = 0;
