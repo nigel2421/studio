@@ -21,11 +21,11 @@ import {
 import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
-const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties') => {
+const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties Ltd') => {
     const isMegaRack = brand === 'Mega Rack';
-    const phone = isMegaRack ? '0793111222' : '+254 7XX XXX XXX';
-    const email = isMegaRack ? 'megarackltd@gmail.com' : 'support@eracovproperties.com';
-    const address = isMegaRack ? 'Industrial Area, Nairobi' : 'Westlands, Nairobi';
+    const phone = isMegaRack ? '0793111222' : '+254 793 111 222';
+    const email = isMegaRack ? 'megaracktradingltd@gmail.com' : 'support@eracovproperties.com';
+    const address = isMegaRack ? 'Westlands, Nairobi' : 'Westlands, Nairobi';
 
     doc.setTextColor(40);
     doc.setFontSize(22);

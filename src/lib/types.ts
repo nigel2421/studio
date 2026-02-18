@@ -1,4 +1,3 @@
-
 export type Property = {
   id: string;
   name: string;
@@ -272,7 +271,7 @@ export type FinancialSummary = {
     totalOtherCosts: number;
     totalNetRemittance: number;
     transactionCount: number;
-    vacantUnitServiceChargeDeduction?: number;
+    vacantUnitServiceChargeDeduction: number;
 };
 
 export const maintenanceCategories = ['Plumbing', 'Electrical', 'HVAC', 'General', 'Appliance', 'Other'] as const;

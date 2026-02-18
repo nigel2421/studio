@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary, DisplayTransaction } from "./types";
@@ -21,7 +20,7 @@ export function calculateTransactionBreakdown(
     // Default to the full service charge amount
     let serviceChargeDeduction = serviceCharge;
     
-    // POLICY: Waive service charge for the month of handover
+    // POLICY: Waive service charge for the month of handover (e.g. Dec handover -> Dec SC 0)
     if (unit?.handoverDate && payment.rentForMonth) {
         const hMonth = format(parseISO(unit.handoverDate), 'yyyy-MM');
         if (hMonth === payment.rentForMonth) {
@@ -86,8 +85,7 @@ export function aggregateFinancials(
     endDate?: Date, 
     landlord?: Landlord | null
 ): FinancialSummary {
-    // We expect input transactions to already be filtered by period rent months
-    // but we re-verify to ensure summary integrity
+    // Filter transactions to strictly match the report period
     const transactions = allTransactions.filter(t => {
         if (!startDate || !endDate) return true;
         try {
@@ -153,6 +151,7 @@ export function generateLandlordDisplayTransactions(
     let transactions: DisplayTransaction[] = [];
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Group payments by tenant to track months paid
     const tenantMonthTracker = new Map<string, number>();
 
     sortedPayments.forEach(payment => {
@@ -204,7 +203,7 @@ export function generateLandlordDisplayTransactions(
         return acc;
     }, {} as Record<string, DisplayTransaction[]>);
 
-    // If a range is provided, ensure all months in range are present
+    // If a range is provided, ensure all months in range are present even if no rent paid
     if (startDate && endDate) {
         let loopDate = startOfMonth(startDate);
         const endLoop = startOfMonth(endDate);
@@ -230,7 +229,7 @@ export function generateLandlordDisplayTransactions(
                     const handoverMonthStart = startOfMonth(hDate);
                     const handoverMonthKey = format(handoverMonthStart, 'yyyy-MM');
                     
-                    // Waive handover month SC
+                    // POLICY: Waive service charge for the month of handover
                     if (handoverMonthKey !== month && (isSameMonth(monthDate, handoverMonthStart) || isAfter(monthDate, handoverMonthStart))) {
                         isBillableInMonth = true;
                     }
@@ -252,7 +251,7 @@ export function generateLandlordDisplayTransactions(
         });
 
         if (monthTransactions.length > 0) {
-            // Consolidate vacant SC into the first transaction of the month for that month
+            // Consolidate vacant SC into the first transaction of the month for transparency
             monthTransactions[0].vacantServiceCharge = monthlyVacantSC;
             monthTransactions[0].serviceChargeDeduction += monthlyVacantSC;
             
@@ -261,7 +260,7 @@ export function generateLandlordDisplayTransactions(
                 t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
             });
         } else if (monthlyVacantSC > 0) {
-            // Inject row for months with ONLY vacant SC
+            // Inject row for months with ONLY vacant service charges
             monthTransactions.push({
                 id: `vacant-${month}`,
                 date: format(monthDate, 'yyyy-MM-dd'),
@@ -283,7 +282,7 @@ export function generateLandlordDisplayTransactions(
 
     let finalTransactions = allSortedMonths.flatMap(m => groupedByMonth[m]);
 
-    // STRICTOR PERIOD FILTERING: The user requested not to see March if it's beyond the period.
+    // Apply strict period filtering one last time to ensure no March rows if report ends in Feb
     if (startDate && endDate) {
         finalTransactions = finalTransactions.filter(t => {
             const rentMonthDate = parseISO(t.rentForMonth + '-01');
@@ -292,6 +291,7 @@ export function generateLandlordDisplayTransactions(
         });
     }
 
+    // Apply otherCosts (KSh 1,000 transaction fee) once per month from Feb 2026 onwards
     const processedForOtherCosts = new Set<string>();
     const policyStartDate = parseISO('2026-02-01');
 
@@ -311,7 +311,7 @@ export function generateLandlordDisplayTransactions(
                 t.otherCosts = 1000;
             }
         }
-        // Final net recalculation after costs
+        // Recalculate net after costs
         t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
     });
     
