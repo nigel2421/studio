@@ -288,6 +288,12 @@ export type MaintenancePriority = (typeof maintenancePriorities)[number];
 export const maintenanceStatuses = ['New', 'In Progress', 'Completed', 'Cancelled'] as const;
 export type MaintenanceStatus = (typeof maintenanceStatuses)[number];
 
+export type MaintenanceUpdate = {
+  message: string;
+  authorName: string;
+  date: string;
+};
+
 export type MaintenanceRequest = {
   id: string;
   tenantId: string;
@@ -301,6 +307,7 @@ export type MaintenanceRequest = {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  updates?: MaintenanceUpdate[];
 };
 
 export type NoticeToVacate = {

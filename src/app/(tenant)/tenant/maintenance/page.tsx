@@ -18,7 +18,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { addMaintenanceRequest, getTenantMaintenanceRequests } from '@/lib/data';
 import type { MaintenanceRequest, MaintenanceCategory, MaintenancePriority, MaintenanceStatus } from '@/lib/types';
 import { maintenanceCategories, maintenancePriorities } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageCircle, User } from 'lucide-react';
+import { format } from 'date-fns';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const formSchema = z.object({
   title: z.string().min(5, 'Please provide a short, descriptive title.').max(100, 'Title is too long.'),
@@ -190,40 +197,67 @@ export default function MaintenancePage() {
             <Card>
             <CardHeader>
                 <CardTitle>Your Request History</CardTitle>
-                <CardDescription>Status of your past and current requests.</CardDescription>
+                <CardDescription>Status and updates for your current issues.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
                 {isLoadingRequests ? (
                 <div className="flex items-center justify-center h-40">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
                 ) : requests.length > 0 ? (
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Issue</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                <Accordion type="single" collapsible className="w-full">
                     {requests.map(req => (
-                        <TableRow key={req.id}>
-                        <TableCell>{new Date(req.date).toLocaleDateString()}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{req.title}</TableCell>
-                        <TableCell>
-                            <Badge variant={req.priority === 'High' || req.priority === 'Urgent' ? 'destructive' : 'outline'}>
-                                {req.priority}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                            <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
-                        </TableCell>
-                        </TableRow>
+                        <AccordionItem value={req.id} key={req.id} className="px-6 border-b">
+                            <AccordionTrigger className="hover:no-underline py-4">
+                                <div className="flex items-center justify-between w-full pr-4 text-left">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-sm truncate max-w-[150px]">{req.title}</span>
+                                            <Badge variant={getStatusVariant(req.status)} className="h-5 text-[10px] uppercase">{req.status}</Badge>
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground">{format(new Date(req.date), 'PPP')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {req.updates && req.updates.length > 0 && (
+                                            <Badge variant="secondary" className="h-5 gap-1">
+                                                <MessageCircle className="h-3 w-3" />
+                                                {req.updates.length}
+                                            </Badge>
+                                        )}
+                                        <Badge variant={req.priority === 'High' || req.priority === 'Urgent' ? 'destructive' : 'outline'} className="h-5 text-[10px]">
+                                            {req.priority}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-2 pb-6">
+                                <div className="p-3 bg-muted/50 rounded-lg text-sm border italic">
+                                    &quot;{req.description}&quot;
+                                </div>
+                                {req.updates && req.updates.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h5 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                            <div className="h-1 w-1 rounded-full bg-primary" />
+                                            Management Updates
+                                        </h5>
+                                        {req.updates.map((update, idx) => (
+                                            <div key={idx} className="pl-4 border-l-2 border-primary/20 space-y-1">
+                                                <div className="flex items-center justify-between text-[10px]">
+                                                    <div className="flex items-center gap-1.5 font-bold">
+                                                        <User className="h-2.5 w-2.5 text-primary" />
+                                                        {update.authorName}
+                                                    </div>
+                                                    <span className="text-muted-foreground">{format(new Date(update.date), 'MMM d')}</span>
+                                                </div>
+                                                <p className="text-sm text-slate-600">{update.message}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </AccordionContent>
+                        </AccordionItem>
                     ))}
-                    </TableBody>
-                </Table>
+                </Accordion>
                 ) : (
                 <p className="text-sm text-muted-foreground text-center h-40 flex items-center justify-center">You have not submitted any maintenance requests yet.</p>
                 )}

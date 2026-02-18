@@ -8,7 +8,8 @@ import {
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
     NoticeToVacate,
-    MaintenanceStatus
+    MaintenanceStatus,
+    MaintenanceUpdate
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
@@ -308,9 +309,6 @@ export async function getMaintenanceRequests(options: { propertyId?: string } = 
     const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'all';
 
     return cacheService.getOrFetch('maintenanceRequests', cacheKey, async () => {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
         const constraints: any[] = [
             orderBy('createdAt', 'desc')
         ];
@@ -324,7 +322,7 @@ export async function getMaintenanceRequests(options: { propertyId?: string } = 
             ...constraints
         );
         return getCollection<MaintenanceRequest>(q);
-    }, 120000);
+    }, 60000);
 }
 
 export async function getAllMaintenanceRequestsForReport(): Promise<MaintenanceRequest[]> {
@@ -961,6 +959,20 @@ export async function updateMaintenanceRequestStatus(requestId: string, status: 
     }
 }
 
+export async function addMaintenanceUpdate(requestId: string, update: MaintenanceUpdate) {
+    try {
+        const requestRef = doc(db, 'maintenanceRequests', requestId);
+        await updateDoc(requestRef, {
+            updates: arrayUnion(update),
+            updatedAt: new Date().toISOString()
+        });
+        cacheService.clear('maintenanceRequests');
+    } catch (error: any) {
+        console.error("Error adding maintenance update:", error);
+        throw new Error("Failed to post response. Please try again.");
+    }
+}
+
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
     return cacheService.getOrFetch('maintenanceRequests', `tenant-${tenantId}`, () => {
         const q = query(
@@ -969,7 +981,7 @@ export async function getTenantMaintenanceRequests(tenantId: string): Promise<Ma
             orderBy('createdAt', 'desc')
         );
         return getCollection<MaintenanceRequest>(q);
-    }, 120000);
+    }, 60000);
 }
 
 
@@ -994,7 +1006,7 @@ export async function addWaterMeterReading(data: {
     let tenantForReading: Tenant | null = null;
     const tenantsSnapshot = await getDocs(query(collection(db, 'tenants'), where('propertyId', '==', propertyId), where('unitName', '==', unitName), limit(1)));
 
-    if (!tenantsSnapshot.empty) {
+    if (! tenantsSnapshot.empty) {
         tenantForReading = { id: tenantsSnapshot.docs[0].id, ...tenantsSnapshot.docs[0].data() } as Tenant;
     } else {
         const allOwners = await getPropertyOwners();

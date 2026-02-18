@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "maintenanceRequest": {
@@ -52,6 +53,17 @@
         "completedAt": {
             "type": "string",
             "format": "date-time"
+        },
+        "updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string" },
+              "authorName": { "type": "string" },
+              "date": { "type": "string", "format": "date-time" }
+            }
+          }
         }
       },
       "required": ["propertyId", "tenantId", "title", "description", "category", "priority", "status", "date", "createdAt", "updatedAt"]

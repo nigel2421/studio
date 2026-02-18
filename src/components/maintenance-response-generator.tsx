@@ -6,30 +6,31 @@ import type { MaintenanceRequest, Tenant, Property } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader, WandSparkles, Copy } from 'lucide-react';
+import { Loader, WandSparkles, Send, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getMaintenanceResponseDraft } from '@/app/actions';
+import { getMaintenanceResponseDraft, performRespondToMaintenanceRequest } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLoading } from '@/hooks/useLoading';
+import { useAuth } from '@/hooks/useAuth';
+import { format } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
 
 interface Props {
   request: MaintenanceRequest;
   tenant: Tenant;
   property: Property;
+  onUpdate: () => void;
 }
 
-export function MaintenanceResponseGenerator({ request, tenant, property }: Props) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [draft, setDraft] = useState<{ draftResponse: string; suggestedActions: string } | null>(null);
+export function MaintenanceResponseGenerator({ request, tenant, property, onUpdate }: Props) {
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [responseMessage, setResponseMessage] = useState('');
   const { toast } = useToast();
+  const { userProfile, user } = useAuth();
+  const { startLoading, stopLoading, isLoading: isSubmitting } = useLoading();
 
-  const { startLoading, stopLoading } = useLoading();
-
-  const handleGenerate = async () => {
-    setIsLoading(true);
-    startLoading('Generating AI Draft...');
-    setDraft(null);
-
+  const handleGenerateAI = async () => {
+    setIsDrafting(true);
     const input = {
       tenantName: tenant.name,
       propertyAddress: property.address,
@@ -42,74 +43,130 @@ export function MaintenanceResponseGenerator({ request, tenant, property }: Prop
     try {
       const result = await getMaintenanceResponseDraft(input);
       if (result.success && result.data) {
-        setDraft(result.data);
-        toast({ title: 'Draft Generated', description: 'AI has generated a response draft.' });
+        setResponseMessage(result.data.draftResponse);
+        toast({ title: 'AI Draft Ready', description: 'The suggested response has been loaded.' });
       } else {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Request failed.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'AI generation failed.' });
     } finally {
-      setIsLoading(false);
-      stopLoading();
+      setIsDrafting(false);
     }
   };
 
-  const copyToClipboard = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ description: `${fieldName} copied to clipboard.` });
-  }
+  const handlePostResponse = async () => {
+    if (!responseMessage.trim()) {
+        toast({ variant: 'destructive', title: 'Empty Message', description: 'Please type a response before sending.' });
+        return;
+    }
+
+    if (!userProfile?.name) {
+        toast({ variant: 'destructive', title: 'Profile Error', description: 'Could not identify responder name. Please check your profile.' });
+        return;
+    }
+
+    startLoading('Posting response...');
+    try {
+        const result = await performRespondToMaintenanceRequest(
+            request,
+            responseMessage,
+            userProfile.name,
+            user?.uid || 'system',
+            tenant.email
+        );
+
+        if (result.success) {
+            toast({ title: 'Response Posted', description: 'Tenant has been notified of the update.' });
+            setResponseMessage('');
+            onUpdate();
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to post update.' });
+    } finally {
+        stopLoading();
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Request Details</CardTitle>
-          <CardDescription>Details for the maintenance request from {tenant.name}.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <p><strong>Tenant:</strong> {tenant.name}</p>
-          <p><strong>Property:</strong> {property.name} ({property.address})</p>
-          <p><strong>Title:</strong> {request.title}</p>
-          <p><strong>Category:</strong> {request.category}</p>
-          <p><strong>Priority:</strong> <span className="capitalize">{request.priority}</span></p>
-          <p><strong>Request:</strong> {request.description}</p>
-        </CardContent>
-      </Card>
+    <div className="grid md:grid-cols-2 gap-6">
+      <div className="space-y-6">
+        <Card>
+            <CardHeader className="p-4">
+                <CardTitle className="text-base">Request Details</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm p-4 pt-0 space-y-2">
+                <p><strong>Resident:</strong> {tenant.name}</p>
+                <p><strong>Property:</strong> {property.name} (Unit {tenant.unitName})</p>
+                <p><strong>Issue:</strong> {request.title}</p>
+                <p><strong>Category:</strong> {request.category}</p>
+                <p><strong>Priority:</strong> <span className="capitalize font-semibold text-destructive">{request.priority}</span></p>
+                <div className="mt-2 p-2 bg-muted rounded border italic">
+                    &quot;{request.description}&quot;
+                </div>
+            </CardContent>
+        </Card>
 
-      <div className="flex justify-center">
-        <Button onClick={handleGenerate} disabled={isLoading}>
-          {isLoading ? (
-            <Loader className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <WandSparkles className="mr-2 h-4 w-4" />
-          )}
-          Generate Draft Response
-        </Button>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <Label htmlFor="staff-response" className="font-bold">Post Update / Response</Label>
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleGenerateAI} 
+                    disabled={isDrafting}
+                    className="text-primary hover:text-primary hover:bg-primary/5"
+                >
+                    {isDrafting ? <Loader className="mr-2 h-3 w-3 animate-spin" /> : <WandSparkles className="mr-2 h-3 w-3" />}
+                    Draft with AI
+                </Button>
+            </div>
+            <Textarea 
+                id="staff-response" 
+                placeholder="Type your message to the tenant here..." 
+                value={responseMessage} 
+                onChange={(e) => setResponseMessage(e.target.value)}
+                rows={8} 
+            />
+            <Button className="w-full" onClick={handlePostResponse} disabled={isSubmitting || !responseMessage.trim()}>
+                {isSubmitting ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Post Update & Notify Tenant
+            </Button>
+        </div>
       </div>
 
-      {draft && (
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="draft-response">Draft Response to Tenant</Label>
-              <Button variant="ghost" size="icon" onClick={() => copyToClipboard(draft.draftResponse, 'Response')}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <Textarea id="draft-response" value={draft.draftResponse} rows={10} readOnly className="bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="suggested-actions">Suggested Internal Actions</Label>
-              <Button variant="ghost" size="icon" onClick={() => copyToClipboard(draft.suggestedActions, 'Actions')}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <Textarea id="suggested-actions" value={draft.suggestedActions} rows={10} readOnly className="bg-muted" />
-          </div>
+      <div className="flex flex-col h-full border rounded-lg bg-slate-50/50">
+        <div className="p-4 border-b bg-white rounded-t-lg">
+            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Response History</h4>
         </div>
-      )}
+        <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+                {request.updates && request.updates.length > 0 ? (
+                    request.updates.map((update, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border shadow-sm space-y-2">
+                            <div className="flex justify-between items-start gap-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <User className="h-3 w-3 text-primary" />
+                                    </div>
+                                    <span className="text-xs font-bold">{update.authorName}</span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{format(new Date(update.date), 'MMM d, h:mm a')}</span>
+                            </div>
+                            <p className="text-sm text-slate-700 leading-relaxed">{update.message}</p>
+                        </div>
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground opacity-50">
+                        <MessageSquare className="h-8 w-8 mb-2" />
+                        <p className="text-xs">No updates posted yet.</p>
+                    </div>
+                )}
+            </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 }

@@ -27,7 +27,7 @@ import { MaintenanceResponseGenerator } from '@/components/maintenance-response-
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, Wrench, ChevronDown, Edit } from 'lucide-react';
+import { Search, Wrench, ChevronDown, Edit, MessageSquare } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -46,7 +46,7 @@ export default function MaintenancePage() {
   const [categoryFilter, setCategoryFilter] = useState<MaintenanceCategory | 'all'>('all');
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const [requests, tenantData, propertyData] = await Promise.all([
       getMaintenanceRequests(),
       getTenants(),
@@ -55,11 +55,11 @@ export default function MaintenancePage() {
     setMaintenanceRequests(requests);
     setTenants(tenantData);
     setProperties(propertyData);
-  };
+  }, []);
   
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const getTenant = useCallback((tenantId: string) => tenants.find((t) => t.id === tenantId), [tenants]);
   const getProperty = useCallback((propertyId: string) => properties.find((p) => p.id === propertyId), [properties]);
@@ -212,20 +212,22 @@ export default function MaintenancePage() {
                               <Dialog>
                               <DialogTrigger asChild>
                                   <Button variant="outline" size="sm">
-                                  Draft Response
+                                  <MessageSquare className="mr-2 h-4 w-4" />
+                                  Respond / Update
                                   </Button>
                               </DialogTrigger>
                               <DialogContent className="max-w-4xl">
                                   <DialogHeader>
-                                      <DialogTitle>Automated Response Draft</DialogTitle>
+                                      <DialogTitle>Update Maintenance Request</DialogTitle>
                                       <DialogDescription>
-                                          AI-generated response draft for the maintenance request. Review and edit as needed.
+                                          Post a response to the resident and track internal updates.
                                       </DialogDescription>
                                   </DialogHeader>
                                   <MaintenanceResponseGenerator
                                     request={request}
                                     tenant={tenant}
                                     property={property}
+                                    onUpdate={fetchData}
                                   />
                               </DialogContent>
                               </Dialog>

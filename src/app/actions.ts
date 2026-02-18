@@ -1,9 +1,10 @@
+
 'use server';
 
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
 import { sendCustomEmail, checkAndSendLeaseReminders } from '@/lib/firebase';
-import { logCommunication, getTenant, getWaterReadingsAndTenants, processOverdueNotices } from '@/lib/data';
-import { Communication, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
+import { logCommunication, getTenant, getWaterReadingsAndTenants, processOverdueNotices, addMaintenanceUpdate } from '@/lib/data';
+import { Communication, Landlord, PropertyOwner, WaterMeterReading, MaintenanceRequest } from '@/lib/types';
 import { generateArrearsServiceChargeInvoicePDF } from '@/lib/pdf-generator';
 import { format } from 'date-fns';
 
@@ -73,6 +74,58 @@ export async function getMaintenanceResponseDraft(input: MaintenanceRequestInput
     const message = error.message || 'Failed to generate AI draft. Please try again.';
     return { success: false, error: message };
   }
+}
+
+export async function performRespondToMaintenanceRequest(
+    request: MaintenanceRequest,
+    message: string,
+    authorName: string,
+    senderId: string,
+    tenantEmail: string
+) {
+    try {
+        const update = {
+            message,
+            authorName,
+            date: new Date().toISOString(),
+        };
+
+        await addMaintenanceUpdate(request.id, update);
+
+        // Notify tenant
+        const subject = `Update on your Maintenance Request: ${request.title}`;
+        const body = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px;">Maintenance Update</h2>
+                <p>Dear Resident,</p>
+                <p>An update has been posted regarding your maintenance request for <strong>"${request.title}"</strong>.</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3763eb;">
+                    <p style="margin: 0; color: #555;">${message}</p>
+                    <p style="margin-top: 10px; font-size: 0.85em; color: #888;">- ${authorName}, Property Management</p>
+                </div>
+                <p>We are working to resolve this issue as quickly as possible. You can view the full history of this request in your tenant portal.</p>
+                <br/>
+                <p>Regards,<br/>The Eracov Properties Team</p>
+            </div>
+        `;
+
+        await performSendCustomEmail(
+            [tenantEmail],
+            subject,
+            body,
+            senderId,
+            {
+                relatedTenantId: request.tenantId,
+                type: 'automation',
+                subType: 'Maintenance Update',
+            }
+        );
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error performing maintenance response:", error);
+        return { success: false, error: error.message || 'Failed to post response.' };
+    }
 }
 
 export async function performSendArrearsReminder(tenantId: string, senderId: string) {
@@ -189,9 +242,9 @@ export async function performSendWaterBills(readingIds: string[], senderId: stri
               <p>Dear ${tenant.name},</p>
               <p>Please find your water bill for unit <strong>${reading.unitName}</strong> for the period ending ${format(new Date(reading.date), 'PPP')}.</p>
               <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                  <tr style="background-color: #f9f9f9;"><td style="padding: 10px; border: 1px solid #ddd;">Prior Reading:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.priorReading} units</td></tr>
+                  <tr style="background-color: #f0f0f0;"><td style="padding: 10px; border: 1px solid #ddd;">Prior Reading:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.priorReading} units</td></tr>
                   <tr><td style="padding: 10px; border: 1px solid #ddd;">Current Reading:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.currentReading} units</td></tr>
-                  <tr style="background-color: #f9f9f9;"><td style="padding: 10px; border: 1px solid #ddd;">Consumption:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.consumption} units</td></tr>
+                  <tr style="background-color: #f0f0f0;"><td style="padding: 10px; border: 1px solid #ddd;">Consumption:</td><td style="padding: 10px; border: 1px solid #ddd;">${reading.consumption} units</td></tr>
                   <tr><td style="padding: 10px; border: 1px solid #ddd;">Rate:</td><td style="padding: 10px; border: 1px solid #ddd;">Ksh ${reading.rate.toLocaleString()}/unit</td></tr>
                   <tr style="background-color: #f0f0f0; font-weight: bold;"><td style="padding: 12px; border: 1px solid #ddd;">Total Amount Due:</td><td style="padding: 12px; border: 1px solid #ddd;">Ksh ${reading.amount.toLocaleString()}</td></tr>
               </table>
