@@ -40,10 +40,21 @@ export function getRecommendedPaymentStatus(tenant: { dueBalance?: number }, dat
 
 /**
  * Process a new payment and update the tenant's balances.
+ * This function is now siloed: 'Water' payments do not affect the Rent/Service Charge balance.
  */
 export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type'], paymentDate: Date = new Date()): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
+
+    // If it's a water payment, it doesn't affect the Rent/SC Due Balance silo
+    if (paymentType === 'Water') {
+        return {
+            dueBalance: newDueBalance,
+            accountBalance: newAccountBalance,
+            'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }, paymentDate),
+            'lease.lastPaymentDate': format(paymentDate, 'yyyy-MM-dd')
+        };
+    }
 
     if (paymentType === 'Adjustment') {
         // Positive amount = DEBIT (increases due balance)
@@ -60,7 +71,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
         };
     }
 
-    // This logic is for normal payments (Rent, Water, etc.)
+    // This logic is for normal Rent/Deposit/ServiceCharge payments
     const positivePaymentAmount = Math.abs(paymentAmount);
     let totalAvailable = positivePaymentAmount + newAccountBalance; 
 
@@ -83,8 +94,7 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
 
 /**
  * Monthly reconciliation logic. This function calculates any missed monthly charges
- * and returns the necessary updates for the tenant object. It's designed to be run
- * to bring a tenant's account up-to-date before displaying a balance or processing a new transaction.
+ * and returns the necessary updates for the tenant object. It strictly handles Rent/Service Charges.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, date: Date = new Date()): { [key: string]: any } {
     if (!tenant.lease || (!tenant.lease.rent && !tenant.lease.serviceCharge)) {
@@ -129,8 +139,6 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         : addMonths(billingStartDate, -1);
 
     // The first month we should even consider billing for.
-    // If they've been billed before, it's the month after that bill.
-    // If they've never been billed, it's their billing start date.
     const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
 
     let monthsToBill = 0;
@@ -138,8 +146,6 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     let loopDate = firstBillableMonth;
     const startOfToday = startOfMonth(date);
 
-    // Rent is billed on the 1st of the month for that month.
-    // e.g., on Feb 1st, Feb rent is charged.
     while (loopDate <= startOfToday) { 
         monthsToBill++;
         latestBilledPeriod = format(loopDate, 'yyyy-MM');
@@ -204,7 +210,6 @@ export function validatePayment(
 
 
     const today = new Date();
-    // Set hours to 0 to compare dates only
     today.setHours(0, 0, 0, 0);
     const paymentDateOnly = new Date(paymentDate);
     paymentDateOnly.setHours(0, 0, 0, 0);
@@ -295,7 +300,7 @@ export function generateLedger(
             const firstBillableMonth = billingStartDate;
             
             let loopDate = firstBillableMonth;
-            const endOfPeriod = startOfMonth(asOfDate); // Bill up to the start of the current month being viewed
+            const endOfPeriod = startOfMonth(asOfDate); 
 
             while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
                 const monthKey = format(loopDate, 'yyyy-MM');
@@ -343,11 +348,9 @@ export function generateLedger(
         if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
         if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
         if (p.type === 'Adjustment' || p.type === 'Reversal') {
-            // Adjustments are general. Only include them in the rent/SC ledger, NOT the water ledger.
-            // This prevents a general credit from being applied to a water bill.
             return (!!finalOptions.includeRent || !!finalOptions.includeServiceCharge) && !finalOptions.includeWater;
         }
-        return false; // Exclude 'Other' by default
+        return false; 
     });
 
     const allPaymentsAndAdjustments = paymentsToInclude.map(p => {

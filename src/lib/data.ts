@@ -1047,12 +1047,9 @@ export async function addWaterMeterReading(data: {
 
     const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
     
-    // Add the water reading amount to the high-level due balance
-    let updatedDue = reconciliationUpdates.dueBalance !== undefined ? reconciliationUpdates.dueBalance : (tenantForReading.dueBalance || 0);
-    updatedDue += amount;
-    
-    reconciliationUpdates.dueBalance = updatedDue;
-    reconciliationUpdates['lease.paymentStatus'] = getRecommendedPaymentStatus({ dueBalance: updatedDue }, asOfDate || new Date());
+    // Note: We no longer add 'amount' to reconciliationUpdates.dueBalance here
+    // because the user wants utility and rent balances to be strictly siloed.
+    // The high-level dueBalance now strictly represents Rent/Service Charges.
 
     if (Object.keys(reconciliationUpdates).length > 0) {
         const tenantRef = doc(db, 'tenants', originalTenant.id);
@@ -1238,16 +1235,16 @@ export async function batchProcessPayments(
 
             transaction.set(paymentDocRef, paymentPayload);
 
-            // Water payments also reduce the high-level dueBalance
+            // processPayment is now siloed - it only updates dueBalance if the type is NOT 'Water'
             const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
 
             workingTenant = {
                 ...workingTenant,
-                dueBalance: paymentProcessingUpdates.dueBalance,
-                accountBalance: paymentProcessingUpdates.accountBalance,
+                dueBalance: paymentProcessingUpdates.dueBalance !== undefined ? paymentProcessingUpdates.dueBalance : workingTenant.dueBalance,
+                accountBalance: paymentProcessingUpdates.accountBalance !== undefined ? paymentProcessingUpdates.accountBalance : workingTenant.accountBalance,
                 lease: {
                     ...workingTenant.lease,
-                    paymentStatus: paymentProcessingUpdates['lease.paymentStatus'],
+                    paymentStatus: paymentProcessingUpdates['lease.paymentStatus'] || workingTenant.lease.paymentStatus,
                     lastPaymentDate: paymentProcessingUpdates['lease.lastPaymentDate'] || workingTenant.lease.lastPaymentDate,
                 }
             };
@@ -1360,7 +1357,7 @@ export async function forceRecalculateTenantBalance(tenantId: string): Promise<v
     const property = await getProperty(tenant.propertyId);
     const unit = property?.units.find(u => u.name === tenant.unitName);
 
-    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date());
+    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date(), { includeWater: false });
 
     const latestPayment = payments[0]; 
 
