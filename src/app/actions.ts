@@ -1,4 +1,3 @@
-
 'use server';
 
 import { generateMaintenanceResponseDraft, type MaintenanceRequestInput } from '@/ai/flows/automated-maintenance-response-drafts';
@@ -36,7 +35,6 @@ export async function performSendCustomEmail(
 
     return { success: true, data: result.data };
   } catch (error: any) {
-    console.error("Error sending custom email:", error);
     // Also log a failed communication attempt
      await logCommunication({
         senderId,
@@ -59,7 +57,6 @@ export async function performCheckLeaseReminders() {
     const result = await checkAndSendLeaseReminders();
     return { success: true, data: result.data };
   } catch (error: any) {
-    console.error("Error checking lease reminders:", error);
     const message = error.message || 'Failed to run automation. Please try again.';
     return { success: false, error: message };
   }
@@ -70,7 +67,6 @@ export async function getMaintenanceResponseDraft(input: MaintenanceRequestInput
     const result = await generateMaintenanceResponseDraft(input);
     return { success: true, data: result };
   } catch (error: any) {
-    console.error(error);
     const message = error.message || 'Failed to generate AI draft. Please try again.';
     return { success: false, error: message };
   }
@@ -123,7 +119,6 @@ export async function performRespondToMaintenanceRequest(
 
         return { success: true };
     } catch (error: any) {
-        console.error("Error performing maintenance response:", error);
         return { success: false, error: error.message || 'Failed to post response.' };
     }
 }
@@ -161,7 +156,6 @@ export async function performSendArrearsReminder(tenantId: string, senderId: str
     }
 
   } catch (error: any) {
-    console.error("Error sending arrears reminder:", error);
     const message = error.message || 'Failed to send reminder.';
     return { success: false, error: message };
   }
@@ -215,7 +209,6 @@ export async function performSendServiceChargeInvoice(
     return await performSendCustomEmail([ownerEmail], subject, body, 'system', commDetails, attachment);
 
   } catch (error: any) {
-    console.error("Error sending service charge invoice:", error);
     return { success: false, error: error.message || 'Failed to send invoice.' };
   }
 }
@@ -231,7 +224,6 @@ export async function performSendWaterBills(readingIds: string[], senderId: stri
 
     for (const { reading, tenant } of billsToSend) {
       if (!tenant?.email) {
-        console.warn(`Skipping bill for unit ${reading.unitName} as tenant email is missing.`);
         continue;
       }
       
@@ -269,7 +261,6 @@ export async function performSendWaterBills(readingIds: string[], senderId: stri
 
     return { success: true, sentCount };
   } catch (error: any) {
-    console.error("Error sending water bills:", error);
     return { success: false, error: error.message || 'An unexpected error occurred while sending bills.' };
   }
 }
@@ -285,7 +276,6 @@ export async function performProcessMoveOuts(editorId: string) {
         }
         return { success: true, data: { message: `Successfully processed ${processedCount} move-out notices.` } };
     } catch (error: any) {
-        console.error("Error running move-out automation:", error);
         return { success: false, error: error.message || 'An unexpected error occurred.' };
     }
 }

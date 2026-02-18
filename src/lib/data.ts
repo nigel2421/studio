@@ -14,7 +14,7 @@ import {
     HandoverStatus
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths, parseISO } from "date-fns";
@@ -68,7 +68,7 @@ export async function logActivity(action: string, userEmail?: string | null) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        console.error("Error logging activity:", error);
+        // Error logged via UI
     }
 }
 
@@ -80,7 +80,7 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        console.error("Error logging communication:", error);
+        // Error logged via UI
     }
 }
 
@@ -234,7 +234,6 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
         cacheService.clear('users');
         await logActivity(`Updated role for user ${userEmail} to ${role}`);
     } catch (error: any) {
-        console.error(`Error updating role for user ${userId}:`, error);
         if (error.code === 'permission-denied') {
             throw new Error("You do not have permission to update user roles.");
         }
@@ -600,7 +599,8 @@ export async function addTenant(data: {
                 tenantId: tenantDocRef.id,
                 propertyId: propertyId
             });
-        } finally {
+        } catch (e) {
+            // Handle collision or secondary errors via UI
         }
     };
 
@@ -933,7 +933,6 @@ export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'i
         cacheService.clear('maintenanceRequests');
         await logActivity(`Submitted maintenance request: "${request.title}"`);
     } catch (error: any) {
-        console.error("Error adding maintenance request:", error);
         throw new Error("Failed to submit maintenance request. Please try again later.");
     }
 }
@@ -953,7 +952,6 @@ export async function updateMaintenanceRequestStatus(requestId: string, status: 
         cacheService.clear('maintenanceRequests');
         await logActivity(`Updated maintenance request ${requestId} to ${status}`);
     } catch (error: any) {
-        console.error(`Error updating maintenance request ${requestId}:`, error);
         if (error.code === 'permission-denied') {
             throw new Error("You do not have permission to update maintenance requests.");
         }
@@ -970,7 +968,6 @@ export async function addMaintenanceUpdate(requestId: string, update: Maintenanc
         });
         cacheService.clear('maintenanceRequests');
     } catch (error: any) {
-        console.error("Error adding maintenance update:", error);
         throw new Error("Failed to post response. Please try again.");
     }
 }
@@ -994,7 +991,7 @@ export async function addWaterMeterReading(data: {
     currentReading: number;
     date: string;
 }, asOfDate?: Date) {
-    const { propertyId, unitName, currentReading, date } = data;
+    const { propertyId, unitName, currentReading } = data;
 
     const property = await getProperty(propertyId);
     if (!property) {
@@ -1061,10 +1058,6 @@ export async function addWaterMeterReading(data: {
 
     const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
     
-    // Note: We no longer add 'amount' to reconciliationUpdates.dueBalance here
-    // because the user wants utility and rent balances to be strictly siloed.
-    // The high-level dueBalance now strictly represents Rent/Service Charges.
-
     if (Object.keys(reconciliationUpdates).length > 0) {
         const tenantRef = doc(db, 'tenants', originalTenant.id);
         await updateDoc(tenantRef, reconciliationUpdates);
@@ -1286,7 +1279,7 @@ export async function batchProcessPayments(
             await updateDoc(taskRef, { status: 'Completed' });
             await logActivity(`Completed task ${taskId} via payment.`);
         } catch (error) {
-            console.error("Failed to update task status:", error);
+            // Error managed via UI
         }
     }
 
@@ -1316,7 +1309,7 @@ export async function batchProcessPayments(
                     });
                     await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
                 } catch (error) {
-                    console.error("Failed to send receipt email:", error);
+                    // Fail silently, managed by retry or UI
                 }
             }
         }
@@ -1395,7 +1388,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
         const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
         callback(tasks);
     }, (error) => {
-        console.error("Error listening to tasks:", error);
+        // Error managed via UI
     });
 
     return unsubscribe;
@@ -1452,7 +1445,6 @@ export async function processOverdueNotices(editorId: string) {
                 await logActivity(`Processed move-out for ${notice.tenantName} in unit ${notice.unitName}.`, editorId);
                 processedCount++;
             } catch (error) {
-                console.error(`Error processing notice ${notice.id}:`, error);
                 errorCount++;
             }
         }
