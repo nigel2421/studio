@@ -17,6 +17,25 @@ export function calculateTransactionBreakdown(
     const grossAmount = payment.amount || 0;
     
     let serviceChargeDeduction = serviceCharge;
+    
+    // Handle service charge waiver based on handover date
+    if (unit?.handoverDate && payment.rentForMonth) {
+        try {
+            const handoverDate = parseISO(unit.handoverDate);
+            const handoverDay = handoverDate.getDate();
+            const firstBillableMonth = handoverDay <= 10
+                ? startOfMonth(addMonths(handoverDate, 1))
+                : startOfMonth(addMonths(handoverDate, 2));
+            
+            const paymentMonth = startOfMonth(parseISO(`${payment.rentForMonth}-01`));
+            if (isBefore(paymentMonth, firstBillableMonth)) {
+                serviceChargeDeduction = 0;
+            }
+        } catch (e) {
+            // silent fail
+        }
+    }
+
     let managementFee = 0;
     const standardManagementFeeRate = 0.05;
 
@@ -43,10 +62,10 @@ export function calculateTransactionBreakdown(
         if (unitRent > 0 && payment.type === 'Rent') {
             const rentRatio = Math.min(1, grossAmount / unitRent); 
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
-            serviceChargeDeduction = serviceCharge * rentRatio;
+            serviceChargeDeduction = serviceChargeDeduction * rentRatio;
         } else {
             managementFee = 0;
-            serviceChargeDeduction = serviceCharge;
+            // serviceChargeDeduction remains as set above (waived or full)
         }
     }
     
@@ -101,26 +120,39 @@ export function aggregateFinancials(
         const start = startOfMonth(startDate);
         const end = startOfMonth(endDate);
         
+        // Map landlord units and ensure propertyId is attached for tenant matching
         const landlordUnits = properties.flatMap(p => 
-            (p.units || []).filter(u => u.landlordId === landlord.id)
+            (p.units || []).filter(u => u.landlordId === landlord.id || (landlord.id === 'soil_merchants_internal' && u.ownership === 'SM'))
+                .map(u => ({ ...u, propertyId: p.id }))
         );
         
         let loopDate = start;
         while(isBefore(loopDate, end) || isSameMonth(loopDate, end)) {
             landlordUnits.forEach(u => {
-                const isOccupied = tenants.some(t => t.unitName === u.name && t.propertyId === u.propertyId);
-
-                if (!isOccupied && u.status === 'vacant' && u.handoverStatus === 'Handed Over' && u.serviceCharge && u.handoverDate) {
-                  const handoverDate = parseISO(u.handoverDate);
-                  const handoverDay = handoverDate.getDate();
-
-                  const firstBillableMonth = handoverDay <= 10
-                      ? startOfMonth(addMonths(handoverDate, 1))
-                      : startOfMonth(addMonths(handoverDate, 2));
-                  
-                  if (isSameMonth(loopDate, firstBillableMonth) || isAfter(loopDate, firstBillableMonth)) {
-                      vacantUnitDeduction += u.serviceCharge;
-                  }
+                // Check if the unit is billable for service charge this month
+                if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
+                    const handoverDate = parseISO(u.handoverDate);
+                    const handoverDay = handoverDate.getDate();
+                    const firstBillableMonth = handoverDay <= 10
+                        ? startOfMonth(addMonths(handoverDate, 1))
+                        : startOfMonth(addMonths(handoverDate, 2));
+                    
+                    if (isSameMonth(loopDate, firstBillableMonth) || isAfter(loopDate, firstBillableMonth)) {
+                        // Check if the unit was occupied during this specific month
+                        const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
+                        let isOccupiedInMonth = false;
+                        if (tenant && tenant.lease?.startDate) {
+                            const leaseStart = startOfMonth(parseISO(tenant.lease.startDate));
+                            if (isSameMonth(loopDate, leaseStart) || isAfter(loopDate, leaseStart)) {
+                                isOccupiedInMonth = true;
+                            }
+                        }
+                        
+                        // If it's vacant or not yet reached lease start, charge landlord
+                        if (!isOccupiedInMonth) {
+                            vacantUnitDeduction += u.serviceCharge;
+                        }
+                    }
                 }
             });
             loopDate = addMonths(loopDate, 1);
