@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,7 +12,7 @@ const ADMIN_AGENT_ROUTES = [
     '/clients', '/landlords', '/airbnb', '/users', '/logs', '/communications',
     '/water-meter/add'
 ];
-const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/clients', '/landlords'];
+const INVESTMENT_CONSULTANT_ROUTES = ['/dashboard', '/properties', '/tenants', '/clients', '/landlords', '/water-meter/add'];
 const TENANT_ROUTES = ['/tenant/dashboard', '/tenant/maintenance'];
 const LANDLORD_ROUTES = ['/landlord/dashboard'];
 const HOMEOWNER_ROUTES = ['/landlord/dashboard']; // Redirect to the same universal dashboard

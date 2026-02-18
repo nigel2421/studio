@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -67,13 +68,14 @@ interface OwnerBill {
 export default function MegarackPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { userProfile } = useAuth();
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
   
   // Common state
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [allLandlords, setAllLandlords] = useState<Landlord[]>([]);
   const [allOwners, setAllOwners] = useState<PropertyOwner[]>([]);
-  const { userProfile } = useAuth();
   
   // State for Add Form
   const [priorReading, setPriorReading] = useState<number | null>(null);
@@ -325,10 +327,9 @@ export default function MegarackPage() {
             date: format(paymentData.date, 'yyyy-MM-dd'),
             type: 'Water' as const,
             status: 'Paid' as const,
-            notes: `Consolidated water payment for ${selectedOwnerBill.owner.name}.`,
             paymentMethod: paymentData.paymentMethod,
             transactionId: paymentData.transactionId,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
         };
         batch.set(mainPaymentRef, mainPaymentPayload);
 
@@ -486,17 +487,19 @@ export default function MegarackPage() {
 
   return (
     <>
-    <Tabs defaultValue="owner-bills" className="space-y-4">
+    <Tabs defaultValue={isInvestmentConsultant ? "all-records" : "owner-bills"} className="space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
              <div>
                 <h2 className="text-3xl font-bold tracking-tight">Megarack - Water Management</h2>
                 <p className="text-muted-foreground">Manage water meter readings and billing records.</p>
             </div>
-            <TabsList>
-                <TabsTrigger value="owner-bills">Owner Bills</TabsTrigger>
-                <TabsTrigger value="all-records">All Records</TabsTrigger>
-                <TabsTrigger value="add">Add Reading</TabsTrigger>
-            </TabsList>
+            {!isInvestmentConsultant && (
+                <TabsList>
+                    <TabsTrigger value="owner-bills">Owner Bills</TabsTrigger>
+                    <TabsTrigger value="all-records">All Records</TabsTrigger>
+                    <TabsTrigger value="add">Add Reading</TabsTrigger>
+                </TabsList>
+            )}
         </div>
         <TabsContent value="owner-bills">
             <Card>
@@ -573,7 +576,7 @@ export default function MegarackPage() {
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                        <div className="flex-1 flex flex-wrap items-center gap-2">
-                           {selectedReadings.length > 0 && (
+                           {selectedReadings.length > 0 && !isInvestmentConsultant && (
                                 <Button size="sm" onClick={() => setIsConfirmSendOpen(true)}>
                                     <Mail className="mr-2 h-4 w-4" />
                                     Send {selectedReadings.length} Bill(s)
@@ -616,12 +619,14 @@ export default function MegarackPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-12 text-center">
-                                    <Checkbox
-                                        checked={selectedReadings.length === paginatedReadings.length && paginatedReadings.length > 0}
-                                        onCheckedChange={toggleSelectAll}
-                                    />
-                                </TableHead>
+                                {!isInvestmentConsultant && (
+                                    <TableHead className="w-12 text-center">
+                                        <Checkbox
+                                            checked={selectedReadings.length === paginatedReadings.length && paginatedReadings.length > 0}
+                                            onCheckedChange={toggleSelectAll}
+                                        />
+                                    </TableHead>
+                                )}
                                 <TableHead>Date</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Tenant</TableHead>
@@ -637,7 +642,7 @@ export default function MegarackPage() {
                         <TableBody>
                             {loadingRecords ? (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">
+                                    <TableCell colSpan={isInvestmentConsultant ? 10 : 11} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
@@ -646,16 +651,18 @@ export default function MegarackPage() {
                                     const isPaid = (reading.status || 'Pending') === 'Paid';
                                     return (
                                     <TableRow key={reading.id} data-state={selectedReadings.includes(reading.id) ? 'selected' : ''}>
-                                         <TableCell className="text-center">
-                                            <Checkbox
-                                                checked={selectedReadings.includes(reading.id)}
-                                                onCheckedChange={(checked) => {
-                                                    setSelectedReadings(prev => 
-                                                        checked ? [...prev, reading.id] : prev.filter(id => id !== reading.id)
-                                                    );
-                                                }}
-                                            />
-                                        </TableCell>
+                                         {!isInvestmentConsultant && (
+                                            <TableCell className="text-center">
+                                                <Checkbox
+                                                    checked={selectedReadings.includes(reading.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        setSelectedReadings(prev => 
+                                                            checked ? [...prev, reading.id] : prev.filter(id => id !== reading.id)
+                                                        );
+                                                    }}
+                                                />
+                                            </TableCell>
+                                         )}
                                         <TableCell>{format(new Date(reading.date), 'dd/MM/yy')}</TableCell>
                                         <TableCell className="font-medium">{reading.unitName}</TableCell>
                                         <TableCell>{reading.tenantName}</TableCell>
@@ -682,16 +689,20 @@ export default function MegarackPage() {
                                                         <Download className="mr-2 h-4 w-4" />
                                                         <span>Download Statement</span>
                                                     </DropdownMenuItem>
-                                                    {isPaid ? (
-                                                        <DropdownMenuItem onClick={() => handleEditClick(reading)}>
-                                                            <Edit2 className="mr-2 h-4 w-4" />
-                                                            <span>Edit Payment</span>
-                                                        </DropdownMenuItem>
-                                                    ) : (
-                                                        <DropdownMenuItem onClick={() => handleRecordPaymentClick(reading)}>
-                                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                                            <span>Record Payment</span>
-                                                        </DropdownMenuItem>
+                                                    {!isInvestmentConsultant && (
+                                                        <>
+                                                            {isPaid ? (
+                                                                <DropdownMenuItem onClick={() => handleEditClick(reading)}>
+                                                                    <Edit2 className="mr-2 h-4 w-4" />
+                                                                    <span>Edit Payment</span>
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem onClick={() => handleRecordPaymentClick(reading)}>
+                                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                                    <span>Record Payment</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -701,7 +712,7 @@ export default function MegarackPage() {
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">
+                                    <TableCell colSpan={isInvestmentConsultant ? 10 : 11} className="h-24 text-center">
                                         No records found for the selected filters.
                                     </TableCell>
                                 </TableRow>

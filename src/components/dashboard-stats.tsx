@@ -11,6 +11,7 @@ import { Users, Building2, Wrench, AlertCircle, Building, Briefcase, BedDouble, 
 import type { Tenant, Property, MaintenanceRequest, Payment, Unit } from "@/lib/types";
 import { calculateTransactionBreakdown } from "@/lib/financial-utils";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DashboardStatsProps {
   tenants: Tenant[];
@@ -20,6 +21,9 @@ interface DashboardStatsProps {
 }
 
 export function DashboardStats({ tenants, properties, maintenanceRequests, payments }: DashboardStatsProps) {
+  const { userProfile } = useAuth();
+  const isInvestmentConsultant = userProfile?.role === 'investment-consultant';
+
   // Only count residents with type 'Tenant' to align with the Residents module
   const activeTenantsOnly = tenants.filter(t => t.residentType === 'Tenant');
   const totalTenants = activeTenantsOnly.length;
@@ -55,9 +59,9 @@ export function DashboardStats({ tenants, properties, maintenanceRequests, payme
     { title: "Total Tenants", value: totalTenants, icon: Users, variant: 'default' },
     { title: "Occupancy Rate", value: `${occupancyRate.toFixed(1)}%`, icon: Percent, variant: 'success' },
     { title: "Vacant Units", value: vacantUnits, icon: Home, variant: 'default' },
-    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, variant: 'danger' },
+    { title: "Total Arrears", value: `Ksh ${totalArrears.toLocaleString()}`, icon: AlertCircle, variant: 'danger', hidden: isInvestmentConsultant },
     { title: "Pending Maint.", value: pendingMaintenance, icon: Wrench, variant: 'warning' },
-  ];
+  ].filter(stat => !stat.hidden);
 
   const variantStyles = {
     default: {

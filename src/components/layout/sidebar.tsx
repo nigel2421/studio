@@ -14,7 +14,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -95,7 +95,7 @@ export function AppSidebar() {
         if (agentHidden.includes(item.href)) return false;
     }
     if (isInvestmentConsultant) {
-        const allowedRoutes = ['/dashboard', '/properties', '/tenants'];
+        const allowedRoutes = ['/dashboard', '/properties', '/tenants', '/water-meter/add'];
         if (!allowedRoutes.includes(item.href)) return false;
     }
     return true;
@@ -135,9 +135,6 @@ export function AppSidebar() {
         <SidebarMenu>
           {visibleNavItems.map((item) => {
             if (item.href === '/tenants') {
-                 if (isInvestmentConsultant && !['/dashboard', '/properties', '/tenants'].includes(item.href)) {
-                    return null;
-                 }
                  return (
                     <Collapsible asChild key="tenants-group" defaultOpen={pathname ? pathname.startsWith('/tenants') : false}>
                         <SidebarMenuItem>
@@ -155,11 +152,13 @@ export function AppSidebar() {
                                             <SidebarMenuSubButton isActive={pathname === '/tenants'}>All Residents</SidebarMenuSubButton>
                                         </Link>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <Link href="/tenants/notice-to-vacate" onClick={() => handleLinkClick('Notice to Vacate')}>
-                                            <SidebarMenuSubButton isActive={pathname === '/tenants/notice-to-vacate'}>Notice to Vacate</SidebarMenuSubButton>
-                                        </Link>
-                                    </SidebarMenuSubItem>
+                                    {!isInvestmentConsultant && (
+                                        <SidebarMenuSubItem>
+                                            <Link href="/tenants/notice-to-vacate" onClick={() => handleLinkClick('Notice to Vacate')}>
+                                                <SidebarMenuSubButton isActive={pathname === '/tenants/notice-to-vacate'}>Notice to Vacate</SidebarMenuSubButton>
+                                            </Link>
+                                        </SidebarMenuSubItem>
+                                    )}
                                     <SidebarMenuSubItem>
                                         <Link href="/tenants/archived" onClick={() => handleLinkClick('Archived Tenants')}>
                                             <SidebarMenuSubButton isActive={pathname === '/tenants/archived'}>Archived</SidebarMenuSubButton>
