@@ -547,27 +547,6 @@ export const generateLandlordStatementPDF = (
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
-    // New Occupancy Summary Table
-    if (summary.unitOccupancySummary && summary.unitOccupancySummary.length > 0) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Occupancy Summary', 14, yPos);
-        yPos += 8;
-
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Unit Name', 'Rented Months', 'Vacant Months']],
-            body: summary.unitOccupancySummary.map(s => [
-                s.unitName,
-                `${s.rentedMonths} month(s)`,
-                `${s.vacantMonths} month(s)`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [41, 102, 182] },
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-    }
-
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
         doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');

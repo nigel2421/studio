@@ -107,7 +107,6 @@ export function aggregateFinancials(
         totalNetRemittance: 0,
         transactionCount: transactions.length,
         vacantUnitServiceChargeDeduction: 0,
-        unitOccupancySummary: [],
     };
     
     transactions.forEach((transaction: DisplayTransaction) => {
@@ -118,63 +117,6 @@ export function aggregateFinancials(
         summary.totalOtherCosts += transaction.otherCosts || 0;
         summary.totalNetRemittance += transaction.netToLandlord;
     });
-
-    const unitOccupancy: Record<string, { rented: number, vacant: number }> = {};
-
-    if (startDate && endDate && landlord) {
-        const start = startOfMonth(startDate);
-        const end = startOfMonth(endDate);
-        
-        // Map landlord units
-        const landlordUnits = properties.flatMap(p => 
-            (p.units || []).filter(u => u.landlordId === landlord.id || (landlord.id === 'soil_merchants_internal' && u.ownership === 'SM'))
-                .map(u => ({ ...u, propertyId: p.id }))
-        );
-
-        landlordUnits.forEach(u => unitOccupancy[u.name] = { rented: 0, vacant: 0 });
-        
-        let loopDate = start;
-        while(isBefore(loopDate, end) || isSameMonth(loopDate, end)) {
-            landlordUnits.forEach(u => {
-                let isBillableInMonth = false;
-                if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
-                    const hDate = parseISO(u.handoverDate);
-                    if (isValid(hDate)) {
-                        const firstMonth = startOfMonth(hDate);
-                        const hMonthKey = format(firstMonth, 'yyyy-MM');
-                        const currentMonthKey = format(loopDate, 'yyyy-MM');
-                        
-                        // Waive SC for handover month
-                        if (hMonthKey !== currentMonthKey && (isSameMonth(loopDate, firstMonth) || isAfter(loopDate, firstMonth))) {
-                            isBillableInMonth = true;
-                        }
-                    }
-                }
-
-                const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
-                let isOccupiedInMonth = false;
-                if (tenant && tenant.lease?.startDate) {
-                    const leaseStart = startOfMonth(parseISO(tenant.lease.startDate));
-                    if (isSameMonth(loopDate, leaseStart) || isAfter(loopDate, leaseStart)) {
-                        isOccupiedInMonth = true;
-                    }
-                }
-                
-                if (isOccupiedInMonth) {
-                    unitOccupancy[u.name].rented++;
-                } else if (isBillableInMonth) {
-                    unitOccupancy[u.name].vacant++;
-                }
-            });
-            loopDate = addMonths(loopDate, 1);
-        }
-    }
-
-    summary.unitOccupancySummary = Object.entries(unitOccupancy).map(([unitName, counts]) => ({
-        unitName,
-        rentedMonths: counts.rented,
-        vacantMonths: counts.vacant,
-    }));
 
     return summary;
 }

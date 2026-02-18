@@ -273,11 +273,6 @@ export type FinancialSummary = {
     totalNetRemittance: number;
     transactionCount: number;
     vacantUnitServiceChargeDeduction?: number;
-    unitOccupancySummary?: {
-        unitName: string;
-        rentedMonths: number;
-        vacantMonths: number;
-    }[];
 };
 
 export const maintenanceCategories = ['Plumbing', 'Electrical', 'HVAC', 'General', 'Appliance', 'Other'] as const;
