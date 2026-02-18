@@ -101,13 +101,14 @@ export function aggregateFinancials(
     
     transactions.forEach((transaction: DisplayTransaction) => {
         summary.totalRent += transaction.gross;
-        summary.totalServiceCharges += transaction.serviceChargeDeduction;
+        // The split logic is now handled inside generateLandlordDisplayTransactions
+        summary.totalServiceCharges += transaction.occupiedServiceCharge || 0;
+        summary.vacantUnitServiceChargeDeduction += transaction.vacantServiceCharge || 0;
         summary.totalManagementFees += transaction.managementFee;
         summary.totalOtherCosts += transaction.otherCosts || 0;
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
-    let vacantUnitDeduction = 0;
     const unitOccupancy: Record<string, { rented: number, vacant: number }> = {};
 
     if (startDate && endDate && landlord) {
@@ -125,7 +126,6 @@ export function aggregateFinancials(
         let loopDate = start;
         while(isBefore(loopDate, end) || isSameMonth(loopDate, end)) {
             landlordUnits.forEach(u => {
-                // For vacant units, landlords are billed starting from the month of handover
                 let isBillableInMonth = false;
                 if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
                     const hDate = parseISO(u.handoverDate);
@@ -150,15 +150,12 @@ export function aggregateFinancials(
                     unitOccupancy[u.name].rented++;
                 } else if (isBillableInMonth) {
                     unitOccupancy[u.name].vacant++;
-                    vacantUnitDeduction += u.serviceCharge!;
                 }
             });
             loopDate = addMonths(loopDate, 1);
         }
     }
 
-    summary.vacantUnitServiceChargeDeduction = vacantUnitDeduction;
-    summary.totalNetRemittance -= vacantUnitDeduction;
     summary.unitOccupancySummary = Object.entries(unitOccupancy).map(([unitName, counts]) => ({
         unitName,
         rentedMonths: counts.rented,
@@ -178,13 +175,13 @@ export function generateLandlordDisplayTransactions(
 ): DisplayTransaction[] {
     const landlordId = landlord?.id;
     const unitMap = new Map<string, Unit>();
-    const landlordUnits = new Map<string, Unit>();
+    const landlordUnits = new Map<string, Unit & { propertyId: string }>();
     properties.forEach(p => {
         (p.units || []).forEach(u => {
             const unitWithProp = { ...u, propertyId: p.id };
             unitMap.set(`${p.id}-${u.name}`, unitWithProp);
             if (u.landlordId === landlordId || (landlordId === 'soil_merchants_internal' && u.ownership === 'SM')) {
-                landlordUnits.set(u.name, unitWithProp);
+                landlordUnits.set(`${p.id}-${u.name}`, unitWithProp);
             }
         });
     });
@@ -200,14 +197,6 @@ export function generateLandlordDisplayTransactions(
     let transactions: DisplayTransaction[] = [];
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const tenantFirstPaymentMap = new Map<string, string>();
-    tenants.forEach(tenant => {
-        const firstPayment = sortedPayments.find(p => p.tenantId === tenant.id && p.type === 'Rent');
-        if (firstPayment) {
-            tenantFirstPaymentMap.set(tenant.id, firstPayment.id);
-        }
-    });
-
     const tenantMonthTracker = new Map<string, number>();
 
     sortedPayments.forEach(payment => {
@@ -216,19 +205,8 @@ export function generateLandlordDisplayTransactions(
 
         const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
         const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
-        const isFirstPaymentForTenant = tenantFirstPaymentMap.get(tenant.id) === payment.id;
         
         let amountToApportionAsRent = payment.amount;
-
-        if (isFirstPaymentForTenant) {
-            const totalDeposits = (tenant.securityDeposit || 0) + (tenant.waterDeposit || 0);
-            if (payment.amount >= totalDeposits) {
-                amountToApportionAsRent = payment.amount - totalDeposits;
-            } else {
-                amountToApportionAsRent = 0;
-            }
-        }
-        
         if (amountToApportionAsRent <= 0 || unitRent <= 0) return;
 
         let remainingAmount = amountToApportionAsRent;
@@ -263,17 +241,94 @@ export function generateLandlordDisplayTransactions(
         tenantMonthTracker.set(tenant.id, monthIndex);
     });
 
-    transactions.sort((a,b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        if (dateA !== dateB) return dateA - dateB;
-        return a.unitName.localeCompare(b.unitName);
+    // Group by month to inject vacant service charges
+    const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
+        const month = t.rentForMonth;
+        if (!acc[month]) acc[month] = [];
+        acc[month].push(t);
+        return acc;
+    }, {} as Record<string, DisplayTransaction[]>);
+
+    // If a range is provided, ensure all months in range are present
+    if (startDate && endDate) {
+        let loopDate = startOfMonth(startDate);
+        const endLoop = startOfMonth(endDate);
+        while (isBefore(loopDate, endLoop) || isSameMonth(loopDate, endLoop)) {
+            const mKey = format(loopDate, 'yyyy-MM');
+            if (!groupedByMonth[mKey]) groupedByMonth[mKey] = [];
+            loopDate = addMonths(loopDate, 1);
+        }
+    }
+
+    const allSortedMonths = Object.keys(groupedByMonth).sort();
+
+    allSortedMonths.forEach(month => {
+        const monthDate = parseISO(month + '-01');
+        const monthTransactions = groupedByMonth[month];
+        
+        let monthlyVacantSC = 0;
+        landlordUnits.forEach(u => {
+            let isBillableInMonth = false;
+            if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
+                const hDate = parseISO(u.handoverDate);
+                if (isValid(hDate)) {
+                    const firstMonth = startOfMonth(hDate);
+                    if (isSameMonth(monthDate, firstMonth) || isAfter(monthDate, firstMonth)) {
+                        isBillableInMonth = true;
+                    }
+                }
+            }
+
+            const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
+            let isOccupiedInMonth = false;
+            if (tenant && tenant.lease?.startDate) {
+                const leaseStart = startOfMonth(parseISO(tenant.lease.startDate));
+                if (isSameMonth(monthDate, leaseStart) || isAfter(monthDate, leaseStart)) {
+                    isOccupiedInMonth = true;
+                }
+            }
+
+            if (!isOccupiedInMonth && isBillableInMonth) {
+                monthlyVacantSC += u.serviceCharge!;
+            }
+        });
+
+        if (monthTransactions.length > 0) {
+            // Consolidate vacant SC into the first transaction of the month for that month
+            monthTransactions[0].vacantServiceCharge = monthlyVacantSC;
+            monthTransactions[0].serviceChargeDeduction += monthlyVacantSC;
+            
+            monthTransactions.forEach((t, idx) => {
+                t.occupiedServiceCharge = (idx === 0) ? (t.serviceChargeDeduction - monthlyVacantSC) : t.serviceChargeDeduction;
+                t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
+            });
+        } else if (monthlyVacantSC > 0) {
+            // Inject row for months with ONLY vacant SC
+            monthTransactions.push({
+                id: `vacant-${month}`,
+                date: format(monthDate, 'yyyy-MM-dd'),
+                propertyId: landlordUnits.values().next().value?.propertyId || '',
+                unitName: 'Vacant Units',
+                unitType: 'N/A',
+                rentForMonth: month,
+                forMonthDisplay: format(monthDate, 'MMM yyyy'),
+                gross: 0,
+                serviceChargeDeduction: monthlyVacantSC,
+                managementFee: 0,
+                otherCosts: 0,
+                netToLandlord: -monthlyVacantSC,
+                vacantServiceCharge: monthlyVacantSC,
+                occupiedServiceCharge: 0
+            });
+        }
     });
+
+    const finalTransactions = allSortedMonths.flatMap(m => groupedByMonth[m]);
 
     const processedForOtherCosts = new Set<string>();
     const policyStartDate = parseISO('2026-02-01');
 
-    transactions.forEach(t => {
+    finalTransactions.forEach(t => {
         const rentMonthDate = parseISO(t.rentForMonth + '-01');
         if (isBefore(rentMonthDate, policyStartDate)) {
             t.otherCosts = 0;
@@ -289,23 +344,9 @@ export function generateLandlordDisplayTransactions(
                 t.otherCosts = 1000;
             }
         }
-    });
-
-    const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
-        const month = t.rentForMonth;
-        if (!acc[month]) acc[month] = [];
-        acc[month].push(t);
-        return acc;
-    }, {} as Record<string, DisplayTransaction[]>);
-
-    const sortedMonths = Object.keys(groupedByMonth).sort();
-
-    sortedMonths.forEach(month => {
-        const monthTransactions = groupedByMonth[month];
-        monthTransactions.forEach((t: DisplayTransaction) => {
-            t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
-        });
+        // Final net recalculation after costs
+        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
     });
     
-    return sortedMonths.flatMap(month => groupedByMonth[month]);
+    return finalTransactions;
 }

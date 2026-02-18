@@ -339,4 +339,6 @@ export type DisplayTransaction = {
     serviceChargeDeduction: number;
     managementFee: number;
     otherCosts: number;
+    occupiedServiceCharge?: number;
+    vacantServiceCharge?: number;
 };

@@ -514,7 +514,8 @@ export const generateLandlordStatementPDF = (
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            // Table footer sums up the total SC (Occupied + Vacant) distributed across rows
+            { content: `-${formatCurrency(summary.totalServiceCharges + (summary.vacantUnitServiceChargeDeduction || 0))}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
