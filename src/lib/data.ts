@@ -1,4 +1,3 @@
-
 import { initializeApp, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
@@ -9,7 +8,10 @@ import {
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
     NoticeToVacate,
     MaintenanceStatus,
-    MaintenanceUpdate
+    MaintenanceUpdate,
+    OwnershipType,
+    ManagementStatus,
+    HandoverStatus
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';

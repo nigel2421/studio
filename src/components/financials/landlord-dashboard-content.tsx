@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,7 +23,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
         const data = displayTransactions.map(t => ({
             Date: new Date(t.date).toLocaleDateString(),
             Unit: t.unitName || 'Unknown',
-            For_Month: t.forMonth,
+            For_Month: t.forMonthDisplay,
             "Gross Amount": t.gross,
             "Service Charge Deduction": t.serviceChargeDeduction,
             "Management Fee": t.managementFee,
@@ -106,6 +105,10 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                         <CardTitle>Transaction History</CardTitle>
                         <CardDescription>Detailed breakdown of recent payments and deductions.</CardDescription>
                     </div>
+                    <Button variant="outline" size="sm" onClick={handleExport}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export CSV
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -129,7 +132,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                                             <div className="font-medium">{transaction.unitName}</div>
                                             <div className="text-xs text-muted-foreground">{transaction.unitType}</div>
                                         </TableCell>
-                                        <TableCell>{transaction.forMonth}</TableCell>
+                                        <TableCell>{transaction.forMonthDisplay}</TableCell>
                                         <TableCell className="text-right">Ksh {transaction.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.managementFee.toLocaleString()}</TableCell>
