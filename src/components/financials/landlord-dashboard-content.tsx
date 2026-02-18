@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
-import { Payment, Property, Tenant, Unit, FinancialSummary } from '@/lib/types';
+import { Property, FinancialSummary } from '@/lib/types';
 import { downloadCSV } from '@/lib/utils';
 import { Button } from '../ui/button';
 

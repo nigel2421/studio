@@ -205,14 +205,38 @@ export const generateOwnerServiceChargeStatementPDF = (
         ((owner.userId && t.userId === owner.userId) || t.email === owner.email)
     );
     
-    if (associatedTenants.length === 0) {
-        doc.text("Could not find any associated resident accounts for this owner.", 14, 80);
-        doc.save(`service_charge_statement_error_${owner.name.toLowerCase().replace(/ /g, '_')}.pdf`);
-        return;
-    }
+    let representativeTenant: Tenant;
+    let associatedTenantIds: string[];
 
-    const representativeTenant = associatedTenants[0];
-    const associatedTenantIds = associatedTenants.map(t => t.id);
+    if (associatedTenants.length > 0) {
+        representativeTenant = associatedTenants[0];
+        associatedTenantIds = associatedTenants.map(t => t.id);
+    } else {
+        // Create a dummy tenant record so generateLedger can work based on owner units
+        representativeTenant = {
+            id: `dummy-${owner.id}`,
+            name: owner.name,
+            email: owner.email,
+            phone: owner.phone,
+            idNumber: 'N/A',
+            residentType: 'Homeowner',
+            lease: { 
+                startDate: '2000-01-01', 
+                endDate: '2099-12-31', 
+                rent: 0, 
+                paymentStatus: 'Paid' 
+            },
+            propertyId: '', 
+            unitName: '', 
+            agent: 'Susan', 
+            status: 'active', 
+            securityDeposit: 0, 
+            waterDeposit: 0, 
+            accountBalance: 0, 
+            dueBalance: 0
+        };
+        associatedTenantIds = [];
+    }
 
     const allAssociatedPayments = allPayments.filter(p => associatedTenantIds.includes(p.tenantId));
     const allAssociatedWaterReadings = allWaterReadings.filter(r => associatedTenantIds.includes(r.tenantId));
@@ -223,9 +247,6 @@ export const generateOwnerServiceChargeStatementPDF = (
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, allAssociatedWaterReadings, owner, endDate, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
     const filterLedgerByDate = (ledger: LedgerEntry[]) => {
-        if (context === 'water') {
-            return ledger;
-        }
         return ledger.filter(entry => {
             try {
                 const entryDate = parseISO(entry.date);
@@ -236,7 +257,7 @@ export const generateOwnerServiceChargeStatementPDF = (
         });
     };
 
-    if (context === 'service-charge') {
+    if (context === 'service-charge' || context === 'full') {
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text('Service Charge Statement', 14, yPos);
@@ -260,9 +281,15 @@ export const generateOwnerServiceChargeStatementPDF = (
         doc.setFont('helvetica', 'bold');
         doc.text('Service Charge Balance:', 140, yPos);
         doc.text(serviceChargeDue > 0 ? formatCurrency(serviceChargeDue) : `${formatCurrency(serviceChargeCredit)} Cr`, 196, yPos, { align: 'right' });
+        yPos += 15;
     }
 
-    if (context === 'water') {
+    if (context === 'water' || context === 'full') {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Water Bill Statement', 14, yPos);
+        yPos += 8;
+
         const waterTableBody = filterLedgerByDate(waterLedger).map(entry => {
             let readingDetails = { unit: entry.description, prior: '', current: '', rate: '' };
             if (entry.id.startsWith('charge-water-')) {
