@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -456,8 +457,6 @@ export const generateLandlordStatementPDF = (
         ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
 
-    if (summary.totalStageTwoCost > 0) summaryData.push(['Stage Two Costs', `-${formatCurrency(summary.totalStageTwoCost)}`]);
-    if (summary.totalStageThreeCost > 0) summaryData.push(['Stage Three Costs', `-${formatCurrency(summary.totalStageThreeCost)}`]);
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`]);
 
     summaryData.push(['Net Rent Payout', formatCurrency(summary.totalNetRemittance)]);
@@ -536,8 +535,7 @@ export const generateLandlordStatementPDF = (
     
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('Unit Portfolio', 14, yPos);
-    yPos += 8;
+    doc.text('Unit Portfolio', 14, yPos); yPos += 8;
 
     autoTable(doc, {
         startY: yPos,

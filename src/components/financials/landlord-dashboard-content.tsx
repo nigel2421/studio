@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -36,7 +37,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
     return (
         <div className="flex flex-col gap-8 pb-10">
 
-            <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium">Total Rent (Gross)</CardTitle>
@@ -87,7 +88,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                         <p className="text-xs text-muted-foreground">Transaction fees</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-primary/5 border-primary/20">
+                <Card className="bg-primary/5 border-primary/20 md:col-span-3 lg:col-span-1">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium text-primary">Net Rent Payout</CardTitle>
                         <Wallet className="h-4 w-4 text-primary" />

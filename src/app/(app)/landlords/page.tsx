@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -307,9 +308,6 @@ export default function LandlordsPage() {
             id: t.id,
             propertyId: t.propertyId,
             unitType: t.unitType,
-            stageTwoCost: t.stageTwoCost,
-            stageThreeCost: t.stageThreeCost,
-            specialDeductions: t.specialDeductions
         }));
         
         const unitsForPDF = relevantProperties.flatMap(p => 

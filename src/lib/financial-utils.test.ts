@@ -227,40 +227,5 @@ describe('Financial Utils Logic', () => {
             expect(transactions[1].otherCosts).toBe(1000);
         });
 
-        it('should apply special deductions per unit once', () => {
-            const landlord = { id: 'special-lord', name: 'Special Lord', email: '', phone: '', deductStageTwoCost: true, deductStageThreeCost: true };
-            const units = [
-                createMockUnit({ name: 'S1', unitType: 'Studio', landlordId: landlord.id }),
-                createMockUnit({ name: 'S2', unitType: 'One Bedroom', landlordId: landlord.id }),
-            ];
-            const props = [createMockProperty('prop-special', units)];
-            const tenants = [
-                createMockTenant({ id: 't-S1', unitName: 'S1', propertyId: 'prop-special', lease: { rent: 20000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
-                createMockTenant({ id: 't-S2', unitName: 'S2', propertyId: 'prop-special', lease: { rent: 30000, startDate: '2024-01-01', endDate: '2025-01-01', paymentStatus: 'Paid' } }),
-            ];
-            const payments = [
-                createMockPayment({ tenantId: 't-S1', amount: 20000, date: '2024-01-05', rentForMonth: '2024-01' }),
-                createMockPayment({ tenantId: 't-S2', amount: 30000, date: '2024-01-06', rentForMonth: '2024-01' }),
-                createMockPayment({ tenantId: 't-S1', amount: 20000, date: '2024-02-05', rentForMonth: '2024-02' }),
-            ];
-            
-            const transactions = generateLandlordDisplayTransactions(payments, tenants, props, landlord);
-            
-            const t1 = transactions.find(t => t.unitName === 'S1' && t.rentForMonth === '2024-01');
-            const t2 = transactions.find(t => t.unitName === 'S2' && t.rentForMonth === '2024-01');
-            const t3 = transactions.find(t => t.unitName === 'S1' && t.rentForMonth === '2024-02');
-            
-            // t1 should have Stage 2 (10000) + Stage 3 Studio (8000) = 18000
-            expect(t1!.specialDeductions).toBe(18000);
-            // t2 should have Stage 2 (10000) + Stage 3 1BR (12000) = 22000
-            expect(t2!.specialDeductions).toBe(22000);
-            // t3 is for a subsequent month for a unit that already had deductions, so it should be 0
-            expect(t3!.specialDeductions).toBe(0);
-
-            // Check net payout (Costs before policy date are 0)
-            expect(t1!.netToLandlord).toBe(20000 - (20000 * 0.05) - 0 - 18000);
-            expect(t2!.netToLandlord).toBe(30000 - (30000 * 0.05) - 0 - 22000);
-        });
-
     });
 });

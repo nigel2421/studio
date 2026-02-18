@@ -240,8 +240,6 @@ export type Landlord = {
   phone: string;
   bankAccount?: string;
   userId?: string;
-  deductStageTwoCost?: boolean;
-  deductStageThreeCost?: boolean;
 };
 
 export const userRoles = ['admin', 'agent', 'tenant', 'landlord', 'viewer', 'water-meter-reader', 'investment-consultant', 'accounts', 'homeowner'] as const;
@@ -272,8 +270,6 @@ export type FinancialSummary = {
     totalManagementFees: number;
     totalServiceCharges: number;
     totalOtherCosts: number;
-    totalStageTwoCost: number;
-    totalStageThreeCost: number;
     totalNetRemittance: number;
     transactionCount: number;
     vacantUnitServiceChargeDeduction?: number;
@@ -338,7 +334,4 @@ export type DisplayTransaction = {
     serviceChargeDeduction: number;
     managementFee: number;
     otherCosts: number;
-    stageTwoCost: number;
-    stageThreeCost: number;
-    specialDeductions: number;
 };
