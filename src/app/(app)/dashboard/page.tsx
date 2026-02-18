@@ -1,4 +1,3 @@
-
 import { Suspense } from 'react';
 import { getProperty, getTenants, getProperties, getPaymentsForTenants, getMaintenanceRequests } from "@/lib/data";
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -17,9 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 
 export const dynamic = 'force-dynamic';
-
-
-
 
 const getDashboardData = async (propId: string) => {
     try {
@@ -181,11 +177,12 @@ async function DashboardContent({ allProperties, selectedPropertyId }: { allProp
     );
 }
 
-export default async function DashboardPage(props: {
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+export default async function DashboardPage({
+    searchParams,
+}: {
+    searchParams: { [key: string]: string | string[] | undefined };
 }) {
-    const resolvedParams = await props.searchParams;
-    const propertyId = resolvedParams?.propertyId as string | undefined;
+    const propertyId = searchParams?.propertyId as string | undefined;
 
     const allProperties = await getProperties();
     const selectedPropertyId = propertyId || allProperties[0]?.id || null;

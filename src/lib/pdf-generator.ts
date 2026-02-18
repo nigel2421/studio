@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary, UnitType, UnitOrientation, unitOrientations } from './types';
@@ -6,7 +5,6 @@ import { calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
-// Helper to add company header
 const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties') => {
     const isMegaRack = brand === 'Mega Rack';
     const phone = isMegaRack ? '0793111222' : '+254 7XX XXX XXX';
@@ -24,17 +22,14 @@ const addHeader = (doc: jsPDF, title: string, brand: string = 'Eracov Properties
     doc.text(`Phone: ${phone}`, 14, 30);
     doc.text(`Email: ${email}`, 14, 34);
 
-    // Document Title
     doc.setFontSize(16);
-    doc.setTextColor(0, 51, 102); // Dark blue
+    doc.setTextColor(0, 51, 102);
     doc.text(title.toUpperCase(), 196, 20, { align: 'right' });
 
-    // Line separator
     doc.setDrawColor(200);
     doc.line(14, 40, 196, 40);
 };
 
-// Helper for currency formatting
 const formatCurrency = (amount: number) => `KSh ${(amount || 0).toLocaleString()}`;
 
 export const generateDocumentPDF = (document: FinancialDocument) => {
@@ -48,7 +43,6 @@ export const generateDocumentPDF = (document: FinancialDocument) => {
         generateServiceCharge(doc, document);
     }
 
-    // Save the PDF
     doc.save(`${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
 };
 
@@ -87,7 +81,7 @@ const generateRentReceipt = (doc: jsPDF, document: FinancialDocument) => {
             ['Rent Payment', formatCurrency(payment.amount)],
         ],
         theme: 'striped',
-        headStyles: { fillColor: [22, 163, 74] }, // Green
+        headStyles: { fillColor: [22, 163, 74] },
         foot: [['TOTAL PAID', formatCurrency(payment.amount)]],
         footStyles: { fillColor: [240, 253, 244], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
@@ -116,7 +110,7 @@ const generateWaterBill = (doc: jsPDF, document: FinancialDocument) => {
             ['Total Cost', '', formatCurrency(reading.amount)],
         ],
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] }, // Blue
+        headStyles: { fillColor: [37, 99, 235] },
         foot: [['TOTAL PAYABLE', '', formatCurrency(reading.amount)]],
         footStyles: { fillColor: [239, 246, 255], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
@@ -141,7 +135,7 @@ const generateServiceCharge = (doc: jsPDF, document: FinancialDocument) => {
         head: [['Description', 'Amount']],
         body: tableBody,
         theme: 'plain',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        headStyles: { fillColor: [217, 119, 6] },
         foot: [['TOTAL', formatCurrency(stmt.amount)]],
         footStyles: { fillColor: [255, 251, 235], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'right' },
         columnStyles: { 1: { halign: 'right' } }
@@ -173,7 +167,6 @@ export const generateOwnerServiceChargeStatementPDF = (
             .map(u => ({ ...u, propertyId: p.id, propertyName: p.name }))
     );
 
-    // Header Section - Right Side
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('STATEMENT FOR:', 14, 48);
@@ -230,11 +223,9 @@ export const generateOwnerServiceChargeStatementPDF = (
     const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, allAssociatedWaterReadings, owner, endDate, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
     const filterLedgerByDate = (ledger: LedgerEntry[]) => {
-        // For water, always show all history regardless of selected date range
         if (context === 'water') {
             return ledger;
         }
-        // For service charge, respect the date range
         return ledger.filter(entry => {
             try {
                 const entryDate = parseISO(entry.date);
@@ -333,14 +324,12 @@ export const generateArrearsServiceChargeInvoicePDF = (
 
     addHeader(doc, 'Service Charge Invoice');
     
-    // Owner Details
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text(owner.name, 14, 50);
     doc.setFont('helvetica', 'normal');
     doc.text(owner.email, 14, 56);
     
-    // Invoice Details
     doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
     doc.text(`For: ${invoiceDetails.month}`, 196, 56, { align: 'right' });
 
@@ -358,7 +347,7 @@ export const generateArrearsServiceChargeInvoicePDF = (
         head: [['Description', 'Amount Due']],
         body,
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        headStyles: { fillColor: [217, 119, 6] },
         foot: [[
             { content: 'TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(invoiceDetails.totalDue), styles: { fontStyle: 'bold', halign: 'right' } }
@@ -374,7 +363,6 @@ export const generateArrearsServiceChargeInvoicePDF = (
     doc.setFont('helvetica', 'normal');
     doc.text('Please remit payment at your earliest convenience to settle this outstanding balance.', 14, yPos);
 
-    // Return as base64 string for email attachment
     return doc.output('datauristring').split(',')[1];
 };
 
@@ -615,9 +603,6 @@ export const generateTenantStatementPDF = (
                 columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
             });
             yPos = (doc as any).lastAutoTable.finalY + 10;
-        } else {
-             doc.text("No rent or service charge transactions for this period.", 14, yPos);
-             yPos += 10;
         }
 
         doc.setFontSize(10);
@@ -664,9 +649,6 @@ export const generateTenantStatementPDF = (
                 columnStyles: { 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } }
             });
             yPos = (doc as any).lastAutoTable.finalY + 10;
-        } else {
-            doc.text("No water transactions for this period.", 14, yPos);
-            yPos += 10;
         }
 
         doc.setFontSize(10);
@@ -792,14 +774,12 @@ export const generateVacantServiceChargeInvoicePDF = (
 
     addHeader(doc, 'Service Charge Invoice');
     
-    // Owner Details
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text(owner.name, 14, 50);
     doc.setFont('helvetica', 'normal');
     doc.text(owner.email, 14, 56);
     
-    // Invoice Details
     doc.text(`Invoice Date: ${dateStr}`, 196, 50, { align: 'right' });
     doc.text(`For: Outstanding Balances on Vacant Units`, 196, 56, { align: 'right' });
 
@@ -820,7 +800,7 @@ export const generateVacantServiceChargeInvoicePDF = (
         head: [['Description', 'Amount Due']],
         body,
         theme: 'striped',
-        headStyles: { fillColor: [217, 119, 6] }, // Amber
+        headStyles: { fillColor: [217, 119, 6] },
         foot: [[
             { content: 'GRAND TOTAL DUE', styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', halign: 'right' } }

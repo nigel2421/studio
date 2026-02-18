@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -21,19 +20,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  FileText,
   Wrench,
   Building2,
-  FolderArchive,
   Briefcase,
   BedDouble,
   LogOut,
-  Archive,
   Banknote,
   Droplets,
   History,
   Mail,
-  CheckSquare,
   ChevronDown,
   UserCog,
   ClipboardList,
@@ -42,13 +37,10 @@ import {
 import { Separator } from '../ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useLoading } from '@/hooks/useLoading';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
-import { Task } from '@/lib/types';
-import { listenToTasks } from '@/lib/data';
-import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -56,8 +48,6 @@ const navItems = [
   { href: '/accounts/arrears', icon: AlertCircle, label: 'Arrears' },
   { href: '/accounts/service-charges', icon: ClipboardList, label: 'Service Charges' },
   { href: '/tenants', icon: Users, label: 'Tenants' },
-  // Archived is now part of the collapsible group
-  // { href: '/tenants/archived', icon: Archive, label: 'Archived Tenants' },
   { href: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/water-meter/add', icon: Droplets, label: 'Megarack' },
   { href: '/properties', icon: Building2, label: 'Properties' },
@@ -96,11 +86,10 @@ export function AppSidebar() {
 
   const handleLinkClick = (label: string) => {
     startLoading(`Loading ${label}...`);
-    // Auto-collapse on mobile is now handled by the useEffect watching pathname
   }
   
   const visibleNavItems = navItems.filter(item => {
-    if (item.href === '/tenants/archived') return false; // Always hide the standalone archived link
+    if (item.href === '/tenants/archived') return false;
     if (isAgent) {
         const agentHidden = ['/accounts', '/accounts/arrears', '/accounts/service-charges'];
         if (agentHidden.includes(item.href)) return false;
@@ -146,15 +135,14 @@ export function AppSidebar() {
         <SidebarMenu>
           {visibleNavItems.map((item) => {
             if (item.href === '/tenants') {
-                 // Render the collapsible Tenants menu if it's not filtered out
                  if (isInvestmentConsultant && !['/dashboard', '/properties', '/tenants'].includes(item.href)) {
                     return null;
                  }
                  return (
-                    <Collapsible asChild key="tenants-group" defaultOpen={pathname.startsWith('/tenants')}>
+                    <Collapsible asChild key="tenants-group" defaultOpen={pathname ? pathname.startsWith('/tenants') : false}>
                         <SidebarMenuItem>
                             <CollapsibleTrigger className="w-full">
-                                <SidebarMenuButton isActive={pathname.startsWith('/tenants')}>
+                                <SidebarMenuButton isActive={pathname ? pathname.startsWith('/tenants') : false}>
                                     <Users />
                                     <span>Tenants</span>
                                     <ChevronDown className="ml-auto h-4 w-4 transition-transform data-[state=open]:rotate-180" />
@@ -241,19 +229,6 @@ export function AppSidebar() {
                 </Link>
               </SidebarMenuItem>
             </>
-          )}
-          {userProfile?.role === 'homeowner' && (
-            <SidebarMenuItem>
-              <Link href="/homeowner-dashboard" onClick={() => handleLinkClick('Homeowner Dashboard')}>
-                <SidebarMenuButton
-                  isActive={isActive('/homeowner-dashboard')}
-                  tooltip="Homeowner Dashboard"
-                >
-                  <LayoutDashboard />
-                  <span>Homeowner Dashboard</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
           )}
         </SidebarMenu>
       </SidebarContent>

@@ -1,12 +1,10 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
-import { Payment, Property, Tenant, Unit } from '@/lib/types';
-import type { FinancialSummary } from '@/lib/types';
+import { Payment, Property, Tenant, Unit, FinancialSummary } from '@/lib/types';
 import { downloadCSV } from '@/lib/utils';
 import { Button } from '../ui/button';
 

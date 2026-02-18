@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading } from '@/lib/types';
+import type { Property, Unit, Tenant, Payment, Landlord, PropertyOwner, WaterMeterReading, FinancialSummary } from '@/lib/types';
 import { getTenants, getAllPaymentsForReport, getProperties, getLandlords, getPaymentHistory, getTenantWaterReadings, getPropertyOwners, getAllWaterReadings } from '@/lib/data';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -11,12 +10,11 @@ import { useRouter } from 'next/navigation';
 import { ClientLandlordDashboard } from '@/components/financials/client-landlord-dashboard';
 import { LandlordDashboardContent } from '@/components/financials/landlord-dashboard-content';
 import { aggregateFinancials, generateLandlordDisplayTransactions } from '@/lib/financial-utils';
-import type { FinancialSummary } from '@/lib/types';
 import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { useLoading } from '@/hooks/useLoading';
-import { isWithinInterval, startOfYear, endOfDay } from 'date-fns';
+import { startOfYear, endOfDay } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -32,7 +30,6 @@ export default function UniversalOwnerDashboardPage() {
     const [isStatementOpen, setIsStatementOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
 
-    // Date range state for dashboard filtering
     const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 

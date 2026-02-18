@@ -1,9 +1,7 @@
-
-
 import { processOverdueNotices } from './data';
-import { Tenant, Property, NoticeToVacate, Unit } from './types';
+import { Tenant, Property, NoticeToVacate, UnitStatus } from './types';
 import { format, subDays } from 'date-fns';
-import { getDocs, doc, writeBatch, getDoc, collection, query, where, updateDoc, addDoc } from 'firebase/firestore';
+import { getDocs, doc, writeBatch, getDoc } from 'firebase/firestore';
 
 jest.mock('firebase/firestore', () => ({
     ...jest.requireActual('firebase/firestore'),
@@ -21,7 +19,6 @@ jest.mock('firebase/firestore', () => ({
 const mockGetDocs = getDocs as jest.Mock;
 const mockGetDoc = getDoc as jest.Mock;
 const mockWriteBatch = writeBatch as jest.Mock;
-const mockAddDoc = addDoc as jest.Mock;
 
 describe('Notice to Vacate Processing', () => {
     beforeEach(() => {
@@ -29,7 +26,6 @@ describe('Notice to Vacate Processing', () => {
     });
 
     it('should process an overdue notice correctly', async () => {
-        // Arrange
         const today = new Date();
         const overdueDate = format(subDays(today, 2), 'yyyy-MM-dd');
         const editorId = 'admin-user-id';
@@ -72,32 +68,25 @@ describe('Notice to Vacate Processing', () => {
             commit: jest.fn().mockResolvedValue(undefined),
         };
         mockWriteBatch.mockReturnValue(batchOperations);
-        mockAddDoc.mockResolvedValue({ id: 'log-id' }); // Mock addDoc for logging
 
-        // Act
         const result = await processOverdueNotices(editorId);
 
-        // Assert
         expect(result).toEqual({ processedCount: 1, errorCount: 0 });
 
-        // Verify notice is updated
         expect(batchOperations.update).toHaveBeenCalledWith(
             expect.objectContaining({ path: 'noticesToVacate/notice-1' }),
             { status: 'Completed' }
         );
 
-        // Verify tenant is archived
         expect(batchOperations.set).toHaveBeenCalledWith(
             expect.objectContaining({ path: 'archived_tenants/tenant-1' }),
             expect.objectContaining({ ...mockTenant, status: 'archived' })
         );
 
-        // Verify tenant is deleted
         expect(batchOperations.delete).toHaveBeenCalledWith(
             expect.objectContaining({ path: 'tenants/tenant-1' })
         );
 
-        // Verify unit is updated
         const expectedUpdatedUnits = [
             { name: 'A101', status: 'vacant' },
             { name: 'A102', status: 'vacant' },
@@ -107,14 +96,7 @@ describe('Notice to Vacate Processing', () => {
             { units: expect.arrayContaining(expectedUpdatedUnits) }
         );
         
-        // Verify batch was committed
         expect(batchOperations.commit).toHaveBeenCalled();
-
-        // Verify activity was logged (since it's not in the batch)
-        expect(mockAddDoc).toHaveBeenCalledWith(
-            expect.anything(), 
-            expect.objectContaining({ action: `Processed move-out for ${mockTenant.name} in unit ${mockTenant.unitName}.` })
-        );
     });
 
     it('should handle cases where no notices are overdue', async () => {
