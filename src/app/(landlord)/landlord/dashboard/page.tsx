@@ -195,7 +195,7 @@ export default function UniversalOwnerDashboardPage() {
                     otherCosts: t.otherCosts
                 }));
 
-                const unitsForPDF = viewData.properties.flatMap((p: Property) => p.units.map((u: Unit) => ({
+                const unitsForPDF = viewData.properties.flatMap((p: Property) => (p.units || []).map((u: Unit) => ({
                     property: p.name,
                     unitName: u.name,
                     unitType: u.unitType,

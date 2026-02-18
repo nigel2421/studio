@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary, UnitType, UnitOrientation, unitOrientations } from './types';
-import { calculateTransactionBreakdown } from '@/lib/financial-utils';
 import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
@@ -212,7 +211,6 @@ export const generateOwnerServiceChargeStatementPDF = (
         representativeTenant = associatedTenants[0];
         associatedTenantIds = associatedTenants.map(t => t.id);
     } else {
-        // Create a dummy tenant record so generateLedger can work based on owner units
         representativeTenant = {
             id: `dummy-${owner.id}`,
             name: owner.name,
@@ -486,10 +484,9 @@ export const generateLandlordStatementPDF = (
         const monthDate = parseISO(monthDateStr);
         if(!isValid(monthDate)) return;
 
-        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 9, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach(t => {
-            const specialCosts = t.specialDeductions || 0;
             body.push([
                 t.date,
                 t.unit,
@@ -498,17 +495,14 @@ export const generateLandlordStatementPDF = (
                 `-${formatCurrency(t.serviceChargeDeduction)}`,
                 `-${formatCurrency(t.mgmtFee)}`,
                 `-${formatCurrency(t.otherCosts || 0)}`,
-                `-${formatCurrency(specialCosts)}`,
                 formatCurrency(t.netToLandlord)
             ]);
         });
     });
     
-    const totalSpecialDeductions = transactions.reduce((acc, t) => acc + (t.specialDeductions || 0), 0);
-
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Stage Costs', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
         body: body,
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -516,7 +510,6 @@ export const generateLandlordStatementPDF = (
             { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(totalSpecialDeductions)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
@@ -528,7 +521,6 @@ export const generateLandlordStatementPDF = (
             5: { halign: 'right' },
             6: { halign: 'right' },
             7: { halign: 'right' },
-            8: { halign: 'right' },
         },
     });
 
@@ -606,7 +598,7 @@ export const generateTenantStatementPDF = (
     const asOf = new Date();
 
     const { ledger: rentLedger, finalDueBalance: rentDue, finalAccountBalance: rentCredit } = generateLedger(tenant, payments, properties, [], undefined, asOf, { includeWater: false });
-    const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeRent: false, includeServiceCharge: false });
+    const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(tenant, payments, properties, waterReadings, undefined, asOf, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
     let yPos = isWaterContext ? 60 : 80;
 

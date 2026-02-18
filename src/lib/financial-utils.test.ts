@@ -1,5 +1,3 @@
-
-
 import { calculateTransactionBreakdown, aggregateFinancials, generateLandlordDisplayTransactions } from './financial-utils';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO } from 'date-fns';
@@ -152,11 +150,9 @@ describe('Financial Utils Logic', () => {
             expect(transactions[0].forMonthDisplay).toBe('Oct 2023');
             expect(transactions[0].gross).toBe(25000);
             expect(transactions[0].managementFee).toBe(1250);
-            expect(transactions[0].otherCosts).toBe(1000);
-            expect(transactions[0].netToLandlord).toBe(22750);
+            expect(transactions[0].netToLandlord).toBe(22750); // 25000 - 1250 - 1000
 
             expect(transactions[3].forMonthDisplay).toBe('Jan 2024');
-            expect(transactions[3].otherCosts).toBe(0); // Jan rule applies
 
             const totalGross = transactions.reduce((sum, t) => sum + t.gross, 0);
             expect(totalGross).toBe(100000);

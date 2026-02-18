@@ -1,23 +1,5 @@
-import { Payment, Property, Tenant, Unit, Landlord, UnitType, FinancialSummary } from "./types";
-import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter } from 'date-fns';
-
-export interface DisplayTransaction {
-    id: string;
-    date: string;
-    propertyId: string;
-    unitName: string;
-    unitType: UnitType | 'N/A';
-    rentForMonth: string;
-    forMonthDisplay: string;
-    gross: number;
-    serviceChargeDeduction: number;
-    managementFee: number;
-    otherCosts: number;
-    netToLandlord: number;
-    stageTwoCost: number;
-    stageThreeCost: number;
-    specialDeductions: number;
-}
+import { Payment, Property, Tenant, Unit, Landlord, UnitType, FinancialSummary, DisplayTransaction } from "./types";
+import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter, isValid } from 'date-fns';
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
