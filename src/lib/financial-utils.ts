@@ -242,7 +242,7 @@ export function generateLandlordDisplayTransactions(
 
     const processedForSpecialDeduction = new Set<string>();
     const processedForOtherCosts = new Set<string>();
-    const policyStartDate = parseISO('2024-02-01');
+    const policyStartDate = parseISO('2026-02-01'); // Policy effective from Feb 2026
 
     transactions.forEach(t => {
         if (landlord && !processedForSpecialDeduction.has(t.unitName)) {
@@ -265,7 +265,7 @@ export function generateLandlordDisplayTransactions(
             processedForSpecialDeduction.add(t.unitName);
         }
 
-        // NEW POLICY: otherCosts (KSh 1000) only applies from Feb 2024 onwards
+        // NEW POLICY: otherCosts (KSh 1000) only applies from Feb 2026 onwards
         const rentMonthDate = parseISO(t.rentForMonth + '-01');
         if (isBefore(rentMonthDate, policyStartDate)) {
             t.otherCosts = 0;

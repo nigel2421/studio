@@ -1,17 +1,18 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Wallet, Building2, TrendingUp, Download, Coins } from 'lucide-react';
-import { Property, FinancialSummary } from '@/lib/types';
+import { Property, FinancialSummary, DisplayTransaction } from '@/lib/types';
 import { downloadCSV } from '@/lib/utils';
 import { Button } from '../ui/button';
 
 interface LandlordDashboardContentProps {
     properties: Property[];
     financialSummary: FinancialSummary;
-    displayTransactions: any[];
+    displayTransactions: DisplayTransaction[];
     totalUnits: number;
 }
 
@@ -132,7 +133,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                                         <TableCell className="text-right">Ksh {transaction.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.managementFee.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right text-muted-foreground">- {(transaction.otherCosts || 0).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">{transaction.otherCosts > 0 ? `- ${transaction.otherCosts.toLocaleString()}` : ''}</TableCell>
                                         <TableCell className="text-right font-bold">Ksh {transaction.netToLandlord.toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}

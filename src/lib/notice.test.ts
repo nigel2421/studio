@@ -1,6 +1,6 @@
 
 import { processOverdueNotices } from './data';
-import { NoticeToVacate } from './types';
+import { NoticeToVacate, Property, UnitStatus } from './types';
 import { format, subDays } from 'date-fns';
 import { getDocs, doc, writeBatch, getDoc } from 'firebase/firestore';
 
@@ -48,8 +48,8 @@ describe('Notice to Vacate Processing', () => {
         const mockProperty = {
             id: 'prop-1',
             name: 'Test Property',
-            units: [{ name: 'A101', status: 'rented' }, { name: 'A102', status: 'vacant' }]
-        };
+            units: [{ name: 'A101', status: 'rented' as UnitStatus }, { name: 'A102', status: 'vacant' as UnitStatus }]
+        } as Property;
 
         mockGetDocs.mockResolvedValue({
             docs: [{ id: 'notice-1', data: () => mockNotice }]

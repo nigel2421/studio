@@ -645,7 +645,7 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
                 }
                 if (!shouldBeAssigned && u.landlordId === landlord.id) {
                     changed = true;
-                    const { landlordId, ...rest } = u;
+                    const { landlordId: _, ...rest } = u;
                     return rest;
                 }
             }

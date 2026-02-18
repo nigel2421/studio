@@ -395,7 +395,7 @@ export const generateArrearsServiceChargeInvoicePDF = (
 export const generateLandlordStatementPDF = (
     landlord: Landlord,
     summary: FinancialSummary,
-    transactions: { date: string; unit: string; gross: number; serviceChargeDeduction: number; mgmtFee: number; otherCosts?: number; stageTwoCost?: number; stageThreeCost?: number; specialDeductions?: number; netToLandlord: number, rentForMonth?: string, forMonthDisplay?: string }[],
+    transactions: DisplayTransaction[],
     units: { property: string; unitName: string; unitType: string; status: string }[],
     startDate?: Date,
     endDate?: Date
@@ -440,16 +440,9 @@ export const generateLandlordStatementPDF = (
         ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
 
-    if (summary.totalStageTwoCost > 0) {
-        summaryData.push(['Stage Two Costs', `-${formatCurrency(summary.totalStageTwoCost)}`]);
-    }
-    if (summary.totalStageThreeCost > 0) {
-        summaryData.push(['Stage Three Costs', `-${formatCurrency(summary.totalStageThreeCost)}`]);
-    }
-    
-    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
-      summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`])
-    }
+    if (summary.totalStageTwoCost > 0) summaryData.push(['Stage Two Costs', `-${formatCurrency(summary.totalStageTwoCost)}`]);
+    if (summary.totalStageThreeCost > 0) summaryData.push(['Stage Three Costs', `-${formatCurrency(summary.totalStageThreeCost)}`]);
+    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`]);
 
     summaryData.push(['Net Rent Payout', formatCurrency(summary.totalNetRemittance)]);
 
@@ -472,7 +465,7 @@ export const generateLandlordStatementPDF = (
         if (!acc[month]) acc[month] = [];
         acc[month].push(t);
         return acc;
-    }, {} as Record<string, typeof transactions>);
+    }, {} as Record<string, DisplayTransaction[]>);
 
     const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => a.localeCompare(b));
     
@@ -483,31 +476,32 @@ export const generateLandlordStatementPDF = (
         const monthDate = parseISO(monthDateStr);
         if(!isValid(monthDate)) return;
 
-        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 7, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach(t => {
             body.push([
                 t.date,
-                t.unit,
+                t.unitName,
                 t.forMonthDisplay,
                 formatCurrency(t.gross),
                 `-${formatCurrency(t.serviceChargeDeduction)}`,
-                `-${formatCurrency(t.mgmtFee)}`,
+                `-${formatCurrency(t.managementFee)}`,
+                t.otherCosts > 0 ? `-${formatCurrency(t.otherCosts)}` : '',
                 formatCurrency(t.netToLandlord)
             ]);
         });
     });
     
-    // Header without Stage Costs column
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
         body: body,
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalServiceCharges)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
@@ -518,6 +512,7 @@ export const generateLandlordStatementPDF = (
             4: { halign: 'right' },
             5: { halign: 'right' },
             6: { halign: 'right' },
+            7: { halign: 'right' },
         },
     });
 
