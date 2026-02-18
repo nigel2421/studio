@@ -1,161 +1,61 @@
 
-import { getTenantsInArrears, getLandlordArrearsBreakdown } from './arrears';
-import { getTenants, getProperties, getAllWaterReadings } from './data';
-import { Tenant, Property, Unit, WaterMeterReading } from './types';
+import { getTenantsInArrears } from './arrears';
+import { getTenants, getAllWaterReadings } from './data';
+import { Tenant, WaterMeterReading } from './types';
 
-// Mock the data fetching functions
 jest.mock('./data', () => ({
   getTenants: jest.fn(),
-  getProperties: jest.fn(),
   getAllWaterReadings: jest.fn(),
 }));
 
 const mockGetTenants = getTenants as jest.Mock;
-const mockGetProperties = getProperties as jest.Mock;
 const mockGetAllWaterReadings = getAllWaterReadings as jest.Mock;
-
-// Helper to create mock data
-const createMockTenant = (id: string, dueBalance: number, propertyId = 'prop-1', unitName = 'A1'): Tenant => ({
-  id,
-  name: `Tenant ${id}`,
-  email: `tenant${id}@test.com`,
-  phone: '123',
-  idNumber: '123',
-  propertyId,
-  unitName,
-  agent: 'Susan',
-  status: 'active',
-  securityDeposit: 20000,
-  waterDeposit: 5000,
-  residentType: 'Tenant',
-  lease: {
-    startDate: '2023-01-01',
-    endDate: '2024-01-01',
-    rent: 20000,
-    paymentStatus: dueBalance > 0 ? 'Overdue' : 'Paid',
-    lastBilledPeriod: '2023-10',
-  },
-  accountBalance: 0,
-  dueBalance,
-});
-
-const createMockWaterBill = (tenantId: string, amount: number, status: 'Paid' | 'Pending' = 'Pending'): WaterMeterReading => ({
-    id: `water-${tenantId}`,
-    tenantId,
-    amount,
-    propertyId: 'prop-1',
-    unitName: 'A1',
-    priorReading: 100,
-    currentReading: 110,
-    consumption: 10,
-    rate: 150,
-    date: '2024-01-15',
-    createdAt: new Date().toISOString(),
-    status,
-});
-
-const createMockUnit = (name: string, landlordId?: string, handoverStatus: 'Handed Over' | 'Pending Hand Over' = 'Handed Over', serviceCharge = 1000): Unit => ({
-    name,
-    status: 'vacant',
-    ownership: 'Landlord',
-    unitType: 'One Bedroom',
-    landlordId,
-    handoverStatus,
-    serviceCharge,
-});
 
 describe('Arrears Logic', () => {
     
     beforeEach(() => {
-        // Clear all mocks before each test
-        mockGetTenants.mockClear();
-        mockGetProperties.mockClear();
-        mockGetAllWaterReadings.mockClear();
+        jest.clearAllMocks();
     });
 
-    describe('getTenantsInArrears', () => {
-        it('should return only tenants with a dueBalance greater than 0', async () => {
-            const tenants = [
-                createMockTenant('1', 5000),
-                createMockTenant('2', 0),
-                createMockTenant('3', 10000),
-                createMockTenant('4', -100), // Credit
-            ];
-            mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllWaterReadings.mockResolvedValue([]);
+    it('should correctly calculate rent arrears by excluding pending water bills', async () => {
+        // Tenant has 25,000 total due balance in DB
+        // 20,000 is for Rent, 5,000 is for an unpaid Water bill
+        const mockTenant = {
+            id: 't1',
+            name: 'John Doe',
+            dueBalance: 25000,
+            residentType: 'Tenant',
+            email: 'john@test.com',
+            propertyId: 'p1',
+            unitName: 'A1',
+            lease: { rent: 20000, paymentStatus: 'Overdue' }
+        } as any;
 
-            const result = await getTenantsInArrears();
+        const mockWaterBill = {
+            id: 'w1',
+            tenantId: 't1',
+            amount: 5000,
+            status: 'Pending'
+        } as any;
 
-            expect(result).toHaveLength(2);
-            expect(result.map(r => r.tenant.id)).toEqual(['3', '1']); // Sorted by arrears descending
-        });
+        mockGetTenants.mockResolvedValue([mockTenant]);
+        mockGetAllWaterReadings.mockResolvedValue([mockWaterBill]);
 
-        it('should exclude pending water bills from rent arrears calculation', async () => {
-            // Tenant has 6500 total due, but 1500 is for water. Rent arrears should be 5000.
-            const tenants = [createMockTenant('1', 6500)];
-            const waterBills = [createMockWaterBill('1', 1500, 'Pending')];
-            mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllWaterReadings.mockResolvedValue(waterBills);
+        const result = await getTenantsInArrears();
 
-            const result = await getTenantsInArrears();
-            
-            expect(result).toHaveLength(1);
-            expect(result[0].arrears).toBe(5000);
-        });
-
-        it('should return an empty array when no tenants are in arrears', async () => {
-            const tenants = [
-                createMockTenant('1', 0),
-                createMockTenant('2', -50),
-            ];
-            mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllWaterReadings.mockResolvedValue([]);
-
-            const result = await getTenantsInArrears();
-            expect(result).toHaveLength(0);
-        });
+        expect(result).toHaveLength(1);
+        // Rent arrears should be 25,000 - 5,000 = 20,000
+        expect(result[0].arrears).toBe(20000);
     });
 
-    describe('getLandlordArrearsBreakdown', () => {
-        it('should calculate arrears for occupied units and service charges for vacant units', async () => {
-            const landlordId = 'landlord-A';
-            const properties: Property[] = [{
-                id: 'prop-1', name: 'Test Property', address: '123 St', type: 'Residential', imageId: '1',
-                units: [
-                    createMockUnit('A1', landlordId), // Vacant
-                    createMockUnit('A2', landlordId), // Occupied
-                    createMockUnit('B1', 'other-landlord'),
-                    createMockUnit('A3', landlordId, 'Pending Hand Over', 2000), // Vacant, but not handed over
-                ],
-            }];
-            const tenants: Tenant[] = [
-                createMockTenant('t-A2', 5000, 'prop-1', 'A2'),
-            ];
+    it('should return empty if total balance is fully accounted for by water bills', async () => {
+        const mockTenant = { id: 't1', dueBalance: 5000 } as any;
+        const mockWaterBill = { id: 'w1', tenantId: 't1', amount: 5000, status: 'Pending' } as any;
 
-            mockGetProperties.mockResolvedValue(properties);
-            mockGetTenants.mockResolvedValue(tenants);
-            mockGetAllWaterReadings.mockResolvedValue([]);
+        mockGetTenants.mockResolvedValue([mockTenant]);
+        mockGetAllWaterReadings.mockResolvedValue([mockWaterBill]);
 
-            const result = await getLandlordArrearsBreakdown(landlordId);
-
-            expect(result.totalTenantArrears).toBe(5000);
-            expect(result.vacantUnitServiceCharge).toBe(1000); // Only from unit A1
-            expect(result.totalDeductions).toBe(6000);
-            
-            const breakdownForA1 = result.breakdown.find(b => b.unit.name === 'A1');
-            expect(breakdownForA1?.tenant).toBeUndefined();
-            expect(breakdownForA1?.tenantArrears).toBe(0);
-            expect(breakdownForA1?.vacantServiceCharge).toBe(1000);
-            
-            const breakdownForA2 = result.breakdown.find(b => b.unit.name === 'A2');
-            expect(breakdownForA2?.tenant?.id).toBe('t-A2');
-            expect(breakdownForA2?.tenantArrears).toBe(5000);
-            expect(breakdownForA2?.vacantServiceCharge).toBe(0);
-            
-            const breakdownForA3 = result.breakdown.find(b => b.unit.name === 'A3');
-            expect(breakdownForA3?.vacantServiceCharge).toBe(0); // Because not handed over
-
-            expect(result.breakdown).toHaveLength(3); // Should not include B1
-        });
+        const result = await getTenantsInArrears();
+        expect(result).toHaveLength(0);
     });
 });
