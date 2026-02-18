@@ -1,5 +1,8 @@
-import { Payment, Property, Tenant, Unit, Landlord, UnitType, FinancialSummary, DisplayTransaction } from "./types";
+
+import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary, DisplayTransaction } from "./types";
 import { isSameMonth, parseISO, differenceInMonths, addMonths, format, isWithinInterval, startOfMonth, isBefore, isAfter, isValid } from 'date-fns';
+
+export type { FinancialSummary, DisplayTransaction };
 
 /**
  * Calculates the breakdown of a rent payment, including management fees and service charges.
@@ -38,12 +41,11 @@ export function calculateTransactionBreakdown(
         serviceChargeDeduction = 0;
     } else {
         if (unitRent > 0 && payment.type === 'Rent') {
-            const rentRatio = Math.min(1, grossAmount / unitRent); // Ensure ratio is not > 1
+            const rentRatio = Math.min(1, grossAmount / unitRent); 
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
-            // Only deduct service charge if it's not a 50% commission deal (initial letting)
             serviceChargeDeduction = serviceCharge * rentRatio;
         } else {
-            managementFee = 0; // No management fee on non-rent or zero-rent payments
+            managementFee = 0;
             serviceChargeDeduction = serviceCharge;
         }
     }
@@ -164,7 +166,6 @@ export function generateLandlordDisplayTransactions(
     });
 
     let transactions: DisplayTransaction[] = [];
-    
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const tenantFirstPaymentMap = new Map<string, string>();
@@ -177,9 +178,7 @@ export function generateLandlordDisplayTransactions(
 
     sortedPayments.forEach(payment => {
         const tenant = tenantMap.get(payment.tenantId);
-        if (!tenant || payment.type !== 'Rent') {
-            return;
-        }
+        if (!tenant || payment.type !== 'Rent') return;
 
         const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
         const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
@@ -202,8 +201,10 @@ export function generateLandlordDisplayTransactions(
         let monthIndex = 0;
         const leaseStartDate = parseISO(tenant.lease.startDate);
 
-        while (remainingAmount > 0 && monthIndex < 24) { 
-            const rentForThisIteration = Math.min(remainingAmount, unitRent);
+        // Cap apportionment at 24 months to prevent infinite loops and map only to full rent months
+        // This ensures excess payment (tenant credit) does not reflect as payout
+        while (remainingAmount >= unitRent && monthIndex < 24) { 
+            const rentForThisIteration = unitRent;
             const currentMonth = addMonths(leaseStartDate, monthIndex);
             
             const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: format(currentMonth, 'yyyy-MM'), type: 'Rent' };
@@ -241,6 +242,7 @@ export function generateLandlordDisplayTransactions(
 
     const processedForSpecialDeduction = new Set<string>();
     const processedForOtherCosts = new Set<string>();
+    const policyStartDate = parseISO('2024-02-01');
 
     transactions.forEach(t => {
         if (landlord && !processedForSpecialDeduction.has(t.unitName)) {
@@ -248,9 +250,7 @@ export function generateLandlordDisplayTransactions(
             let stageTwo = 0;
             let stageThree = 0;
 
-            if (landlord.deductStageTwoCost) {
-                stageTwo = 10000;
-            }
+            if (landlord.deductStageTwoCost) stageTwo = 10000;
             if (landlord.deductStageThreeCost && unit) {
                 switch (unit.unitType) {
                     case 'Studio': stageThree = 8000; break;
@@ -265,12 +265,17 @@ export function generateLandlordDisplayTransactions(
             processedForSpecialDeduction.add(t.unitName);
         }
 
-        const isJanuary = new Date(t.rentForMonth + '-02').getMonth() === 0;
-        if (!isJanuary) {
-             if (landlordUnits.size > 1) {
+        // NEW POLICY: otherCosts (KSh 1000) only applies from Feb 2024 onwards
+        const rentMonthDate = parseISO(t.rentForMonth + '-01');
+        if (isBefore(rentMonthDate, policyStartDate)) {
+            t.otherCosts = 0;
+        } else {
+            if (landlordUnits.size > 1) {
                 if (!processedForOtherCosts.has(t.rentForMonth)) {
                     t.otherCosts = 1000;
                     processedForOtherCosts.add(t.rentForMonth);
+                } else {
+                    t.otherCosts = 0;
                 }
             } else {
                 t.otherCosts = 1000;
@@ -280,9 +285,7 @@ export function generateLandlordDisplayTransactions(
 
     const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
         const month = t.rentForMonth;
-        if (!acc[month]) {
-            acc[month] = [];
-        }
+        if (!acc[month]) acc[month] = [];
         acc[month].push(t);
         return acc;
     }, {} as Record<string, DisplayTransaction[]>);
@@ -292,7 +295,6 @@ export function generateLandlordDisplayTransactions(
 
     sortedMonths.forEach(month => {
         const monthTransactions = groupedByMonth[month];
-        
         if (deficitCarryOver > 0 && monthTransactions.length > 0) {
             monthTransactions[0].specialDeductions = (monthTransactions[0].specialDeductions || 0) + deficitCarryOver;
         }

@@ -1,5 +1,5 @@
 
-import { initializeApp, getApp, deleteApp } from "firebase/app";
+import { initializeApp, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { cacheService } from './cache';
 import {
@@ -7,12 +7,8 @@ import {
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
-    OwnershipType,
-    ManagementStatus,
-    HandoverStatus,
-    Lease,
-    MaintenanceStatus,
-    NoticeToVacate
+    NoticeToVacate,
+    MaintenanceStatus
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentReference, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
@@ -167,7 +163,7 @@ export async function getUsers(
     const ownerUnitsMap = new Map<string, Unit[]>();
     allCombinedOwners.forEach(owner => {
         const units: Unit[] = [];
-        if ('assignedUnits' in owner) { // PropertyOwner
+        if ('assignedUnits' in owner) { 
             (owner as PropertyOwner).assignedUnits.forEach(au => {
                 au.unitNames.forEach(unitName => {
                     const unit = allUnitsMap.get(`${au.propertyId}-${unitName}`);
@@ -383,7 +379,7 @@ export async function getAllWaterReadings(): Promise<WaterMeterReading[]> {
     return cacheService.getOrFetch('waterReadings', 'all', async () => {
         const q = query(collectionGroup(db, 'waterReadings'), orderBy('date', 'desc'));
         return getCollection<WaterMeterReading>(q);
-    }, 120000); // 2 min cache
+    }, 120000); 
 }
 
 export async function getLatestWaterReading(propertyId: string, unitName: string): Promise<WaterMeterReading | null> {
@@ -461,12 +457,12 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString().split('T')[0],
             rent: 0,
             serviceCharge: serviceCharge,
-            paymentStatus: 'Paid' as const, // Start as paid, reconciliation will create first charge.
-            lastBilledPeriod: lastBilledPeriod, // Set to month before first charge
+            paymentStatus: 'Paid' as const, 
+            lastBilledPeriod: lastBilledPeriod, 
         },
         securityDeposit: 0,
         waterDeposit: 0,
-        dueBalance: 0, // Start with zero balance
+        dueBalance: 0, 
         accountBalance: 0,
         userId: owner.userId,
     };
@@ -635,7 +631,6 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     const landlordRef = doc(db, 'landlords', landlord.id);
     await setDoc(landlordRef, landlord, { merge: true });
 
-    // Update units
     const propertiesToUpdate = new Map<string, Unit[]>();
 
     const allProperties = await getProperties(true);
@@ -735,13 +730,13 @@ export async function bulkUpdateUnitsFromCSV(propertyId: string, csvData: Record
         if (row.BaselineReading) unitData.baselineReading = Number(row.BaselineReading);
 
 
-        if (existingUnit) { // Update existing unit
+        if (existingUnit) { 
             const unitIndex = newUnitsArray.findIndex(u => u.name.toLowerCase() === unitName.toLowerCase());
             if (unitIndex !== -1) {
                 newUnitsArray[unitIndex] = { ...newUnitsArray[unitIndex], ...unitData };
                 updatedCount++;
             }
-        } else { // Create new unit
+        } else { 
             if (!row.UnitType) {
                 errors.push(`Row ${index + 2}: New unit '${unitName}' requires 'UnitType'.`);
                 return;
@@ -781,7 +776,7 @@ export async function archiveTenant(tenantId: string): Promise<void> {
         if (propertySnap.exists()) {
             const propertyData = propertySnap.data() as Property;
             const updatedUnits = propertyData.units.map(u =>
-                u.name === tenant.unitName ? { ...u, status: 'vacant' } : u
+                u.name === tenant.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
             );
             await updateDoc(propertyRef, { units: updatedUnits });
         }
@@ -806,7 +801,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
         if (oldPropSnap.exists()) {
             const oldPropData = oldPropSnap.data() as Property;
             const updatedOldUnits = oldPropData.units.map(u =>
-                u.name === oldTenant.unitName ? { ...u, status: 'vacant' } : u
+                u.name === oldTenant.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
             );
             await updateDoc(oldPropRef, { units: updatedOldUnits });
         }
@@ -817,7 +812,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
             if (newPropSnap.exists()) {
                 const newPropData = newPropSnap.data() as Property;
                 const updatedNewUnits = newPropData.units.map(u =>
-                    u.name === tenantData.unitName ? { ...u, status: 'rented' } : u
+                    u.name === tenantData.unitName ? { ...u, status: 'rented' as UnitStatus } : u
                 );
                 await updateDoc(newPropRef, { units: updatedNewUnits });
             }
@@ -1123,7 +1118,7 @@ export async function getPaymentsForTenants(tenantIds: string[]): Promise<Paymen
     if (tenantIds.length === 0) {
         return [];
     }
-    const cacheKey = `tenants-payments-${tenantIds.slice(0, 5).join('-')}`; // simple cache key
+    const cacheKey = `tenants-payments-${tenantIds.slice(0, 5).join('-')}`; 
     return cacheService.getOrFetch('payments', cacheKey, async () => {
         const paymentChunks: Payment[][] = [];
         for (let i = 0; i < tenantIds.length; i += 30) {
@@ -1359,12 +1354,9 @@ export async function forceRecalculateTenantBalance(tenantId: string): Promise<v
     const property = await getProperty(tenant.propertyId);
     const unit = property?.units.find(u => u.name === tenant.unitName);
 
-    // Create a dummy starting point for the ledger
-    const dummyStartDate = parseISO(tenant.lease.startDate);
+    const { finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date());
 
-    const { ledger, finalDueBalance, finalAccountBalance } = generateLedger(tenant, payments, [property!], [], undefined, new Date());
-
-    const latestPayment = payments[0]; // Assuming they are sorted by date desc
+    const latestPayment = payments[0]; 
 
     const tenantRef = doc(db, 'tenants', tenantId);
     await updateDoc(tenantRef, {
@@ -1418,7 +1410,6 @@ export async function processOverdueNotices(editorId: string) {
     for (const notice of notices) {
         if (new Date(notice.scheduledMoveOutDate) < today) {
             try {
-                // 1. Archive the tenant
                 const tenantRef = doc(db, 'tenants', notice.tenantId);
                 const tenantSnap = await getDoc(tenantRef);
                 if (tenantSnap.exists()) {
@@ -1427,7 +1418,6 @@ export async function processOverdueNotices(editorId: string) {
                     batch.set(archivedTenantRef, { ...tenantData, archivedAt: new Date().toISOString(), status: 'archived' });
                     batch.delete(tenantRef);
 
-                    // 2. Mark unit as vacant
                     const propertyRef = doc(db, 'properties', notice.propertyId);
                     const propertySnap = await getDoc(propertyRef);
                     if (propertySnap.exists()) {
@@ -1439,7 +1429,6 @@ export async function processOverdueNotices(editorId: string) {
                     }
                 }
 
-                // 3. Complete the notice
                 const noticeRef = doc(db, 'noticesToVacate', notice.id);
                 batch.update(noticeRef, { status: 'Completed' });
 

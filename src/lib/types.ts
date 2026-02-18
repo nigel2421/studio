@@ -1,5 +1,4 @@
 
-
 export type Property = {
   id: string;
   name: string;
@@ -116,13 +115,6 @@ export type PaymentStatus = 'Paid' | 'Pending' | 'Failed' | 'Voided';
 
 export const paymentMethods = ['M-Pesa', 'Bank Transfer', 'Card'] as const;
 
-/**
- * Represents a single financial transaction.
- * This can be a payment from a tenant, or a debit/credit adjustment from management.
- * Adjustments (like late fees) are a 'Payment' of type 'Adjustment'.
- * A positive amount for an adjustment is a DEBIT (increases due balance).
- * A negative amount for an adjustment is a CREDIT (decreases due balance).
- */
 export type Payment = {
   id: string;
   tenantId: string;
@@ -132,7 +124,6 @@ export type Payment = {
   status: PaymentStatus;
   notes?: string;
   rentForMonth?: string;
-  // Optional fields for more detailed tracking
   paymentMethod: (typeof paymentMethods)[number];
   transactionId: string;
   createdAt: string;
@@ -151,22 +142,18 @@ export type Payment = {
   linkedTo?: string;
 };
 
-/**
- * Represents any communication sent out from the system.
- * This covers automated reminders, manual announcements, and receipts.
- */
 export type Communication = {
   id: string;
   type: 'announcement' | 'automation';
-  subType?: string; // e.g., 'Payment Receipt', 'Arrears Reminder'
+  subType?: string;
   subject: string;
   body: string;
   recipients: string[];
   recipientCount: number;
-  senderId: string; // 'system' or a user ID
+  senderId: string;
   timestamp: string;
   status: 'sent' | 'failed';
-  deliveryMethod?: 'email' | 'sms' | 'in-app'; // Defaults to email
+  deliveryMethod?: 'email' | 'sms' | 'in-app';
   relatedTenantId?: string;
 };
 
@@ -175,7 +162,7 @@ export type ServiceChargeStatement = {
   tenantId: string;
   propertyId: string;
   unitName: string;
-  period: string; // e.g., "January 2026"
+  period: string;
   amount: number;
   items: { description: string; amount: number }[];
   date: string;
@@ -205,7 +192,6 @@ export interface LedgerEntry {
     balance: number;
     forMonth?: string;
     status?: PaymentStatus;
-    // For water bills
     priorReading?: number;
     currentReading?: number;
     consumption?: number;
@@ -311,7 +297,7 @@ export type MaintenanceRequest = {
   category: MaintenanceCategory;
   priority: MaintenancePriority;
   status: MaintenanceStatus;
-  date: string; // Submission date, matches createdAt
+  date: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -330,4 +316,22 @@ export type NoticeToVacate = {
   submittedByName: string;
   status: 'Active' | 'Completed';
   reason?: string;
+};
+
+export type DisplayTransaction = {
+    id: string;
+    date: string;
+    propertyId: string;
+    unitName: string;
+    unitType: string;
+    rentForMonth: string;
+    forMonthDisplay: string;
+    netToLandlord: number;
+    gross: number;
+    serviceChargeDeduction: number;
+    managementFee: number;
+    otherCosts: number;
+    stageTwoCost: number;
+    stageThreeCost: number;
+    specialDeductions: number;
 };

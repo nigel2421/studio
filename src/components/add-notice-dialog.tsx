@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { addNoticeToVacate } from '@/lib/data';
 import { type Tenant, type Property } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -93,16 +94,12 @@ export function AddNoticeDialog({
     };
 
     if (Object.values(validationCriteria).some(v => !v)) {
-      console.error("Notice to Vacate - Validation Failed. Current state:", {
+      console.error("Notice to Vacate - Validation Failed:", {
           ...validationCriteria,
           selectedTenantName: selectedTenant?.name,
-          selectedPropertyId: selectedProperty,
-          selectedUnitName: selectedUnit,
-          selectedDate: moveOutDate,
           userProfileName: userProfile?.name,
-          userProfileEmail: userProfile?.email,
       });
-      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please ensure all fields are selected and try again.' });
+      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please ensure all fields are selected.' });
       return;
     }
 
@@ -111,10 +108,10 @@ export function AddNoticeDialog({
       const property = properties.find(p => p.id === selectedProperty);
 
       await addNoticeToVacate({
-        tenantId: selectedTenant.id,
+        tenantId: selectedTenant!.id,
         propertyId: selectedProperty,
         unitName: selectedUnit,
-        tenantName: selectedTenant.name,
+        tenantName: selectedTenant!.name,
         propertyName: property?.name || 'N/A',
         noticeSubmissionDate: new Date().toISOString(),
         scheduledMoveOutDate: format(moveOutDate, 'yyyy-MM-dd'),
@@ -124,11 +121,11 @@ export function AddNoticeDialog({
         reason: reason,
       });
 
-      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant.name} has been recorded.` });
+      toast({ title: 'Notice Submitted', description: `Notice to vacate for ${selectedTenant!.name} recorded.` });
       onNoticeAdded();
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error submitting notice to vacate:", error);
+      console.error("Error submitting notice:", error);
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit notice.' });
     } finally {
       stopLoading();
@@ -140,9 +137,7 @@ export function AddNoticeDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Notice to Vacate</DialogTitle>
-          <DialogDescription>
-            Select a tenant and their scheduled move-out date.
-          </DialogDescription>
+          <DialogDescription>Select a tenant and their scheduled move-out date.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
@@ -151,14 +146,9 @@ export function AddNoticeDialog({
               <Select onValueChange={setSelectedProperty} value={selectedProperty}>
                 <SelectTrigger id="property"><SelectValue placeholder="Select a property" /></SelectTrigger>
                 <SelectContent>
-                  {propertiesWithTenants.map(p => {
-                    const tenantCount = activeTenants.filter(t => t.propertyId === p.id).length;
-                    return (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} <span className="text-muted-foreground text-xs ml-1">({tenantCount} tenant{tenantCount !== 1 ? 's' : ''})</span>
-                      </SelectItem>
-                    );
-                  })}
+                  {propertiesWithTenants.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -167,14 +157,9 @@ export function AddNoticeDialog({
               <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedProperty}>
                 <SelectTrigger id="unit"><SelectValue placeholder="Select an occupied unit" /></SelectTrigger>
                 <SelectContent>
-                  {occupiedUnits.map(u => {
-                    const tenant = activeTenants.find(t => t.propertyId === selectedProperty && t.unitName === u.name);
-                    return (
-                      <SelectItem key={u.name} value={u.name}>
-                        {u.name} {tenant && <span className="text-muted-foreground text-xs ml-1">({tenant.name})</span>}
-                      </SelectItem>
-                    );
-                  })}
+                  {occupiedUnits.map(u => (
+                    <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
