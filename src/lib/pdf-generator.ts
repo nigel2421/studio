@@ -1,6 +1,22 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FinancialDocument, WaterMeterReading, Payment, ServiceChargeStatement, Landlord, Unit, Property, PropertyOwner, Tenant, LedgerEntry, FinancialSummary, UnitType, UnitOrientation, unitOrientations, DisplayTransaction } from './types';
+import { 
+    FinancialDocument, 
+    WaterMeterReading, 
+    Payment, 
+    ServiceChargeStatement, 
+    Landlord, 
+    Unit, 
+    Property, 
+    PropertyOwner, 
+    Tenant, 
+    LedgerEntry, 
+    FinancialSummary, 
+    UnitType, 
+    UnitOrientation, 
+    unitOrientations, 
+    DisplayTransaction 
+} from './types';
 import { format, parseISO, isValid } from 'date-fns';
 import { generateLedger } from './financial-logic';
 
@@ -147,6 +163,7 @@ export const generateOwnerServiceChargeStatementPDF = (
     owner: PropertyOwner | Landlord,
     allProperties: Property[],
     allTenants: Tenant[],
+    allPayments: Payment[],
     allWaterReadings: WaterMeterReading[],
     startDate: Date,
     endDate: Date,
@@ -236,13 +253,13 @@ export const generateOwnerServiceChargeStatementPDF = (
         associatedTenantIds = [];
     }
 
-    const allAssociatedPayments = associatedTenantIds.length > 0 ? associatedTenants.flatMap(t => [] as Payment[]) : []; // Placeholder, actual logic needs access to all payments or filter them
+    const allAssociatedPayments = allPayments.filter(p => associatedTenantIds.includes(p.tenantId));
     const allAssociatedWaterReadings = allWaterReadings.filter(r => associatedTenantIds.includes(r.tenantId));
 
 
-    const { ledger: serviceChargeLedger, finalDueBalance: serviceChargeDue, finalAccountBalance: serviceChargeCredit } = generateLedger(representativeTenant, [], allProperties, [], owner, endDate, { includeWater: false, includeRent: false, includeServiceCharge: true });
+    const { ledger: serviceChargeLedger, finalDueBalance: serviceChargeDue, finalAccountBalance: serviceChargeCredit } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, [], owner, endDate, { includeWater: false, includeRent: false, includeServiceCharge: true });
     
-    const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(representativeTenant, [], allProperties, allAssociatedWaterReadings, owner, endDate, { includeRent: false, includeServiceCharge: false, includeWater: true });
+    const { ledger: waterLedger, finalDueBalance: waterDue, finalAccountBalance: waterCredit } = generateLedger(representativeTenant, allAssociatedPayments, allProperties, allAssociatedWaterReadings, owner, endDate, { includeRent: false, includeServiceCharge: false, includeWater: true });
 
     const filterLedgerByDate = (ledger: LedgerEntry[]) => {
         return ledger.filter(entry => {

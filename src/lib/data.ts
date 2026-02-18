@@ -68,7 +68,7 @@ export async function logActivity(action: string, userEmail?: string | null) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        // Error logged via UI
+        // Error managed via UI or centralized listener
     }
 }
 
@@ -80,7 +80,7 @@ export async function logCommunication(data: Omit<Communication, 'id'>) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        // Error logged via UI
+        // Error managed via UI or centralized listener
     }
 }
 
@@ -1242,7 +1242,7 @@ export async function batchProcessPayments(
 
             transaction.set(paymentDocRef, paymentPayload);
 
-            // processPayment is now siloed - it only updates dueBalance if the type is NOT 'Water'
+            // processPayment only updates dueBalance if the type is NOT 'Water'
             const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
 
             workingTenant = {
@@ -1279,7 +1279,7 @@ export async function batchProcessPayments(
             await updateDoc(taskRef, { status: 'Completed' });
             await logActivity(`Completed task ${taskId} via payment.`);
         } catch (error) {
-            // Error managed via UI
+            // Error managed via UI or centralized listener
         }
     }
 
@@ -1309,7 +1309,7 @@ export async function batchProcessPayments(
                     });
                     await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
                 } catch (error) {
-                    // Fail silently, managed by retry or UI
+                    // Fail silently, managed by retry or UI centralized listener
                 }
             }
         }
@@ -1388,7 +1388,7 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
         const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
         callback(tasks);
     }, (error) => {
-        // Error managed via UI
+        // Error managed via UI or centralized listener
     });
 
     return unsubscribe;
