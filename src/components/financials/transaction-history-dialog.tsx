@@ -46,6 +46,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 const asOf = new Date();
                 const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
                 setLedger(generatedLedger.sort((a,b) => a.date.localeCompare(b.date)));
+
+                // Auto-Heal: Silently recalculate the high-level balance to ensure it only includes rent/service charges.
+                // This clears out legacy unified balances that might include water data.
+                forceRecalculateTenantBalance(tenant.id).catch(err => console.error("Auto-heal failed:", err));
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {

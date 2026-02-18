@@ -64,7 +64,7 @@ export default function AccountsPage() {
       .filter(r => r.residentType === 'Tenant')
       .map(tenant => ({
           ...tenant,
-          // Ensure paymentStatus is always fresh based on balance
+          // Ensure paymentStatus is always fresh based on balance and 5th of month rule
           lease: {
               ...tenant.lease,
               paymentStatus: getRecommendedPaymentStatus(tenant)
