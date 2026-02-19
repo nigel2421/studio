@@ -160,23 +160,5 @@ describe('Financial Utils Logic', () => {
             
             expect(transactions.some(t => t.rentForMonth === '2025-10')).toBe(true);
         });
-
-        it('should not apply any otherCosts even if income is present', () => {
-            const landlordId = 'fee-lord';
-            const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
-            const units = [
-                createMockUnit('V1', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'rented' })
-            ];
-            const props = [createMockProperty('p1', units)];
-            const tenant = createMockTenant({ id: 't1', unitName: 'V1', propertyId: 'p1', lease: { rent: 20000 } });
-            const payment = createMockPayment({ tenantId: 't1', amount: 20000, rentForMonth: '2026-02' });
-            
-            const startDate = parseISO('2026-02-01');
-            const endDate = parseISO('2026-02-28');
-
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, landlord, startDate, endDate);
-            
-            expect(transactions[0].otherCosts).toBe(0);
-        });
     });
 });

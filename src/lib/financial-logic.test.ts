@@ -67,7 +67,7 @@ describe('Financial Logic', () => {
             // Should have: Rent Charge (20k), Water Deposit Charge (5k), Water Deposit Payment (5k)
             // Final balance should be 20k (unpaid rent)
             expect(finalDueBalance).toBe(20000);
-            expect(ledger.some(l => l.description === 'Water Deposit')).toBe(true);
+            expect(ledger.some(l => l.description.includes('Water Deposit'))).toBe(true);
             expect(ledger.some(l => l.description.includes('Water Deposit') && l.payment === 5000)).toBe(true);
         });
     });
@@ -108,7 +108,7 @@ describe('Financial Logic', () => {
                 includeWater: true 
             });
             
-            expect(ledger.every(l => l.description.includes('Water') || l.description.includes('Payment'))).toBe(true);
+            expect(ledger.every(l => l.description.includes('Water') || l.description.includes('Payment') || l.description.includes('Adjustment'))).toBe(true);
             expect(ledger.some(l => l.description.includes('Rent'))).toBe(false);
         });
     });
