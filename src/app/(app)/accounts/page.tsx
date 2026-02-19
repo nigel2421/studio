@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -60,17 +61,39 @@ export default function AccountsPage() {
   }, []);
 
   const tenantsOnly = useMemo(() => {
+    const tenantPaymentsMap = new Map<string, Payment[]>();
+    payments.forEach(p => {
+        if (!tenantPaymentsMap.has(p.tenantId)) {
+            tenantPaymentsMap.set(p.tenantId, []);
+        }
+        tenantPaymentsMap.get(p.tenantId)!.push(p);
+    });
+
     return residents
       .filter(r => r.residentType === 'Tenant')
-      .map(tenant => ({
-          ...tenant,
-          // Ensure paymentStatus is always fresh based on balance and 5th of month rule
-          lease: {
-              ...tenant.lease,
-              paymentStatus: getRecommendedPaymentStatus(tenant)
-          }
-      }));
-  }, [residents]);
+      .map(tenant => {
+          const tenantPayments = tenantPaymentsMap.get(tenant.id) || [];
+          const { finalDueBalance, finalAccountBalance } = generateLedger(
+              tenant, 
+              tenantPayments, 
+              properties, 
+              [], 
+              null, 
+              new Date(), 
+              { includeWater: false }
+          );
+
+          return {
+              ...tenant,
+              dueBalance: finalDueBalance,
+              accountBalance: finalAccountBalance,
+              lease: {
+                  ...tenant.lease,
+                  paymentStatus: getRecommendedPaymentStatus({ dueBalance: finalDueBalance })
+              }
+          };
+      });
+  }, [residents, payments, properties]);
 
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p) => p.id === propertyId);

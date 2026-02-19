@@ -102,7 +102,8 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     }
 
     let billingStartDate: Date;
-    const leaseStartDate = parseISO(tenant.lease.startDate);
+    const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
+    const leaseStartDate = parseISO(leaseStartDateStr);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
         const handoverDate = parseISO(unit.handoverDate);
@@ -120,17 +121,19 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02'))
         : addMonths(billingStartDate, -1);
 
-    const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
+    const firstBillableMonth = lastBilledDate && isValid(lastBilledDate) ? addMonths(lastBilledDate, 1) : billingStartDate;
 
     let monthsToBill = 0;
     let latestBilledPeriod = tenant.lease.lastBilledPeriod;
     let loopDate = firstBillableMonth;
     const startOfToday = startOfMonth(date);
 
-    while (loopDate <= startOfToday) { 
-        monthsToBill++;
-        latestBilledPeriod = format(loopDate, 'yyyy-MM');
-        loopDate = addMonths(loopDate, 1);
+    if (isValid(loopDate)) {
+        while (loopDate <= startOfToday) { 
+            monthsToBill++;
+            latestBilledPeriod = format(loopDate, 'yyyy-MM');
+            loopDate = addMonths(loopDate, 1);
+        }
     }
     
     if (monthsToBill === 0) {
@@ -220,13 +223,26 @@ export function generateLedger(
         const unit = property?.units.find(u => u.name === tenant.unitName);
         if (unit && property) {
             ownerUnits = [{ ...unit, propertyId: property.id, propertyName: property.name }];
+        } else if (tenant.unitName) {
+            // FALLBACK: If unit is not found in properties, use tenant record info to still generate ledger
+            ownerUnits = [{ 
+                name: tenant.unitName, 
+                status: 'rented', 
+                ownership: 'Landlord', 
+                unitType: 'Studio', 
+                rentAmount: tenant.lease.rent,
+                serviceCharge: tenant.lease.serviceCharge || 0,
+                propertyId: tenant.propertyId, 
+                propertyName: 'Assigned Property' 
+            }];
         }
     }
 
     let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string, priorReading?: number, currentReading?: number, consumption?: number, rate?: number, unitName?: string }[] = [];
 
     if (tenant.residentType === 'Tenant' && finalOptions.includeRent) {
-        const leaseStartDate = parseISO(tenant.lease.startDate);
+        const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
+        const leaseStartDate = parseISO(leaseStartDateStr);
         if (tenant.securityDeposit && tenant.securityDeposit > 0) {
             allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
         }
@@ -258,21 +274,24 @@ export function generateLedger(
                     billingStartDate = startOfMonth(addMonths(handoverDate, 2));
                 }
             } else {
-                billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
+                const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
+                billingStartDate = startOfMonth(parseISO(leaseStartDateStr));
             }
             
             let loopDate = billingStartDate;
             const endOfPeriod = startOfMonth(asOfDate); 
 
-            while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
-                const monthKey = format(loopDate, 'yyyy-MM');
-                if (!monthlyChargesMap.has(monthKey)) {
-                    monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [], type: chargeType });
+            if (isValid(loopDate)) {
+                while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
+                    const monthKey = format(loopDate, 'yyyy-MM');
+                    if (!monthlyChargesMap.has(monthKey)) {
+                        monthlyChargesMap.set(monthKey, { charge: 0, unitNames: [], type: chargeType });
+                    }
+                    const entry = monthlyChargesMap.get(monthKey)!;
+                    entry.charge += monthlyCharge;
+                    if (!entry.unitNames.includes(unit.name)) entry.unitNames.push(unit.name);
+                    loopDate = addMonths(loopDate, 1);
                 }
-                const entry = monthlyChargesMap.get(monthKey)!;
-                entry.charge += monthlyCharge;
-                if (!entry.unitNames.includes(unit.name)) entry.unitNames.push(unit.name);
-                loopDate = addMonths(loopDate, 1);
             }
         }
     });

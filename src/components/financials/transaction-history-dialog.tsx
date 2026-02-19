@@ -46,7 +46,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 setAllTenantPayments(payments);
                 const asOf = new Date();
                 const { ledger: generatedLedger, finalDueBalance } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
-                setLedger(generatedLedger.sort((a,b) => a.date.localeCompare(b.date)));
+                setLedger(generatedLedger.sort((a,b) => b.date.localeCompare(a.date))); // Newest first
 
                 // Sync balance logic: If the final ledger balance differs from the stored balance, trigger a re-sync
                 if (Math.abs(finalDueBalance - (tenant.dueBalance || 0)) > 1) {
@@ -61,8 +61,10 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     }, [tenant, open, allProperties]);
 
     useEffect(() => {
-        fetchAndSetLedger();
-    }, [fetchAndSetLedger, onPaymentAdded]);
+        if (open) {
+            fetchAndSetLedger();
+        }
+    }, [fetchAndSetLedger, open]);
 
     const handleEditClick = (paymentId: string) => {
         const payment = allTenantPayments.find(p => p.id === paymentId);
@@ -78,6 +80,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         await forceRecalculateTenantBalance(tenant.id);
         toast({ title: "Payment Updated" });
         onPaymentAdded();
+        fetchAndSetLedger();
     };
 
     const paginatedLedger = ledger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -102,7 +105,7 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                         <DialogDescription>Financial record for {tenant.name} (Unit: {tenant.unitName})</DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-between items-center mb-4">
-                        <AddPaymentDialog properties={allProperties} tenants={allTenants} onPaymentAdded={onPaymentAdded} tenant={tenant}>
+                        <AddPaymentDialog properties={allProperties} tenants={allTenants} onPaymentAdded={() => { onPaymentAdded(); fetchAndSetLedger(); }} tenant={tenant}>
                             <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Record Payment</Button>
                         </AddPaymentDialog>
                         <Button variant="outline" size="sm" onClick={handleDownloadPDF}><Download className="mr-2 h-4 w-4" /> Export PDF</Button>
