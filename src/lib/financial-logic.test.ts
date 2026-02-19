@@ -1,9 +1,8 @@
-
 import { generateLedger, reconcileMonthlyBilling, validatePayment, getRecommendedPaymentStatus } from './financial-logic';
 import { Tenant, Unit, Payment, Property, Lease } from './types';
 import { parseISO, format } from 'date-fns';
 
-const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> } = {}): Tenant => {
+const createMockTenant = (overrides: Omit<Partial<Tenant>, 'lease'> & { lease?: Partial<Lease> } = {}): Tenant => {
     const defaultLease: Lease = {
         startDate: '2026-01-01',
         endDate: '2027-01-01',
@@ -38,7 +37,7 @@ const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> 
             ...defaultLease,
             ...leaseOverrides,
         },
-    };
+    } as Tenant;
 };
 
 describe('Financial Logic', () => {
