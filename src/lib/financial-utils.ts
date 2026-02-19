@@ -59,6 +59,7 @@ export function calculateTransactionBreakdown(
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
             
             // Apply service charge deduction pro-rated to the amount of rent paid
+            // Unless it's the very first month where we already waived or charged 50%
             serviceChargeDeduction = serviceChargeDeduction * rentRatio;
         } else {
             // No fees or deductions for non-rent types (deposits, etc)
@@ -85,16 +86,24 @@ export function aggregateFinancials(
     endDate?: Date, 
     landlord?: Landlord | null
 ): FinancialSummary {
-    // Filter transactions to strictly match the report period
+    // Filter transactions to strictly match the report logic:
+    // 1. Show all income rows (gross > 0) that were generated (they are pre-filtered by payment date)
+    // 2. Filter artificial vacant rows (gross === 0) to stay within the range
     const transactions = allTransactions.filter(t => {
         if (!startDate || !endDate) return true;
-        try {
-            const rentMonthDate = parseISO(t.rentForMonth + '-01');
-            return (isSameMonth(rentMonthDate, startDate) || isAfter(rentMonthDate, startDate)) &&
-                   (isSameMonth(rentMonthDate, endDate) || isBefore(rentMonthDate, endDate));
-        } catch(e) {
-            return false;
-        }
+        
+        const rentMonthDate = parseISO(t.rentForMonth + '-01');
+        
+        // Hide future months (beyond the current report end date)
+        if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
+
+        // For rows with actual income, we allow them even if the rent month is before the range
+        // (because the payment itself was received within the range)
+        if (t.gross > 0) return true;
+
+        // For vacant rows, strictly adhere to the range
+        return (isSameMonth(rentMonthDate, startDate) || isAfter(rentMonthDate, startDate)) &&
+               (isSameMonth(rentMonthDate, endDate) || isBefore(rentMonthDate, endDate));
     });
 
     const summary: FinancialSummary = {
@@ -151,7 +160,7 @@ export function generateLandlordDisplayTransactions(
     let transactions: DisplayTransaction[] = [];
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Group payments by tenant to track months paid
+    // Group payments by tenant to track months paid across all payments
     const tenantMonthTracker = new Map<string, number>();
 
     sortedPayments.forEach(payment => {
@@ -282,12 +291,21 @@ export function generateLandlordDisplayTransactions(
 
     let finalTransactions = allSortedMonths.flatMap(m => groupedByMonth[m]);
 
-    // Apply strict period filtering one last time to ensure no March rows if report ends in Feb
+    // Apply filtering:
+    // 1. Hide future months (after endDate)
+    // 2. For months before startDate, ONLY show if they are income rows (gross > 0)
+    //    because the money was collected within the report period even if the rent month is old.
     if (startDate && endDate) {
         finalTransactions = finalTransactions.filter(t => {
             const rentMonthDate = parseISO(t.rentForMonth + '-01');
-            return (isSameMonth(rentMonthDate, startDate) || isAfter(rentMonthDate, startDate)) &&
-                   (isSameMonth(rentMonthDate, endDate) || isBefore(rentMonthDate, endDate));
+            
+            if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
+            
+            if (isBefore(rentMonthDate, startDate) && !isSameMonth(rentMonthDate, startDate)) {
+                return t.gross > 0;
+            }
+            
+            return true;
         });
     }
 
@@ -300,15 +318,20 @@ export function generateLandlordDisplayTransactions(
         if (isBefore(rentMonthDate, policyStartDate)) {
             t.otherCosts = 0;
         } else {
-            if (landlordUnits.size > 1) {
-                if (!processedForOtherCosts.has(t.rentForMonth)) {
-                    t.otherCosts = 1000;
-                    processedForOtherCosts.add(t.rentForMonth);
+            // POLICY: Only apply transaction fee if there is INCOME (gross > 0)
+            if (t.gross > 0) {
+                if (landlordUnits.size > 1) {
+                    if (!processedForOtherCosts.has(t.rentForMonth)) {
+                        t.otherCosts = 1000;
+                        processedForOtherCosts.add(t.rentForMonth);
+                    } else {
+                        t.otherCosts = 0;
+                    }
                 } else {
-                    t.otherCosts = 0;
+                    t.otherCosts = 1000;
                 }
             } else {
-                t.otherCosts = 1000;
+                t.otherCosts = 0;
             }
         }
         // Recalculate net after costs

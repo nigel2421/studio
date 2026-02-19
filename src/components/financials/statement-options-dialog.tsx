@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Landlord, PropertyOwner } from '@/lib/types';
-import { startOfYear } from 'date-fns';
+import { startOfYear, subMonths } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 
 interface StatementOptionsDialogProps {
@@ -18,7 +18,8 @@ interface StatementOptionsDialogProps {
 }
 
 export function StatementOptionsDialog({ isOpen, onClose, entity, onGenerate, isGenerating }: StatementOptionsDialogProps) {
-    const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
+    // Default to 12 months ago to capture earlier leases
+    const [startDate, setStartDate] = useState<Date | undefined>(subMonths(new Date(), 12));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
     if (!entity) {

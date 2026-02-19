@@ -14,7 +14,7 @@ import { Loader2, LogOut, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatementOptionsDialog } from '@/components/financials/statement-options-dialog';
 import { useLoading } from '@/hooks/useLoading';
-import { startOfYear, endOfDay } from 'date-fns';
+import { startOfYear, endOfDay, subMonths } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -30,7 +30,8 @@ export default function UniversalOwnerDashboardPage() {
     const [isStatementOpen, setIsStatementOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
 
-    const [startDate, setStartDate] = useState<Date | undefined>(startOfYear(new Date()));
+    // Default to showing 12 months of history so November/October units are visible
+    const [startDate, setStartDate] = useState<Date | undefined>(subMonths(new Date(), 12));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
     useEffect(() => {
