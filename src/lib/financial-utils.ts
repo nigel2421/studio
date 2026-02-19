@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Payment, Property, Tenant, Unit, Landlord, FinancialSummary, DisplayTransaction } from "./types";
@@ -97,7 +98,6 @@ export function aggregateFinancials(
         if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
 
         // For rows with actual income, we allow them even if the rent month is before the range
-        // (because the payment itself was received within the range OR it's specifically for a month in range)
         if (t.gross > 0) return true;
 
         // For status rows (Vacant/Unpaid), strictly adhere to the range
@@ -120,7 +120,7 @@ export function aggregateFinancials(
         summary.totalServiceCharges += transaction.occupiedServiceCharge || 0;
         summary.vacantUnitServiceChargeDeduction += transaction.vacantServiceCharge || 0;
         summary.totalManagementFees += transaction.managementFee;
-        summary.totalOtherCosts += transaction.otherCosts || 0;
+        summary.totalOtherCosts += 0; // Explicitly zeroed per instruction
         summary.totalNetRemittance += transaction.netToLandlord;
     });
 
@@ -173,7 +173,6 @@ export function generateLandlordDisplayTransactions(
     let transactions: DisplayTransaction[] = [];
     const sortedPayments = [...filteredPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Group payments by tenant to track months paid across all payments
     const tenantMonthTracker = new Map<string, number>();
 
     sortedPayments.forEach(payment => {
@@ -186,7 +185,6 @@ export function generateLandlordDisplayTransactions(
         let remainingAmount = payment.amount;
         if (remainingAmount <= 0 || unitRent <= 0) return;
 
-        // Respect explicit rentForMonth if provided, otherwise use sequential tracker
         let currentMonth: Date;
         if (payment.rentForMonth && isValid(parseISO(payment.rentForMonth + '-01'))) {
             currentMonth = parseISO(payment.rentForMonth + '-01');
@@ -215,7 +213,7 @@ export function generateLandlordDisplayTransactions(
                 gross: breakdown.gross,
                 serviceChargeDeduction: breakdown.serviceChargeDeduction,
                 managementFee: breakdown.managementFee,
-                otherCosts: 0, // Transaction Fee Removed per Management Instruction
+                otherCosts: 0, 
                 occupiedServiceCharge: breakdown.serviceChargeDeduction,
                 vacantServiceCharge: 0
             });
@@ -231,7 +229,6 @@ export function generateLandlordDisplayTransactions(
         tenantMonthTracker.set(tenant.id, Math.floor(totalPaymentsSoFar / totalRentExpectedPerMonth));
     });
 
-    // Group by month to inject status rows for all units
     const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
         const month = t.rentForMonth;
         if (!acc[month]) acc[month] = [];
@@ -239,7 +236,6 @@ export function generateLandlordDisplayTransactions(
         return acc;
     }, {} as Record<string, DisplayTransaction[]>);
 
-    // If a range is provided, ensure all months in range are present
     if (startDate && endDate) {
         let loopDate = startOfMonth(startDate);
         const endLoop = startOfMonth(endDate);
@@ -267,7 +263,6 @@ export function generateLandlordDisplayTransactions(
                     const handoverMonthStart = startOfMonth(hDate);
                     const handoverMonthKey = format(handoverMonthStart, 'yyyy-MM');
                     
-                    // POLICY: Waive service charge for the month of handover
                     if (handoverMonthKey !== month && (isSameMonth(monthDate, handoverMonthStart) || isAfter(monthDate, handoverMonthStart))) {
                         isBillableForServiceCharge = true;
                     }
@@ -310,7 +305,6 @@ export function generateLandlordDisplayTransactions(
 
     let finalTransactions = allSortedMonths.flatMap(m => groupedByMonth[m]);
 
-    // Apply report period filtering
     if (startDate && endDate) {
         finalTransactions = finalTransactions.filter(t => {
             const rentMonthDate = parseISO(t.rentForMonth + '-01');
@@ -322,9 +316,8 @@ export function generateLandlordDisplayTransactions(
         });
     }
 
-    // Final net recalculation
     finalTransactions.forEach(t => {
-        t.otherCosts = 0; // Explicitly zeroed as per management instruction
+        t.otherCosts = 0; 
         t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee;
     });
     

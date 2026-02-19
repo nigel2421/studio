@@ -28,7 +28,6 @@ export function LandlordDashboardContent({ properties, financialSummary, display
             "Gross Amount": t.gross,
             "Service Charge Deduction": t.serviceChargeDeduction,
             "Management Fee": t.managementFee,
-            "Other Costs": t.otherCosts || 0,
             "Net Payout": t.netToLandlord,
         }));
         downloadCSV(data, 'landlord_financial_statement.csv');
@@ -37,7 +36,7 @@ export function LandlordDashboardContent({ properties, financialSummary, display
     return (
         <div className="flex flex-col gap-8 pb-10">
 
-            <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium">Total Rent (Gross)</CardTitle>
@@ -78,24 +77,14 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                         <p className="text-xs text-muted-foreground">Agency fee on rent</p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium">Other Costs</CardTitle>
-                        <Coins className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">Ksh {financialSummary.totalOtherCosts.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Transaction fees</p>
-                    </CardContent>
-                </Card>
-                <Card className="bg-primary/5 border-primary/20 md:col-span-3 lg:col-span-1">
+                <Card className="bg-primary/5 border-primary/20 md:col-span-2 lg:col-span-4">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-sm font-medium text-primary">Net Rent Payout</CardTitle>
                         <Wallet className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-primary">Ksh {(financialSummary.totalNetRemittance).toLocaleString()}</div>
-                        <p className="text-xs text-primary/80">Available for payout</p>
+                        <div className="text-3xl font-bold text-primary">Ksh {(financialSummary.totalNetRemittance).toLocaleString()}</div>
+                        <p className="text-sm text-primary/80">Available for payout</p>
                     </CardContent>
                 </Card>
             </div>
@@ -121,7 +110,6 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">S. Charge</TableHead>
                                 <TableHead className="text-right">Mgmt Fee</TableHead>
-                                <TableHead className="text-right">Other Costs</TableHead>
                                 <TableHead className="text-right">Net</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -137,7 +125,6 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                                         <TableCell className="text-right">Ksh {transaction.gross.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.serviceChargeDeduction.toLocaleString()}</TableCell>
                                         <TableCell className="text-right text-muted-foreground">- {transaction.managementFee.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right text-muted-foreground">{transaction.otherCosts > 0 ? `- ${transaction.otherCosts.toLocaleString()}` : ''}</TableCell>
                                         <TableCell className="text-right font-bold">Ksh {transaction.netToLandlord.toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}
@@ -146,9 +133,8 @@ export function LandlordDashboardContent({ properties, financialSummary, display
                             <TableRow>
                                 <TableCell colSpan={3} className="font-bold text-right">Totals</TableCell>
                                 <TableCell className="text-right font-bold">Ksh {financialSummary.totalRent.toLocaleString()}</TableCell>
-                                <TableCell className="text-right font-bold text-muted-foreground">- {financialSummary.totalServiceCharges.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold text-muted-foreground">- {(financialSummary.totalServiceCharges + (financialSummary.vacantUnitServiceChargeDeduction || 0)).toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold text-muted-foreground">- {financialSummary.totalManagementFees.toLocaleString()}</TableCell>
-                                <TableCell className="text-right font-bold text-muted-foreground">- {financialSummary.totalOtherCosts.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">Ksh {financialSummary.totalNetRemittance.toLocaleString()}</TableCell>
                             </TableRow>
                         </TableFooter>

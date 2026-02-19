@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -453,7 +454,6 @@ export const generateLandlordStatementPDF = (
         ['Total Rent (Gross)', formatCurrency(summary.totalRent)],
         [serviceChargeLabel, `-${formatCurrency(summary.totalServiceCharges)}`],
         ['Management Fees', `-${formatCurrency(summary.totalManagementFees)}`],
-        ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
 
     if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
@@ -465,7 +465,7 @@ export const generateLandlordStatementPDF = (
     autoTable(doc, {
         startY: yPos,
         body: summaryData,
-        theme: 'grid', // Keeps full gridlines for summary as requested
+        theme: 'grid', 
         styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
     });
@@ -492,7 +492,7 @@ export const generateLandlordStatementPDF = (
         const monthDate = parseISO(monthDateStr);
         if(!isValid(monthDate)) return;
 
-        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
+        body.push([{ content: format(monthDate, 'MMMM yyyy'), colSpan: 7, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0,0,0] } }]);
         const monthTransactions = groupedByMonth[month];
         monthTransactions.forEach((t: DisplayTransaction) => {
             body.push([
@@ -502,7 +502,6 @@ export const generateLandlordStatementPDF = (
                 formatCurrency(t.gross),
                 t.serviceChargeDeduction > 0 ? `-${formatCurrency(t.serviceChargeDeduction)}` : formatCurrency(0),
                 t.managementFee > 0 ? `-${formatCurrency(t.managementFee)}` : '',
-                t.otherCosts > 0 ? `-${formatCurrency(t.otherCosts)}` : '',
                 formatCurrency(t.netToLandlord)
             ]);
         });
@@ -510,40 +509,35 @@ export const generateLandlordStatementPDF = (
     
     autoTable(doc, {
         startY: yPos,
-        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Other Costs', 'Net']],
+        head: [['Date', 'Unit', 'For Month', 'Gross', 'S. Charge', 'Mgmt Fee', 'Net']],
         body: body,
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalServiceCharges + (summary.vacantUnitServiceChargeDeduction || 0))}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
-        theme: 'striped', // Striped background for horizontal clarity
-        styles: { fontSize: 8, cellPadding: 2, lineWidth: 0 }, // No horizontal borders
+        theme: 'striped', 
+        styles: { fontSize: 8, cellPadding: 2, lineWidth: 0 }, 
         headStyles: { fillColor: [41, 102, 182], textColor: [255, 255, 255], lineWidth: 0 },
         columnStyles: {
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' },
             6: { halign: 'right' },
-            7: { halign: 'right' },
         },
         didDrawCell: (data) => {
-            // Logic to draw vertical lines only
             if (data.section === 'body' || data.section === 'head' || data.section === 'foot') {
                 doc.setDrawColor(200);
                 doc.setLineWidth(0.1);
                 
-                // Draw right line for every cell except the last one in the row
                 if (data.column.index < data.table.columns.length - 1) {
                     const x = data.cell.x + data.cell.width;
                     doc.line(x, data.cell.y, x, data.cell.y + data.cell.height);
                 }
                 
-                // Draw left line for the very first cell
                 if (data.column.index === 0) {
                     doc.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
                 }
