@@ -117,7 +117,7 @@ describe('Financial Utils Logic', () => {
             expect(transactions).toHaveLength(1);
             expect(transactions[0].rentForMonth).toBe('2025-12');
             expect(transactions[0].serviceChargeDeduction).toBe(0); // Waived
-            expect(transactions[0].gross).toBe(0); // Status row
+            expect(transactions[0].gross).toBe(0); // Status row showing it's occupied but unpaid
         });
 
         it('should apply 50% management fee for initial letting but respect handover SC rules', () => {
@@ -173,6 +173,7 @@ describe('Financial Utils Logic', () => {
             ];
             const props = [createMockProperty('p1', units)];
             
+            // Policy starts Feb 2026
             const startDate = parseISO('2026-02-01');
             const endDate = parseISO('2026-02-28');
 
@@ -180,7 +181,7 @@ describe('Financial Utils Logic', () => {
             
             expect(transactions).toHaveLength(1);
             expect(transactions[0].gross).toBe(0);
-            expect(transactions[0].otherCosts).toBe(0); // Should be zero for vacant rows
+            expect(transactions[0].otherCosts).toBe(0); // Should be zero for vacant/unpaid rows
             expect(transactions[0].netToLandlord).toBe(-4000);
         });
     });
