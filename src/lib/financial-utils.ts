@@ -88,7 +88,7 @@ export function aggregateFinancials(
 ): FinancialSummary {
     // Filter transactions to strictly match the report logic:
     // 1. Show all income rows (gross > 0) that were generated (they are pre-filtered by payment date)
-    // 2. Filter artificial vacant rows (gross === 0) to stay within the range
+    // 2. Filter status rows (gross === 0) to stay within the range
     const transactions = allTransactions.filter(t => {
         if (!startDate || !endDate) return true;
         
@@ -101,7 +101,7 @@ export function aggregateFinancials(
         // (because the payment itself was received within the range)
         if (t.gross > 0) return true;
 
-        // For vacant rows, strictly adhere to the range
+        // For status rows (Vacant/Unpaid), strictly adhere to the range
         return (isSameMonth(rentMonthDate, startDate) || isAfter(rentMonthDate, startDate)) &&
                (isSameMonth(rentMonthDate, endDate) || isBefore(rentMonthDate, endDate));
     });
@@ -137,7 +137,7 @@ export function generateLandlordDisplayTransactions(
     endDate?: Date
 ): DisplayTransaction[] {
     const landlordId = landlord?.id;
-    const unitMap = new Map<string, Unit>();
+    const unitMap = new Map<string, Unit & { propertyId: string }>();
     const landlordUnits = new Map<string, Unit & { propertyId: string }>();
     properties.forEach(p => {
         (p.units || []).forEach(u => {
@@ -196,6 +196,8 @@ export function generateLandlordDisplayTransactions(
                 serviceChargeDeduction: breakdown.serviceChargeDeduction,
                 managementFee: breakdown.managementFee,
                 otherCosts: 0,
+                occupiedServiceCharge: breakdown.serviceChargeDeduction,
+                vacantServiceCharge: 0
             });
             
             remainingAmount -= rentForThisIteration;
@@ -204,7 +206,7 @@ export function generateLandlordDisplayTransactions(
         tenantMonthTracker.set(tenant.id, monthIndex);
     });
 
-    // Group by month to inject vacant service charges
+    // Group by month to inject status rows for all units
     const groupedByMonth = transactions.reduce((acc, t: DisplayTransaction) => {
         const month = t.rentForMonth;
         if (!acc[month]) acc[month] = [];
@@ -212,7 +214,7 @@ export function generateLandlordDisplayTransactions(
         return acc;
     }, {} as Record<string, DisplayTransaction[]>);
 
-    // If a range is provided, ensure all months in range are present even if no rent paid
+    // If a range is provided, ensure all months in range are present
     if (startDate && endDate) {
         let loopDate = startOfMonth(startDate);
         const endLoop = startOfMonth(endDate);
@@ -228,9 +230,14 @@ export function generateLandlordDisplayTransactions(
     allSortedMonths.forEach(month => {
         const monthDate = parseISO(month + '-01');
         const monthTransactions = groupedByMonth[month];
-        
-        let monthlyVacantSC = 0;
+        const reportedUnitsInMonth = new Set(monthTransactions.map(t => t.unitName));
+
         landlordUnits.forEach(u => {
+            if (reportedUnitsInMonth.has(u.name)) return; // Already reported via income
+
+            // Unit was NOT reported via a payment for this month. 
+            // We must determine if it was billable/occupied to show its status.
+            
             let isBillableInMonth = false;
             if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
                 const hDate = parseISO(u.handoverDate);
@@ -245,6 +252,8 @@ export function generateLandlordDisplayTransactions(
                 }
             }
 
+            if (!isBillableInMonth) return;
+
             const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
             let isOccupiedInMonth = false;
             if (tenant && tenant.lease?.startDate) {
@@ -254,53 +263,41 @@ export function generateLandlordDisplayTransactions(
                 }
             }
 
-            if (!isOccupiedInMonth && isBillableInMonth) {
-                monthlyVacantSC += u.serviceCharge!;
-            }
-        });
-
-        if (monthTransactions.length > 0) {
-            // Consolidate vacant SC into the first transaction of the month for transparency
-            monthTransactions[0].vacantServiceCharge = monthlyVacantSC;
-            monthTransactions[0].serviceChargeDeduction += monthlyVacantSC;
+            // Injected status row for rented units without payment or vacant billable units
+            const scAmount = u.serviceCharge || 0;
             
-            monthTransactions.forEach((t, idx) => {
-                t.occupiedServiceCharge = (idx === 0) ? (t.serviceChargeDeduction - monthlyVacantSC) : t.serviceChargeDeduction;
-                t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
-            });
-        } else if (monthlyVacantSC > 0) {
-            // Inject row for months with ONLY vacant service charges
             monthTransactions.push({
-                id: `vacant-${month}`,
+                id: `status-${month}-${u.name}`,
                 date: format(monthDate, 'yyyy-MM-dd'),
-                propertyId: landlordUnits.values().next().value?.propertyId || '',
-                unitName: 'Vacant Units',
-                unitType: 'N/A',
+                propertyId: u.propertyId,
+                unitName: u.name,
+                unitType: u.unitType || 'N/A',
                 rentForMonth: month,
                 forMonthDisplay: format(monthDate, 'MMM yyyy'),
                 gross: 0,
-                serviceChargeDeduction: monthlyVacantSC,
+                serviceChargeDeduction: scAmount,
                 managementFee: 0,
                 otherCosts: 0,
-                netToLandlord: -monthlyVacantSC,
-                vacantServiceCharge: monthlyVacantSC,
-                occupiedServiceCharge: 0
+                netToLandlord: -scAmount,
+                vacantServiceCharge: isOccupiedInMonth ? 0 : scAmount,
+                occupiedServiceCharge: isOccupiedInMonth ? scAmount : 0
             });
-        }
+        });
+        
+        // Sort transactions within the month alphabetically by unit name for clarity
+        monthTransactions.sort((a, b) => a.unitName.localeCompare(b.unitName));
     });
 
     let finalTransactions = allSortedMonths.flatMap(m => groupedByMonth[m]);
 
-    // Apply filtering:
-    // 1. Hide future months (after endDate)
-    // 2. For months before startDate, ONLY show if they are income rows (gross > 0)
-    //    because the money was collected within the report period even if the rent month is old.
+    // Apply report period filtering
     if (startDate && endDate) {
         finalTransactions = finalTransactions.filter(t => {
             const rentMonthDate = parseISO(t.rentForMonth + '-01');
             
             if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
             
+            // Allow income rows from old months if payment date is in range
             if (isBefore(rentMonthDate, startDate) && !isSameMonth(rentMonthDate, startDate)) {
                 return t.gross > 0;
             }
@@ -309,7 +306,7 @@ export function generateLandlordDisplayTransactions(
         });
     }
 
-    // Apply otherCosts (KSh 1,000 transaction fee) once per month from Feb 2026 onwards
+    // Apply transaction fee logic (KSh 1,000 once per month per landlord, only if income exists)
     const processedForOtherCosts = new Set<string>();
     const policyStartDate = parseISO('2026-02-01');
 
@@ -334,7 +331,7 @@ export function generateLandlordDisplayTransactions(
                 t.otherCosts = 0;
             }
         }
-        // Recalculate net after costs
+        // Recalculate net after final costs
         t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
     });
     
