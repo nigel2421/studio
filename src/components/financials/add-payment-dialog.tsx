@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { batchProcessPayments } from '@/lib/data';
-import { type Tenant, type Property, type Payment, type Unit, paymentMethods, type WaterMeterReading } from '@/lib/types';
+import { type Tenant, type Property, type Payment, paymentMethods, type WaterMeterReading } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,6 @@ import { useLoading } from '@/hooks/useLoading';
 import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-
 
 const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
 
@@ -85,20 +85,12 @@ export function AddPaymentDialog({
 
   const displayData = useMemo(() => {
     if (!tenantForDisplay) return { balance: 0, nextDueDate: null, waterBalance: 0 };
-
     const today = new Date();
-    const dayOfMonth = today.getDate();
-    let dueDate: Date;
-
-    if (dayOfMonth > 5) {
-        dueDate = startOfMonth(addMonths(today, 1));
-    } else {
-        dueDate = startOfMonth(today);
-    }
-     dueDate.setDate(5);
+    let dueDate = startOfMonth(today.getDate() > 5 ? addMonths(today, 1) : today);
+    dueDate.setDate(5);
 
     let waterBalance = 0;
-    if (defaultPaymentType === 'Water' && allReadings) {
+    if (allReadings) {
         waterBalance = allReadings
             .filter(r => r.tenantId === tenantForDisplay.id && (r.status === 'Pending' || r.status === undefined))
             .reduce((sum, r) => sum + r.amount, 0);
@@ -109,8 +101,7 @@ export function AddPaymentDialog({
         nextDueDate: format(dueDate, 'do MMMM yyyy'),
         waterBalance,
     };
-
-  }, [tenantForDisplay, defaultPaymentType, allReadings]);
+  }, [tenantForDisplay, allReadings]);
 
   const availablePaymentTypes = useMemo(() => {
     if (tenantForDisplay?.residentType === 'Homeowner') {
@@ -125,167 +116,76 @@ export function AddPaymentDialog({
 
   const getDefaultAmount = useCallback((type: Payment['type'], tenantInfo: Tenant | null | undefined): string => {
     if (!tenantInfo) return '';
-
     switch (type) {
-      case 'Rent':
-        return (tenantInfo.lease?.rent || '').toString();
-      case 'ServiceCharge':
-        return (tenantInfo.lease?.serviceCharge || '').toString();
-      case 'Water':
-        return (displayData.waterBalance || '').toString();
-      case 'Deposit':
-        return (tenantInfo.securityDeposit || '').toString();
-      default:
-        return '';
+      case 'Rent': return (tenantInfo.lease?.rent || '').toString();
+      case 'ServiceCharge': return (tenantInfo.lease?.serviceCharge || '').toString();
+      case 'Water': return (displayData.waterBalance || '').toString();
+      case 'Deposit': return (tenantInfo.securityDeposit || '').toString();
+      default: return '';
     }
   }, [displayData.waterBalance]);
 
   useEffect(() => {
     if (open) {
         const type = defaultPaymentType || defaultEntryType;
-        
-        let amount = '';
-        if (readingForPayment && type === 'Water') {
-            amount = readingForPayment.amount.toString();
-        } else if (tenantForDisplay) {
-            amount = getDefaultAmount(type, tenantForDisplay);
-        }
-
-        const rentForMonthDefault = format(new Date(), 'yyyy-MM');
-        
-        const initialEntry: PaymentEntry = {
-            id: Date.now(),
-            amount,
-            type,
-            date: new Date(),
-            rentForMonth: rentForMonthDefault,
-            paymentMethod: 'M-Pesa',
-            transactionId: '',
-        };
+        let amount = (readingForPayment && type === 'Water') ? readingForPayment.amount.toString() : getDefaultAmount(type, tenantForDisplay);
+        const initialEntry: PaymentEntry = { id: Date.now(), amount, type, date: new Date(), rentForMonth: format(new Date(), 'yyyy-MM'), paymentMethod: 'M-Pesa', transactionId: '' };
         setPaymentEntries([initialEntry]);
-
-        if (tenant) {
-            setSelectedProperty(tenant.propertyId);
-        }
+        if (tenant) setSelectedProperty(tenant.propertyId);
     } else {
         setPaymentEntries([]);
-        if (!tenant) {
-            setSelectedProperty('');
-            setSelectedFloor('');
-            setSelectedUnit('');
-        }
+        if (!tenant) { setSelectedProperty(''); setSelectedFloor(''); setSelectedUnit(''); }
     }
-}, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment, getDefaultAmount, setSelectedProperty, setSelectedFloor, setSelectedUnit]);
-
+  }, [open, tenant, tenantForDisplay, defaultPaymentType, defaultEntryType, readingForPayment, getDefaultAmount, setSelectedProperty, setSelectedFloor, setSelectedUnit]);
 
   const monthOptions = Array.from({ length: 18 }, (_, i) => {
     const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-    return {
-      value: format(d, 'yyyy-MM'),
-      label: format(d, 'MMMM yyyy'),
-    };
+    d.setDate(1); d.setMonth(d.getMonth() - i);
+    return { value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
   });
 
   const occupiedUnitsOnFloor = useMemo(() => {
     if (!selectedFloor) return [];
-    const tenantUnitsForProperty = new Set(
-      tenants.filter(t => t.propertyId === selectedProperty).map(t => t.unitName)
-    );
-    return unitsOnFloor.filter(unit => tenantUnitsForProperty.has(unit.name));
+    const tenantUnits = new Set(tenants.filter(t => t.propertyId === selectedProperty).map(t => t.unitName));
+    return unitsOnFloor.filter(unit => tenantUnits.has(unit.name));
   }, [selectedProperty, selectedFloor, unitsOnFloor, tenants]);
 
   const handleEntryChange = (id: number, field: keyof Omit<PaymentEntry, 'id'>, value: any) => {
-    setPaymentEntries(entries =>
-      entries.map(entry => (entry.id === id ? { ...entry, [field]: value } : entry))
-    );
+    setPaymentEntries(entries => entries.map(entry => (entry.id === id ? { ...entry, [field]: value } : entry)));
   };
   
   const addEntry = (type: Payment['type']) => {
-    const newEntry: PaymentEntry = {
-        id: Date.now(),
-        amount: type === 'Adjustment' ? '' : getDefaultAmount(type, tenantForDisplay),
-        type: type,
-        date: new Date(),
-        rentForMonth: format(new Date(), 'yyyy-MM'),
-        paymentMethod: 'M-Pesa',
-        transactionId: '',
-    };
-    setPaymentEntries(prev => [...prev, newEntry]);
+    setPaymentEntries(prev => [...prev, { id: Date.now(), amount: getDefaultAmount(type, tenantForDisplay), type, date: new Date(), rentForMonth: format(new Date(), 'yyyy-MM'), paymentMethod: 'M-Pesa', transactionId: '' }]);
   };
   
-  const removeEntry = (id: number) => {
-      setPaymentEntries(prev => prev.filter(entry => entry.id !== id));
-  };
-
-
   const { startLoading, stopLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    let finalTenantId = tenantForDisplay?.id;
-
-    if (!finalTenantId) {
-      toast({ variant: 'destructive', title: 'Missing Tenant', description: 'Please select a valid unit with an assigned tenant.' });
-      return;
-    }
-    
-    if (paymentEntries.some(e => !e.transactionId && e.type !== 'Adjustment')) {
-        toast({ variant: 'destructive', title: 'Missing Transaction ID', description: 'Please provide a transaction ID for all payments.' });
-        return;
-    }
-
+    if (!tenantForDisplay?.id) { toast({ variant: 'destructive', title: 'Missing Tenant' }); return; }
+    if (paymentEntries.some(e => !e.transactionId && e.type !== 'Adjustment')) { toast({ variant: 'destructive', title: 'Missing Transaction ID' }); return; }
     const validEntries = paymentEntries.filter(e => e.amount && (e.type === 'Adjustment' ? e.amount !== '0' : Number(e.amount) > 0));
-
-
-    if (validEntries.length === 0) {
-      toast({ variant: 'destructive', title: 'No Payments', description: 'Please enter a non-zero amount for at least one payment record.' });
-      return;
-    }
+    if (validEntries.length === 0) { toast({ variant: 'destructive', title: 'No Payments' }); return; }
 
     setIsLoading(true);
     startLoading(`Recording ${validEntries.length} payment(s)...`);
     try {
-      const paymentsToBatch = validEntries.map(e => ({
-        amount: Number(e.amount),
-        date: format(e.date, 'yyyy-MM-dd'),
-        rentForMonth: e.rentForMonth,
-        type: e.type,
-        paymentMethod: e.paymentMethod,
-        transactionId: e.transactionId,
-        waterReadingId: e.type === 'Water' && readingForPayment ? readingForPayment.id : undefined,
-      }));
-
-      await batchProcessPayments(finalTenantId, paymentsToBatch, taskId);
-
-      toast({ title: 'Payments Added', description: `${validEntries.length} payment(s) have been successfully recorded.` });
+      const data = validEntries.map(e => ({ amount: Number(e.amount), date: format(e.date, 'yyyy-MM-dd'), rentForMonth: e.rentForMonth, type: e.type, paymentMethod: e.paymentMethod, transactionId: e.transactionId, waterReadingId: e.type === 'Water' && readingForPayment ? readingForPayment.id : undefined }));
+      await batchProcessPayments(tenantForDisplay.id, data, taskId);
+      toast({ title: 'Payments Added' });
       onPaymentAdded();
       setOpen(false);
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to add one or more payments.' });
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
       setIsLoading(false);
       stopLoading();
     }
   };
   
-  const trigger = children ? (
-    <DialogTrigger asChild>{children}</DialogTrigger>
-  ) : (
-    controlledOpen === undefined ? 
-    <DialogTrigger asChild>
-      <Button>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Add Payment
-      </Button>
-    </DialogTrigger> : null
-  );
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {trigger}
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Add Payment Record</DialogTitle>
@@ -295,150 +195,45 @@ export function AddPaymentDialog({
           <div className="space-y-4 py-4">
             {!tenant && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="development">Development</Label>
-                    <Select onValueChange={setSelectedProperty} value={selectedProperty}>
-                      <SelectTrigger id="development"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>{properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="floor">Floor</Label>
-                    <Select onValueChange={setSelectedFloor} value={selectedFloor} disabled={!selectedProperty}>
-                      <SelectTrigger id="floor"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>{floors.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unit</Label>
-                    <Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedFloor}>
-                      <SelectTrigger id="unit"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>{occupiedUnitsOnFloor.map(u => <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-2"><Label>Development</Label><Select onValueChange={setSelectedProperty} value={selectedProperty}><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger><SelectContent>{properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-2"><Label>Floor</Label><Select onValueChange={setSelectedFloor} value={selectedFloor} disabled={!selectedProperty}><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger><SelectContent>{floors.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-2"><Label>Unit</Label><Select onValueChange={setSelectedUnit} value={selectedUnit} disabled={!selectedFloor}><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger><SelectContent>{occupiedUnitsOnFloor.map(u => <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>)}</SelectContent></Select></div>
               </div>
             )}
-
             {tenantForDisplay && (
-                <div className="p-4 my-2 border rounded-lg bg-blue-50 border-blue-200">
+                <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
                     <h4 className="font-semibold text-blue-900">Summary for {tenantForDisplay.name}</h4>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
-                        {defaultPaymentType !== 'Water' && (
-                            <>
-                                <div>
-                                    <div className="text-muted-foreground">Monthly Charge:</div>
-                                    <div className="font-medium">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Next Due Date:</div>
-                                    <div className="font-medium">{displayData.nextDueDate}</div>
-                                </div>
-                            </>
-                        )}
-                        <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
-                            <div className="flex justify-between items-center">
-                                <div className="text-muted-foreground font-bold text-red-600">
-                                    {defaultPaymentType === 'Water' ? 'Total Pending Water Bill:' : 'Total Amount Pending:'}
-                                </div>
-                                <div className="font-bold text-red-600 text-lg">
-                                    Ksh {(defaultPaymentType === 'Water') ? displayData.waterBalance.toLocaleString() : displayData.balance.toLocaleString()}
-                                </div>
-                            </div>
-                        </div>
+                        <div><div className="text-muted-foreground">Charge:</div><div className="font-medium">Ksh {(tenantForDisplay.lease?.rent || tenantForDisplay.lease?.serviceCharge || 0).toLocaleString()}</div></div>
+                        <div><div className="text-muted-foreground">Due Date:</div><div className="font-medium">{displayData.nextDueDate}</div></div>
+                        <div className="col-span-2 pt-2 border-t border-blue-200 flex justify-between font-bold text-red-600"><span>Pending Balance:</span><span>Ksh {displayData.balance.toLocaleString()}</span></div>
                     </div>
                 </div>
             )}
-            
             <div className="space-y-2 pt-4">
-              <div className="flex items-center justify-between">
-                <Label>Payment Records</Label>
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="outline" size="sm">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Record
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuLabel>Payment Types</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {availablePaymentTypes.map(type => (
-                             <DropdownMenuItem key={type} onSelect={() => addEntry(type)}>
-                                {type}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+              <div className="flex items-center justify-between"><Label>Payment Records</Label>
+                 <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Record</Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuLabel>Types</DropdownMenuLabel><DropdownMenuSeparator />{availablePaymentTypes.map(type => (<DropdownMenuItem key={type} onSelect={() => addEntry(type)}>{type}</DropdownMenuItem>))}</DropdownMenuContent></DropdownMenu>
               </div>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry) => (
                   <div key={entry.id} className="p-3 border rounded-lg relative space-y-4">
-                     {paymentEntries.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeEntry(entry.id)} className="absolute top-1 right-1 h-6 w-6 z-10">
-                            <X className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                     )}
+                     {paymentEntries.length > 1 && (<Button type="button" variant="ghost" size="icon" onClick={() => setPaymentEntries(prev => prev.filter(e => e.id !== entry.id))} className="absolute top-1 right-1 h-6 w-6 z-10"><X className="h-4 w-4 text-muted-foreground" /></Button>)}
                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="space-y-1">
-                          <Label htmlFor={`type-${entry.id}`} className="text-xs">Type</Label>
-                          <Input id={`type-${entry.id}`} value={entry.type} readOnly className="bg-muted font-medium" />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor={`amount-${entry.id}`} className="text-xs">
-                            {entry.type === 'Adjustment' ? 'Amount (+/-)' : 'Amount (Ksh)'}
-                          </Label>
-                          <Input id={`amount-${entry.id}`} type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required />
-                        </div>
-                         <div className="space-y-1">
-                            <Label htmlFor={`payment-method-${entry.id}`} className="text-xs">Method</Label>
-                            <Select value={entry.paymentMethod} onValueChange={(value) => handleEntryChange(entry.id, 'paymentMethod', value as Payment['paymentMethod'])}>
-                                <SelectTrigger id={`payment-method-${entry.id}`}>
-                                    <SelectValue placeholder="Method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {paymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor={`date-${entry.id}`} className="text-xs">Payment Date</Label>
-                          <DatePicker id={`date-${entry.id}`} value={entry.date} onChange={(d) => {if(d) handleEntryChange(entry.id, 'date', d)}} />
-                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Type</Label><Input value={entry.type} readOnly className="bg-muted font-medium" /></div>
+                        <div className="space-y-1"><Label className="text-xs">Amount (Ksh)</Label><Input type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required /></div>
+                        <div className="space-y-1"><Label className="text-xs">Method</Label><Select value={entry.paymentMethod} onValueChange={(v) => handleEntryChange(entry.id, 'paymentMethod', v)}><SelectTrigger><SelectValue placeholder="Method" /></SelectTrigger><SelectContent>{paymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-xs">Date</Label><DatePicker value={entry.date} onChange={(d) => d && handleEntryChange(entry.id, 'date', d)} /></div>
                      </div>
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <Label htmlFor={`rent-for-${entry.id}`} className="text-xs">For Month</Label>
-                          <Select
-                              value={entry.rentForMonth}
-                              onValueChange={(value) => handleEntryChange(entry.id, 'rentForMonth', value)}
-                          >
-                              <SelectTrigger id={`rent-for-${entry.id}`} className="h-10">
-                                  <SelectValue placeholder="Select month" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  {monthOptions.map(option => (
-                                      <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                      </SelectItem>
-                                  ))}
-                              </SelectContent>
-                          </Select>
-                        </div>
-                         <div className="space-y-1">
-                            <Label htmlFor={`transaction-id-${entry.id}`} className="text-xs">Transaction ID</Label>
-                            <Input id={`transaction-id-${entry.id}`} value={entry.transactionId || ''} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} placeholder="e.g. UAE6G3OSE9" required/>
-                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Month</Label><Select value={entry.rentForMonth} onValueChange={(v) => handleEntryChange(entry.id, 'rentForMonth', v)}><SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger><SelectContent>{monthOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-xs">Transaction ID</Label><Input value={entry.transactionId} onChange={(e) => handleEntryChange(entry.id, 'transactionId', e.target.value)} required /></div>
                      </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isLoading || paymentEntries.length === 0}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Payments
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button type="submit" disabled={isLoading || paymentEntries.length === 0}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Save Payments'}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

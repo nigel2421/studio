@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -41,16 +42,16 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (tenant && open) {
             setIsLoading(true);
             try {
-                // Rent module should not show water bills, so we don't fetch/pass them
                 const payments = await getPaymentHistory(tenant.id);
                 setAllTenantPayments(payments);
                 const asOf = new Date();
-                const { ledger: generatedLedger } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
+                const { ledger: generatedLedger, finalDueBalance } = generateLedger(tenant, payments, allProperties, [], undefined, asOf, { includeWater: false });
                 setLedger(generatedLedger.sort((a,b) => a.date.localeCompare(b.date)));
 
-                // Auto-Heal: Silently recalculate the high-level balance to ensure it only includes rent/service charges.
-                // This clears out legacy unified balances that might include water data.
-                forceRecalculateTenantBalance(tenant.id).catch(err => console.error("Auto-heal failed:", err));
+                // Sync balance logic: If the final ledger balance differs from the stored balance, trigger a re-sync
+                if (Math.abs(finalDueBalance - (tenant.dueBalance || 0)) > 1) {
+                    forceRecalculateTenantBalance(tenant.id).catch(console.error);
+                }
             } catch (error) {
                 console.error("Failed to generate ledger:", error);
             } finally {
@@ -68,47 +69,26 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
         if (payment) {
             setSelectedPaymentForEdit(payment);
             setIsEditDialogOpen(true);
-        } else {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not find the original payment record to edit."
-            });
         }
     };
     
     const handleSaveEdit = async (paymentId: string, data: EditFormValues) => {
-        if (!userProfile?.id || !tenant?.id) {
-             toast({ variant: "destructive", title: "Authentication Error", description: "Could not identify the editor."});
-             return;
-        }
-        
-        await updatePayment(
-            paymentId,
-            { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') },
-            data.reason,
-            userProfile.id
-        );
-        
+        if (!userProfile?.id || !tenant?.id) return;
+        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
         await forceRecalculateTenantBalance(tenant.id);
-        
-        toast({ title: "Payment Updated", description: "The transaction has been successfully updated."});
-        
+        toast({ title: "Payment Updated" });
         onPaymentAdded();
     };
 
+    const paginatedLedger = ledger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     const totalPages = Math.ceil(ledger.length / pageSize);
-    const paginatedLedger = ledger.slice(
-        (currentPage - 1) * pageSize,
-        currentPage * pageSize
-    );
 
     const handleDownloadPDF = async () => {
         if (!tenant) return;
         const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
-        const fullPaymentHistory = await getPaymentHistory(tenant.id);
-        const waterReadings = await getTenantWaterReadings(tenant.id);
-        generateTenantStatementPDF(tenant, fullPaymentHistory, allProperties, waterReadings, 'rent');
+        const fullHistory = await getPaymentHistory(tenant.id);
+        const readings = await getTenantWaterReadings(tenant.id);
+        generateTenantStatementPDF(tenant, fullHistory, allProperties, readings, 'rent');
     };
 
     if (!tenant) return null;
@@ -119,36 +99,17 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
                         <DialogTitle>Transaction History</DialogTitle>
-                        <DialogDescription>
-                            Financial record for {tenant.name} (Unit: {tenant.unitName})
-                        </DialogDescription>
+                        <DialogDescription>Financial record for {tenant.name} (Unit: {tenant.unitName})</DialogDescription>
                     </DialogHeader>
-
                     <div className="flex justify-between items-center mb-4">
-                        <AddPaymentDialog
-                            properties={allProperties}
-                            tenants={allTenants}
-                            onPaymentAdded={onPaymentAdded}
-                            tenant={tenant}
-                        >
-                            <Button variant="outline" size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Record Payment
-                            </Button>
+                        <AddPaymentDialog properties={allProperties} tenants={allTenants} onPaymentAdded={onPaymentAdded} tenant={tenant}>
+                            <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Record Payment</Button>
                         </AddPaymentDialog>
-                        <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Export PDF
-                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleDownloadPDF}><Download className="mr-2 h-4 w-4" /> Export PDF</Button>
                     </div>
-
                     <div className="border rounded-md">
                         <ScrollArea className="h-[450px]">
-                            {isLoading ? (
-                                <div className="flex justify-center p-8">
-                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                                </div>
-                            ) : (
+                            {isLoading ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> : (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -162,68 +123,26 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {paginatedLedger.length > 0 ? (
-                                            paginatedLedger.map((entry, index) => (
-                                                <TableRow key={`${entry.id}-${index}`}>
-                                                    <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                                    <TableCell>{entry.forMonth}</TableCell>
-                                                    <TableCell>{entry.description}</TableCell>
-                                                    <TableCell className="text-right text-red-600 font-medium">
-                                                        {entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}`: '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-right text-green-600 font-medium">
-                                                        {entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-bold">
-                                                        {entry.balance < 0
-                                                            ? <span className="text-green-600">Ksh {Math.abs(entry.balance).toLocaleString()} Cr</span>
-                                                            : `Ksh ${entry.balance.toLocaleString()}`
-                                                        }
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {!entry.id.startsWith('charge-') && (
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(entry.id)}>
-                                                                <Edit2 className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        ) : (
-                                            <TableRow>
-                                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                    No transaction history found.
-                                                </TableCell>
+                                        {paginatedLedger.length > 0 ? paginatedLedger.map((entry, idx) => (
+                                            <TableRow key={`${entry.id}-${idx}`}>
+                                                <TableCell>{format(new Date(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell>{entry.forMonth}</TableCell>
+                                                <TableCell>{entry.description}</TableCell>
+                                                <TableCell className="text-right text-red-600">{entry.charge > 0 ? `Ksh ${entry.charge.toLocaleString()}` : '-'}</TableCell>
+                                                <TableCell className="text-right text-green-600">{entry.payment > 0 ? `Ksh ${entry.payment.toLocaleString()}` : '-'}</TableCell>
+                                                <TableCell className="text-right font-bold">{entry.balance < 0 ? `Ksh ${Math.abs(entry.balance).toLocaleString()} Cr` : `Ksh ${entry.balance.toLocaleString()}`}</TableCell>
+                                                <TableCell>{!entry.id.startsWith('charge-') && <Button variant="ghost" size="icon" onClick={() => handleEditClick(entry.id)}><Edit2 className="h-4 w-4" /></Button>}</TableCell>
                                             </TableRow>
-                                        )}
+                                        )) : <TableRow><TableCell colSpan={7} className="text-center py-8">No history found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
                             )}
                         </ScrollArea>
                     </div>
-                    {ledger.length > 0 && (
-                        <div className="pt-4 border-t">
-                            <PaginationControls
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                pageSize={pageSize}
-                                totalItems={ledger.length}
-                                onPageChange={setCurrentPage}
-                                onPageSizeChange={(size) => {
-                                    setPageSize(size);
-                                    setCurrentPage(1);
-                                }}
-                            />
-                        </div>
-                    )}
+                    <div className="pt-4 border-t"><PaginationControls currentPage={currentPage} totalPages={totalPages} pageSize={pageSize} totalItems={ledger.length} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} /></div>
                 </DialogContent>
             </Dialog>
-            <EditPaymentDialog 
-                payment={selectedPaymentForEdit}
-                open={isEditDialogOpen}
-                onOpenChange={setIsEditDialogOpen}
-                onSave={handleSaveEdit}
-            />
+            <EditPaymentDialog payment={selectedPaymentForEdit} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSave={handleSaveEdit} />
         </>
     );
 }

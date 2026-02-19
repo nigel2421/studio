@@ -1,21 +1,15 @@
 
 import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord, WaterMeterReading } from './types';
-import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore } from 'date-fns';
+import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore, isValid } from 'date-fns';
 
 /**
  * Calculates the total amount due for a tenant in the current billing cycle.
- * First month: Rent + Deposit.
- * Other months: Rent.
- * Service charge is assumed to be included in the rent.
  */
 export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): number {
     if (!tenant.lease) {
         return 0;
     }
     const rent = tenant.lease.rent || 0;
-    
-    // For monthly reconciliation, only charge rent. 
-    // Deposit is handled at tenant creation.
     return rent;
 }
 
@@ -40,13 +34,11 @@ export function getRecommendedPaymentStatus(tenant: { dueBalance?: number }, dat
 
 /**
  * Process a new payment and update the tenant's balances.
- * This function is now siloed: 'Water' payments do not affect the Rent/Service Charge balance.
  */
 export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type'], paymentDate: Date = new Date()): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
 
-    // If it's a water payment, it doesn't affect the Rent/SC Due Balance silo
     if (paymentType === 'Water') {
         return {
             dueBalance: newDueBalance,
@@ -57,8 +49,6 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
     }
 
     if (paymentType === 'Adjustment') {
-        // Positive amount = DEBIT (increases due balance)
-        // Negative amount = CREDIT (decreases due balance)
         newDueBalance += paymentAmount;
         if (newDueBalance < 0) {
             newAccountBalance += Math.abs(newDueBalance);
@@ -71,14 +61,13 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
         };
     }
 
-    // This logic is for normal Rent/Deposit/ServiceCharge payments
     const positivePaymentAmount = Math.abs(paymentAmount);
     let totalAvailable = positivePaymentAmount + newAccountBalance; 
 
     if (totalAvailable >= newDueBalance) {
         totalAvailable -= newDueBalance;
         newDueBalance = 0;
-        newAccountBalance = totalAvailable; // Any excess becomes credit
+        newAccountBalance = totalAvailable;
     } else {
         newDueBalance -= totalAvailable;
         newAccountBalance = 0;
@@ -93,12 +82,10 @@ export function processPayment(tenant: Tenant, paymentAmount: number, paymentTyp
 }
 
 /**
- * Monthly reconciliation logic. This function calculates any missed monthly charges
- * and returns the necessary updates for the tenant object. It strictly handles Rent/Service Charges.
+ * Monthly reconciliation logic. Strictly handles Rent/Service Charges.
  */
 export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, date: Date = new Date()): { [key: string]: any } {
     if (!tenant.lease || (!tenant.lease.rent && !tenant.lease.serviceCharge)) {
-        console.warn(`Skipping billing for tenant ${tenant.name} (${tenant.id}) due to missing lease or charge information.`);
         return {};
     }
 
@@ -107,7 +94,6 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         : (tenant.lease.rent || 0);
 
     if (monthlyCharge <= 0) {
-        // If there's no monthly charge, just update the status based on current balance
         const updatedStatus = getRecommendedPaymentStatus(tenant, date);
         if (tenant.lease.paymentStatus !== updatedStatus) {
             return { 'lease.paymentStatus': updatedStatus };
@@ -115,16 +101,12 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
         return {};
     }
 
-    // Determine the true start of billing
     let billingStartDate: Date;
     const leaseStartDate = parseISO(tenant.lease.startDate);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
         const handoverDate = parseISO(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
-        
-        // Handover on/before 10th waives that month, billing starts next month
-        // Handover after 10th waives next month, billing starts month after
         if (handoverDay <= 10) {
             billingStartDate = startOfMonth(addMonths(handoverDate, 1));
         } else {
@@ -135,10 +117,9 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     }
     
     const lastBilledDate = tenant.lease.lastBilledPeriod && !/NaN/.test(tenant.lease.lastBilledPeriod)
-        ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02')) // Use day 2 to avoid TZ issues
+        ? startOfMonth(parseISO(tenant.lease.lastBilledPeriod + '-02'))
         : addMonths(billingStartDate, -1);
 
-    // The first month we should even consider billing for.
     const firstBillableMonth = lastBilledDate ? addMonths(lastBilledDate, 1) : billingStartDate;
 
     let monthsToBill = 0;
@@ -153,7 +134,6 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     }
     
     if (monthsToBill === 0) {
-        // No new months to bill, but status might need update based on current balance
         const updatedStatus = getRecommendedPaymentStatus(tenant, date);
         if (tenant.lease.paymentStatus !== updatedStatus) {
             return { 'lease.paymentStatus': updatedStatus };
@@ -165,7 +145,6 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     let newDueBalance = (tenant.dueBalance || 0) + totalNewCharges;
     let newAccountBalance = tenant.accountBalance || 0;
 
-    // Apply any existing overpayment credit
     if (newAccountBalance > 0) {
         if (newAccountBalance >= newDueBalance) {
             newAccountBalance -= newDueBalance;
@@ -184,30 +163,27 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     };
 }
 
-
 export function validatePayment(
     paymentAmount: number,
     paymentDate: Date,
     tenant: Tenant,
     paymentType: Payment['type']
 ): void {
-
     if (paymentType !== 'Adjustment') {
         if (paymentAmount <= 0) {
             throw new Error(`Invalid payment amount: Ksh ${paymentAmount}. Amount must be positive.`);
         }
         if (paymentAmount > 1000000) {
-            throw new Error(`Payment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
+            throw new Error(`Payment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit.`);
         }
-    } else { // For adjustments
+    } else {
          if (Math.abs(paymentAmount) > 1000000) {
-            throw new Error(`Adjustment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit of Ksh 1,000,000.`);
+            throw new Error(`Adjustment amount Ksh ${paymentAmount.toLocaleString()} exceeds the maximum limit.`);
         }
          if (paymentAmount === 0) {
              throw new Error(`Adjustment amount cannot be zero.`);
          }
     }
-
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -216,14 +192,6 @@ export function validatePayment(
 
     if (paymentDateOnly > today) {
         throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be in the future.`);
-    }
-
-    if (tenant.residentType === 'Tenant' && tenant.lease?.startDate) {
-        const leaseStartDate = parseISO(tenant.lease.startDate);
-        leaseStartDate.setHours(0, 0, 0, 0);
-        if (paymentDateOnly < leaseStartDate) {
-            throw new Error(`Invalid payment date: ${format(paymentDate, 'yyyy-MM-dd')}. Date cannot be before the lease start date of ${tenant.lease.startDate}.`);
-        }
     }
 }
 
@@ -273,10 +241,7 @@ export function generateLedger(
         const isHomeowner = tenant.residentType === 'Homeowner';
         const chargeType = isHomeowner ? 'Service Charge' : 'Rent';
         
-        if (
-            (chargeType === 'Rent' && !finalOptions.includeRent) ||
-            (chargeType === 'Service Charge' && !finalOptions.includeServiceCharge)
-        ) {
+        if ((chargeType === 'Rent' && !finalOptions.includeRent) || (chargeType === 'Service Charge' && !finalOptions.includeServiceCharge)) {
             return;
         }
 
@@ -287,7 +252,6 @@ export function generateLedger(
             if (isHomeowner && unit?.handoverDate) {
                 const handoverDate = parseISO(unit.handoverDate);
                 const handoverDay = handoverDate.getDate();
-                
                 if (handoverDay <= 10) {
                     billingStartDate = startOfMonth(addMonths(handoverDate, 1));
                 } else {
@@ -297,9 +261,7 @@ export function generateLedger(
                 billingStartDate = startOfMonth(parseISO(tenant.lease.startDate));
             }
             
-            const firstBillableMonth = billingStartDate;
-            
-            let loopDate = firstBillableMonth;
+            let loopDate = billingStartDate;
             const endOfPeriod = startOfMonth(asOfDate); 
 
             while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
@@ -319,27 +281,12 @@ export function generateLedger(
         const chargeDate = parseISO(key + '-01');
         const unitText = value.unitNames.length > 1 ? 'Units' : 'Unit';
         const description = `${value.type} for ${unitText}: ${value.unitNames.join(', ')}`;
-
-        allCharges.push({
-            id: `charge-${key}`, date: chargeDate, description, charge: value.charge, payment: 0, forMonth: format(chargeDate, 'MMM yyyy'),
-        });
+        allCharges.push({ id: `charge-${key}`, date: chargeDate, description, charge: value.charge, payment: 0, forMonth: format(chargeDate, 'MMM yyyy') });
     });
 
     if (finalOptions.includeWater && allTenantWaterReadings) {
       allTenantWaterReadings.forEach(reading => {
-          allCharges.push({
-              id: `charge-water-${reading.id}`,
-              date: new Date(reading.date),
-              description: `Water Bill for ${reading.unitName}`,
-              charge: reading.amount,
-              payment: 0,
-              forMonth: format(new Date(reading.date), 'MMM yyyy'),
-              priorReading: reading.priorReading,
-              currentReading: reading.currentReading,
-              consumption: reading.consumption,
-              rate: reading.rate,
-              unitName: reading.unitName,
-          });
+          allCharges.push({ id: `charge-water-${reading.id}`, date: new Date(reading.date), description: `Water Bill for ${reading.unitName}`, charge: reading.amount, payment: 0, forMonth: format(new Date(reading.date), 'MMM yyyy'), priorReading: reading.priorReading, currentReading: reading.currentReading, consumption: reading.consumption, rate: reading.rate, unitName: reading.unitName });
       });
     }
 
@@ -347,48 +294,20 @@ export function generateLedger(
         if (p.type === 'Water') return !!finalOptions.includeWater;
         if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
         if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
-        if (p.type === 'Adjustment' || p.type === 'Reversal') {
-            return (!!finalOptions.includeRent || !!finalOptions.includeServiceCharge) && !finalOptions.includeWater;
-        }
-        return false; 
+        return (p.type === 'Adjustment' || p.type === 'Reversal') && !finalOptions.includeWater;
     });
 
     const allPaymentsAndAdjustments = paymentsToInclude.map(p => {
         const isAdjustment = p.type === 'Adjustment';
         let details = p.notes || `Payment Received`;
         if (p.paymentMethod) details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
-
-        let waterReadingDetails: Partial<LedgerEntry> = {};
-        if (p.type === 'Water' && p.waterReadingId && allTenantWaterReadings) {
-            const reading = allTenantWaterReadings.find(r => r.id === p.waterReadingId);
-            if (reading) {
-                waterReadingDetails = {
-                    unitName: reading.unitName,
-                    priorReading: reading.priorReading,
-                    currentReading: reading.currentReading,
-                    consumption: reading.consumption,
-                    rate: reading.rate,
-                };
-            }
-        }
-
-        return {
-            id: p.id,
-            date: new Date(p.date),
-            description: details,
-            charge: isAdjustment && p.amount > 0 ? p.amount : 0,
-            payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0),
-            forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined,
-            status: p.status,
-            ...waterReadingDetails,
-        };
+        return { id: p.id, date: new Date(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status };
     });
 
     const combined = [...allCharges, ...allPaymentsAndAdjustments].sort((a, b) => {
         const dateA = a.date instanceof Date ? a.date : new Date(a.date);
         const dateB = b.date instanceof Date ? b.date : new Date(b.date);
-        const dateDiff = dateA.getTime() - dateB.getTime();
-        if (dateDiff !== 0) return dateDiff;
+        if (dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
         if (a.charge > 0 && b.payment > 0) return -1;
         if (a.payment > 0 && b.charge > 0) return 1;
         return 0;
@@ -401,12 +320,5 @@ export function generateLedger(
         return { ...item, date: format(item.date, 'yyyy-MM-dd'), balance: runningBalance, forMonth: item.forMonth, status: (item as any).status };
     });
 
-    const finalDueBalance = Math.max(0, runningBalance);
-    const finalAccountBalance = Math.max(0, -runningBalance);
-
-    return {
-        ledger: ledgerWithBalance,
-        finalDueBalance,
-        finalAccountBalance,
-    };
+    return { ledger: ledgerWithBalance, finalDueBalance: Math.max(0, runningBalance), finalAccountBalance: Math.max(0, -runningBalance) };
 }
