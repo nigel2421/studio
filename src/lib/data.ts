@@ -416,7 +416,22 @@ export async function batchProcessPayments(tenantId: string, entries: any[], tas
         Object.assign(workingTenant, recon);
         for (const entry of entries) {
             const payRef = doc(collection(db, 'payments'));
-            tx.set(payRef, { tenantId, ...entry, status: 'Paid', createdAt: new Date().toISOString() });
+            
+            // SANITIZE: Ensure no 'undefined' fields are passed to tx.set()
+            const sanitizedEntry = { ...entry };
+            Object.keys(sanitizedEntry).forEach(key => {
+                if (sanitizedEntry[key] === undefined) {
+                    delete sanitizedEntry[key];
+                }
+            });
+
+            tx.set(payRef, { 
+                tenantId, 
+                ...sanitizedEntry, 
+                status: 'Paid', 
+                createdAt: new Date().toISOString() 
+            });
+
             if (entry.type === 'Water' && entry.waterReadingId) tx.update(doc(db, 'waterReadings', entry.waterReadingId), { status: 'Paid', paymentId: payRef.id });
             const updates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
             Object.assign(workingTenant, updates);

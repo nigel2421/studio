@@ -170,7 +170,22 @@ export function AddPaymentDialog({
     setIsLoading(true);
     startLoading(`Recording ${validEntries.length} payment(s)...`);
     try {
-      const data = validEntries.map(e => ({ amount: Number(e.amount), date: format(e.date, 'yyyy-MM-dd'), rentForMonth: e.rentForMonth, type: e.type, paymentMethod: e.paymentMethod, transactionId: e.transactionId, waterReadingId: e.type === 'Water' && readingForPayment ? readingForPayment.id : undefined }));
+      const data = validEntries.map(e => {
+          const entryData: any = { 
+            amount: Number(e.amount), 
+            date: format(e.date, 'yyyy-MM-dd'), 
+            rentForMonth: e.rentForMonth, 
+            type: e.type, 
+            paymentMethod: e.paymentMethod, 
+            transactionId: e.transactionId 
+          };
+          
+          if (e.type === 'Water' && readingForPayment) {
+              entryData.waterReadingId = readingForPayment.id;
+          }
+          
+          return entryData;
+      });
       await batchProcessPayments(tenantForDisplay.id, data, taskId);
       toast({ title: 'Payments Added' });
       onPaymentAdded();
