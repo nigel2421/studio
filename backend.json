@@ -1,6 +1,24 @@
 
 {
   "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores user account details and roles.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { 
+          "type": "string", 
+          "enum": ["admin", "agent", "tenant", "landlord", "viewer", "water-meter-reader", "investment-consultant", "accounts", "homeowner"] 
+        },
+        "name": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "landlordId": { "type": "string" },
+        "propertyOwnerId": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    },
     "maintenanceRequest": {
       "title": "Maintenance Request",
       "description": "A request for maintenance submitted by a tenant.",
@@ -92,6 +110,12 @@
     "providers": []
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/userProfile"
+      },
+      "description": "Stores all user profiles."
+    },
     "/maintenanceRequests/{maintenanceRequestId}": {
       "schema": {
         "$ref": "#/entities/maintenanceRequest"
