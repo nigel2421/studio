@@ -117,7 +117,7 @@ describe('Financial Utils Logic', () => {
             expect(transactions).toHaveLength(1);
             expect(transactions[0].rentForMonth).toBe('2025-12');
             expect(transactions[0].serviceChargeDeduction).toBe(0); // Waived
-            expect(transactions[0].gross).toBe(0); // Status row showing it's occupied but unpaid
+            expect(transactions[0].gross).toBe(0); 
         });
 
         it('should apply 50% management fee for initial letting but respect handover SC rules', () => {
@@ -130,13 +130,10 @@ describe('Financial Utils Logic', () => {
                 lease: { startDate: '2026-01-01', rent: 25000 }
             });
             
-            // First month of lease is Jan 2026. Handover was Dec 2025.
             const payment = createMockPayment({ amount: 25000, rentForMonth: '2026-01' });
             const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             
-            // Initial letting (Jan) within 3 months of Dec handover -> 50% Fee
             expect(breakdown.managementFee).toBe(12500);
-            // Jan is NOT the handover month -> S.Charge should be deducted
             expect(breakdown.serviceChargeDeduction).toBe(2000);
         });
     });
@@ -152,7 +149,6 @@ describe('Financial Utils Logic', () => {
                 lease: { startDate: '2025-10-01', rent: 20000 } 
             });
             
-            // Payment made in Jan 2026 covering Oct 2025
             const payment = createMockPayment({ 
                 tenantId: 't1', amount: 20000, date: '2026-01-10', rentForMonth: '2025-10' 
             });
@@ -165,24 +161,22 @@ describe('Financial Utils Logic', () => {
             expect(transactions.some(t => t.rentForMonth === '2025-10')).toBe(true);
         });
 
-        it('should apply otherCosts only if income is present (gross > 0)', () => {
+        it('should not apply any otherCosts even if income is present', () => {
             const landlordId = 'fee-lord';
             const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
             const units = [
-                createMockUnit('V1', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' })
+                createMockUnit('V1', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'rented' })
             ];
             const props = [createMockProperty('p1', units)];
+            const tenant = createMockTenant({ id: 't1', unitName: 'V1', propertyId: 'p1', lease: { rent: 20000 } });
+            const payment = createMockPayment({ tenantId: 't1', amount: 20000, rentForMonth: '2026-02' });
             
-            // Policy starts Feb 2026
             const startDate = parseISO('2026-02-01');
             const endDate = parseISO('2026-02-28');
 
-            const transactions = generateLandlordDisplayTransactions([], [], props, landlord, startDate, endDate);
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, landlord, startDate, endDate);
             
-            expect(transactions).toHaveLength(1);
-            expect(transactions[0].gross).toBe(0);
-            expect(transactions[0].otherCosts).toBe(0); // Should be zero for vacant/unpaid rows
-            expect(transactions[0].netToLandlord).toBe(-4000);
+            expect(transactions[0].otherCosts).toBe(0);
         });
     });
 });

@@ -150,7 +150,7 @@ export function generateLandlordDisplayTransactions(
 
     const tenantMap = new Map(tenants.map(t => [t.id, t]));
 
-    // Updated Filter Logic: Include payments received in range OR covering months in range
+    // Include payments received in range OR covering months in range
     const filteredPayments = payments.filter(p => {
         if (!startDate || !endDate) return true;
         const paymentDate = parseISO(p.date);
@@ -215,7 +215,7 @@ export function generateLandlordDisplayTransactions(
                 gross: breakdown.gross,
                 serviceChargeDeduction: breakdown.serviceChargeDeduction,
                 managementFee: breakdown.managementFee,
-                otherCosts: 0,
+                otherCosts: 0, // Transaction Fee Removed per Management Instruction
                 occupiedServiceCharge: breakdown.serviceChargeDeduction,
                 vacantServiceCharge: 0
             });
@@ -224,7 +224,6 @@ export function generateLandlordDisplayTransactions(
             currentMonth = addMonths(currentMonth, 1);
         }
         
-        // Update tracker based on total rent paid to date
         const totalRentExpectedPerMonth = unitRent;
         const totalPaymentsSoFar = sortedPayments
             .filter(p => p.tenantId === tenant.id && p.type === 'Rent' && new Date(p.date) <= new Date(payment.date))
@@ -259,11 +258,8 @@ export function generateLandlordDisplayTransactions(
         const reportedUnitsInMonth = new Set(monthTransactions.map(t => t.unitName));
 
         landlordUnits.forEach(u => {
-            if (reportedUnitsInMonth.has(u.name)) return; // Already reported via income
+            if (reportedUnitsInMonth.has(u.name)) return; 
 
-            // Unit was NOT reported via a payment for this month. 
-            // We must determine if it should be shown based on handover OR occupancy.
-            
             let isBillableForServiceCharge = false;
             if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
                 const hDate = parseISO(u.handoverDate);
@@ -287,12 +283,8 @@ export function generateLandlordDisplayTransactions(
                 }
             }
 
-            // A unit should appear in the month's report if:
-            // 1. It is occupied (to show rent status/arrears)
-            // 2. OR It is billable for service charge (handed over and not waived)
             if (!isOccupiedInMonth && !isBillableForServiceCharge) return;
 
-            // Injected status row for rented units without payment or vacant billable units
             const scAmount = isBillableForServiceCharge ? (u.serviceCharge || 0) : 0;
             
             monthTransactions.push({
@@ -313,7 +305,6 @@ export function generateLandlordDisplayTransactions(
             });
         });
         
-        // Sort transactions within the month alphabetically by unit name for clarity
         monthTransactions.sort((a, b) => a.unitName.localeCompare(b.unitName));
     });
 
@@ -323,45 +314,18 @@ export function generateLandlordDisplayTransactions(
     if (startDate && endDate) {
         finalTransactions = finalTransactions.filter(t => {
             const rentMonthDate = parseISO(t.rentForMonth + '-01');
-            
             if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
-            
-            // Allow income rows from old months if payment date is in range
             if (isBefore(rentMonthDate, startDate) && !isSameMonth(rentMonthDate, startDate)) {
                 return t.gross > 0;
             }
-            
             return true;
         });
     }
 
-    // Apply transaction fee logic (KSh 1,000 once per month per landlord, only if income exists)
-    const processedForOtherCosts = new Set<string>();
-    const policyStartDate = parseISO('2026-02-01');
-
+    // Final net recalculation
     finalTransactions.forEach(t => {
-        const rentMonthDate = parseISO(t.rentForMonth + '-01');
-        if (isBefore(rentMonthDate, policyStartDate)) {
-            t.otherCosts = 0;
-        } else {
-            // POLICY: Only apply transaction fee if there is INCOME (gross > 0)
-            if (t.gross > 0) {
-                if (landlordUnits.size > 1) {
-                    if (!processedForOtherCosts.has(t.rentForMonth)) {
-                        t.otherCosts = 1000;
-                        processedForOtherCosts.add(t.rentForMonth);
-                    } else {
-                        t.otherCosts = 0;
-                    }
-                } else {
-                    t.otherCosts = 1000;
-                }
-            } else {
-                t.otherCosts = 0;
-            }
-        }
-        // Recalculate net after final costs
-        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee - (t.otherCosts || 0);
+        t.otherCosts = 0; // Explicitly zeroed as per management instruction
+        t.netToLandlord = t.gross - t.serviceChargeDeduction - t.managementFee;
     });
     
     return finalTransactions;
