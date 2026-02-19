@@ -4,6 +4,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 
 // Your web app's Firebase configuration
@@ -19,6 +20,14 @@ export const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize App Check
+if (typeof window !== "undefined") {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6LdRuXAsAAAAAG14sq0FbcHahQ2Gnff0SzCBPDVZ'),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 // Export auth and db
 export const db = getFirestore(app);
