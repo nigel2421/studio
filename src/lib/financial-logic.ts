@@ -3,6 +3,21 @@ import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord, 
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore, isValid } from 'date-fns';
 
 /**
+ * Robust date parsing utility to handle various date string formats.
+ */
+function safeParseDate(dateStr: string | undefined): Date {
+    if (!dateStr) return new Date();
+    // Standard Date constructor is quite robust for basic formats
+    const d = new Date(dateStr);
+    if (isValid(d)) return d;
+    // Fallback to parseISO for strict ISO formats
+    const isoD = parseISO(dateStr);
+    if (isValid(isoD)) return isoD;
+    // Last resort default
+    return new Date();
+}
+
+/**
  * Calculates the total amount due for a tenant in the current billing cycle.
  */
 export function calculateTargetDue(tenant: Tenant, date: Date = new Date()): number {
@@ -102,11 +117,11 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     }
 
     let billingStartDate: Date;
-    const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
-    const leaseStartDate = parseISO(leaseStartDateStr);
+    const leaseStartDateStr = tenant.lease.startDate;
+    const leaseStartDate = safeParseDate(leaseStartDateStr);
 
     if (tenant.residentType === 'Homeowner' && unit?.handoverDate) {
-        const handoverDate = parseISO(unit.handoverDate);
+        const handoverDate = safeParseDate(unit.handoverDate);
         const handoverDay = handoverDate.getDate();
         if (handoverDay <= 10) {
             billingStartDate = startOfMonth(addMonths(handoverDate, 1));
@@ -129,7 +144,7 @@ export function reconcileMonthlyBilling(tenant: Tenant, unit: Unit | undefined, 
     const startOfToday = startOfMonth(date);
 
     if (isValid(loopDate)) {
-        while (loopDate <= startOfToday) { 
+        while (isBefore(loopDate, startOfToday) || isSameMonth(loopDate, startOfToday)) { 
             monthsToBill++;
             latestBilledPeriod = format(loopDate, 'yyyy-MM');
             loopDate = addMonths(loopDate, 1);
@@ -219,12 +234,15 @@ export function generateLedger(
         );
         ownerUnits = [...new Map(ownerUnits.map(item => [`${item.propertyId}-${item.name}`, item])).values()];
     } else {
+        // Robust unit matching: trim whitespace and use case-insensitive matching
+        const targetUnitName = tenant.unitName?.trim().toLowerCase();
         const property = properties.find(p => p.id === tenant.propertyId);
-        const unit = property?.units.find(u => u.name === tenant.unitName);
+        const unit = property?.units.find(u => u.name.trim().toLowerCase() === targetUnitName);
+        
         if (unit && property) {
             ownerUnits = [{ ...unit, propertyId: property.id, propertyName: property.name }];
         } else if (tenant.unitName) {
-            // FALLBACK: If unit is not found in properties, use tenant record info to still generate ledger
+            // FALLBACK: Use lease data to generate charges even if unit is missing from property list
             ownerUnits = [{ 
                 name: tenant.unitName, 
                 status: 'rented', 
@@ -240,9 +258,9 @@ export function generateLedger(
 
     let allCharges: { id: string, date: Date, description: string, charge: number, payment: number, forMonth?: string, priorReading?: number, currentReading?: number, consumption?: number, rate?: number, unitName?: string }[] = [];
 
+    const leaseStartDate = safeParseDate(tenant.lease.startDate);
+
     if (tenant.residentType === 'Tenant' && finalOptions.includeRent) {
-        const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
-        const leaseStartDate = parseISO(leaseStartDateStr);
         if (tenant.securityDeposit && tenant.securityDeposit > 0) {
             allCharges.push({ id: 'charge-security-deposit', date: leaseStartDate, description: 'Security Deposit', charge: tenant.securityDeposit, payment: 0, forMonth: format(leaseStartDate, 'MMM yyyy') });
         }
@@ -264,24 +282,22 @@ export function generateLedger(
         const monthlyCharge = isHomeowner ? (unit?.serviceCharge || 0) : (tenant.lease.rent || 0);
 
         if (monthlyCharge > 0) {
-            let billingStartDate: Date;
+            let unitBillingStart: Date;
             if (isHomeowner && unit?.handoverDate) {
-                const handoverDate = parseISO(unit.handoverDate);
+                const handoverDate = safeParseDate(unit.handoverDate);
                 const handoverDay = handoverDate.getDate();
-                if (handoverDay <= 10) {
-                    billingStartDate = startOfMonth(addMonths(handoverDate, 1));
-                } else {
-                    billingStartDate = startOfMonth(addMonths(handoverDate, 2));
-                }
+                unitBillingStart = handoverDay <= 10
+                    ? startOfMonth(addMonths(handoverDate, 1))
+                    : startOfMonth(addMonths(handoverDate, 2));
             } else {
-                const leaseStartDateStr = tenant.lease.startDate || format(new Date(), 'yyyy-MM-dd');
-                billingStartDate = startOfMonth(parseISO(leaseStartDateStr));
+                unitBillingStart = startOfMonth(leaseStartDate);
             }
             
-            let loopDate = billingStartDate;
+            let loopDate = unitBillingStart;
             const endOfPeriod = startOfMonth(asOfDate); 
 
             if (isValid(loopDate)) {
+                // Loop through every month from start to current period
                 while (isBefore(loopDate, endOfPeriod) || isSameMonth(loopDate, endOfPeriod)) {
                     const monthKey = format(loopDate, 'yyyy-MM');
                     if (!monthlyChargesMap.has(monthKey)) {
@@ -305,7 +321,7 @@ export function generateLedger(
 
     if (finalOptions.includeWater && allTenantWaterReadings) {
       allTenantWaterReadings.forEach(reading => {
-          allCharges.push({ id: `charge-water-${reading.id}`, date: new Date(reading.date), description: `Water Bill for ${reading.unitName}`, charge: reading.amount, payment: 0, forMonth: format(new Date(reading.date), 'MMM yyyy'), priorReading: reading.priorReading, currentReading: reading.currentReading, consumption: reading.consumption, rate: reading.rate, unitName: reading.unitName });
+          allCharges.push({ id: `charge-water-${reading.id}`, date: safeParseDate(reading.date), description: `Water Bill for ${reading.unitName}`, charge: reading.amount, payment: 0, forMonth: format(safeParseDate(reading.date), 'MMM yyyy'), priorReading: reading.priorReading, currentReading: reading.currentReading, consumption: reading.consumption, rate: reading.rate, unitName: reading.unitName });
       });
     }
 
@@ -320,13 +336,14 @@ export function generateLedger(
         const isAdjustment = p.type === 'Adjustment';
         let details = p.notes || `Payment Received`;
         if (p.paymentMethod) details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
-        return { id: p.id, date: new Date(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status };
+        return { id: p.id, date: safeParseDate(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status };
     });
 
     const combined = [...allCharges, ...allPaymentsAndAdjustments].sort((a, b) => {
-        const dateA = a.date instanceof Date ? a.date : new Date(a.date);
-        const dateB = b.date instanceof Date ? b.date : new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
+        const timeA = a.date.getTime();
+        const timeB = b.date.getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        // If same day, put charges before payments
         if (a.charge > 0 && b.payment > 0) return -1;
         if (a.payment > 0 && b.charge > 0) return 1;
         return 0;
