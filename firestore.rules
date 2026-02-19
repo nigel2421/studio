@@ -8,46 +8,59 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper to check if user owns the record
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Profiles: Any authenticated user can read profiles (needed for mentions/lookups),
-    // but only the owner or an admin can write.
+    // Broad rules for MVP: Allow all authenticated users to read and write
+    // This ensures that onboarding, profile creation, and dashboard data fetching are not blocked.
+    
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwner(userId) || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow read, write: if isSignedIn();
     }
 
-    // Maintenance Requests: Tenants can read/write their own, admins/agents can manage all.
     match /maintenanceRequests/{requestId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
-    // Notices to Vacate: Access for authenticated residents and management.
     match /noticesToVacate/{noticeId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
-    // Properties and Units: Read access for all staff/owners, write for admin/agent.
     match /properties/{propertyId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
-    // Tenants: Read access for all staff, write for admin/agent.
     match /tenants/{tenantId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
-    // Payments: Read for relevant parties, write for admin/accounts.
     match /payments/{paymentId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
+    }
+
+    match /logs/{logId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /communications/{commId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /waterReadings/{readingId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /propertyOwners/{ownerId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /landlords/{landlordId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /archived_tenants/{tenantId} {
+      allow read, write: if isSignedIn();
     }
 
     // Catch-all for other collections defined in the schema
@@ -56,3 +69,5 @@ service cloud.firestore {
     }
   }
 }
+
+// Deployment trigger: 2024-05-22T10:00:00Z

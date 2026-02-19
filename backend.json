@@ -24,54 +24,17 @@
       "description": "A request for maintenance submitted by a tenant.",
       "type": "object",
       "properties": {
-        "propertyId": {
-          "type": "string",
-          "description": "The ID of the property."
-        },
-        "tenantId": {
-          "type": "string",
-          "description": "The ID of the tenant who submitted the request."
-        },
-        "title": {
-          "type": "string",
-          "description": "A brief title for the maintenance issue."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the maintenance issue."
-        },
-        "category": {
-          "type": "string",
-          "description": "The category of the maintenance request.",
-          "enum": ["Plumbing", "Electrical", "HVAC", "General", "Appliance", "Other"]
-        },
-        "priority": {
-          "type": "string",
-          "description": "The priority level of the request.",
-          "enum": ["Low", "Medium", "High", "Urgent"]
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the request.",
-          "enum": ["New", "In Progress", "Completed", "Cancelled"]
-        },
-        "date": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The date the request was submitted."
-        },
-        "createdAt": {
-            "type": "string",
-            "format": "date-time"
-        },
-        "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-        },
-        "completedAt": {
-            "type": "string",
-            "format": "date-time"
-        },
+        "propertyId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Plumbing", "Electrical", "HVAC", "General", "Appliance", "Other"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
+        "status": { "type": "string", "enum": ["New", "In Progress", "Completed", "Cancelled"] },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
         "updates": {
           "type": "array",
           "items": {
@@ -101,32 +64,141 @@
         "submittedBy": { "type": "string", "enum": ["Admin", "Tenant"] },
         "submittedByName": { "type": "string" },
         "status": { "type": "string", "enum": ["Active", "Completed"] },
-        "reason": { "type": "string", "description": "The reason the tenant is vacating." }
+        "reason": { "type": "string" }
       },
       "required": ["tenantId", "propertyId", "unitName", "tenantName", "propertyName", "noticeSubmissionDate", "scheduledMoveOutDate", "submittedBy", "status"]
+    },
+    "property": {
+      "title": "Property",
+      "description": "A building or development in the portfolio.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "type": { "type": "string" },
+        "imageId": { "type": "string" },
+        "lateFee": { "type": "number" },
+        "units": {
+          "type": "array",
+          "items": { "$ref": "#/entities/unit" }
+        }
+      },
+      "required": ["name", "address", "type"]
+    },
+    "unit": {
+      "title": "Unit",
+      "description": "An individual unit within a property.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["vacant", "rented", "airbnb", "client occupied"] },
+        "ownership": { "type": "string", "enum": ["SM", "Landlord"] },
+        "unitType": { "type": "string", "enum": ["Studio", "One Bedroom", "Two Bedroom", "Shop", "Three Bedroom"] },
+        "unitOrientation": { "type": "string", "enum": ["MURANG'A.RD", "FOREST.RD", "GMA-ANNEX", "MUTHAIGA", "MID-BLOCK UNIT"] },
+        "managementStatus": { "type": "string", "enum": ["Rented for Soil Merchants", "Rented for Clients", "Client Managed", "Airbnb"] },
+        "rentAmount": { "type": "number" },
+        "serviceCharge": { "type": "number" },
+        "handoverStatus": { "type": "string", "enum": ["Pending Hand Over", "Handed Over"] },
+        "handoverDate": { "type": "string", "format": "date" },
+        "landlordId": { "type": "string" }
+      },
+      "required": ["name", "status", "ownership", "unitType"]
+    },
+    "tenant": {
+      "title": "Tenant",
+      "description": "A resident currently living in a unit.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "unitName": { "type": "string" },
+        "residentType": { "type": "string", "enum": ["Tenant", "Homeowner"] },
+        "dueBalance": { "type": "number" },
+        "accountBalance": { "type": "number" },
+        "lease": {
+          "type": "object",
+          "properties": {
+            "rent": { "type": "number" },
+            "startDate": { "type": "string", "format": "date" },
+            "paymentStatus": { "type": "string", "enum": ["Paid", "Pending", "Overdue"] }
+          }
+        }
+      },
+      "required": ["name", "email", "propertyId", "unitName", "residentType"]
+    },
+    "payment": {
+      "title": "Payment",
+      "description": "A financial transaction record.",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "type": { "type": "string", "enum": ["Rent", "Deposit", "ServiceCharge", "Water", "Other", "Adjustment", "Reversal"] },
+        "status": { "type": "string", "enum": ["Paid", "Pending", "Failed", "Voided"] },
+        "transactionId": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["M-Pesa", "Bank Transfer", "Card"] }
+      },
+      "required": ["tenantId", "amount", "date", "type", "status"]
     }
   },
   "auth": {
-    "providers": []
+    "providers": ["password"]
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": {
-        "$ref": "#/entities/userProfile"
-      },
+      "schema": { "$ref": "#/entities/userProfile" },
       "description": "Stores all user profiles."
     },
-    "/maintenanceRequests/{maintenanceRequestId}": {
-      "schema": {
-        "$ref": "#/entities/maintenanceRequest"
-      },
-      "description": "Stores all maintenance requests from tenants."
+    "/properties/{propertyId}": {
+      "schema": { "$ref": "#/entities/property" },
+      "description": "Stores building and unit details."
+    },
+    "/tenants/{tenantId}": {
+      "schema": { "$ref": "#/entities/tenant" },
+      "description": "Stores active resident records."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/payment" },
+      "description": "Stores all financial transactions."
+    },
+    "/maintenanceRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/maintenanceRequest" },
+      "description": "Stores maintenance issues."
     },
     "/noticesToVacate/{noticeId}": {
-      "schema": {
-        "$ref": "#/entities/noticeToVacate"
-      },
-      "description": "Stores all active and completed notices to vacate."
+      "schema": { "$ref": "#/entities/noticeToVacate" },
+      "description": "Stores move-out notices."
+    },
+    "/logs/{logId}": {
+      "schema": { "type": "object" },
+      "description": "Audit trail of system actions."
+    },
+    "/communications/{commId}": {
+      "schema": { "type": "object" },
+      "description": "History of sent messages."
+    },
+    "/waterReadings/{readingId}": {
+      "schema": { "type": "object" },
+      "description": "Water meter consumption records."
+    },
+    "/tasks/{taskId}": {
+      "schema": { "type": "object" },
+      "description": "Onboarding and administrative tasks."
+    },
+    "/propertyOwners/{ownerId}": {
+      "schema": { "type": "object" },
+      "description": "Contact info for client property owners."
+    },
+    "/landlords/{landlordId}": {
+      "schema": { "type": "object" },
+      "description": "Contact info for investor landlords."
+    },
+    "/archived_tenants/{tenantId}": {
+      "schema": { "$ref": "#/entities/tenant" },
+      "description": "Archive of former residents."
     }
   }
 }
