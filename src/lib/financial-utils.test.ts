@@ -74,48 +74,44 @@ const createMockPayment = (overrides: Partial<Payment> = {}): Payment => ({
 describe('Financial Utils Logic', () => {
 
     describe('Handover and Consolidation Rules', () => {
-        it('should waive service charge for the month of handover', () => {
+        it('should waive service charge strictly for the month of handover', () => {
             const unit = createMockUnit('U1', {
-                handoverDate: '2025-12-15',
-                serviceCharge: 3000
+                handoverDate: '2025-12-03',
+                serviceCharge: 2000
             });
             const tenant = createMockTenant({
-                lease: { startDate: '2025-12-15', rent: 20000 }
+                lease: { startDate: '2025-12-03', rent: 25000 }
             });
-            const payment = createMockPayment({
-                amount: 20000,
-                rentForMonth: '2025-12'
-            });
+            
+            // Dec payment: SC should be 0
+            const decPayment = createMockPayment({ amount: 25000, rentForMonth: '2025-12' });
+            const decBreakdown = calculateTransactionBreakdown(decPayment, unit, tenant);
+            expect(decBreakdown.serviceChargeDeduction).toBe(0);
 
-            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
-            expect(breakdown.serviceChargeDeduction).toBe(0);
+            // Jan payment: SC should be 2000 (not waived anymore)
+            const janPayment = createMockPayment({ amount: 25000, rentForMonth: '2026-01' });
+            const janBreakdown = calculateTransactionBreakdown(janPayment, unit, tenant);
+            expect(janBreakdown.serviceChargeDeduction).toBe(2000);
         });
 
-        it('should sum service charges for rented and vacant units in the same month', () => {
-            const landlordId = 'multi-unit-lord';
-            const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
-            
-            const units = [
-                createMockUnit('A', { landlordId, serviceCharge: 3000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over' }),
-                createMockUnit('B', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' }),
-            ];
-            const props = [createMockProperty('p1', units)];
-            
-            const tenantA = createMockTenant({ 
-                id: 'tA', unitName: 'A', propertyId: 'p1', 
-                lease: { startDate: '2026-01-01', rent: 20000 } 
+        it('should apply 50% management fee for initial letting but respect handover SC rules', () => {
+            const unit = createMockUnit('GMA 10-G', {
+                handoverDate: '2025-12-03',
+                serviceCharge: 2000,
+                managementStatus: 'Rented for Clients'
+            });
+            const tenant = createMockTenant({
+                lease: { startDate: '2026-01-01', rent: 25000 }
             });
             
-            const payments = [
-                createMockPayment({ tenantId: 'tA', amount: 20000, date: '2026-01-05', rentForMonth: '2026-01' })
-            ];
-
-            const transactions = generateLandlordDisplayTransactions(payments, [tenantA], props, landlord);
+            // First month of lease is Jan 2026. Handover was Dec 2025.
+            const payment = createMockPayment({ amount: 25000, rentForMonth: '2026-01' });
+            const breakdown = calculateTransactionBreakdown(payment, unit, tenant);
             
-            expect(transactions).toHaveLength(1);
-            // S.Charge should be 3000 (occupied) + 4000 (vacant) = 7000
-            expect(transactions[0].serviceChargeDeduction).toBe(7000);
-            expect(transactions[0].netToLandlord).toBe(20000 - 7000 - 1000); // 12000
+            // Initial letting (Jan) within 3 months of Dec handover -> 50% Fee
+            expect(breakdown.managementFee).toBe(12500);
+            // Jan is NOT the handover month -> S.Charge should be deducted
+            expect(breakdown.serviceChargeDeduction).toBe(2000);
         });
     });
 

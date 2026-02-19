@@ -21,6 +21,7 @@ export function calculateTransactionBreakdown(
     let serviceChargeDeduction = serviceCharge;
     
     // POLICY: Waive service charge for the month of handover (e.g. Dec handover -> Dec SC 0)
+    // This is the ONLY place where service charge is waived.
     if (unit?.handoverDate && payment.rentForMonth) {
         const hMonth = format(parseISO(unit.handoverDate), 'yyyy-MM');
         if (hMonth === payment.rentForMonth) {
@@ -49,9 +50,9 @@ export function calculateTransactionBreakdown(
     }
 
     if (isRentedForClients && isFirstMonthOfLease && isInitialLettingAfterHandover) {
-        // Initial letting month: 50% commission and waived service charge deduction
+        // Initial letting month: 50% commission. 
+        // Service charge is NOT automatically waived here anymore; it relies on the handover month check above.
         managementFee = unitRent * 0.50;
-        serviceChargeDeduction = 0;
     } else {
         // Standard processing for subsequent months or non-initial lettings
         if (unitRent > 0 && payment.type === 'Rent') {
@@ -59,7 +60,6 @@ export function calculateTransactionBreakdown(
             managementFee = (unitRent * standardManagementFeeRate) * rentRatio;
             
             // Apply service charge deduction pro-rated to the amount of rent paid
-            // Unless it's the very first month where we already waived or charged 50%
             serviceChargeDeduction = serviceChargeDeduction * rentRatio;
         } else {
             // No fees or deductions for non-rent types (deposits, etc)
