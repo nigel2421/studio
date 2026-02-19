@@ -94,6 +94,32 @@ describe('Financial Utils Logic', () => {
             expect(janBreakdown.serviceChargeDeduction).toBe(2000);
         });
 
+        it('should show units in handover month if rented, even if service charge is waived', () => {
+            const landlordId = 'lord-dec';
+            const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
+            const unit = createMockUnit('12-G', { 
+                landlordId, 
+                handoverDate: '2025-12-03', 
+                handoverStatus: 'Handed Over',
+                serviceCharge: 2000 
+            });
+            const props = [createMockProperty('p1', [unit])];
+            const tenant = createMockTenant({ 
+                id: 't1', unitName: '12-G', propertyId: 'p1', 
+                lease: { startDate: '2025-12-03', rent: 25000 } 
+            });
+            
+            const startDate = parseISO('2025-12-01');
+            const endDate = parseISO('2025-12-31');
+
+            const transactions = generateLandlordDisplayTransactions([], [tenant], props, landlord, startDate, endDate);
+            
+            expect(transactions).toHaveLength(1);
+            expect(transactions[0].rentForMonth).toBe('2025-12');
+            expect(transactions[0].serviceChargeDeduction).toBe(0); // Waived
+            expect(transactions[0].gross).toBe(0); // Status row
+        });
+
         it('should apply 50% management fee for initial letting but respect handover SC rules', () => {
             const unit = createMockUnit('GMA 10-G', {
                 handoverDate: '2025-12-03',

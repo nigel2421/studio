@@ -248,9 +248,9 @@ export function generateLandlordDisplayTransactions(
             if (reportedUnitsInMonth.has(u.name)) return; // Already reported via income
 
             // Unit was NOT reported via a payment for this month. 
-            // We must determine if it was billable/occupied to show its status.
+            // We must determine if it should be shown based on handover OR occupancy.
             
-            let isBillableInMonth = false;
+            let isBillableForServiceCharge = false;
             if (u.handoverStatus === 'Handed Over' && u.serviceCharge && u.serviceCharge > 0 && u.handoverDate) {
                 const hDate = parseISO(u.handoverDate);
                 if (isValid(hDate)) {
@@ -259,12 +259,10 @@ export function generateLandlordDisplayTransactions(
                     
                     // POLICY: Waive service charge for the month of handover
                     if (handoverMonthKey !== month && (isSameMonth(monthDate, handoverMonthStart) || isAfter(monthDate, handoverMonthStart))) {
-                        isBillableInMonth = true;
+                        isBillableForServiceCharge = true;
                     }
                 }
             }
-
-            if (!isBillableInMonth) return;
 
             const tenant = tenants.find(t => t.unitName === u.name && t.propertyId === u.propertyId);
             let isOccupiedInMonth = false;
@@ -275,8 +273,13 @@ export function generateLandlordDisplayTransactions(
                 }
             }
 
+            // A unit should appear in the month's report if:
+            // 1. It is occupied (to show rent status/arrears)
+            // 2. OR It is billable for service charge (handed over and not waived)
+            if (!isOccupiedInMonth && !isBillableForServiceCharge) return;
+
             // Injected status row for rented units without payment or vacant billable units
-            const scAmount = u.serviceCharge || 0;
+            const scAmount = isBillableForServiceCharge ? (u.serviceCharge || 0) : 0;
             
             monthTransactions.push({
                 id: `status-${month}-${u.name}`,

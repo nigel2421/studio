@@ -456,14 +456,16 @@ export const generateLandlordStatementPDF = (
         ['Other Costs (Transaction Fees)', `-${formatCurrency(summary.totalOtherCosts || 0)}`],
     ];
 
-    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`]);
+    if (summary.vacantUnitServiceChargeDeduction && summary.vacantUnitServiceChargeDeduction > 0) {
+        summaryData.push(['Service Charges (from Vacant Units)', `-${formatCurrency(summary.vacantUnitServiceChargeDeduction)}`]);
+    }
 
     summaryData.push(['Net Rent Payout', formatCurrency(summary.totalNetRemittance)]);
 
     autoTable(doc, {
         startY: yPos,
         body: summaryData,
-        theme: 'grid', // Gridlines for visual structure
+        theme: 'grid',
         styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
     });
@@ -498,7 +500,7 @@ export const generateLandlordStatementPDF = (
                 t.unitName,
                 t.forMonthDisplay,
                 formatCurrency(t.gross),
-                t.gross > 0 ? `-${formatCurrency(t.serviceChargeDeduction)}` : `-${formatCurrency(t.serviceChargeDeduction)}`,
+                `-${formatCurrency(t.serviceChargeDeduction)}`,
                 t.managementFee > 0 ? `-${formatCurrency(t.managementFee)}` : '',
                 t.otherCosts > 0 ? `-${formatCurrency(t.otherCosts)}` : '',
                 formatCurrency(t.netToLandlord)
@@ -519,7 +521,7 @@ export const generateLandlordStatementPDF = (
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
-        theme: 'grid', // Gridlines for visual structure
+        theme: 'grid',
         headStyles: { fillColor: [41, 102, 182] },
         columnStyles: {
             3: { halign: 'right' },
