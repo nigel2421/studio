@@ -18,6 +18,8 @@ import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setD
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
 import { format, startOfMonth, addMonths, parseISO } from "date-fns";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const WATER_RATE = 150; // Ksh per unit
 
@@ -60,52 +62,90 @@ export async function logActivity(action: string, userEmail?: string | null) {
     const user = auth.currentUser;
     if (!user && !userEmail) return;
 
-    try {
-        await addDoc(collection(db, 'logs'), {
-            userId: user?.uid || 'system',
-            userEmail: user?.email || userEmail || 'system',
-            action,
-            timestamp: new Date().toISOString(),
+    const activityData = {
+        userId: user?.uid || 'system',
+        userEmail: user?.email || userEmail || 'system',
+        action,
+        timestamp: new Date().toISOString(),
+    };
+
+    addDoc(collection(db, 'logs'), activityData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'logs',
+                    operation: 'create',
+                    requestResourceData: activityData,
+                }));
+            }
         });
-    } catch (error) {
-        // Error managed via UI or centralized listener
-    }
 }
 
 
 export async function logCommunication(data: Omit<Communication, 'id'>) {
-    try {
-        await addDoc(collection(db, 'communications'), {
-            ...data,
-            timestamp: new Date().toISOString(),
+    const commData = {
+        ...data,
+        timestamp: new Date().toISOString(),
+    };
+    addDoc(collection(db, 'communications'), commData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'communications',
+                    operation: 'create',
+                    requestResourceData: commData,
+                }));
+            }
         });
-    } catch (error) {
-        // Error managed via UI or centralized listener
-    }
 }
 
 
 async function getCollection<T>(collectionOrQuery: string | Query, queryConstraints: any[] = []): Promise<T[]> {
     let q: Query;
+    let path = 'unknown';
     if (typeof collectionOrQuery === 'string') {
+        path = collectionOrQuery;
         q = query(collection(db, collectionOrQuery), ...queryConstraints);
     } else {
         q = collectionOrQuery;
+        // Try to extract path from query object for context
+        path = (q as any)._query?.path?.segments?.join('/') || 'query';
     }
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => postToJSON<T>(doc));
+    
+    try {
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => postToJSON<T>(doc));
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path,
+                operation: 'list',
+            }));
+        }
+        throw serverError;
+    }
 }
 
 async function getDocument<T>(collectionName: string, id: string): Promise<T | null> {
     const docRef = doc(db, collectionName, id);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-        return postToJSON<T>(docSnap);
-    } else {
-        return null;
+    try {
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return postToJSON<T>(docSnap);
+        } else {
+            return null;
+        }
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: `${collectionName}/${id}`,
+                operation: 'get',
+            }));
+        }
+        throw serverError;
     }
 }
+
 async function getAllUsers(): Promise<UserProfile[]> {
     return cacheService.getOrFetch('users', 'all', () => getCollection<UserProfile>('users'), 300000);
 }
@@ -224,21 +264,22 @@ export async function getUsers(
 
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
-    try {
-        const userRef = doc(db, 'users', userId);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) throw new Error("User not found.");
-        const userEmail = userSnap.data().email;
-
-        await updateDoc(userRef, { role });
-        cacheService.clear('users');
-        await logActivity(`Updated role for user ${userEmail} to ${role}`);
-    } catch (error: any) {
-        if (error.code === 'permission-denied') {
-            throw new Error("You do not have permission to update user roles.");
-        }
-        throw new Error("A database error occurred while updating the user role.");
-    }
+    const userRef = doc(db, 'users', userId);
+    updateDoc(userRef, { role })
+        .then(() => {
+            cacheService.clear('users');
+            logActivity(`Updated role for user ID ${userId} to ${role}`);
+        })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `users/${userId}`,
+                    operation: 'update',
+                    requestResourceData: { role },
+                }));
+            }
+            throw serverError;
+        });
 }
 
 export async function getLogs(): Promise<Log[]> {
@@ -269,12 +310,20 @@ export async function getPaginatedCollection<T>(
     constraints.push(limit(options.pageSize));
 
     const q = query(collection(db, collectionName), ...constraints);
-    const querySnapshot = await getDocs(q);
-
-    const items = querySnapshot.docs.map(doc => postToJSON<T>(doc));
-    const lastDocId = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1].id : null;
-
-    return { items, lastDocId };
+    try {
+        const querySnapshot = await getDocs(q);
+        const items = querySnapshot.docs.map(doc => postToJSON<T>(doc));
+        const lastDocId = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1].id : null;
+        return { items, lastDocId };
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: collectionName,
+                operation: 'list',
+            }));
+        }
+        throw serverError;
+    }
 }
 
 
@@ -301,7 +350,8 @@ export async function getArchivedTenants(): Promise<ArchivedTenant[]> {
 }
 
 export async function getCommunications(): Promise<Communication[]> {
-    return getCollection<Communication>(query(collection(db, 'communications'), orderBy('timestamp', 'desc'), limit(50)));
+    const q = query(collection(db, 'communications'), orderBy('timestamp', 'desc'), limit(50));
+    return getCollection<Communication>(q);
 }
 
 
@@ -389,11 +439,21 @@ export async function getLatestWaterReading(propertyId: string, unitName: string
         orderBy('date', 'desc'),
         limit(1)
     );
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-        return null;
+    try {
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+            return null;
+        }
+        return postToJSON<WaterMeterReading>(querySnapshot.docs[0]);
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'waterReadings',
+                operation: 'list',
+            }));
+        }
+        throw serverError;
     }
-    return postToJSON<WaterMeterReading>(querySnapshot.docs[0]);
 }
 
 export async function getTenant(id: string): Promise<Tenant | null> {
@@ -466,17 +526,34 @@ export async function findOrCreateHomeownerTenant(owner: PropertyOwner, unit: Un
         userId: owner.userId,
     };
 
-    const tenantDocRef = await addDoc(tenantsRef, newTenantData);
+    const tenantDocRef = await addDoc(tenantsRef, newTenantData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'tenants',
+                    operation: 'create',
+                    requestResourceData: newTenantData,
+                }));
+            }
+            throw serverError;
+        });
+
     cacheService.clear('tenants');
-    await logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
+    logActivity(`Auto-created homeowner resident account for ${owner.name} for unit ${unit.name}`);
 
     if (owner.userId) {
         const userRef = doc(db, 'users', owner.userId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists() && !userSnap.data().tenantId) {
-            await updateDoc(userRef, { tenantId: tenantDocRef.id });
-            cacheService.clear('users');
-        }
+        updateDoc(userRef, { tenantId: tenantDocRef.id })
+            .catch(async (serverError: any) => {
+                if (serverError.code === 'permission-denied') {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: `users/${owner.userId}`,
+                        operation: 'update',
+                        requestResourceData: { tenantId: tenantDocRef.id },
+                    }));
+                }
+            });
+        cacheService.clear('users');
     }
 
     return { id: tenantDocRef.id, ...newTenantData } as Tenant;
@@ -554,31 +631,43 @@ export async function addTenant(data: {
         dueBalance: initialDue,
         accountBalance: 0,
     };
-    const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData);
+    
+    const tenantDocRef = await addDoc(collection(db, 'tenants'), newTenantData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'tenants',
+                    operation: 'create',
+                    requestResourceData: newTenantData,
+                }));
+            }
+            throw serverError;
+        });
 
     const totalInitialCharges = initialDue;
     const taskDescription = `Complete onboarding for ${name} in ${unitName}. An initial balance of Ksh ${totalInitialCharges.toLocaleString()} is pending. (Rent: ${rent}, Sec. Deposit: ${securityDeposit || 0}, Water Deposit: ${waterDeposit || 0})`;
 
-    const independentOperations = [
-        addTask({
-            title: `Onboard: ${name}`,
-            description: taskDescription,
-            status: 'Pending',
-            priority: 'High',
-            category: 'Financial',
-            tenantId: tenantDocRef.id,
-            propertyId,
-            unitName,
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
-        }),
-        logActivity(`Created tenant: ${name} (${email})`),
-        updateProperty(propertyId, {
-            units: property.units.map(u =>
-                u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
-            )
-        }),
-        logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`)
-    ];
+    addTask({
+        title: `Onboard: ${name}`,
+        description: taskDescription,
+        status: 'Pending',
+        priority: 'High',
+        category: 'Financial',
+        tenantId: tenantDocRef.id,
+        propertyId,
+        unitName,
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+    });
+    
+    logActivity(`Created tenant: ${name} (${email})`);
+    
+    updateProperty(propertyId, {
+        units: property.units.map(u =>
+            u.name === unitName ? { ...u, status: 'rented' as UnitStatus } : u
+        )
+    });
+    
+    logActivity(`Updated unit ${unitName} in property ${property.name} to 'rented'`);
 
     const createAuthUser = async () => {
         const appName = 'tenant-auth-worker';
@@ -604,7 +693,7 @@ export async function addTenant(data: {
         }
     };
 
-    await Promise.all([...independentOperations, createAuthUser()]);
+    createAuthUser();
     cacheService.clear('tenants');
     cacheService.clear('tasks');
 }
@@ -615,21 +704,48 @@ export async function addProperty(property: Omit<Property, 'id' | 'imageId'>): P
         imageId: `property-${Math.floor(Math.random() * 3) + 1}`,
     };
 
-    await addDoc(collection(db, "properties"), newPropertyData);
+    addDoc(collection(db, "properties"), newPropertyData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'properties',
+                    operation: 'create',
+                    requestResourceData: newPropertyData,
+                }));
+            }
+        });
     cacheService.clear('properties');
-    await logActivity(`Added new property: ${property.name}`);
+    logActivity(`Added new property: ${property.name}`);
 }
 
 export async function updateProperty(propertyId: string, data: Partial<Property>): Promise<void> {
     const propertyRef = doc(db, 'properties', propertyId);
-    await updateDoc(propertyRef, data);
+    updateDoc(propertyRef, data)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `properties/${propertyId}`,
+                    operation: 'update',
+                    requestResourceData: data,
+                }));
+            }
+        });
     cacheService.clear('properties');
-    await logActivity(`Updated property: ID ${propertyId}`);
+    logActivity(`Updated property: ID ${propertyId}`);
 }
 
 export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
     const landlordRef = doc(db, 'landlords', landlord.id);
-    await setDoc(landlordRef, landlord, { merge: true });
+    setDoc(landlordRef, landlord, { merge: true })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `landlords/${landlord.id}`,
+                    operation: 'write',
+                    requestResourceData: landlord,
+                }));
+            }
+        });
 
     const propertiesToUpdate = new Map<string, Unit[]>();
 
@@ -661,11 +777,18 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
         batch.update(doc(db, 'properties', propId), { units });
     });
 
-    await batch.commit();
+    batch.commit().catch(async (serverError: any) => {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'properties (batch)',
+                operation: 'update',
+            }));
+        }
+    });
 
     cacheService.clear('properties');
     cacheService.clear('landlords');
-    await logActivity(`Saved landlord: ${landlord.name}`);
+    logActivity(`Saved landlord: ${landlord.name}`);
 }
 
 
@@ -688,10 +811,17 @@ export async function addLandlordsFromCSV(landlords: { name: string; email: stri
         }
     }
 
-    await batch.commit();
+    batch.commit().catch(async (serverError: any) => {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'landlords (batch)',
+                operation: 'create',
+            }));
+        }
+    });
     if (added > 0) {
         cacheService.clear('landlords');
-        await logActivity(`Bulk-added ${added} new landlords via CSV.`);
+        logActivity(`Bulk-added ${added} new landlords via CSV.`);
     }
     return { added, skipped };
 }
@@ -753,8 +883,8 @@ export async function bulkUpdateUnitsFromCSV(propertyId: string, csvData: Record
     });
 
     if (updatedCount > 0 || createdCount > 0) {
-        await updateProperty(propertyId, { units: newUnitsArray });
-        await logActivity(`CSV Upload for ${property.name}: ${createdCount} created, ${updatedCount} updated.`);
+        updateProperty(propertyId, { units: newUnitsArray });
+        logActivity(`CSV Upload for ${property.name}: ${createdCount} created, ${updatedCount} updated.`);
     }
 
     return { updatedCount, createdCount, errors };
@@ -769,8 +899,7 @@ export async function archiveTenant(tenantId: string): Promise<void> {
         const batch = writeBatch(db);
         batch.set(archivedTenantRef, { ...tenant, archivedAt: new Date().toISOString(), status: 'archived' });
         batch.delete(tenantRef);
-        await batch.commit();
-
+        
         const propertyRef = doc(db, 'properties', tenant.propertyId);
         const propertySnap = await getDoc(propertyRef);
         if (propertySnap.exists()) {
@@ -778,22 +907,40 @@ export async function archiveTenant(tenantId: string): Promise<void> {
             const updatedUnits = propertyData.units.map(u =>
                 u.name === tenant.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
             );
-            await updateDoc(propertyRef, { units: updatedUnits });
+            batch.update(propertyRef, { units: updatedUnits });
         }
+
+        batch.commit().catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'archive (batch)',
+                    operation: 'write',
+                }));
+            }
+        });
 
         cacheService.clear('tenants');
         cacheService.clear('archived_tenants');
-        await logActivity(`Archived resident: ${tenant.name}`);
+        logActivity(`Archived resident: ${tenant.name}`);
     }
 }
 
 export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>): Promise<void> {
     const oldTenant = await getTenant(tenantId);
     const tenantRef = doc(db, 'tenants', tenantId);
-    await updateDoc(tenantRef, tenantData);
+    updateDoc(tenantRef, tenantData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `tenants/${tenantId}`,
+                    operation: 'update',
+                    requestResourceData: tenantData,
+                }));
+            }
+        });
     cacheService.clear('tenants');
 
-    await logActivity(`Updated tenant: ${tenantData.name || oldTenant?.name}`);
+    logActivity(`Updated tenant: ${tenantData.name || oldTenant?.name}`);
 
     if (oldTenant && (oldTenant.propertyId !== tenantData.propertyId || oldTenant.unitName !== tenantData.unitName)) {
         const oldPropRef = doc(db, 'properties', oldTenant.propertyId);
@@ -803,7 +950,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
             const updatedOldUnits = oldPropData.units.map(u =>
                 u.name === oldTenant.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
             );
-            await updateDoc(oldPropRef, { units: updatedOldUnits });
+            updateDoc(oldPropRef, { units: updatedOldUnits });
         }
 
         if (tenantData.propertyId && tenantData.unitName) {
@@ -814,7 +961,7 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
                 const updatedNewUnits = newPropData.units.map(u =>
                     u.name === tenantData.unitName ? { ...u, status: 'rented' as UnitStatus } : u
                 );
-                await updateDoc(newPropRef, { units: updatedNewUnits });
+                updateDoc(newPropRef, { units: updatedNewUnits });
             }
         }
     }
@@ -822,9 +969,18 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
 
 export async function updatePropertyOwner(ownerId: string, data: Partial<PropertyOwner>): Promise<void> {
     const ownerRef = doc(db, 'propertyOwners', ownerId);
-    await updateDoc(ownerRef, data);
+    updateDoc(ownerRef, data)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `propertyOwners/${ownerId}`,
+                    operation: 'update',
+                    requestResourceData: data,
+                }));
+            }
+        });
     cacheService.clear('propertyOwners');
-    await logActivity(`Updated property owner: ${data.name || ownerId}`);
+    logActivity(`Updated property owner: ${data.name || ownerId}`);
 }
 
 export async function deletePropertyOwner(ownerId: string): Promise<void> {
@@ -842,11 +998,18 @@ export async function deletePropertyOwner(ownerId: string): Promise<void> {
                 propertyOwnerId: deleteField()
             });
         }
-        await batch.commit();
+        batch.commit().catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'deletePropertyOwner (batch)',
+                    operation: 'write',
+                }));
+            }
+        });
 
         cacheService.clear('propertyOwners');
         cacheService.clear('users');
-        await logActivity(`Deleted property owner: ${ownerData.name}`);
+        logActivity(`Deleted property owner: ${ownerData.name}`);
     }
 }
 
@@ -886,90 +1049,130 @@ export async function deleteLandlord(landlordId: string): Promise<void> {
         batch.update(userRef, { role: 'viewer', landlordId: deleteField() });
     }
 
-    await batch.commit();
+    batch.commit().catch(async (serverError: any) => {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'deleteLandlord (batch)',
+                operation: 'write',
+            }));
+        }
+    });
     cacheService.clear('landlords');
     cacheService.clear('properties');
     cacheService.clear('users');
-    await logActivity(`Deleted landlord: ${landlordData.name}`);
+    logActivity(`Deleted landlord: ${landlordData.name}`);
 }
 
 export async function createUserProfile(userId: string, email: string, role: UserProfile['role'], details: Partial<UserProfile> = {}) {
     const userProfileRef = doc(db, 'users', userId);
-    await setDoc(userProfileRef, {
+    setDoc(userProfileRef, {
         email,
         role,
         ...details,
-    }, { merge: true });
+    }, { merge: true })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `users/${userId}`,
+                    operation: 'write',
+                    requestResourceData: { email, role, ...details },
+                }));
+            }
+        });
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
     return cacheService.getOrFetch('userProfiles', userId, async () => {
         const userProfileRef = doc(db, 'users', userId);
-        const docSnap = await getDoc(userProfileRef);
-        if (docSnap.exists()) {
-            const userProfile = postToJSON<UserProfile>(docSnap);
+        try {
+            const docSnap = await getDoc(userProfileRef);
+            if (docSnap.exists()) {
+                const userProfile = postToJSON<UserProfile>(docSnap);
 
-            if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
-                const tenantDetails = await getTenant(userProfile.tenantId);
-                userProfile.tenantDetails = tenantDetails ?? undefined;
+                if ((userProfile.role === 'tenant' || userProfile.role === 'homeowner') && userProfile.tenantId) {
+                    const tenantDetails = await getTenant(userProfile.tenantId);
+                    userProfile.tenantDetails = tenantDetails ?? undefined;
+                }
+                return userProfile;
             }
-            return userProfile;
+            return null;
+        } catch (serverError: any) {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `users/${userId}`,
+                    operation: 'get',
+                }));
+            }
+            throw serverError;
         }
-        return null;
     }, 60000);
 }
 
 
 export async function addMaintenanceRequest(request: Omit<MaintenanceRequest, 'id' | 'date' | 'createdAt' | 'updatedAt' | 'status'>) {
-    try {
-        const now = new Date().toISOString();
-        await addDoc(collection(db, 'maintenanceRequests'), {
-            ...request,
-            date: now,
-            createdAt: now,
-            updatedAt: now,
-            status: 'New',
+    const now = new Date().toISOString();
+    const maintData = {
+        ...request,
+        date: now,
+        createdAt: now,
+        updatedAt: now,
+        status: 'New',
+    };
+    addDoc(collection(db, 'maintenanceRequests'), maintData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'maintenanceRequests',
+                    operation: 'create',
+                    requestResourceData: maintData,
+                }));
+            }
         });
-        cacheService.clear('maintenanceRequests');
-        await logActivity(`Submitted maintenance request: "${request.title}"`);
-    } catch (error: any) {
-        throw new Error("Failed to submit maintenance request. Please try again later.");
-    }
+    cacheService.clear('maintenanceRequests');
+    logActivity(`Submitted maintenance request: "${request.title}"`);
 }
 
 export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceStatus) {
-    try {
-        const requestRef = doc(db, 'maintenanceRequests', requestId);
-        const updateData: { status: MaintenanceStatus, updatedAt: string, completedAt?: string } = {
-            status,
-            updatedAt: new Date().toISOString()
-        };
-        if (status === 'Completed' || status === 'Cancelled') {
-            updateData.completedAt = new Date().toISOString();
-        }
-        await updateDoc(requestRef, updateData);
-
-        cacheService.clear('maintenanceRequests');
-        await logActivity(`Updated maintenance request ${requestId} to ${status}`);
-    } catch (error: any) {
-        if (error.code === 'permission-denied') {
-            throw new Error("You do not have permission to update maintenance requests.");
-        }
-        throw new Error("A database error occurred while updating the request status.");
+    const requestRef = doc(db, 'maintenanceRequests', requestId);
+    const updateData: { status: MaintenanceStatus, updatedAt: string, completedAt?: string } = {
+        status,
+        updatedAt: new Date().toISOString()
+    };
+    if (status === 'Completed' || status === 'Cancelled') {
+        updateData.completedAt = new Date().toISOString();
     }
+    updateDoc(requestRef, updateData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `maintenanceRequests/${requestId}`,
+                    operation: 'update',
+                    requestResourceData: updateData,
+                }));
+            }
+        });
+
+    cacheService.clear('maintenanceRequests');
+    logActivity(`Updated maintenance request ${requestId} to ${status}`);
 }
 
 export async function addMaintenanceUpdate(requestId: string, update: MaintenanceUpdate) {
-    try {
-        const requestRef = doc(db, 'maintenanceRequests', requestId);
-        await updateDoc(requestRef, {
-            updates: arrayUnion(update),
-            updatedAt: new Date().toISOString()
+    const requestRef = doc(db, 'maintenanceRequests', requestId);
+    const updateData = {
+        updates: arrayUnion(update),
+        updatedAt: new Date().toISOString()
+    };
+    updateDoc(requestRef, updateData)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `maintenanceRequests/${requestId}`,
+                    operation: 'update',
+                    requestResourceData: updateData,
+                }));
+            }
         });
-        cacheService.clear('maintenanceRequests');
-    } catch (error: any) {
-        throw new Error("Failed to post response. Please try again.");
-    }
+    cacheService.clear('maintenanceRequests');
 }
 
 export async function getTenantMaintenanceRequests(tenantId: string): Promise<MaintenanceRequest[]> {
@@ -1045,26 +1248,46 @@ export async function addWaterMeterReading(data: {
     const consumption = currentReading - data.priorReading;
     const amount = consumption * WATER_RATE;
 
-    await addDoc(collection(db, 'waterReadings'), {
+    const readingPayload = {
         ...data,
         tenantId: originalTenant.id,
         consumption,
         rate: WATER_RATE,
         amount,
         createdAt: serverTimestamp(),
-        status: 'Pending',
-    });
+        status: 'Pending' as const,
+    };
+
+    addDoc(collection(db, 'waterReadings'), readingPayload)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'waterReadings',
+                    operation: 'create',
+                    requestResourceData: readingPayload,
+                }));
+            }
+        });
     cacheService.clear('waterReadings');
 
     const reconciliationUpdates = reconcileMonthlyBilling(tenantForReading, unit, asOfDate || new Date());
     
     if (Object.keys(reconciliationUpdates).length > 0) {
         const tenantRef = doc(db, 'tenants', originalTenant.id);
-        await updateDoc(tenantRef, reconciliationUpdates);
+        updateDoc(tenantRef, reconciliationUpdates)
+            .catch(async (serverError: any) => {
+                if (serverError.code === 'permission-denied') {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: `tenants/${originalTenant.id}`,
+                        operation: 'update',
+                        requestResourceData: reconciliationUpdates,
+                    }));
+                }
+            });
         cacheService.clear('tenants');
     }
 
-    await logActivity(`Added water reading for unit ${data.unitName}`);
+    logActivity(`Added water reading for unit ${data.unitName}`);
 }
 
 export async function addPayment(
@@ -1084,20 +1307,50 @@ export async function addPayment(
     if (!tenant) throw new Error("Tenant not found.");
     validatePayment(entry.amount, new Date(entry.date), tenant, entry.type);
 
-    const paymentDocRef = await addDoc(collection(db, 'payments'), {
+    const paymentPayload = {
         tenantId,
         ...entry,
-        status: 'Paid',
+        status: 'Paid' as const,
         createdAt: new Date().toISOString()
-    });
+    };
+
+    const paymentDocRef = await addDoc(collection(db, 'payments'), paymentPayload)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'payments',
+                    operation: 'create',
+                    requestResourceData: paymentPayload,
+                }));
+            }
+            throw serverError;
+        });
 
     const paymentUpdate = processPayment(tenant, entry.amount, entry.type, new Date(entry.date));
     const tenantRef = doc(db, 'tenants', tenantId);
-    await updateDoc(tenantRef, paymentUpdate);
+    updateDoc(tenantRef, paymentUpdate)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `tenants/${tenantId}`,
+                    operation: 'update',
+                    requestResourceData: paymentUpdate,
+                }));
+            }
+        });
 
     if (entry.type === 'Water' && entry.waterReadingId) {
         const readingRef = doc(db, 'waterReadings', entry.waterReadingId);
-        await updateDoc(readingRef, { status: 'Paid', paymentId: paymentDocRef.id });
+        updateDoc(readingRef, { status: 'Paid', paymentId: paymentDocRef.id })
+            .catch(async (serverError: any) => {
+                if (serverError.code === 'permission-denied') {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: `waterReadings/${entry.waterReadingId}`,
+                        operation: 'update',
+                        requestResourceData: { status: 'Paid', paymentId: paymentDocRef.id },
+                    }));
+                }
+            });
     }
 
     cacheService.clear('tenants');
@@ -1163,10 +1416,20 @@ export async function getPropertyWaterReadings(propertyId: string): Promise<Wate
             return getDocs(q);
         });
 
-        const snapshots = await Promise.all(fetchPromises);
-        return snapshots.flatMap(snapshot =>
-            snapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc))
-        );
+        try {
+            const snapshots = await Promise.all(fetchPromises);
+            return snapshots.flatMap(snapshot =>
+                snapshot.docs.map(doc => postToJSON<WaterMeterReading>(doc))
+            );
+        } catch (serverError: any) {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'waterReadings',
+                    operation: 'list',
+                }));
+            }
+            throw serverError;
+        }
     }, 120000);
 }
 
@@ -1242,7 +1505,6 @@ export async function batchProcessPayments(
 
             transaction.set(paymentDocRef, paymentPayload);
 
-            // processPayment only updates dueBalance if the type is NOT 'Water'
             const paymentProcessingUpdates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
 
             workingTenant = {
@@ -1271,16 +1533,29 @@ export async function batchProcessPayments(
         }
 
         transaction.update(tenantRef, finalUpdates);
+    }).catch(async (serverError: any) => {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'batchProcessPayments (transaction)',
+                operation: 'write',
+            }));
+        }
+        throw serverError;
     });
 
     if (taskId) {
-        try {
-            const taskRef = doc(db, 'tasks', taskId);
-            await updateDoc(taskRef, { status: 'Completed' });
-            await logActivity(`Completed task ${taskId} via payment.`);
-        } catch (error) {
-            // Error managed via UI or centralized listener
-        }
+        const taskRef = doc(db, 'tasks', taskId);
+        updateDoc(taskRef, { status: 'Completed' })
+            .catch(async (serverError: any) => {
+                if (serverError.code === 'permission-denied') {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: `tasks/${taskId}`,
+                        operation: 'update',
+                        requestResourceData: { status: 'Completed' },
+                    }));
+                }
+            });
+        logActivity(`Completed task ${taskId} via payment.`);
     }
 
     cacheService.clear('tenants');
@@ -1307,7 +1582,7 @@ export async function batchProcessPayments(
                         paymentMethod: entry.paymentMethod,
                         transactionId: entry.transactionId,
                     });
-                    await logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
+                    logActivity(`Sent payment receipt to ${tenant.name} (${tenant.email})`);
                 } catch (error) {
                     // Fail silently, managed by retry or UI centralized listener
                 }
@@ -1316,10 +1591,20 @@ export async function batchProcessPayments(
     }
 }
 export async function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
-    await addDoc(collection(db, 'tasks'), {
+    const taskPayload = {
         ...taskData,
         createdAt: new Date().toISOString(),
-    });
+    };
+    addDoc(collection(db, 'tasks'), taskPayload)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'tasks',
+                    operation: 'create',
+                    requestResourceData: taskPayload,
+                }));
+            }
+        });
     cacheService.clear('tasks');
 }
 
@@ -1347,13 +1632,24 @@ export async function updatePayment(
         },
     };
 
-    await updateDoc(paymentRef, {
+    const updatePayload = {
         ...data,
         editHistory: arrayUnion(editRecord),
-    });
+    };
+
+    updateDoc(paymentRef, updatePayload)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `payments/${paymentId}`,
+                    operation: 'update',
+                    requestResourceData: updatePayload,
+                }));
+            }
+        });
 
     cacheService.clear('payments');
-    await logActivity(`Edited payment ${paymentId}. Reason: ${reason}`, editorId);
+    logActivity(`Edited payment ${paymentId}. Reason: ${reason}`, editorId);
 }
 
 export async function forceRecalculateTenantBalance(tenantId: string): Promise<void> {
@@ -1369,14 +1665,25 @@ export async function forceRecalculateTenantBalance(tenantId: string): Promise<v
     const latestPayment = payments[0]; 
 
     const tenantRef = doc(db, 'tenants', tenantId);
-    await updateDoc(tenantRef, {
+    const updatePayload = {
         dueBalance: finalDueBalance,
         accountBalance: finalAccountBalance,
         'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: finalDueBalance }),
         'lease.lastPaymentDate': latestPayment ? latestPayment.date : tenant.lease.lastPaymentDate,
-    });
+    };
+
+    updateDoc(tenantRef, updatePayload)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `tenants/${tenantId}`,
+                    operation: 'update',
+                    requestResourceData: updatePayload,
+                }));
+            }
+        });
     cacheService.clear('tenants');
-    await logActivity(`Forced balance recalculation for tenant ${tenant.name}.`);
+    logActivity(`Forced balance recalculation for tenant ${tenant.name}.`);
 }
 
 
@@ -1387,17 +1694,31 @@ export function listenToTasks(callback: (tasks: Task[]) => void): () => void {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const tasks = querySnapshot.docs.map(doc => postToJSON<Task>(doc));
         callback(tasks);
-    }, (error) => {
-        // Error managed via UI or centralized listener
+    }, (serverError: any) => {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'tasks',
+                operation: 'list',
+            }));
+        }
     });
 
     return unsubscribe;
 }
 
 export async function addNoticeToVacate(notice: Omit<NoticeToVacate, 'id'>) {
-    await addDoc(collection(db, 'noticesToVacate'), notice);
+    addDoc(collection(db, 'noticesToVacate'), notice)
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'noticesToVacate',
+                    operation: 'create',
+                    requestResourceData: notice,
+                }));
+            }
+        });
     cacheService.clear('noticesToVacate');
-    await logActivity(`Submitted notice to vacate for ${notice.tenantName}`);
+    logActivity(`Submitted notice to vacate for ${notice.tenantName}`);
 }
 
 export async function getNoticesToVacate(): Promise<NoticeToVacate[]> {
@@ -1410,53 +1731,70 @@ export async function getNoticesToVacate(): Promise<NoticeToVacate[]> {
 export async function processOverdueNotices(editorId: string) {
     const today = new Date();
     const q = query(collection(db, 'noticesToVacate'), where('status', '==', 'Active'));
-    const snapshot = await getDocs(q);
-    const notices = snapshot.docs.map(doc => postToJSON<NoticeToVacate>(doc));
+    try {
+        const snapshot = await getDocs(q);
+        const notices = snapshot.docs.map(doc => postToJSON<NoticeToVacate>(doc));
 
-    let processedCount = 0;
-    let errorCount = 0;
-    const batch = writeBatch(db);
+        let processedCount = 0;
+        let errorCount = 0;
+        const batch = writeBatch(db);
 
-    for (const notice of notices) {
-        if (new Date(notice.scheduledMoveOutDate) < today) {
-            try {
-                const tenantRef = doc(db, 'tenants', notice.tenantId);
-                const tenantSnap = await getDoc(tenantRef);
-                if (tenantSnap.exists()) {
-                    const tenantData = tenantSnap.data() as Tenant;
-                    const archivedTenantRef = doc(db, 'archived_tenants', notice.tenantId);
-                    batch.set(archivedTenantRef, { ...tenantData, archivedAt: new Date().toISOString(), status: 'archived' });
-                    batch.delete(tenantRef);
+        for (const notice of notices) {
+            if (new Date(notice.scheduledMoveOutDate) < today) {
+                try {
+                    const tenantRef = doc(db, 'tenants', notice.tenantId);
+                    const tenantSnap = await getDoc(tenantRef);
+                    if (tenantSnap.exists()) {
+                        const tenantData = tenantSnap.data() as Tenant;
+                        const archivedTenantRef = doc(db, 'archived_tenants', notice.tenantId);
+                        batch.set(archivedTenantRef, { ...tenantData, archivedAt: new Date().toISOString(), status: 'archived' });
+                        batch.delete(tenantRef);
 
-                    const propertyRef = doc(db, 'properties', notice.propertyId);
-                    const propertySnap = await getDoc(propertyRef);
-                    if (propertySnap.exists()) {
-                        const propertyData = propertySnap.data() as Property;
-                        const updatedUnits = propertyData.units.map(u =>
-                            u.name === notice.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
-                        );
-                        batch.update(propertyRef, { units: updatedUnits });
+                        const propertyRef = doc(db, 'properties', notice.propertyId);
+                        const propertySnap = await getDoc(propertyRef);
+                        if (propertySnap.exists()) {
+                            const propertyData = propertySnap.data() as Property;
+                            const updatedUnits = propertyData.units.map(u =>
+                                u.name === notice.unitName ? { ...u, status: 'vacant' as UnitStatus } : u
+                            );
+                            batch.update(propertyRef, { units: updatedUnits });
+                        }
                     }
+
+                    const noticeRef = doc(db, 'noticesToVacate', notice.id);
+                    batch.update(noticeRef, { status: 'Completed' });
+
+                    logActivity(`Processed move-out for ${notice.tenantName} in unit ${notice.unitName}.`, editorId);
+                    processedCount++;
+                } catch (error) {
+                    errorCount++;
                 }
-
-                const noticeRef = doc(db, 'noticesToVacate', notice.id);
-                batch.update(noticeRef, { status: 'Completed' });
-
-                await logActivity(`Processed move-out for ${notice.tenantName} in unit ${notice.unitName}.`, editorId);
-                processedCount++;
-            } catch (error) {
-                errorCount++;
             }
         }
-    }
 
-    if (processedCount > 0) {
-        await batch.commit();
-        cacheService.clear('tenants');
-        cacheService.clear('archived_tenants');
-        cacheService.clear('properties');
-        cacheService.clear('noticesToVacate');
-    }
+        if (processedCount > 0) {
+            batch.commit().catch(async (serverError: any) => {
+                if (serverError.code === 'permission-denied') {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: 'processOverdueNotices (batch)',
+                        operation: 'write',
+                    }));
+                }
+            });
+            cacheService.clear('tenants');
+            cacheService.clear('archived_tenants');
+            cacheService.clear('properties');
+            cacheService.clear('noticesToVacate');
+        }
 
-    return { processedCount, errorCount };
+        return { processedCount, errorCount };
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'noticesToVacate',
+                operation: 'list',
+            }));
+        }
+        throw serverError;
+    }
 }
