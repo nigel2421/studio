@@ -17,7 +17,7 @@ import { PlusCircle, Loader2, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
-const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'Water', 'Adjustment', 'Other'];
+const allPaymentTypes: Payment['type'][] = ['Rent', 'Deposit', 'ServiceCharge', 'WaterDeposit', 'Adjustment', 'Other'];
 
 interface PaymentEntry {
   id: number;
@@ -119,16 +119,16 @@ export function AddPaymentDialog({
     switch (type) {
       case 'Rent': return (tenantInfo.lease?.rent || '').toString();
       case 'ServiceCharge': return (tenantInfo.lease?.serviceCharge || '').toString();
-      case 'Water': return (displayData.waterBalance || '').toString();
+      case 'WaterDeposit': return (tenantInfo.waterDeposit || '').toString();
       case 'Deposit': return (tenantInfo.securityDeposit || '').toString();
       default: return '';
     }
-  }, [displayData.waterBalance]);
+  }, []);
 
   useEffect(() => {
     if (open) {
         const type = defaultPaymentType || defaultEntryType;
-        let amount = (readingForPayment && type === 'Water') ? readingForPayment.amount.toString() : getDefaultAmount(type, tenantForDisplay);
+        let amount = (readingForPayment && type === 'WaterDeposit') ? readingForPayment.amount.toString() : getDefaultAmount(type, tenantForDisplay);
         const initialEntry: PaymentEntry = { id: Date.now(), amount, type, date: new Date(), rentForMonth: format(new Date(), 'yyyy-MM'), paymentMethod: 'M-Pesa', transactionId: '' };
         setPaymentEntries([initialEntry]);
         if (tenant) setSelectedProperty(tenant.propertyId);
@@ -180,7 +180,7 @@ export function AddPaymentDialog({
             transactionId: e.transactionId 
           };
           
-          if (e.type === 'Water' && readingForPayment) {
+          if (e.type === 'WaterDeposit' && readingForPayment) {
               entryData.waterReadingId = readingForPayment.id;
           }
           
@@ -227,14 +227,14 @@ export function AddPaymentDialog({
             )}
             <div className="space-y-2 pt-4">
               <div className="flex items-center justify-between"><Label>Payment Records</Label>
-                 <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Record</Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuLabel>Types</DropdownMenuLabel><DropdownMenuSeparator />{availablePaymentTypes.map(type => (<DropdownMenuItem key={type} onSelect={() => addEntry(type)}>{type}</DropdownMenuItem>))}</DropdownMenuContent></DropdownMenu>
+                 <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Record</Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuLabel>Types</DropdownMenuLabel><DropdownMenuSeparator />{availablePaymentTypes.map(type => (<DropdownMenuItem key={type} onSelect={() => addEntry(type)}>{type === 'WaterDeposit' ? 'Water Deposit' : type}</DropdownMenuItem>))}</DropdownMenuContent></DropdownMenu>
               </div>
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                 {paymentEntries.map((entry) => (
                   <div key={entry.id} className="p-3 border rounded-lg relative space-y-4">
                      {paymentEntries.length > 1 && (<Button type="button" variant="ghost" size="icon" onClick={() => setPaymentEntries(prev => prev.filter(e => e.id !== entry.id))} className="absolute top-1 right-1 h-6 w-6 z-10"><X className="h-4 w-4 text-muted-foreground" /></Button>)}
                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="space-y-1"><Label className="text-xs">Type</Label><Input value={entry.type} readOnly className="bg-muted font-medium" /></div>
+                        <div className="space-y-1"><Label className="text-xs">Type</Label><Input value={entry.type === 'WaterDeposit' ? 'Water Deposit' : entry.type} readOnly className="bg-muted font-medium" /></div>
                         <div className="space-y-1"><Label className="text-xs">Amount (Ksh)</Label><Input type="number" value={entry.amount} onChange={(e) => handleEntryChange(entry.id, 'amount', e.target.value)} required /></div>
                         <div className="space-y-1"><Label className="text-xs">Method</Label><Select value={entry.paymentMethod} onValueChange={(v) => handleEntryChange(entry.id, 'paymentMethod', v)}><SelectTrigger><SelectValue placeholder="Method" /></SelectTrigger><SelectContent>{paymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-1"><Label className="text-xs">Date</Label><DatePicker value={entry.date} onChange={(d) => d && handleEntryChange(entry.id, 'date', d)} /></div>

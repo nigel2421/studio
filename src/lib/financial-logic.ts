@@ -1,4 +1,3 @@
-
 import { Tenant, Payment, Unit, LedgerEntry, Property, PropertyOwner, Landlord, WaterMeterReading } from './types';
 import { format, isAfter, startOfMonth, addDays, getMonth, getYear, parseISO, isSameMonth, differenceInMonths, addMonths, isBefore, isValid } from 'date-fns';
 
@@ -53,15 +52,6 @@ export function getRecommendedPaymentStatus(tenant: { dueBalance?: number }, dat
 export function processPayment(tenant: Tenant, paymentAmount: number, paymentType: Payment['type'], paymentDate: Date = new Date()): { [key: string]: any } {
     let newDueBalance = tenant.dueBalance || 0;
     let newAccountBalance = tenant.accountBalance || 0;
-
-    if (paymentType === 'Water') {
-        return {
-            dueBalance: newDueBalance,
-            accountBalance: newAccountBalance,
-            'lease.paymentStatus': getRecommendedPaymentStatus({ dueBalance: newDueBalance }, paymentDate),
-            'lease.lastPaymentDate': format(paymentDate, 'yyyy-MM-dd')
-        };
-    }
 
     if (paymentType === 'Adjustment') {
         newDueBalance += paymentAmount;
@@ -326,8 +316,7 @@ export function generateLedger(
     }
 
     const paymentsToInclude = allTenantPayments.filter(p => {
-        if (p.type === 'Water') return !!finalOptions.includeWater;
-        if (p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent;
+        if (p.type === 'WaterDeposit' || p.type === 'Rent' || p.type === 'Deposit') return !!finalOptions.includeRent || !!finalOptions.includeWater;
         if (p.type === 'ServiceCharge') return !!finalOptions.includeServiceCharge;
         return (p.type === 'Adjustment' || p.type === 'Reversal') && !finalOptions.includeWater;
     });

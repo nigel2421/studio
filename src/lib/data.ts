@@ -432,7 +432,7 @@ export async function batchProcessPayments(tenantId: string, entries: any[], tas
                 createdAt: new Date().toISOString() 
             });
 
-            if (entry.type === 'Water' && entry.waterReadingId) tx.update(doc(db, 'waterReadings', entry.waterReadingId), { status: 'Paid', paymentId: payRef.id });
+            if (entry.type === 'WaterDeposit' && entry.waterReadingId) tx.update(doc(db, 'waterReadings', entry.waterReadingId), { status: 'Paid', paymentId: payRef.id });
             const updates = processPayment(workingTenant, entry.amount, entry.type, new Date(entry.date));
             Object.assign(workingTenant, updates);
         }

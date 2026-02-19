@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -324,7 +325,7 @@ export default function MegarackPage() {
             tenantId: primaryTenantId,
             amount: paymentData.amount,
             date: format(paymentData.date, 'yyyy-MM-dd'),
-            type: 'Water' as const,
+            type: 'WaterDeposit' as const,
             status: 'Paid' as const,
             paymentMethod: paymentData.paymentMethod,
             transactionId: paymentData.transactionId,
@@ -842,7 +843,7 @@ export default function MegarackPage() {
         properties={properties}
         tenants={tenants}
         onPaymentAdded={handlePaymentAdded}
-        defaultPaymentType="Water"
+        defaultPaymentType="WaterDeposit"
         allReadings={allReadings}
         readingForPayment={selectedReadingForPayment}
     />

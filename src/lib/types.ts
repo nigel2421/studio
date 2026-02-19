@@ -119,7 +119,7 @@ export type Payment = {
   tenantId: string;
   amount: number;
   date: string;
-  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'Water' | 'Other' | 'Adjustment' | 'Reversal';
+  type: 'Rent' | 'Deposit' | 'ServiceCharge' | 'WaterDeposit' | 'Other' | 'Adjustment' | 'Reversal';
   status: PaymentStatus;
   notes?: string;
   rentForMonth?: string;
