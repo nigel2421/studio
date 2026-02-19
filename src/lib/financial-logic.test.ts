@@ -63,15 +63,15 @@ describe('Financial Logic', () => {
     describe('generateLedger filtering', () => {
         it('should exclude water charges when includeWater is false', () => {
             const tenant = createMockTenant();
-            const waterReadings = [{ id: 'w1', amount: 1500, date: '2026-01-15' } as any];
+            const waterReadings = [{ id: 'w1', amount: 1500, date: '2026-01-15', tenantId: 'test-tenant', unitName: 'A1' } as any];
             const { ledger } = generateLedger(tenant, [], [], waterReadings, null, new Date(), { includeWater: false });
             expect(ledger.some(l => l.description.includes('Water Bill'))).toBe(false);
         });
 
         it('should include only water items when includeRent and includeServiceCharge are false', () => {
             const tenant = createMockTenant();
-            const payments = [{ id: 'p1', amount: 1500, type: 'Water', date: '2026-01-16' } as any];
-            const waterReadings = [{ id: 'w1', amount: 1500, date: '2026-01-15', unitName: 'A1' } as any];
+            const payments = [{ id: 'p1', amount: 1500, type: 'Water', date: '2026-01-16', tenantId: 'test-tenant' } as any];
+            const waterReadings = [{ id: 'w1', amount: 1500, date: '2026-01-15', unitName: 'A1', tenantId: 'test-tenant' } as any];
             
             const { ledger } = generateLedger(tenant, payments, [], waterReadings, null, new Date(), { 
                 includeRent: false, 

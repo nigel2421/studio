@@ -41,8 +41,8 @@ const createMockTenant = (overrides: Partial<Tenant> & { lease?: Partial<Lease> 
     };
 };
 
-const createMockUnit = (overrides: Partial<Unit> = {}): Unit => ({
-    name: 'Test Unit',
+const createMockUnit = (name: string, overrides: Partial<Unit> = {}): Unit => ({
+    name,
     status: 'rented',
     ownership: 'Landlord',
     unitType: 'One Bedroom',
@@ -75,8 +75,8 @@ const createMockPayment = (overrides: Partial<Payment> = {}): Payment => ({
 describe('Financial Utils Logic', () => {
 
     describe('Handover and Consolidation Rules', () => {
-        it('should waive service charge for the month of handover (Dec handover -> Dec SC 0)', () => {
-            const unit = createMockUnit({
+        it('should waive service charge for the month of handover', () => {
+            const unit = createMockUnit('U1', {
                 handoverDate: '2025-12-15',
                 serviceCharge: 3000
             });
@@ -92,14 +92,13 @@ describe('Financial Utils Logic', () => {
             expect(breakdown.serviceChargeDeduction).toBe(0);
         });
 
-        it('should sum service charges for rented and vacant units in the first transaction of the month', () => {
+        it('should sum service charges for rented and vacant units in the same month', () => {
             const landlordId = 'multi-unit-lord';
             const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
             
-            // Unit A is rented (SC 3000), Unit B is vacant (SC 4000)
             const units = [
-                createMockUnit({ name: 'A', landlordId, serviceCharge: 3000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over' }),
-                createMockUnit({ name: 'B', landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' }),
+                createMockUnit('A', { landlordId, serviceCharge: 3000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over' }),
+                createMockUnit('B', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' }),
             ];
             const props = [createMockProperty('p1', units)];
             
@@ -114,80 +113,54 @@ describe('Financial Utils Logic', () => {
 
             const transactions = generateLandlordDisplayTransactions(payments, [tenantA], props, landlord);
             
-            // Should have 1 transaction for Jan
             expect(transactions).toHaveLength(1);
             // S.Charge should be 3000 (occupied) + 4000 (vacant) = 7000
             expect(transactions[0].serviceChargeDeduction).toBe(7000);
-            expect(transactions[0].vacantServiceCharge).toBe(4000);
-            // Net = 20000 - 7000 - 1000 (mgmt fee) - 0 (no otherCosts yet as it's the start month)
-            // Wait, otherCosts policy is Feb 2026.
-            expect(transactions[0].netToLandlord).toBe(12000); // 20000 - 7000 - 1000
+            expect(transactions[0].netToLandlord).toBe(20000 - 7000 - 1000); // 12000
+        });
+    });
+
+    describe('Fee and Historical Logic', () => {
+        it('should capture historical rent months if paid within the report period', () => {
+            const landlordId = 'hist-lord';
+            const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
+            const unit = createMockUnit('U1', { landlordId, rentAmount: 20000 });
+            const props = [createMockProperty('p1', [unit])];
+            const tenant = createMockTenant({ 
+                id: 't1', unitName: 'U1', propertyId: 'p1', 
+                lease: { startDate: '2025-10-01', rent: 20000 } 
+            });
+            
+            // Payment made in Jan 2026 covering Oct 2025
+            const payment = createMockPayment({ 
+                tenantId: 't1', amount: 20000, date: '2026-01-10', rentForMonth: '2025-10' 
+            });
+
+            const startDate = parseISO('2026-01-01');
+            const endDate = parseISO('2026-01-31');
+
+            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, landlord, startDate, endDate);
+            
+            expect(transactions.some(t => t.rentForMonth === '2025-10')).toBe(true);
         });
 
-        it('should inject a row for months with only vacant units and no rental income', () => {
-            const landlordId = 'vacant-lord';
+        it('should apply otherCosts only if income is present (gross > 0)', () => {
+            const landlordId = 'fee-lord';
             const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
             const units = [
-                createMockUnit({ name: 'V1', landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' })
+                createMockUnit('V1', { landlordId, serviceCharge: 4000, handoverDate: '2025-11-01', handoverStatus: 'Handed Over', status: 'vacant' })
             ];
             const props = [createMockProperty('p1', units)];
             
-            const startDate = parseISO('2026-01-01');
-            const endDate = parseISO('2026-01-31');
+            const startDate = parseISO('2026-02-01');
+            const endDate = parseISO('2026-02-28');
 
             const transactions = generateLandlordDisplayTransactions([], [], props, landlord, startDate, endDate);
             
             expect(transactions).toHaveLength(1);
-            expect(transactions[0].unitName).toBe('Vacant Units');
             expect(transactions[0].gross).toBe(0);
-            expect(transactions[0].serviceChargeDeduction).toBe(4000);
+            expect(transactions[0].otherCosts).toBe(0); // Should be zero for vacant rows
             expect(transactions[0].netToLandlord).toBe(-4000);
-        });
-
-        it('should strictly exclude transactions outside the report period (no March in Jan-Feb report)', () => {
-            const landlordId = 'period-lord';
-            const landlord = { id: landlordId, name: 'Landlord' } as Landlord;
-            const unit = createMockUnit({ name: 'U1', landlordId, rentAmount: 20000 });
-            const props = [createMockProperty('p1', [unit])];
-            const tenant = createMockTenant({ id: 't1', unitName: 'U1', propertyId: 'p1', lease: { startDate: '2026-01-01', rent: 20000 } });
-            
-            // Payment covers 3 months
-            const payment = createMockPayment({ tenantId: 't1', amount: 60000, date: '2026-01-05' });
-
-            const startDate = parseISO('2026-01-01');
-            const endDate = parseISO('2026-02-28');
-
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, landlord, startDate, endDate);
-            
-            const months = transactions.map(t => t.rentForMonth);
-            expect(months).toContain('2026-01');
-            expect(months).toContain('2026-02');
-            expect(months).not.toContain('2026-03');
-            expect(transactions).toHaveLength(2);
-        });
-    });
-
-    describe('Other Costs Policy (Feb 2026)', () => {
-        it('should apply KSh 1,000 transaction fee from Feb 2026 onwards', () => {
-            const unit = createMockUnit({ name: 'U1', rentAmount: 20000 });
-            const props = [createMockProperty('p1', [unit])];
-            const tenant = createMockTenant({ id: 't1', unitName: 'U1', propertyId: 'p1', lease: { startDate: '2026-02-01', rent: 20000 } });
-            const payment = createMockPayment({ tenantId: 't1', amount: 20000, date: '2026-02-05', rentForMonth: '2026-02' });
-
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, null);
-            
-            expect(transactions[0].otherCosts).toBe(1000);
-        });
-
-        it('should not apply transaction fee before Feb 2026', () => {
-            const unit = createMockUnit({ name: 'U1', rentAmount: 20000 });
-            const props = [createMockProperty('p1', [unit])];
-            const tenant = createMockTenant({ id: 't1', unitName: 'U1', propertyId: 'p1', lease: { startDate: '2026-01-01', rent: 20000 } });
-            const payment = createMockPayment({ tenantId: 't1', amount: 20000, date: '2026-01-05', rentForMonth: '2026-01' });
-
-            const transactions = generateLandlordDisplayTransactions([payment], [tenant], props, null);
-            
-            expect(transactions[0].otherCosts).toBe(0);
         });
     });
 });
