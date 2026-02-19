@@ -51,7 +51,6 @@ export function calculateTransactionBreakdown(
 
     if (isRentedForClients && isFirstMonthOfLease && isInitialLettingAfterHandover) {
         // Initial letting month: 50% commission. 
-        // Service charge is NOT automatically waived here anymore; it relies on the handover month check above.
         managementFee = unitRent * 0.50;
     } else {
         // Standard processing for subsequent months or non-initial lettings
@@ -173,23 +172,30 @@ export function generateLandlordDisplayTransactions(
         let remainingAmount = payment.amount;
         if (remainingAmount <= 0 || unitRent <= 0) return;
 
-        let monthIndex = tenantMonthTracker.get(tenant.id) || 0;
-        const leaseStartDate = parseISO(tenant.lease.startDate);
+        // Respect explicit rentForMonth if provided, otherwise use sequential tracker
+        let currentMonth: Date;
+        if (payment.rentForMonth && isValid(parseISO(payment.rentForMonth + '-01'))) {
+            currentMonth = parseISO(payment.rentForMonth + '-01');
+        } else {
+            let monthIndex = tenantMonthTracker.get(tenant.id) || 0;
+            const leaseStartDate = parseISO(tenant.lease.startDate);
+            currentMonth = addMonths(leaseStartDate, monthIndex);
+        }
 
-        while (remainingAmount >= unitRent && monthIndex < 24) { 
+        while (remainingAmount >= unitRent) { 
             const rentForThisIteration = unitRent;
-            const currentMonth = addMonths(leaseStartDate, monthIndex);
+            const monthKey = format(currentMonth, 'yyyy-MM');
             
-            const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: format(currentMonth, 'yyyy-MM'), type: 'Rent' };
+            const virtualPayment: Payment = { ...payment, amount: rentForThisIteration, rentForMonth: monthKey, type: 'Rent' };
             const breakdown = calculateTransactionBreakdown(virtualPayment, unit, tenant);
             
             transactions.push({
-                id: `${payment.id}-${monthIndex}`,
+                id: `${payment.id}-${currentMonth.getTime()}`,
                 date: payment.date,
                 propertyId: tenant.propertyId,
                 unitName: tenant.unitName,
                 unitType: unit?.unitType || 'N/A',
-                rentForMonth: format(currentMonth, 'yyyy-MM'),
+                rentForMonth: monthKey,
                 forMonthDisplay: format(currentMonth, 'MMM yyyy'),
                 netToLandlord: breakdown.netToLandlord,
                 gross: breakdown.gross,
@@ -201,9 +207,15 @@ export function generateLandlordDisplayTransactions(
             });
             
             remainingAmount -= rentForThisIteration;
-            monthIndex++;
+            currentMonth = addMonths(currentMonth, 1);
         }
-        tenantMonthTracker.set(tenant.id, monthIndex);
+        
+        // Update tracker based on total rent paid to date
+        const totalRentExpectedPerMonth = unitRent;
+        const totalPaymentsSoFar = sortedPayments
+            .filter(p => p.tenantId === tenant.id && p.type === 'Rent' && new Date(p.date) <= new Date(payment.date))
+            .reduce((sum, p) => sum + p.amount, 0);
+        tenantMonthTracker.set(tenant.id, Math.floor(totalPaymentsSoFar / totalRentExpectedPerMonth));
     });
 
     // Group by month to inject status rows for all units

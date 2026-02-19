@@ -30,7 +30,7 @@ export default function UniversalOwnerDashboardPage() {
     const [isStatementOpen, setIsStatementOpen] = useState(false);
     const { startLoading: startPdfLoading, stopLoading: stopPdfLoading, isLoading: isPdfGenerating } = useLoading();
 
-    // Default to showing 12 months of history so November/October units are visible
+    // Default to showing 12 months of history to capture older lease starts
     const [startDate, setStartDate] = useState<Date | undefined>(subMonths(new Date(), 12));
     const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 

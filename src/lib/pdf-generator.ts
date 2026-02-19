@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -464,7 +463,7 @@ export const generateLandlordStatementPDF = (
     autoTable(doc, {
         startY: yPos,
         body: summaryData,
-        theme: 'plain',
+        theme: 'grid', // Gridlines for visual structure
         styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
     });
@@ -499,8 +498,8 @@ export const generateLandlordStatementPDF = (
                 t.unitName,
                 t.forMonthDisplay,
                 formatCurrency(t.gross),
-                `-${formatCurrency(t.serviceChargeDeduction)}`,
-                `-${formatCurrency(t.managementFee)}`,
+                t.gross > 0 ? `-${formatCurrency(t.serviceChargeDeduction)}` : `-${formatCurrency(t.serviceChargeDeduction)}`,
+                t.managementFee > 0 ? `-${formatCurrency(t.managementFee)}` : '',
                 t.otherCosts > 0 ? `-${formatCurrency(t.otherCosts)}` : '',
                 formatCurrency(t.netToLandlord)
             ]);
@@ -514,14 +513,13 @@ export const generateLandlordStatementPDF = (
         foot: [[
             { content: 'Totals', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalRent), styles: { fontStyle: 'bold', halign: 'right' } },
-            // Table footer sums up the total SC (Occupied + Vacant) distributed across rows
             { content: `-${formatCurrency(summary.totalServiceCharges + (summary.vacantUnitServiceChargeDeduction || 0))}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalManagementFees)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: `-${formatCurrency(summary.totalOtherCosts)}`, styles: { fontStyle: 'bold', halign: 'right' } },
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
-        theme: 'striped',
+        theme: 'grid', // Gridlines for visual structure
         headStyles: { fillColor: [41, 102, 182] },
         columnStyles: {
             3: { halign: 'right' },
