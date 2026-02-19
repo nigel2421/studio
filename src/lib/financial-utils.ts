@@ -86,7 +86,7 @@ export function aggregateFinancials(
     landlord?: Landlord | null
 ): FinancialSummary {
     // Filter transactions to strictly match the report logic:
-    // 1. Show all income rows (gross > 0) that were generated (they are pre-filtered by payment date)
+    // 1. Show all income rows (gross > 0) that were generated
     // 2. Filter status rows (gross === 0) to stay within the range
     const transactions = allTransactions.filter(t => {
         if (!startDate || !endDate) return true;
@@ -97,7 +97,7 @@ export function aggregateFinancials(
         if (isAfter(rentMonthDate, endDate) && !isSameMonth(rentMonthDate, endDate)) return false;
 
         // For rows with actual income, we allow them even if the rent month is before the range
-        // (because the payment itself was received within the range)
+        // (because the payment itself was received within the range OR it's specifically for a month in range)
         if (t.gross > 0) return true;
 
         // For status rows (Vacant/Unpaid), strictly adhere to the range
@@ -150,10 +150,24 @@ export function generateLandlordDisplayTransactions(
 
     const tenantMap = new Map(tenants.map(t => [t.id, t]));
 
+    // Updated Filter Logic: Include payments received in range OR covering months in range
     const filteredPayments = payments.filter(p => {
         if (!startDate || !endDate) return true;
         const paymentDate = parseISO(p.date);
-        return isWithinInterval(paymentDate, { start: startDate, end: endDate });
+        const inDateRange = isWithinInterval(paymentDate, { start: startDate, end: endDate });
+        
+        let inMonthRange = false;
+        if (p.rentForMonth) {
+            const rentMonthDate = parseISO(p.rentForMonth + '-01');
+            if (isValid(rentMonthDate)) {
+                const s = startOfMonth(startDate);
+                const e = startOfMonth(endDate);
+                inMonthRange = (isSameMonth(rentMonthDate, s) || isAfter(rentMonthDate, s)) &&
+                               (isSameMonth(rentMonthDate, e) || isBefore(rentMonthDate, e));
+            }
+        }
+        
+        return inDateRange || inMonthRange;
     });
 
     let transactions: DisplayTransaction[] = [];

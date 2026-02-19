@@ -465,7 +465,7 @@ export const generateLandlordStatementPDF = (
     autoTable(doc, {
         startY: yPos,
         body: summaryData,
-        theme: 'grid',
+        theme: 'grid', // Keeps full gridlines for summary as requested
         styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3 } },
         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
     });
@@ -500,7 +500,7 @@ export const generateLandlordStatementPDF = (
                 t.unitName,
                 t.forMonthDisplay,
                 formatCurrency(t.gross),
-                `-${formatCurrency(t.serviceChargeDeduction)}`,
+                t.serviceChargeDeduction > 0 ? `-${formatCurrency(t.serviceChargeDeduction)}` : formatCurrency(0),
                 t.managementFee > 0 ? `-${formatCurrency(t.managementFee)}` : '',
                 t.otherCosts > 0 ? `-${formatCurrency(t.otherCosts)}` : '',
                 formatCurrency(t.netToLandlord)
@@ -521,8 +521,9 @@ export const generateLandlordStatementPDF = (
             { content: formatCurrency(summary.totalNetRemittance), styles: { fontStyle: 'bold', halign: 'right' } }
         ]],
         footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
-        theme: 'grid',
-        headStyles: { fillColor: [41, 102, 182] },
+        theme: 'striped', // Striped background for horizontal clarity
+        styles: { fontSize: 8, cellPadding: 2, lineWidth: 0 }, // No horizontal borders
+        headStyles: { fillColor: [41, 102, 182], textColor: [255, 255, 255], lineWidth: 0 },
         columnStyles: {
             3: { halign: 'right' },
             4: { halign: 'right' },
@@ -530,6 +531,24 @@ export const generateLandlordStatementPDF = (
             6: { halign: 'right' },
             7: { halign: 'right' },
         },
+        didDrawCell: (data) => {
+            // Logic to draw vertical lines only
+            if (data.section === 'body' || data.section === 'head' || data.section === 'foot') {
+                doc.setDrawColor(200);
+                doc.setLineWidth(0.1);
+                
+                // Draw right line for every cell except the last one in the row
+                if (data.column.index < data.table.columns.length - 1) {
+                    const x = data.cell.x + data.cell.width;
+                    doc.line(x, data.cell.y, x, data.cell.y + data.cell.height);
+                }
+                
+                // Draw left line for the very first cell
+                if (data.column.index === 0) {
+                    doc.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+                }
+            }
+        }
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
