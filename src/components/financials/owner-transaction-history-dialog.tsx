@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -15,7 +16,7 @@ import { performSendServiceChargeInvoice } from '@/app/actions';
 import { InvoicePreviewDialog } from './invoice-preview-dialog';
 import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
-import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
+import { EditPaymentDialog, type EditFormValues } from './edit-payment-dialog';
 import { getPaymentHistory, updatePayment, forceRecalculateTenantBalance, getTenantWaterReadings, getAllWaterReadings } from '@/lib/data';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -55,46 +56,51 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
         setIsLoading(true);
 
         const fetchLedger = async () => {
-            const associatedTenants = (owner?.userId 
-                ? allTenants.filter(t => t.residentType === 'Homeowner' && t.userId === owner.userId) 
-                : allTenants.filter(t => t.residentType === 'Homeowner' && t.email === owner.email)
-            );
-            const uniqueTenants = Array.from(new Map(associatedTenants.map(t => [t.id, t])).values());
-            
-            let primaryTenant: Tenant | undefined = uniqueTenants[0];
-    
-            if (uniqueTenants.length > 0) {
-                const associatedTenantIds = uniqueTenants.map(t => t.id);
-                const [paymentsQuery, waterQuery] = await Promise.all([
-                    getDocs(query(collection(db, 'payments'), where('tenantId', 'in', associatedTenantIds))),
-                    getDocs(query(collection(db, 'waterReadings'), where('tenantId', 'in', associatedTenantIds)))
-                ]);
-                const currentTenantPayments = paymentsQuery.docs.map(d => ({ id: d.id, ...d.data() }) as Payment);
-                const currentTenantWaterReadings = waterQuery.docs.map(d => ({ id: d.id, ...d.data() }) as WaterMeterReading);
-
-                setTenantPayments(currentTenantPayments);
-    
-                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant!, currentTenantPayments, allProperties, currentTenantWaterReadings, owner, undefined, { includeWater: false });
+            try {
+                const associatedTenants = (owner?.userId 
+                    ? allTenants.filter(t => t.residentType === 'Homeowner' && t.userId === owner.userId) 
+                    : allTenants.filter(t => t.residentType === 'Homeowner' && t.email === owner.email)
+                );
+                const uniqueTenants = Array.from(new Map(associatedTenants.map(t => [t.id, t])).values());
                 
-                setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                setFinalDueBalance(dueBalance);
-            } else {
-                const dummyTenant: Tenant = {
-                    id: `dummy-${owner.id}`,
-                    name: owner.name,
-                    email: owner.email,
-                    phone: owner.phone,
-                    idNumber: 'N/A',
-                    residentType: 'Homeowner',
-                    lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Paid', serviceCharge: 0 },
-                    propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
-                };
-                primaryTenant = dummyTenant;
-                const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, [], owner, undefined, { includeWater: false });
-                setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                setFinalDueBalance(dueBalance);
+                let primaryTenant: Tenant | undefined = uniqueTenants[0];
+        
+                if (uniqueTenants.length > 0) {
+                    const associatedTenantIds = uniqueTenants.map(t => t.id);
+                    const [paymentsQuery, waterQuery] = await Promise.all([
+                        getDocs(query(collection(db, 'payments'), where('tenantId', 'in', associatedTenantIds))),
+                        getDocs(query(collection(db, 'waterReadings'), where('tenantId', 'in', associatedTenantIds)))
+                    ]);
+                    const currentTenantPayments = paymentsQuery.docs.map(d => ({ id: d.id, ...d.data() }) as Payment);
+                    const currentTenantWaterReadings = waterQuery.docs.map(d => ({ id: d.id, ...d.data() }) as WaterMeterReading);
+
+                    setTenantPayments(currentTenantPayments);
+        
+                    const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(primaryTenant!, currentTenantPayments, allProperties, currentTenantWaterReadings, owner, undefined, { includeWater: false });
+                    
+                    setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setFinalDueBalance(dueBalance);
+                } else {
+                    const dummyTenant: Tenant = {
+                        id: `dummy-${owner.id}`,
+                        name: owner.name,
+                        email: owner.email,
+                        phone: owner.phone,
+                        idNumber: 'N/A',
+                        residentType: 'Homeowner',
+                        lease: { startDate: '2000-01-01', endDate: '2099-12-31', rent: 0, paymentStatus: 'Paid', serviceCharge: 0 },
+                        propertyId: '', unitName: '', agent: 'Susan', status: 'active', securityDeposit: 0, waterDeposit: 0, accountBalance: 0, dueBalance: 0
+                    };
+                    primaryTenant = dummyTenant;
+                    const { ledger: generatedLedger, finalDueBalance: dueBalance } = generateLedger(dummyTenant, [], allProperties, [], owner, undefined, { includeWater: false });
+                    setLedger(generatedLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    setFinalDueBalance(dueBalance);
+                }
+            } catch (error) {
+                console.error("Error loading owner ledger:", error);
+            } finally {
+                setIsLoading(false);
             }
-            setIsLoading(false);
         }
 
         fetchLedger();
@@ -121,11 +127,15 @@ export function OwnerTransactionHistoryDialog({ owner, open, onOpenChange, allPr
             return;
         }
 
-        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
-        await forceRecalculateTenantBalance(tenant.id);
-        toast({ title: "Payment Updated", description: "The transaction has been successfully updated."});
-        if (onDataChange) {
-            onDataChange();
+        try {
+            await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
+            await forceRecalculateTenantBalance(tenant.id);
+            toast({ title: "Payment Updated", description: "The transaction has been successfully updated."});
+            if (onDataChange) {
+                onDataChange();
+            }
+        } catch (error) {
+            console.error("Failed to save edited payment:", error);
         }
     };
 

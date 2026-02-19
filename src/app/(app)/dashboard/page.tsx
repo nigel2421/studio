@@ -35,12 +35,14 @@ export default function DashboardPage() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            // Optimization: Fetch the list of properties first to determine the active ID
             const props = await getProperties();
             setAllProperties(props);
 
             const activePropId = propertyId || props[0]?.id;
             
             if (activePropId) {
+                // Optimization: Fetch all property-specific data in parallel
                 const [propDetails, propTenants, propMaint] = await Promise.all([
                     getProperty(activePropId),
                     getTenants({ propertyId: activePropId }),
@@ -52,9 +54,14 @@ export default function DashboardPage() {
                     setTenants(propTenants);
                     setMaintenanceRequests(propMaint);
 
+                    // Fetch payments only after tenants are loaded
                     const tenantIds = propTenants.map(t => t.id);
-                    const propPayments = await getPaymentsForTenants(tenantIds);
-                    setPayments(propPayments);
+                    if (tenantIds.length > 0) {
+                        const propPayments = await getPaymentsForTenants(tenantIds);
+                        setPayments(propPayments);
+                    } else {
+                        setPayments([]);
+                    }
                 }
             }
         } catch (error) {

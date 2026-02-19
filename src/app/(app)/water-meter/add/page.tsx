@@ -22,7 +22,7 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddPaymentDialog } from '@/components/financials/add-payment-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { EditPaymentDialog, EditFormValues } from '@/components/financials/edit-payment-dialog';
+import { EditPaymentDialog, type EditFormValues } from '@/components/financials/edit-payment-dialog';
 import { doc, updateDoc, writeBatch, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ConfirmOwnerWaterPaymentDialog } from '@/components/financials/confirm-owner-water-payment-dialog';
@@ -49,6 +49,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface WaterReadingRecord extends WaterMeterReading {
@@ -126,31 +127,36 @@ export default function MegarackPage() {
   // Combined data fetching
   const fetchData = async () => {
         setLoadingRecords(true);
-        const [propsData, tenantsData, landlordsData, ownersData] = await Promise.all([
-            getProperties(true),
-            getTenants(),
-            getLandlords(),
-            getPropertyOwners()
-        ]);
-        setProperties(propsData);
-        setTenants(tenantsData);
-        setAllLandlords(landlordsData);
-        setAllOwners(ownersData);
+        try {
+            const [propsData, tenantsData, landlordsData, ownersData] = await Promise.all([
+                getProperties(true),
+                getTenants(),
+                getLandlords(),
+                getPropertyOwners()
+            ]);
+            setProperties(propsData);
+            setTenants(tenantsData);
+            setAllLandlords(landlordsData);
+            setAllOwners(ownersData);
 
-        const allReadingsData = (await Promise.all(propsData.map(p => getPropertyWaterReadings(p.id))))
-            .flat()
-            .map(reading => {
-                const tenant = tenantsData.find(t => t.id === reading.tenantId);
-                const property = propsData.find(p => p.id === reading.propertyId);
-                return {
-                    ...reading,
-                    tenantName: tenant?.name || 'N/A',
-                    propertyName: property?.name || 'N/A',
-                };
-            });
-        
-        setAllReadings(allReadingsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        setLoadingRecords(false);
+            const allReadingsData = (await Promise.all(propsData.map(p => getPropertyWaterReadings(p.id))))
+                .flat()
+                .map(reading => {
+                    const tenant = tenantsData.find(t => t.id === reading.tenantId);
+                    const property = propsData.find(p => p.id === reading.propertyId);
+                    return {
+                        ...reading,
+                        tenantName: tenant?.name || 'N/A',
+                        propertyName: property?.name || 'N/A',
+                    };
+                });
+            
+            setAllReadings(allReadingsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        } catch (error) {
+            console.error("Failed to fetch megarack data:", error);
+        } finally {
+            setLoadingRecords(false);
+        }
     }
 
   useEffect(() => {
@@ -161,7 +167,7 @@ export default function MegarackPage() {
     if (loadingRecords) return;
 
     // Process Owner Bills
-    const ownerByUnitMap = new Map<string, PropertyOwner>();
+    const ownerByUnitMap = new Map<string, PropertyOwner | Landlord>();
     allOwners.forEach(o => {
         o.assignedUnits?.forEach(au => {
             au.unitNames.forEach(unitName => {
@@ -316,8 +322,10 @@ export default function MegarackPage() {
     try {
         const batch = writeBatch(db);
         let amountToAllocate = paymentData.amount;
-        const readingsToPay = selectedOwnerBill.readings.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const readingsToPay = [...selectedOwnerBill.readings].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
+        if (readingsToPay.length === 0) return;
+
         // Create one main payment record for the consolidated amount
         const primaryTenantId = readingsToPay[0].tenantId;
         const mainPaymentRef = doc(collection(db, 'payments'));
@@ -340,8 +348,6 @@ export default function MegarackPage() {
                 batch.update(readingRef, { status: 'Paid', paymentId: mainPaymentRef.id });
                 amountToAllocate -= reading.amount;
             } else {
-                // Handle partial payment if necessary, for now we assume full payment of oldest bills
-                console.warn(`Partial payment detected. Not enough funds to cover bill for unit ${reading.unitName} dated ${reading.date}.`);
                 break;
             }
         }
@@ -386,7 +392,10 @@ export default function MegarackPage() {
   };
 
   const handleSaveEdit = async (paymentId: string, data: EditFormValues) => {
-    if (!userProfile?.id || !selectedPayment?.tenantId) return;
+    if (!userProfile?.id || !selectedPayment?.tenantId) {
+        toast({ variant: 'destructive', title: 'Profile Error', description: 'Could not identify your user profile.' });
+        return;
+    }
 
     startLoading('Updating payment record...');
     try {
@@ -473,7 +482,6 @@ export default function MegarackPage() {
         const tenantPayments = await getPaymentHistory(tenant.id);
         const tenantWaterReadings = allReadings.filter(r => r.tenantId === tenant.id);
         
-        // Pass context 'megarack' to use Mega Rack branding and filter for water only
         generateTenantStatementPDF(tenant, tenantPayments, properties, tenantWaterReadings, 'megarack');
 
         toast({ title: 'Statement Generated', description: `Water Statement for ${tenant.name} downloaded.` });

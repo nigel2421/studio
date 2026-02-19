@@ -13,7 +13,7 @@ import { format, parseISO } from 'date-fns';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { generateLedger } from '@/lib/financial-logic';
 import { useAuth } from '@/hooks/useAuth';
-import { EditPaymentDialog, EditFormValues } from './edit-payment-dialog';
+import { EditPaymentDialog, type EditFormValues } from './edit-payment-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -75,12 +75,20 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
     };
     
     const handleSaveEdit = async (paymentId: string, data: EditFormValues) => {
-        if (!userProfile?.id || !tenant?.id) return;
-        await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
-        await forceRecalculateTenantBalance(tenant.id);
-        toast({ title: "Payment Updated" });
-        onPaymentAdded();
-        fetchAndSetLedger();
+        if (!userProfile?.id || !tenant?.id) {
+            toast({ variant: 'destructive', title: 'Profile Error', description: 'Could not identify your user profile.' });
+            return;
+        }
+        
+        try {
+            await updatePayment(paymentId, { amount: data.amount, date: format(data.date, 'yyyy-MM-dd') }, data.reason, userProfile.id);
+            await forceRecalculateTenantBalance(tenant.id);
+            toast({ title: "Payment Updated" });
+            onPaymentAdded();
+            fetchAndSetLedger();
+        } catch (error) {
+            console.error("Failed to save edited payment:", error);
+        }
     };
 
     const paginatedLedger = ledger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -88,10 +96,14 @@ export function TransactionHistoryDialog({ tenant, open, onOpenChange, onPayment
 
     const handleDownloadPDF = async () => {
         if (!tenant) return;
-        const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
-        const fullHistory = await getPaymentHistory(tenant.id);
-        const readings = await getTenantWaterReadings(tenant.id);
-        generateTenantStatementPDF(tenant, fullHistory, allProperties, readings, 'rent');
+        try {
+            const { generateTenantStatementPDF } = await import('@/lib/pdf-generator');
+            const fullHistory = await getPaymentHistory(tenant.id);
+            const readings = await getTenantWaterReadings(tenant.id);
+            generateTenantStatementPDF(tenant, fullHistory, allProperties, readings, 'rent');
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+        }
     };
 
     if (!tenant) return null;
