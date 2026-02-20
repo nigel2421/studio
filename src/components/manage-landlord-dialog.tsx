@@ -34,7 +34,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const { isLoading, startLoading, stopLoading } = useLoading();
@@ -54,7 +55,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         setName(landlord.name || '');
         setEmail(landlord.email || '');
         setPhone(landlord.phone || '');
-        setBankAccount(landlord.bankAccount || '');
+        setBankName(landlord.bankName || '');
+        setBankAccountNumber(landlord.bankAccountNumber || '');
         // Pre-select units already assigned to this landlord
         const currentlyAssigned = allLandlordOwnedUnits
           .filter(u => u.landlordId === landlord.id)
@@ -65,7 +67,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         setName('');
         setEmail('');
         setPhone('');
-        setBankAccount('');
+        setBankName('');
+        setBankAccountNumber('');
         setSelectedUnits([]);
       }
       setUnitSearchTerm('');
@@ -109,7 +112,8 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
         name,
         email,
         phone,
-        bankAccount,
+        bankName,
+        bankAccountNumber,
         userId: landlord?.userId,
       };
       await onSave(landlordData, selectedUnits);
@@ -145,9 +149,15 @@ export function ManageLandlordDialog({ isOpen, onClose, landlord, properties, al
                 <Label htmlFor="landlord-email">Email</Label>
                 <Input id="landlord-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-            <div className="grid gap-2">
-              <Label htmlFor="bank-account">Bank Account Details</Label>
-              <Input id="bank-account" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="bank-name">Bank Name</Label>
+                <Input id="bank-name" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. NCBA" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="bank-account-number">Account Number</Label>
+                <Input id="bank-account-number" value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="e.g. 123456789" />
+              </div>
             </div>
 
             <div className="grid gap-4 pt-2">

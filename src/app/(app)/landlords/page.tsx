@@ -6,7 +6,7 @@ import { getLandlords, getProperties, addOrUpdateLandlord, getTenants, getAllPay
 import type { Landlord, Property, Unit, Tenant, Payment } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LandlordCsvUploader } from '@/components/landlord-csv-uploader';
-import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2, Trash, Users } from 'lucide-react';
+import { Building, Building2, PlusCircle, Edit, ExternalLink, Search, FileDown, Loader2, Users2, Trash, Users, Landmark, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ManageLandlordDialog } from '@/components/manage-landlord-dialog';
@@ -27,7 +27,8 @@ const SOIL_MERCHANTS_LANDLORD: Landlord = {
   name: 'Soil Merchants',
   email: 'internal@eracov.com',
   phone: 'N/A',
-  bankAccount: 'Internal Account',
+  bankName: 'Internal',
+  bankAccountNumber: 'Internal Account',
 };
 
 
@@ -454,10 +455,26 @@ export default function LandlordsPage() {
                       <Card key={landlord.id} className="flex flex-col">
                         <CardHeader>
                            <div className="flex justify-between items-start">
-                            <div>
+                            <div className="space-y-1">
                               <CardTitle>{landlord.name}</CardTitle>
                               <CardDescription>{landlord.email}</CardDescription>
                               <CardDescription>{landlord.phone}</CardDescription>
+                              {(landlord.bankName || landlord.bankAccountNumber) && (
+                                <div className="pt-2 border-t mt-2 space-y-1">
+                                  {landlord.bankName && (
+                                    <div className="flex items-center text-xs text-muted-foreground font-medium">
+                                      <Landmark className="mr-1.5 h-3 w-3" />
+                                      {landlord.bankName}
+                                    </div>
+                                  )}
+                                  {landlord.bankAccountNumber && (
+                                    <div className="flex items-center text-xs text-muted-foreground font-medium">
+                                      <CreditCard className="mr-1.5 h-3 w-3" />
+                                      {landlord.bankAccountNumber}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center">
                                 {!isInvestmentConsultant && (

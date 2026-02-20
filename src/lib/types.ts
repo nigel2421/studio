@@ -237,6 +237,8 @@ export type Landlord = {
   name: string;
   email: string;
   phone: string;
+  bankName?: string;
+  bankAccountNumber?: string;
   bankAccount?: string;
   userId?: string;
 };
