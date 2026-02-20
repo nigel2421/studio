@@ -13,7 +13,7 @@ export function calculateTransactionBreakdown(
     unit: Unit | undefined,
     tenant: Tenant | undefined
 ) {
-    const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+    const unitRent = tenant?.lease?.rent || unit?.rentAmount || 0;
     const serviceCharge = unit?.serviceCharge || tenant?.lease?.serviceCharge || 0;
     const grossAmount = payment.amount || 0;
     
@@ -160,7 +160,7 @@ export function generateLandlordDisplayTransactions(
         if (!tenant || payment.type !== 'Rent') return;
 
         const unit = unitMap.get(`${tenant.propertyId}-${tenant.unitName}`);
-        const unitRent = unit?.rentAmount || tenant?.lease?.rent || 0;
+        const unitRent = tenant?.lease?.rent || unit?.rentAmount || 0;
         let remainingAmount = payment.amount;
         if (remainingAmount <= 0 || unitRent <= 0) return;
 

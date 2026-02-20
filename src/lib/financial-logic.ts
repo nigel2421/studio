@@ -323,7 +323,8 @@ export function generateLedger(
 
     const allPaymentsAndAdjustments = paymentsToInclude.map(p => {
         const isAdjustment = p.type === 'Adjustment';
-        let details = p.notes || `Payment Received`;
+        const typeLabel = p.type === 'Rent' ? 'Payment' : `${p.type.replace(/([A-Z])/g, ' $1').trim()} Payment`;
+        let details = p.notes || `${typeLabel} Received`;
         if (p.paymentMethod) details += ` (${p.paymentMethod}${p.transactionId ? `: ${p.transactionId}` : ''})`;
         return { id: p.id, date: safeParseDate(p.date), description: details, charge: isAdjustment && p.amount > 0 ? p.amount : 0, payment: !isAdjustment ? p.amount : (isAdjustment && p.amount < 0 ? Math.abs(p.amount) : 0), forMonth: p.rentForMonth ? format(parseISO(p.rentForMonth + '-02'), 'MMM yyyy') : undefined, status: p.status };
     });

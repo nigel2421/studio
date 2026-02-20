@@ -318,7 +318,7 @@ export async function batchProcessPayments(tenantId: string, entries: any[], tas
     
     let workingTenant = { id: tenantSnap.id, ...tenantSnap.data() } as Tenant;
     const prop = await getProperty(workingTenant.propertyId);
-    const unit = prop?.units.find(u => u.name === workingTenant.unitName);
+    const unit = prop?.units?.find(u => u.name === workingTenant.unitName);
 
     await runTransaction(db, async (tx) => {
         const recon = reconcileMonthlyBilling(workingTenant, unit, new Date());
