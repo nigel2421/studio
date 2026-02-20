@@ -1,3 +1,4 @@
+
 // Import all exports from data.ts to allow spying
 import {
     getUsers,
@@ -9,7 +10,6 @@ import {
     getPropertyOwners,
     getTenant,
     getPaymentHistory,
-    getTenantWaterReadings,
     batchProcessPayments
 } from './data';
 import { cacheService } from './cache'; 
@@ -17,6 +17,7 @@ import { cacheService } from './cache';
 // Import types for mock data
 import { Landlord, Property, PropertyOwner, UserProfile, Unit, Payment, Tenant } from './types';
 import { runTransaction } from 'firebase/firestore';
+import { format } from 'date-fns';
 
 // Mock the entire 'firebase/firestore' module
 jest.mock('firebase/firestore', () => ({
@@ -58,13 +59,19 @@ describe('Data Logic in `data.ts`', () => {
     describe('batchProcessPayments with WaterDeposit', () => {
         it('should correctly process multiple payments including WaterDeposit', async () => {
             const tenantId = 't1';
+            // We provide a complete lease mock to prevent reconcileMonthlyBilling from adding unexpected charges
             const mockTenant = { 
                 id: tenantId, 
                 dueBalance: 25000, 
                 accountBalance: 0, 
                 propertyId: 'p1', 
                 unitName: 'A1',
-                lease: { rent: 20000, paymentStatus: 'Overdue' }
+                lease: { 
+                    rent: 20000, 
+                    paymentStatus: 'Overdue',
+                    startDate: '2020-01-01',
+                    lastBilledPeriod: format(new Date(), 'yyyy-MM') // Already billed for this period
+                }
             };
             
             mockGetDoc.mockResolvedValue({ 
@@ -74,8 +81,8 @@ describe('Data Logic in `data.ts`', () => {
             });
 
             const entries = [
-                { amount: 20000, date: '2026-01-05', type: 'Rent', paymentMethod: 'M-Pesa', transactionId: 'TX1' },
-                { amount: 5000, date: '2026-01-05', type: 'WaterDeposit', paymentMethod: 'M-Pesa', transactionId: 'TX2' }
+                { amount: 20000, date: format(new Date(), 'yyyy-MM-dd'), type: 'Rent', paymentMethod: 'M-Pesa', transactionId: 'TX1' },
+                { amount: 5000, date: format(new Date(), 'yyyy-MM-dd'), type: 'WaterDeposit', paymentMethod: 'M-Pesa', transactionId: 'TX2' }
             ];
 
             const mockTx = {

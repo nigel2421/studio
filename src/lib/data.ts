@@ -1,3 +1,4 @@
+
 'use client';
 
 import { initializeApp, getApp } from "firebase/app";
@@ -421,12 +422,11 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
 export async function getUsers(options: { searchQuery?: string; roleFilters?: UserRole[]; page?: number; pageSize?: number; } = {}): Promise<{ users: UserProfile[]; totalCount: number }> {
     const { searchQuery = '', roleFilters = [], page = 1, pageSize = 10 } = options;
-    const [allUsers, properties, landlords, propertyOwners] = await Promise.all([
-        getCollection<UserProfile>('users'), 
-        getProperties(), 
-        getLandlords(), 
-        getPropertyOwners()
-    ]);
+    
+    const allUsers = await cacheService.getOrFetch('userProfiles', 'all-users', () => getCollection<UserProfile>('users'), 300000);
+    const properties = await getProperties();
+    const landlords = await getLandlords();
+    const propertyOwners = await getPropertyOwners();
     
     const investorIds = new Set<string>();
     const clientIds = new Set<string>();
