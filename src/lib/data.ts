@@ -8,13 +8,13 @@ import {
     ArchivedTenant, MaintenanceRequest, UserProfile, Log, Landlord,
     UserRole, UnitStatus, PropertyOwner, FinancialDocument, ServiceChargeStatement, Communication, Task, UnitType,
     unitStatuses, ownershipTypes, unitTypes, managementStatuses, handoverStatuses, UnitOrientation, unitOrientations, Agent,
-    NoticeToVacate, MaintenanceStatus, MaintenanceUpdate, OwnershipType, ManagementStatus, HandoverStatus
+    NoticeToVacate, MaintenanceStatus, MaintenanceUpdate, OwnershipType, ManagementStatus, HandoverStatus, PaymentStatus
 } from './types';
 import { db, firebaseConfig, sendPaymentReceipt } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, where, setDoc, serverTimestamp, arrayUnion, writeBatch, orderBy, deleteDoc, limit, onSnapshot, runTransaction, collectionGroup, deleteField, startAfter, DocumentSnapshot, Query, documentId } from 'firebase/firestore';
 import { auth } from './firebase';
 import { reconcileMonthlyBilling, processPayment, validatePayment, getRecommendedPaymentStatus, generateLedger } from './financial-logic';
-import { format, startOfMonth, addMonths, parseISO } from "date-fns";
+import { format, startOfMonth, addMonths, parseISO, isValid } from "date-fns";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
@@ -48,7 +48,7 @@ function postToJSON<T>(doc: DocumentSnapshot): T {
  * Helper to remove undefined fields from data objects before Firestore writes.
  * Firestore does not support undefined values.
  */
-function sanitizeData(data: any) {
+export function sanitizeData(data: any) {
     if (typeof data !== 'object' || data === null) return data;
     const sanitized = { ...data };
     Object.keys(sanitized).forEach(key => {
@@ -225,6 +225,10 @@ export async function getPaymentHistory(tenantId: string): Promise<Payment[]> {
     }, 60000);
 }
 
+export async function getPayment(id: string): Promise<Payment | null> {
+    return cacheService.getOrFetch('payments', id, () => getDocument<Payment>('payments', id), 60000);
+}
+
 export async function getMaintenanceRequests(options: { propertyId?: string } = {}): Promise<MaintenanceRequest[]> {
     const { propertyId } = options;
     const cacheKey = propertyId ? `prop-${propertyId}-last90` : 'all';
@@ -236,7 +240,40 @@ export async function getMaintenanceRequests(options: { propertyId?: string } = 
     }, 60000);
 }
 
+export async function getTenantWaterReadings(tenantId: string): Promise<WaterMeterReading[]> {
+    return cacheService.getOrFetch('waterReadings', `tenant-${tenantId}`, () => {
+        const q = query(collection(db, 'waterReadings'), where('tenantId', '==', tenantId), orderBy('date', 'desc'));
+        return getCollection<WaterMeterReading>(q);
+    }, 60000);
+}
+
 // --- Data Modification Functions ---
+
+export async function addPayment(tenantId: string, payment: any): Promise<void> {
+    const payRef = doc(collection(db, 'payments'));
+    const paymentData = sanitizeData({
+        ...payment,
+        tenantId,
+        status: 'Paid' as const,
+        createdAt: new Date().toISOString()
+    });
+    
+    setDoc(payRef, paymentData)
+        .then(() => {
+            cacheService.clear('payments');
+            logActivity(`Added payment for tenant ${tenantId}`);
+            forceRecalculateTenantBalance(tenantId);
+        })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: payRef.path,
+                    operation: 'create',
+                    requestResourceData: paymentData,
+                }));
+            }
+        });
+}
 
 export async function updatePayment(paymentId: string, data: Partial<Payment>, reason: string, editorId: string): Promise<void> {
     const paymentRef = doc(db, 'payments', paymentId);
@@ -553,6 +590,25 @@ export async function updateProperty(propertyId: string, data: Partial<Property>
     cacheService.clear('properties');
 }
 
+export async function updateTenant(tenantId: string, data: Partial<Tenant>): Promise<void> {
+    const tenantRef = doc(db, 'tenants', tenantId);
+    const sanitizedData = sanitizeData(data);
+    updateDoc(tenantRef, sanitizedData)
+        .then(() => {
+            cacheService.clear('tenants');
+            logActivity(`Updated tenant ${tenantId}`);
+        })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: tenantRef.path,
+                    operation: 'update',
+                    requestResourceData: sanitizedData
+                }));
+            }
+        });
+}
+
 export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames: string[]): Promise<void> {
     const landlordRef = doc(db, 'landlords', landlord.id);
     const sanitizedLandlord = sanitizeData(landlord);
@@ -583,6 +639,25 @@ export async function addOrUpdateLandlord(landlord: Landlord, assignedUnitNames:
     batch.commit().catch(() => {});
     cacheService.clear('properties');
     cacheService.clear('landlords');
+}
+
+export async function updatePropertyOwner(ownerId: string, data: Partial<PropertyOwner>): Promise<void> {
+    const ownerRef = doc(db, 'propertyOwners', ownerId);
+    const sanitizedData = sanitizeData(data);
+    updateDoc(ownerRef, sanitizedData)
+        .then(() => {
+            cacheService.clear('propertyOwners');
+            logActivity(`Updated property owner ${ownerId}`);
+        })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: ownerRef.path,
+                    operation: 'update',
+                    requestResourceData: sanitizedData
+                }));
+            }
+        });
 }
 
 export async function deletePropertyOwner(ownerId: string): Promise<void> {
@@ -626,6 +701,25 @@ export async function createUserProfile(userId: string, email: string, role: Use
             }));
         }
     });
+}
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+    const userRef = doc(db, 'users', userId);
+    const updateData = { role };
+    updateDoc(userRef, updateData)
+        .then(() => {
+            cacheService.clear('userProfiles');
+            logActivity(`Updated user role for ${userId} to ${role}`);
+        })
+        .catch(async (serverError: any) => {
+            if (serverError.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: userRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
+            }
+        });
 }
 
 export async function updateMaintenanceRequestStatus(requestId: string, status: MaintenanceStatus) {
